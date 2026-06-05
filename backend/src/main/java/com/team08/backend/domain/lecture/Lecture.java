@@ -1,6 +1,6 @@
-package org.example.backend.domain.lecture;
+package com.team08.backend.domain.lecture;
 
-import org.example.backend.domain.chapter.Chapter;
+import com.team08.backend.domain.chapter.Chapter;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -10,10 +10,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity

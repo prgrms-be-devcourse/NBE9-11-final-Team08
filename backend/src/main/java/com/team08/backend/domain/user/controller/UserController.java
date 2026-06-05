@@ -1,7 +1,7 @@
-package org.example.backend.domain.user.controller;
+package com.team08.backend.domain.user.controller;
 
-import org.example.backend.domain.user.dto.LoginUserDto;
-import org.example.backend.global.auth.principal.LoginUserPrincipal;
+import com.team08.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;

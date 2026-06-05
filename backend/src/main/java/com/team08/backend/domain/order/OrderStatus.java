@@ -1,4 +1,4 @@
-package org.example.backend.domain.order;
+package com.team08.backend.domain.order;
 
 public enum OrderStatus {
     PENDING_PAYMENT,

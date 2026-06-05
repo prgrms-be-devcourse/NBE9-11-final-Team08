@@ -1,4 +1,4 @@
-package org.example.backend.domain.course;
+package com.team08.backend.domain.course;
 
 public enum CourseStatus {
     DRAFT,

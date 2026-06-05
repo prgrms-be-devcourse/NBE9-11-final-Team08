@@ -1,11 +1,11 @@
-package org.example.backend.global.auth.filter;
+package com.team08.backend.global.auth.filter;
 
+import com.team08.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.backend.domain.user.dto.LoginUserDto;
-import org.example.backend.global.auth.principal.LoginUserPrincipal;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
