@@ -1,5 +1,6 @@
-package org.example.backend.global.auth.principal;
+package com.team08.backend.global.auth.principal;
 
-import org.example.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 
-public record LoginUserPrincipal(LoginUserDto user) {}
+public record LoginUserPrincipal(LoginUserDto user) {
+}

@@ -1,4 +1,4 @@
-package org.example.backend.domain.payment;
+package com.team08.backend.domain.payment;
 
 public enum PaymentStatus {
     READY,

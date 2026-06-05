@@ -1,7 +1,7 @@
-package org.example.backend.domain.course;
+package com.team08.backend.domain.course;
 
-import org.example.backend.domain.category.Category;
-import org.example.backend.domain.user.User;
+import com.team08.backend.domain.category.Category;
+import com.team08.backend.domain.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,10 +14,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity

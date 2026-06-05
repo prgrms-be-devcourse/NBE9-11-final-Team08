@@ -1,6 +1,6 @@
-package org.example.backend.global.auth.config;
+package com.team08.backend.global.auth.config;
 
-import org.example.backend.global.auth.filter.MockLoginUserFilter;
+import com.team08.backend.global.auth.filter.MockLoginUserFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

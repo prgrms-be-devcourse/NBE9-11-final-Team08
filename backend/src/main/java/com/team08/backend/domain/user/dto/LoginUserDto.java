@@ -1,4 +1,4 @@
-package org.example.backend.domain.user.dto;
+package com.team08.backend.domain.user.dto;
 
 public record LoginUserDto(
     Long id,
