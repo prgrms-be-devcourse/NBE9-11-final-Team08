@@ -1,9 +1,17 @@
 HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+
+# Backend Gradle
+backend/.gradle/
+backend/build/
+
+!backend/gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
 
 ### STS ###
 .apt_generated
