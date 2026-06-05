@@ -1,0 +1,614 @@
+// =====================================
+// ENUMS
+// =====================================
+
+Enum order_status {
+  PENDING_PAYMENT
+  PAID
+  CANCELED
+  REFUNDED
+  EXPIRED
+}
+
+Enum payment_status {
+  READY
+  SUCCESS
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+Enum enrollment_status {
+  ACTIVE
+  CANCELED
+  EXPIRED
+}
+
+Enum course_status {
+  DRAFT
+  IN_REVIEW
+  ON_SALE
+  SUSPENDED
+}
+
+Enum study_status {
+  RECRUITING
+  IN_PROGRESS
+  CLOSED
+}
+
+Enum study_visibility {
+  PUBLIC
+  PRIVATE
+}
+
+Enum study_member_role {
+  OWNER
+  MEMBER
+}
+
+Enum study_member_status {
+  ACTIVE
+  KICKED
+  LEFT
+}
+
+Enum application_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+Enum post_type {
+  NOTICE
+  FREE
+}
+
+Enum discount_type {
+  AMOUNT
+  PERCENT
+}
+
+Enum coupon_status {
+  ISSUED
+  USED
+  EXPIRED
+}
+
+// =====================================
+// USERS
+// =====================================
+
+Table users {
+  id bigint [pk, increment]
+
+  email varchar [not null, unique]
+  password varchar [not null]
+
+  nickname varchar [not null]
+
+  profile_image varchar
+
+  role varchar [not null]
+
+  created_at timestamp [not null]
+}
+
+// =====================================
+// CATEGORY
+// =====================================
+
+Table categories {
+  id bigint [pk, increment]
+
+  parent_category_id bigint
+
+  name varchar [not null]
+
+  depth int [not null]
+}
+
+// =====================================
+// COURSE
+// =====================================
+
+Table courses {
+  id bigint [pk, increment]
+
+  instructor_id bigint [not null]
+
+  category_id bigint
+
+  title varchar [not null]
+
+  description text
+
+  thumbnail varchar
+
+  price int [not null]
+
+  status course_status [not null]
+
+  view_count int [not null, default: 0]
+
+  created_at timestamp [not null]
+
+  updated_at timestamp [not null]
+
+  deleted_at timestamp
+}
+
+// =====================================
+// CHAPTER
+// =====================================
+
+Table chapters {
+  id bigint [pk, increment]
+
+  course_id bigint [not null]
+
+  title varchar [not null]
+
+  order_no int [not null]
+
+  created_at timestamp [not null]
+
+  updated_at timestamp [not null]
+}
+
+// =====================================
+// LECTURE
+// =====================================
+
+Table lectures {
+  id bigint [pk, increment]
+
+  chapter_id bigint [not null]
+
+  youtube_video_id varchar [not null]
+
+  title varchar [not null]
+
+  duration_seconds int [not null]
+
+  order_no int [not null]
+
+  is_free_preview boolean [not null, default: false]
+
+  created_at timestamp [not null]
+
+  updated_at timestamp [not null]
+}
+
+// =====================================
+// LECTURE COMMENTS
+// =====================================
+
+Table lecture_comments {
+  id bigint [pk, increment]
+
+  lecture_id bigint [not null]
+
+  user_id bigint [not null]
+
+  parent_id bigint
+
+  content text [not null]
+
+  timestamp_seconds int
+
+  deleted boolean [not null, default: false]
+
+  created_at timestamp [not null]
+
+  updated_at timestamp [not null]
+}
+
+// =====================================
+// STUDY REPORTS
+// =====================================
+
+Table study_reports {
+  id bigint [pk, increment]
+
+  user_id bigint [not null]
+
+  course_id bigint [not null]
+
+  total_watch_time int [default: 0]
+
+  total_comments int [default: 0]
+
+  progress_rate decimal(5,2)
+
+  generated_at timestamp [not null]
+}
+
+// =====================================
+// CART
+// =====================================
+
+Table carts {
+  id bigint [pk, increment]
+
+  user_id bigint [not null, unique]
+
+  created_at datetime [not null]
+
+  updated_at datetime
+}
+
+Table cart_items {
+  id bigint [pk, increment]
+
+  cart_id bigint [not null]
+
+  course_id bigint [not null]
+
+  price int [not null]
+
+  created_at datetime [not null]
+
+  indexes {
+    (cart_id, course_id) [unique]
+  }
+}
+
+// =====================================
+// COUPON
+// =====================================
+
+Table coupon_policies {
+  id bigint [pk, increment]
+
+  name varchar(100) [not null]
+
+  discount_type discount_type [not null]
+
+  discount_value int [not null]
+
+  max_discount_amount int
+
+  valid_days int [not null]
+
+  total_quantity int
+
+  category_id bigint
+
+  created_at datetime [not null]
+
+  updated_at datetime [not null]
+}
+
+Table issued_coupons {
+  id bigint [pk, increment]
+
+  policy_id bigint [not null]
+
+  user_id bigint [not null]
+
+  status coupon_status [not null]
+
+  issued_at datetime [not null]
+
+  expired_at datetime [not null]
+
+  used_at datetime
+}
+
+// =====================================
+// ATTENDANCE
+// =====================================
+
+Table attendance_logs {
+  id bigint [pk, increment]
+
+  user_id bigint [not null]
+
+  attendance_date date [not null]
+
+  consecutive_days int [not null]
+
+  monthly_total_days int [not null]
+
+  created_at datetime [not null]
+
+  indexes {
+    (user_id, attendance_date) [unique]
+  }
+}
+
+// =====================================
+// ORDER
+// =====================================
+
+Table orders {
+  id bigint [pk, increment]
+
+  user_id bigint [not null]
+
+  order_number varchar [not null, unique]
+
+  total_price int [not null]
+
+  discount_price int [not null, default: 0]
+
+  final_price int [not null]
+
+  issued_coupon_id bigint
+
+  status order_status [not null, default: 'PENDING_PAYMENT']
+
+  ordered_at datetime [not null]
+
+  paid_at datetime
+
+  canceled_at datetime
+
+  expired_at datetime
+
+  refunded_at datetime
+
+  created_at datetime [not null]
+
+  updated_at datetime
+}
+
+Table order_items {
+  id bigint [pk, increment]
+
+  order_id bigint [not null]
+
+  course_id bigint [not null]
+
+  course_title varchar [not null]
+
+  price int [not null]
+
+  discount_price int [not null, default: 0]
+
+  final_price int [not null]
+
+  created_at datetime [not null]
+
+  updated_at datetime
+}
+
+// =====================================
+// PAYMENT
+// =====================================
+
+Table payments {
+  id bigint [pk, increment]
+
+  order_id bigint [not null, unique]
+
+  payment_key varchar
+
+  method varchar
+
+  amount int [not null]
+
+  status payment_status [not null, default: 'READY']
+
+  paid_at datetime
+
+  failed_reason varchar
+
+  created_at datetime [not null]
+
+  updated_at datetime
+}
+
+// =====================================
+// ENROLLMENT
+// =====================================
+
+// Table enrollments {
+//   id bigint [pk, increment]
+
+//   user_id bigint [not null]
+
+//   course_id bigint [not null]
+
+//   order_id bigint [not null]
+
+//   status enrollment_status [not null, default: 'ACTIVE']
+
+//   enrolled_at datetime [not null]
+
+//   canceled_at datetime
+
+//   expired_at datetime
+
+//   created_at datetime [not null]
+
+//   updated_at datetime
+
+//   indexes {
+//     (user_id, course_id) [unique]
+//   }
+// }
+
+// =====================================
+// STUDY
+// =====================================
+
+Table studies {
+  id bigint [pk, increment]
+
+  course_id bigint [not null]
+
+  owner_id bigint [not null]
+
+  title varchar(255) [not null]
+
+  description text
+
+  status study_status [not null]
+
+  visibility study_visibility [not null]
+
+  max_member_count int
+
+  start_date date
+
+  end_date date
+
+  created_at datetime [not null]
+
+  updated_at datetime [not null]
+}
+
+// =====================================
+// STUDY MEMBERS
+// =====================================
+
+Table study_members {
+  id bigint [pk, increment]
+
+  study_id bigint [not null]
+
+  user_id bigint [not null]
+
+  role study_member_role [not null]
+
+  status study_member_status [not null]
+
+  joined_at datetime [not null]
+  
+  left_at datetime
+  
+  kicked_at datetime
+
+  indexes {
+    (study_id, user_id) [unique]
+  }
+}
+
+// =====================================
+// STUDY APPLICATIONS
+// =====================================
+
+Table study_applications {
+  id bigint [pk, increment]
+
+  study_id bigint [not null]
+
+  user_id bigint [not null]
+
+  message text
+
+  status application_status [not null]
+
+  applied_at datetime [not null]
+
+  processed_at datetime
+
+  indexes {
+    (study_id, user_id) [unique]
+  }
+}
+
+// =====================================
+// POSTS
+// =====================================
+
+Table posts {
+  id bigint [pk, increment]
+
+  study_id bigint [not null]
+
+  user_id bigint [not null]
+
+  title varchar(255) [not null]
+
+  content text [not null]
+
+  type post_type [not null]
+
+  created_at datetime [not null]
+
+  updated_at datetime [not null]
+
+  deleted_at datetime
+}
+
+// =====================================
+// COMMENTS
+// =====================================
+
+Table comments {
+  id bigint [pk, increment]
+
+  post_id bigint [not null]
+
+  user_id bigint [not null]
+
+  content text [not null]
+
+  created_at datetime [not null]
+
+  updated_at datetime [not null]
+
+  deleted_at datetime
+}
+
+// =====================================
+// RELATIONS
+// =====================================
+
+Ref: categories.parent_category_id > categories.id
+
+Ref: courses.instructor_id > users.id
+Ref: courses.category_id > categories.id
+
+Ref: chapters.course_id > courses.id
+
+Ref: lectures.chapter_id > chapters.id
+
+Ref: lecture_comments.lecture_id > lectures.id
+Ref: lecture_comments.user_id > users.id
+Ref: lecture_comments.parent_id > lecture_comments.id
+
+Ref: study_reports.user_id > users.id
+Ref: study_reports.course_id > courses.id
+
+Ref: carts.user_id - users.id
+
+Ref: cart_items.cart_id > carts.id
+Ref: cart_items.course_id > courses.id
+
+Ref: coupon_policies.category_id > categories.id
+
+Ref: issued_coupons.policy_id > coupon_policies.id
+Ref: issued_coupons.user_id > users.id
+
+Ref: attendance_logs.user_id > users.id
+
+Ref: orders.user_id > users.id
+Ref: orders.issued_coupon_id > issued_coupons.id
+
+Ref: order_items.order_id > orders.id
+Ref: order_items.course_id > courses.id
+
+Ref: payments.order_id - orders.id
+
+// Ref: enrollments.user_id > users.id
+// Ref: enrollments.course_id > courses.id
+// Ref: enrollments.order_id > orders.id
+
+Ref: studies.course_id > courses.id
+Ref: studies.owner_id > users.id
+
+Ref: study_members.study_id > studies.id
+Ref: study_members.user_id > users.id
+
+Ref: study_applications.study_id > studies.id
+Ref: study_applications.user_id > users.id
+
+Ref: posts.study_id > studies.id
+Ref: posts.user_id > users.id
+
+Ref: comments.post_id > posts.id
+Ref: comments.user_id > users.id
