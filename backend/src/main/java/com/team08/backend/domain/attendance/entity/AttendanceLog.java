@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -48,4 +49,14 @@ public class AttendanceLog {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+
+    @Builder
+    public AttendanceLog(User user, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays) {
+        this.user = user;
+        this.attendanceDate = attendanceDate;
+        this.consecutiveDays = consecutiveDays;
+        this.monthlyTotalDays = monthlyTotalDays;
+        this.createdAt = LocalDateTime.now();
+    }
 }
