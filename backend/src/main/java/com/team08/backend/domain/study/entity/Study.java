@@ -176,7 +176,7 @@ public class Study {
         }
     }
 
-    private boolean isOwner(Long userId) {
+    public boolean isOwner(Long userId) {
         return owner.getId().equals(userId);
     }
 

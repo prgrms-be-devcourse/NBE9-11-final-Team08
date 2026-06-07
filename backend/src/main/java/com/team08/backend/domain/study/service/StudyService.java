@@ -1,11 +1,22 @@
 package com.team08.backend.domain.study.service;
 
+import com.team08.backend.domain.comment.entity.Comment;
+import com.team08.backend.domain.comment.repository.CommentRepository;
+import com.team08.backend.domain.post.entity.Post;
+import com.team08.backend.domain.post.repository.PostRepository;
 import com.team08.backend.domain.study.dto.request.StudyApplicationCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyCommentCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyCommentUpdateRequest;
 import com.team08.backend.domain.study.dto.request.StudyCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyPostCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyPostUpdateRequest;
 import com.team08.backend.domain.study.dto.request.StudyUpdateRequest;
 import com.team08.backend.domain.study.dto.response.StudyApplicationResponse;
+import com.team08.backend.domain.study.dto.response.StudyCommentResponse;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
 import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
+import com.team08.backend.domain.study.dto.response.StudyPostDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyPostSummaryResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.*;
 import com.team08.backend.domain.study.exception.*;
@@ -31,6 +42,8 @@ public class StudyService {
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final StudyApplicationRepository studyApplicationRepository;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
 
     @Transactional
     public Long create(Long userId, StudyCreateRequest request) {
@@ -271,13 +284,119 @@ public class StudyService {
         log.debug("스터디 탈퇴 studyId={}, userId={}, memberId={}", id, userId, member.getId());
     }
 
+    @Transactional
+    public StudyPostDetailResponse createStudyPost(Long id, Long userId, StudyPostCreateRequest request) {
+        StudyMember member = getActiveStudyMember(id, userId);
+        Study study = getActiveStudyWithOwner(id);
+
+        Post post = Post.create(
+                study,
+                member.getUser(),
+                request.title(),
+                request.content(),
+                request.type()
+        );
+        Post savedPost = postRepository.save(post);
+
+        log.debug("스터디 게시글 작성 studyId={}, postId={}, userId={}", id, savedPost.getId(), userId);
+
+        return StudyPostDetailResponse.from(savedPost, List.of());
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudyPostSummaryResponse> getStudyPosts(Long id, Long userId) {
+        getActiveStudyMember(id, userId);
+
+        return postRepository.findByStudyIdAndDeletedAtIsNullOrderByCreatedAtDesc(id)
+                .stream()
+                .map(StudyPostSummaryResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public StudyPostDetailResponse getStudyPost(Long id, Long postId, Long userId) {
+        getActiveStudyMember(id, userId);
+
+        Post post = getActiveStudyPost(id, postId);
+        List<StudyCommentResponse> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId)
+                .stream()
+                .map(StudyCommentResponse::from)
+                .toList();
+
+        return StudyPostDetailResponse.from(post, comments);
+    }
+
+    @Transactional
+    public void updateStudyPost(Long id, Long postId, Long userId, StudyPostUpdateRequest request) {
+        getActiveStudyMember(id, userId);
+        Post post = getActiveStudyPost(id, postId);
+
+        post.update(
+                userId,
+                request.title(),
+                request.content(),
+                request.type()
+        );
+
+        log.debug("스터디 게시글 수정 studyId={}, postId={}, userId={}", id, postId, userId);
+    }
+
+    @Transactional
+    public void deleteStudyPost(Long id, Long postId, Long userId) {
+        getActiveStudyMember(id, userId);
+        Post post = getActiveStudyPost(id, postId);
+
+        post.delete(userId);
+
+        log.debug("스터디 게시글 삭제 studyId={}, postId={}, userId={}", id, postId, userId);
+    }
+
+    @Transactional
+    public StudyCommentResponse createStudyComment(Long id, Long postId, Long userId, StudyCommentCreateRequest request) {
+        StudyMember member = getActiveStudyMember(id, userId);
+        Post post = getActiveStudyPost(id, postId);
+
+        Comment comment = Comment.create(post, member.getUser(), request.content());
+        Comment savedComment = commentRepository.save(comment);
+
+        log.debug("스터디 댓글 작성 studyId={}, postId={}, commentId={}, userId={}", id, postId, savedComment.getId(), userId);
+
+        return StudyCommentResponse.from(savedComment);
+    }
+
+    @Transactional
+    public void updateStudyComment(Long id, Long postId, Long commentId, Long userId, StudyCommentUpdateRequest request) {
+        getActiveStudyMember(id, userId);
+        getActiveStudyPost(id, postId);
+
+        Comment comment = getStudyComment(postId, commentId);
+        comment.update(userId, request.content());
+
+        log.debug("스터디 댓글 수정 studyId={}, postId={}, commentId={}, userId={}", id, postId, commentId, userId);
+    }
+
+    @Transactional
+    public void deleteStudyComment(Long id, Long postId, Long commentId, Long userId) {
+        getActiveStudyMember(id, userId);
+        getActiveStudyPost(id, postId);
+
+        Comment comment = getStudyComment(postId, commentId);
+        comment.delete(userId);
+
+        log.debug("스터디 댓글 삭제 studyId={}, postId={}, commentId={}, userId={}", id, postId, commentId, userId);
+    }
+
     private Study getOwnedStudy(Long id, Long userId) {
-        Study study = studyRepository.findActiveStudyByIdWithOwner(id)
-                .orElseThrow(StudyNotFoundException::new);
+        Study study = getActiveStudyWithOwner(id);
 
         study.validateOwner(userId);
 
         return study;
+    }
+
+    private Study getActiveStudyWithOwner(Long id) {
+        return studyRepository.findActiveStudyByIdWithOwner(id)
+                .orElseThrow(StudyNotFoundException::new);
     }
 
     private void validateCanApply(Long id, Long userId, Study study) {
@@ -305,4 +424,20 @@ public class StudyService {
         return studyMemberRepository.findByIdAndStudyId(memberId, id)
                 .orElseThrow(StudyMemberNotFoundException::new);
     }
+
+    private StudyMember getActiveStudyMember(Long id, Long userId) {
+        return studyMemberRepository.findByStudyIdAndUserIdAndStatus(id, userId, StudyMemberStatus.ACTIVE)
+                .orElseThrow(StudyAccessDeniedException::new);
+    }
+
+    private Post getActiveStudyPost(Long id, Long postId) {
+        return postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, id)
+                .orElseThrow(StudyPostNotFoundException::new);
+    }
+
+    private Comment getStudyComment(Long postId, Long commentId) {
+        return commentRepository.findByIdAndPostId(commentId, postId)
+                .orElseThrow(StudyCommentNotFoundException::new);
+    }
+
 }

@@ -2,12 +2,24 @@ package com.team08.backend.domain.study.service;
 
 import com.team08.backend.domain.fixture.StudyFixture;
 import com.team08.backend.domain.fixture.UserFixture;
+import com.team08.backend.domain.comment.entity.Comment;
+import com.team08.backend.domain.comment.repository.CommentRepository;
+import com.team08.backend.domain.post.entity.Post;
+import com.team08.backend.domain.post.entity.PostType;
+import com.team08.backend.domain.post.repository.PostRepository;
 import com.team08.backend.domain.study.dto.request.StudyApplicationCreateRequest;
 import com.team08.backend.domain.study.dto.request.StudyCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyCommentCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyCommentUpdateRequest;
+import com.team08.backend.domain.study.dto.request.StudyPostCreateRequest;
+import com.team08.backend.domain.study.dto.request.StudyPostUpdateRequest;
 import com.team08.backend.domain.study.dto.request.StudyUpdateRequest;
 import com.team08.backend.domain.study.dto.response.StudyApplicationResponse;
+import com.team08.backend.domain.study.dto.response.StudyCommentResponse;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
 import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
+import com.team08.backend.domain.study.dto.response.StudyPostDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyPostSummaryResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.*;
 import com.team08.backend.domain.study.exception.*;
@@ -49,6 +61,12 @@ public class StudyServiceTest {
 
     @Mock
     private StudyApplicationRepository studyApplicationRepository;
+
+    @Mock
+    private PostRepository postRepository;
+
+    @Mock
+    private CommentRepository commentRepository;
 
     @InjectMocks
     private StudyService studyService;
@@ -746,5 +764,397 @@ public class StudyServiceTest {
         )).isInstanceOf(StudyKickedMemberCannotApplyException.class);
 
         verify(studyApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void 활성_스터디_멤버는_게시글을_작성할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        StudyPostCreateRequest request = new StudyPostCreateRequest("질문", "내용", PostType.FREE);
+        Post post = Post.create(study, user, request.title(), request.content(), request.type());
+        ReflectionTestUtils.setField(post, "id", 100L);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.save(any(Post.class))).willReturn(post);
+
+        // when
+        StudyPostDetailResponse response = studyService.createStudyPost(studyId, userId, request);
+
+        // then
+        assertThat(response.postId()).isEqualTo(100L);
+        assertThat(response.title()).isEqualTo(request.title());
+        assertThat(response.type()).isEqualTo(PostType.FREE);
+        verify(postRepository).save(any(Post.class));
+    }
+
+    @Test
+    void 비멤버는_게시글을_작성할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyService.createStudyPost(
+                studyId,
+                userId,
+                new StudyPostCreateRequest("질문", "내용", PostType.FREE)
+        )).isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_생성자만_NOTICE_게시글을_작성할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long memberId = 2L;
+        User owner = UserFixture.user(1L);
+        User memberUser = UserFixture.user(memberId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(memberUser, study);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, memberId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.createStudyPost(
+                studyId,
+                memberId,
+                new StudyPostCreateRequest("공지", "내용", PostType.NOTICE)
+        )).isInstanceOf(StudyAccessDeniedException.class);
+
+        verify(postRepository, never()).save(any());
+    }
+
+    @Test
+    void 게시글_목록은_삭제되지_않은_게시글만_조회한다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, user, "질문", "내용", PostType.FREE);
+        ReflectionTestUtils.setField(post, "id", 100L);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByStudyIdAndDeletedAtIsNullOrderByCreatedAtDesc(studyId))
+                .willReturn(List.of(post));
+
+        // when
+        List<StudyPostSummaryResponse> responses = studyService.getStudyPosts(studyId, userId);
+
+        // then
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).postId()).isEqualTo(100L);
+    }
+
+    @Test
+    void 비멤버는_게시글_목록을_조회할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyService.getStudyPosts(studyId, userId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 게시글_상세는_댓글_목록을_포함한다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        Long postId = 100L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, user, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, user, "댓글");
+        ReflectionTestUtils.setField(post, "id", postId);
+        ReflectionTestUtils.setField(comment, "id", 200L);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findByPostIdOrderByCreatedAtAsc(postId))
+                .willReturn(List.of(comment));
+
+        // when
+        StudyPostDetailResponse response = studyService.getStudyPost(studyId, postId, userId);
+
+        // then
+        assertThat(response.postId()).isEqualTo(postId);
+        assertThat(response.comments()).hasSize(1);
+        assertThat(response.comments().get(0).content()).isEqualTo("댓글");
+    }
+
+    @Test
+    void 게시글_작성자는_자신의_게시글을_수정할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        Long postId = 100L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, user, "질문", "내용", PostType.FREE);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+
+        // when
+        studyService.updateStudyPost(studyId, postId, userId, new StudyPostUpdateRequest("수정", "수정 내용", PostType.FREE));
+
+        // then
+        assertThat(post.getTitle()).isEqualTo("수정");
+        assertThat(post.getContent()).isEqualTo("수정 내용");
+    }
+
+    @Test
+    void 작성자가_아니면_게시글을_수정할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long writerId = 2L;
+        Long requestUserId = 3L;
+        Long postId = 100L;
+        User owner = UserFixture.user(1L);
+        User writer = UserFixture.user(writerId);
+        User requestUser = UserFixture.user(requestUserId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(requestUser, study);
+        Post post = Post.create(study, writer, "질문", "내용", PostType.FREE);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, requestUserId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.updateStudyPost(
+                studyId,
+                postId,
+                requestUserId,
+                new StudyPostUpdateRequest("수정", "수정 내용", PostType.FREE)
+        )).isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_생성자는_타인의_게시글을_삭제할_수_있다() {
+        // given
+        Long ownerId = 1L;
+        Long writerId = 2L;
+        Long studyId = 10L;
+        Long postId = 100L;
+        User owner = UserFixture.user(ownerId);
+        User writer = UserFixture.user(writerId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember ownerMember = StudyMember.createOwner(owner, study);
+        Post post = Post.create(study, writer, "질문", "내용", PostType.FREE);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, ownerId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(ownerMember));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+
+        // when
+        studyService.deleteStudyPost(studyId, postId, ownerId);
+
+        // then
+        assertThat(post.isDeleted()).isTrue();
+    }
+
+    @Test
+    void 활성_스터디_멤버는_댓글을_작성할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        Long postId = 100L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, owner, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, user, "댓글");
+        ReflectionTestUtils.setField(comment, "id", 200L);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.save(any(Comment.class))).willReturn(comment);
+
+        // when
+        StudyCommentResponse response = studyService.createStudyComment(
+                studyId,
+                postId,
+                userId,
+                new StudyCommentCreateRequest("댓글")
+        );
+
+        // then
+        assertThat(response.commentId()).isEqualTo(200L);
+        assertThat(response.content()).isEqualTo("댓글");
+        verify(commentRepository).save(any(Comment.class));
+    }
+
+    @Test
+    void 비멤버는_댓글을_작성할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long postId = 100L;
+        Long userId = 2L;
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> studyService.createStudyComment(
+                studyId,
+                postId,
+                userId,
+                new StudyCommentCreateRequest("댓글")
+        )).isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 댓글_작성자는_자신의_댓글을_수정하고_삭제할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        Long postId = 100L;
+        Long commentId = 200L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, owner, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, user, "댓글");
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findByIdAndPostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+
+        // when
+        studyService.updateStudyComment(studyId, postId, commentId, userId, new StudyCommentUpdateRequest("수정 댓글"));
+        studyService.deleteStudyComment(studyId, postId, commentId, userId);
+
+        // then
+        assertThat(comment.getContent()).isEqualTo("수정 댓글");
+        assertThat(comment.isDeleted()).isTrue();
+    }
+
+    @Test
+    void 작성자가_아니면_댓글을_수정할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long writerId = 2L;
+        Long requestUserId = 3L;
+        Long postId = 100L;
+        Long commentId = 200L;
+        User owner = UserFixture.user(1L);
+        User writer = UserFixture.user(writerId);
+        User requestUser = UserFixture.user(requestUserId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(requestUser, study);
+        Post post = Post.create(study, owner, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, writer, "댓글");
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, requestUserId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findByIdAndPostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.updateStudyComment(
+                studyId,
+                postId,
+                commentId,
+                requestUserId,
+                new StudyCommentUpdateRequest("수정 댓글")
+        )).isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_생성자는_타인의_댓글을_삭제할_수_있다() {
+        // given
+        Long ownerId = 1L;
+        Long writerId = 2L;
+        Long studyId = 10L;
+        Long postId = 100L;
+        Long commentId = 200L;
+        User owner = UserFixture.user(ownerId);
+        User writer = UserFixture.user(writerId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember ownerMember = StudyMember.createOwner(owner, study);
+        Post post = Post.create(study, owner, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, writer, "댓글");
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, ownerId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(ownerMember));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findByIdAndPostId(commentId, postId))
+                .willReturn(Optional.of(comment));
+
+        // when
+        studyService.deleteStudyComment(studyId, postId, commentId, ownerId);
+
+        // then
+        assertThat(comment.isDeleted()).isTrue();
+    }
+
+    @Test
+    void 삭제된_댓글은_상세_응답에서_placeholder로_표시된다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        Long postId = 100L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+        Post post = Post.create(study, user, "질문", "내용", PostType.FREE);
+        Comment comment = Comment.create(post, user, "댓글");
+        comment.delete(userId);
+
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(Optional.of(member));
+        given(postRepository.findByIdAndStudyIdAndDeletedAtIsNull(postId, studyId))
+                .willReturn(Optional.of(post));
+        given(commentRepository.findByPostIdOrderByCreatedAtAsc(postId))
+                .willReturn(List.of(comment));
+
+        // when
+        StudyPostDetailResponse response = studyService.getStudyPost(studyId, postId, userId);
+
+        // then
+        assertThat(response.comments()).hasSize(1);
+        assertThat(response.comments().get(0).deleted()).isTrue();
+        assertThat(response.comments().get(0).content()).isEqualTo("삭제된 댓글입니다.");
     }
 }

@@ -1,6 +1,7 @@
 package com.team08.backend.domain.comment.entity;
 
 import com.team08.backend.domain.post.entity.Post;
+import com.team08.backend.domain.study.exception.StudyAccessDeniedException;
 import com.team08.backend.domain.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,4 +48,49 @@ public class Comment {
     private LocalDateTime updatedAt;
 
     private LocalDateTime deletedAt;
+
+    private Comment(Post post, User user, String content) {
+        this.post = post;
+        this.user = user;
+        this.content = content;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = createdAt;
+    }
+
+    public static Comment create(Post post, User user, String content) {
+        return new Comment(post, user, content);
+    }
+
+    public void update(Long userId, String content) {
+        validateWriter(userId);
+
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void delete(Long userId) {
+        if (!isWriter(userId) && !post.getStudy().isOwner(userId)) {
+            throw new StudyAccessDeniedException();
+        }
+
+        deletedAt = LocalDateTime.now();
+    }
+
+    public String getDisplayContent() {
+        return isDeleted() ? "삭제된 댓글입니다." : content;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    private void validateWriter(Long userId) {
+        if (!isWriter(userId)) {
+            throw new StudyAccessDeniedException();
+        }
+    }
+
+    private boolean isWriter(Long userId) {
+        return user.getId().equals(userId);
+    }
 }
