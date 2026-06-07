@@ -50,4 +50,12 @@ public interface StudyRepository extends JpaRepository<Study, Long> {
         AND s.deletedAt IS NULL
     """)
     Optional<Study> findActiveStudyByIdWithOwner(Long id);
+
+    @Query("""
+        SELECT s
+        FROM Study s
+        WHERE s.id = :id
+        AND s.deletedAt IS NULL
+    """)
+    Optional<Study> findActiveStudyById(Long id);
 }

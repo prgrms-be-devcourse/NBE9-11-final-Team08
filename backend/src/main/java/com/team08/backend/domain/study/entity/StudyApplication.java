@@ -1,6 +1,7 @@
 package com.team08.backend.domain.study.entity;
 
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.study.exception.InvalidStudyApplicationStatusException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -54,4 +55,36 @@ public class StudyApplication {
     private LocalDateTime appliedAt;
 
     private LocalDateTime processedAt;
+
+    private StudyApplication(Study study, User user, String message) {
+        this.study = study;
+        this.user = user;
+        this.message = message;
+        this.status = ApplicationStatus.PENDING;
+        this.appliedAt = LocalDateTime.now();
+    }
+
+    public static StudyApplication create(Study study, User user, String message) {
+        return new StudyApplication(study, user, message);
+    }
+
+    public void approve() {
+        validatePending();
+
+        status = ApplicationStatus.APPROVED;
+        processedAt = LocalDateTime.now();
+    }
+
+    public void reject() {
+        validatePending();
+
+        status = ApplicationStatus.REJECTED;
+        processedAt = LocalDateTime.now();
+    }
+
+    private void validatePending() {
+        if (status != ApplicationStatus.PENDING) {
+            throw new InvalidStudyApplicationStatusException();
+        }
+    }
 }

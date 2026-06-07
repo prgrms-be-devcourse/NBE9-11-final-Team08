@@ -2,14 +2,15 @@ package com.team08.backend.domain.study.service;
 
 import com.team08.backend.domain.fixture.StudyFixture;
 import com.team08.backend.domain.fixture.UserFixture;
+import com.team08.backend.domain.study.dto.request.StudyApplicationCreateRequest;
 import com.team08.backend.domain.study.dto.request.StudyCreateRequest;
 import com.team08.backend.domain.study.dto.request.StudyUpdateRequest;
+import com.team08.backend.domain.study.dto.response.StudyApplicationResponse;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.*;
-import com.team08.backend.domain.study.exception.InvalidStudyPeriodException;
-import com.team08.backend.domain.study.exception.StudyAccessDeniedException;
-import com.team08.backend.domain.study.exception.StudyNotFoundException;
+import com.team08.backend.domain.study.exception.*;
+import com.team08.backend.domain.study.repository.StudyApplicationRepository;
 import com.team08.backend.domain.study.repository.StudyMemberRepository;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -43,6 +45,9 @@ public class StudyServiceTest {
 
     @Mock
     private StudyMemberRepository studyMemberRepository;
+
+    @Mock
+    private StudyApplicationRepository studyApplicationRepository;
 
     @InjectMocks
     private StudyService studyService;
@@ -335,6 +340,247 @@ public class StudyServiceTest {
 
         // when & then
         assertThatThrownBy(() -> studyService.deleteStudy(studyId, requestUserId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 모집중인_스터디에_참여_신청한다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyApplicationCreateRequest request = new StudyApplicationCreateRequest("참여하고 싶습니다.");
+        StudyApplication application = StudyApplication.create(study, user, request.message());
+        ReflectionTestUtils.setField(application, "id", 100L);
+
+        given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(false);
+        given(studyApplicationRepository.existsByStudyIdAndUserId(studyId, userId)).willReturn(false);
+        given(studyApplicationRepository.save(any(StudyApplication.class))).willReturn(application);
+
+        // when
+        StudyApplicationResponse response = studyService.applyStudy(studyId, userId, request);
+
+        // then
+        assertThat(response.applicationId()).isEqualTo(100L);
+        assertThat(response.studyId()).isEqualTo(studyId);
+        assertThat(response.userId()).isEqualTo(userId);
+        assertThat(response.message()).isEqualTo(request.message());
+        assertThat(response.status()).isEqualTo(ApplicationStatus.PENDING);
+        verify(studyApplicationRepository).save(any(StudyApplication.class));
+    }
+
+    @Test
+    void 모집이_종료된_스터디에는_참여_신청할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        Study study = StudyFixture.study(studyId, owner);
+        study.changeRecruitmentStatus(StudyRecruitmentStatus.CLOSED);
+
+        given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.applyStudy(
+                studyId,
+                userId,
+                new StudyApplicationCreateRequest("참여하고 싶습니다.")
+        )).isInstanceOf(StudyRecruitmentClosedException.class);
+
+        verify(studyApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void 이미_스터디_멤버인_사용자는_참여_신청할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyService.applyStudy(
+                studyId,
+                userId,
+                new StudyApplicationCreateRequest("참여하고 싶습니다.")
+        )).isInstanceOf(StudyAlreadyMemberException.class);
+
+        verify(studyApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void 동일_사용자는_동일_스터디에_중복_신청할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
+                .willReturn(false);
+        given(studyApplicationRepository.existsByStudyIdAndUserId(studyId, userId)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyService.applyStudy(
+                studyId,
+                userId,
+                new StudyApplicationCreateRequest("참여하고 싶습니다.")
+        )).isInstanceOf(DuplicateStudyApplicationException.class);
+
+        verify(studyApplicationRepository, never()).save(any());
+    }
+
+    @Test
+    void 사용자는_자신의_참여_신청을_취소할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyApplication application = StudyApplication.create(study, user, "참여하고 싶습니다.");
+
+        given(studyApplicationRepository.findByStudyIdAndUserId(studyId, userId))
+                .willReturn(Optional.of(application));
+
+        // when
+        studyService.cancelStudyApplication(studyId, userId);
+
+        // then
+        verify(studyApplicationRepository).delete(application);
+    }
+
+    @Test
+    void 스터디_생성자는_참여_신청_목록을_조회할_수_있다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        User owner = UserFixture.user(ownerId);
+        User user = UserFixture.user(2L);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyApplication application = StudyApplication.create(study, user, "참여하고 싶습니다.");
+        ReflectionTestUtils.setField(application, "id", 100L);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyApplicationRepository.findByStudyIdOrderByAppliedAtAsc(studyId))
+                .willReturn(List.of(application));
+
+        // when
+        List<StudyApplicationResponse> responses = studyService.getStudyApplications(studyId, ownerId);
+
+        // then
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).applicationId()).isEqualTo(100L);
+        assertThat(responses.get(0).status()).isEqualTo(ApplicationStatus.PENDING);
+    }
+
+    @Test
+    void 스터디_생성자가_참여_신청을_승인하면_멤버로_등록된다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        Long applicationId = 100L;
+        User owner = UserFixture.user(ownerId);
+        User applicant = UserFixture.user(2L);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyApplication application = StudyApplication.create(study, applicant, "참여하고 싶습니다.");
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyApplicationRepository.findByIdAndStudyId(applicationId, studyId))
+                .willReturn(Optional.of(application));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, applicant.getId(), StudyMemberStatus.ACTIVE))
+                .willReturn(false);
+
+        // when
+        studyService.approveStudyApplication(studyId, applicationId, ownerId);
+
+        // then
+        assertThat(application.getStatus()).isEqualTo(ApplicationStatus.APPROVED);
+        verify(studyMemberRepository, times(1)).save(any(StudyMember.class));
+    }
+
+    @Test
+    void 스터디_생성자가_참여_신청을_거절하면_멤버로_등록하지_않는다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        Long applicationId = 100L;
+        User owner = UserFixture.user(ownerId);
+        User applicant = UserFixture.user(2L);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyApplication application = StudyApplication.create(study, applicant, "참여하고 싶습니다.");
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyApplicationRepository.findByIdAndStudyId(applicationId, studyId))
+                .willReturn(Optional.of(application));
+
+        // when
+        studyService.rejectStudyApplication(studyId, applicationId, ownerId);
+
+        // then
+        assertThat(application.getStatus()).isEqualTo(ApplicationStatus.REJECTED);
+        verify(studyMemberRepository, never()).save(any(StudyMember.class));
+    }
+
+    @Test
+    void 생성자가_아니면_참여_신청_목록을_조회할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long requestUserId = 2L;
+        Long studyId = 10L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.getStudyApplications(studyId, requestUserId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 생성자가_아니면_참여_신청을_승인할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long requestUserId = 2L;
+        Long studyId = 10L;
+        Long applicationId = 100L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.approveStudyApplication(studyId, applicationId, requestUserId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+
+        verify(studyMemberRepository, never()).save(any(StudyMember.class));
+    }
+
+    @Test
+    void 생성자가_아니면_참여_신청을_거절할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long requestUserId = 2L;
+        Long studyId = 10L;
+        Long applicationId = 100L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.rejectStudyApplication(studyId, applicationId, requestUserId))
                 .isInstanceOf(StudyAccessDeniedException.class);
     }
 }

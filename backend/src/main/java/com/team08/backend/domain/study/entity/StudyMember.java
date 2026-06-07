@@ -68,4 +68,8 @@ public class StudyMember {
     public static StudyMember createOwner(User owner, Study study) {
         return new StudyMember(owner, study, StudyMemberRole.OWNER);
     }
+
+    public static StudyMember createMember(User user, Study study) {
+        return new StudyMember(user, study, StudyMemberRole.MEMBER);
+    }
 }

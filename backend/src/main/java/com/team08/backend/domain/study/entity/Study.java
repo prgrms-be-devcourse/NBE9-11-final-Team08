@@ -94,7 +94,7 @@ public class Study {
     }
 
     public void validateOwner(Long userId) {
-        if (!owner.getId().equals(userId)) {
+        if (!isOwner(userId)) {
             throw new StudyAccessDeniedException();
         }
     }
@@ -164,6 +164,24 @@ public class Study {
 
     public LocalDate getEndDate() {
         return status == StudyStatus.CLOSED ? actualEndDate : plannedEndDate;
+    }
+
+    public void validateCanReceiveApplicationFrom(Long userId) {
+        if (isRecruitingClosed()) {
+            throw new StudyRecruitmentClosedException();
+        }
+
+        if (isOwner(userId)) {
+            throw new StudyAlreadyMemberException();
+        }
+    }
+
+    private boolean isOwner(Long userId) {
+        return owner.getId().equals(userId);
+    }
+
+    private boolean isRecruitingClosed() {
+        return recruitmentStatus == StudyRecruitmentStatus.CLOSED;
     }
 
     private static void validateTitle(String title) {
