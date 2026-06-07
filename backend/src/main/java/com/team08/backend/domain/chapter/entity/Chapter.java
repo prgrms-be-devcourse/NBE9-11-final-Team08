@@ -36,9 +36,10 @@ public class Chapter {
     @Column(nullable = false)
     private Integer orderNo;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+//    //TODO: chapter에 시간관련 필드 쓰시는 분 없으시면 삭제할까합니다.
+//    @Column(nullable = false)
+//    private LocalDateTime createdAt;
+//
+//    @Column(nullable = false)
+//    private LocalDateTime updatedAt;
 }
