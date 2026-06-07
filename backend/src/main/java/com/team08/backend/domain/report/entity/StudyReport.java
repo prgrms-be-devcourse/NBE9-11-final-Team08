@@ -45,4 +45,21 @@ public class StudyReport {
 
     @Column(nullable = false)
     private LocalDateTime generatedAt;
+
+    public static StudyReport generate(
+            User user,
+            Course course,
+            Integer totalWatchTime,
+            Integer totalComments,
+            BigDecimal progressRate
+    ) {
+        StudyReport report = new StudyReport();
+        report.user = user;
+        report.course = course;
+        report.totalWatchTime = totalWatchTime;
+        report.totalComments = totalComments;
+        report.progressRate = progressRate;
+        report.generatedAt = LocalDateTime.now();
+        return report;
+    }
 }
