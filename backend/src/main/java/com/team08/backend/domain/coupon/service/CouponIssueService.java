@@ -1,50 +1,204 @@
 package com.team08.backend.domain.coupon.service;
 
+import com.team08.backend.domain.coupon.dto.CouponListResponse;
+import com.team08.backend.domain.coupon.dto.ExpectedDiscountResponse;
+import com.team08.backend.domain.coupon.entity.CouponPolicy;
+import com.team08.backend.domain.coupon.entity.CouponStatus;
+import com.team08.backend.domain.coupon.entity.CouponType;
 import com.team08.backend.domain.coupon.entity.IssuedCoupon;
-import com.team08.backend.domain.coupon.repository.CouponRepository;
+import com.team08.backend.domain.coupon.repository.CouponPolicyRepository;
 import com.team08.backend.domain.coupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class CouponIssueService {
 
     private final IssuedCouponRepository issuedCouponRepository;
-    private final CouponRepository couponRepository;
+    private final CouponPolicyRepository couponPolicyRepository;
+    private final UserRepository userRepository;
 
+    // TODO 나중에 유저 생성 로직에 추가
     @Transactional
-    public void issueFirstComeCoupon(Long userId, Long couponId, LocalDateTime requestTime) {
+    public void issueSignUpCoupon(Long userId) {
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
+        // 쿠폰 타입으로 정책 단건 조회 (주로 자동 발급용 AUTO 타입 조회 시 사용)
+        CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
+                .orElseThrow(() -> new IllegalArgumentException("쿠폰 정책을 찾을 수 없음"));
 
-        // 1. [실패 방어] 시간 검증 (오전 10시 이전인지 확인)
-        if (requestTime.getHour() < 10) {
-            throw new IllegalArgumentException("쿠폰 발급은 오전 10시부터 가능합니다.");
-        }
-
-        // 2. [실패 방어] 중복 발급 검증
-        if (issuedCouponRepository.existsByUserIdAndCouponId(userId, couponId)) {
-            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
-        }
-
-        // 3. [실패 방어] 수량 소진 검증 (1000개 제한)
-        long issuedCount = issuedCouponRepository.countByCouponId(couponId);
-        if (issuedCount >= 1000) {
-            throw new IllegalStateException("선착순 쿠폰이 모두 소진되었습니다.");
-        }
-
-        // 4. [성공 로직] 쿠폰 발급 (저장)
-        // (주의: IssuedCoupon 엔티티 구조에 맞게 Mock이나 Builder로 생성해야 합니다.
-        // 현재는 로직 흐름을 완성하기 위해 임시 객체를 만들어 save 합니다.)
-
-        // 만약 IssuedCoupon에 @Builder가 없다면 User때처럼 임시로 Mock을 쓰거나 @Builder를 추가해 주세요!
+        // [시스템] 쿠폰 발급 및 저장
         IssuedCoupon newCoupon = IssuedCoupon.builder()
-                //.userId(userId)        // 엔티티에 유저 아이디(또는 User 객체)가 들어간다면 세팅
-                //.couponId(couponId)    // 쿠폰 아이디 세팅
+                .user(user)
+                .policy(policy)
+                .expiredAt(policy.calculateExpirationDate())
                 .build();
 
         issuedCouponRepository.save(newCoupon);
+    }
+
+    // [시스템] 출석 보상 쿠폰 자동 발급
+    @Transactional
+    public void issueAttendanceCoupon(Long userId) {
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
+
+        // 쿠폰 이름으로 정책 단건 조회
+        CouponPolicy policy = couponPolicyRepository.findByName("연속 출석 보상 쿠폰")
+                .orElseThrow(() -> new IllegalArgumentException("출석 쿠폰 정책을 찾을 수 없음"));
+
+        // 쿠폰 발급 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.builder()
+                .user(user)
+                .policy(policy)
+                .expiredAt(policy.calculateExpirationDate())
+                .build();
+
+        issuedCouponRepository.save(newCoupon);
+    }
+
+    // [사용자] 일반 쿠폰 다운로드
+    @Transactional
+    public void downloadCoupon(Long userId, Long policyId) {
+        // 중복 발급 검증
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
+        }
+
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
+
+        // 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findById(policyId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+
+        // 일반 다운로드 쿠폰 여부 검증
+        if (policy.getCouponType() != CouponType.NORMAL) {
+            throw new IllegalArgumentException("일반 다운로드 전용 쿠폰이 아닙니다.");
+        }
+
+        // 쿠폰 발급 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.builder()
+                .user(user)
+                .policy(policy)
+                .expiredAt(policy.calculateExpirationDate())
+                .build();
+
+        issuedCouponRepository.save(newCoupon);
+    }
+
+    // [사용자] 선착순 쿠폰 다운로드
+    @Transactional
+    public void downloadFcfsCoupon(Long userId, Long policyId) {
+        // 중복 발급 검증
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
+        }
+
+        // 사용자 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
+
+        // 비관적 락을 적용한 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+
+        // 선착순 쿠폰 여부 검증
+        if (policy.getCouponType() != CouponType.FCFS) {
+            throw new IllegalArgumentException("선착순 발급 전용 쿠폰이 아닙니다.");
+        }
+
+        // 쿠폰 발급 기간 검증
+        LocalDateTime now = LocalDateTime.now();
+        if (policy.getIssueStartDate() != null && now.isBefore(policy.getIssueStartDate())) {
+            throw new IllegalStateException("아직 쿠폰 발급 기간이 시작되지 않았습니다.");
+        }
+        if (policy.getIssueEndDate() != null && now.isAfter(policy.getIssueEndDate())) {
+            throw new IllegalStateException("쿠폰 발급 기간이 종료되었습니다.");
+        }
+
+        // 쿠폰 수량 차감
+        policy.decreaseQuantity();
+
+        // 쿠폰 발급 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.builder()
+                .user(user)
+                .policy(policy)
+                .expiredAt(policy.calculateExpirationDate())
+                .build();
+
+        issuedCouponRepository.save(newCoupon);
+    }
+
+    // [사용자] 내 쿠폰 목록 조회 (나중에 수정 필요할 수도)
+    @Transactional(readOnly = true)
+    public List<CouponListResponse> getMyCoupons(Long userId) {
+        return issuedCouponRepository.findByUserIdOrderByIssuedAtDesc(userId)
+                .stream()
+                .map(CouponListResponse::from)
+                .toList();
+    }
+
+    // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 (결제 전 화면 용 API)
+    @Transactional(readOnly = true)
+    public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+
+        // 본인 쿠폰인지 검증
+        if (!issuedCoupon.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 쿠폰만 사용할 수 있습니다.");
+        }
+
+        // 상태/만료일 검증
+        if (issuedCoupon.getStatus() != CouponStatus.ISSUED) {
+            throw new IllegalStateException("사용할 수 없는 쿠폰 상태입니다.");
+        }
+
+        // 할인 예상 금액 계산
+        int discountAmount = issuedCoupon.getPolicy().calculateDiscountAmount(originalPrice);
+
+        // 할인된 최종 가격 계산 (0원 이하 방어)
+        int finalPrice = Math.max(0, originalPrice - discountAmount);
+
+        // 결과 DTO 반환
+        return ExpectedDiscountResponse.builder()
+                .couponName(issuedCoupon.getPolicy().getName())
+                .originalPrice(originalPrice)
+                .discountAmount(discountAmount)
+                .finalPrice(finalPrice)
+                .build();
+    }
+
+    // TODO 나중에 결제 로직에 추가
+    // [시스템] 결제 시 쿠폰 사용 처리 
+    @Transactional
+    public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+
+        // 본인 쿠폰인지 검증
+        if (!issuedCoupon.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 쿠폰만 사용할 수 있습니다.");
+        }
+
+        // 할인 금액 계산
+        int discountAmount = issuedCoupon.getPolicy().calculateDiscountAmount(originalPrice);
+
+        // [시스템] 쿠폰 사용 처리 (ISSUED -> USED)
+        issuedCoupon.use();
+
+        // 최종 할인된 금액 반환 
+        return discountAmount;
     }
 }
