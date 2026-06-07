@@ -1,20 +1,16 @@
 package com.team08.backend.domain.attendance.repository;
 
 import com.team08.backend.domain.attendance.entity.AttendanceLog;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.Optional;
 
-public class AttendanceRepository {
-    public Object existsByUserIdAndAttendanceDate(Long userId, LocalDate today) {
-        return null;
-    }
+public interface AttendanceRepository extends JpaRepository<AttendanceLog, Long> {
 
-    public Optional<AttendanceLog> findByUserIdAndAttendanceDate(Long userId, LocalDate yesterday) {
-        return null;
-    }
+    boolean existsByUserIdAndAttendanceDate(Long userId, LocalDate date);
 
-    public void save(Object any) {
-        
-    }
+    Optional<AttendanceLog> findByUserIdAndAttendanceDate(Long userId, LocalDate date);
+
+    long countByUserIdAndAttendanceDateBetween(Long userId, LocalDate start, LocalDate end);
 }

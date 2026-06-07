@@ -2,12 +2,14 @@ package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.entity.AttendanceLog;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
+import com.team08.backend.domain.coupon.service.CouponIssueService;
 import com.team08.backend.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Optional;
 
 @Service
@@ -15,16 +17,18 @@ import java.util.Optional;
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
+    private final CouponIssueService couponIssueService;
 
+    // [사용자] 출석체크 및 보상 지급
     @Transactional
     public AttendanceLog checkIn(Long userId, LocalDate today) {
 
         // 오늘 이미 출석했는지 검증 (중복 출석 방지)
-        if ((boolean) attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)) {
+        if (attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)) {
             throw new IllegalStateException("오늘은 이미 출석하셨습니다.");
         }
 
-        //  어제 출석 기록 조회
+        // 어제 출석 기록 조회
         LocalDate yesterday = today.minusDays(1);
         Optional<AttendanceLog> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
 
@@ -33,16 +37,27 @@ public class AttendanceService {
                 .map(log -> log.getConsecutiveDays() + 1)
                 .orElse(1);
 
+        // 이번 달 누적 출석일 계산
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
+        long currentMonthCount = attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today);
+        int monthlyTotalDays = (int) currentMonthCount + 1;
+
         User user = User.builder().id(userId).build();
 
+        // 출석 기록 세팅 및 저장
         AttendanceLog todayLog = AttendanceLog.builder()
                 .user(user)
                 .attendanceDate(today)
                 .consecutiveDays(consecutiveDays)
-                .monthlyTotalDays(1)
+                .monthlyTotalDays(monthlyTotalDays)
                 .build();
 
         attendanceRepository.save(todayLog);
+
+        if (consecutiveDays == 7) {
+            // [시스템] 출석 보상 쿠폰 자동 발급
+            couponIssueService.issueAttendanceCoupon(userId);
+        }
 
         return todayLog;
     }
