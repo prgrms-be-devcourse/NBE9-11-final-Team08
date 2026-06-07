@@ -37,13 +37,14 @@ public class PaymentService {
         Payment payment = getOrCreatePayment(order);
 
         if (order.getStatus() == OrderStatus.PAID || payment.getStatus() == PaymentStatus.SUCCESS) {
+            // 결제 성공 API가 중복 호출되어도 수강권은 한 번만 발급되어야 한다.
             return PaymentResponse.from(payment);
         }
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "결제할 수 없는 주문 상태입니다.");
         }
 
-        // TODO: 실제 PG 승인 검증은 PG 연동 시 구현합니다.
+        // TODO: 실제 PG 승인 검증은 PG 연동 시 결제 금액과 승인 결과를 함께 검증한다.
         payment.succeed(resolvePaymentKey(paymentKey), resolveMethod(method), clock);
         order.markPaid(clock);
         issueEnrollments(order);
@@ -63,6 +64,7 @@ public class PaymentService {
         }
 
         Payment payment = getOrCreatePayment(order);
+        // 결제 실패 후 재시도를 허용하기 위해 주문 상태는 결제 대기로 유지한다.
         payment.fail(resolveFailedReason(failedReason), clock);
 
         return PaymentResponse.from(payment);
