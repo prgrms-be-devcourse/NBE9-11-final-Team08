@@ -7,6 +7,7 @@ import com.team08.backend.domain.study.dto.request.StudyCreateRequest;
 import com.team08.backend.domain.study.dto.request.StudyUpdateRequest;
 import com.team08.backend.domain.study.dto.response.StudyApplicationResponse;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.*;
 import com.team08.backend.domain.study.exception.*;
@@ -357,6 +358,8 @@ public class StudyServiceTest {
 
         given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.KICKED))
+                .willReturn(false);
         given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
                 .willReturn(false);
         given(studyApplicationRepository.existsByStudyIdAndUserId(studyId, userId)).willReturn(false);
@@ -404,6 +407,8 @@ public class StudyServiceTest {
         Study study = StudyFixture.study(studyId, owner);
 
         given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.KICKED))
+                .willReturn(false);
         given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
                 .willReturn(true);
 
@@ -426,6 +431,8 @@ public class StudyServiceTest {
         Study study = StudyFixture.study(studyId, owner);
 
         given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.KICKED))
+                .willReturn(false);
         given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.ACTIVE))
                 .willReturn(false);
         given(studyApplicationRepository.existsByStudyIdAndUserId(studyId, userId)).willReturn(true);
@@ -582,5 +589,162 @@ public class StudyServiceTest {
         // when & then
         assertThatThrownBy(() -> studyService.rejectStudyApplication(studyId, applicationId, requestUserId))
                 .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_생성자는_멤버_목록을_조회할_수_있다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        User owner = UserFixture.user(ownerId);
+        User user = UserFixture.user(2L);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember ownerMember = StudyMember.createOwner(owner, study);
+        StudyMember member = StudyMember.createMember(user, study);
+        ReflectionTestUtils.setField(ownerMember, "id", 100L);
+        ReflectionTestUtils.setField(member, "id", 101L);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.findByStudyIdAndStatusOrderByJoinedAtAsc(studyId, StudyMemberStatus.ACTIVE))
+                .willReturn(List.of(ownerMember, member));
+
+        // when
+        List<StudyMemberResponse> responses = studyService.getStudyMembers(studyId, ownerId);
+
+        // then
+        assertThat(responses).hasSize(2);
+        assertThat(responses.get(0).role()).isEqualTo(StudyMemberRole.OWNER);
+        assertThat(responses.get(1).role()).isEqualTo(StudyMemberRole.MEMBER);
+    }
+
+    @Test
+    void 생성자가_아니면_멤버_목록을_조회할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long requestUserId = 2L;
+        Long studyId = 10L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.getStudyMembers(studyId, requestUserId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_생성자는_멤버를_강퇴할_수_있다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        Long memberId = 100L;
+        User owner = UserFixture.user(ownerId);
+        User user = UserFixture.user(2L);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.findByIdAndStudyId(memberId, studyId)).willReturn(Optional.of(member));
+
+        // when
+        studyService.kickStudyMember(studyId, memberId, ownerId);
+
+        // then
+        assertThat(member.getStatus()).isEqualTo(StudyMemberStatus.KICKED);
+        assertThat(member.getKickedAt()).isNotNull();
+    }
+
+    @Test
+    void 스터디_생성자는_강퇴할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long studyId = 10L;
+        Long ownerMemberId = 100L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember ownerMember = StudyMember.createOwner(owner, study);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.findByIdAndStudyId(ownerMemberId, studyId)).willReturn(Optional.of(ownerMember));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.kickStudyMember(studyId, ownerMemberId, ownerId))
+                .isInstanceOf(StudyOwnerCannotBeKickedException.class);
+    }
+
+    @Test
+    void 생성자가_아니면_멤버를_강퇴할_수_없다() {
+        // given
+        Long ownerId = 1L;
+        Long requestUserId = 2L;
+        Long studyId = 10L;
+        Long memberId = 100L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyByIdWithOwner(studyId)).willReturn(Optional.of(study));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.kickStudyMember(studyId, memberId, requestUserId))
+                .isInstanceOf(StudyAccessDeniedException.class);
+    }
+
+    @Test
+    void 스터디_멤버는_자발적으로_탈퇴할_수_있다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        User user = UserFixture.user(userId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember member = StudyMember.createMember(user, study);
+
+        given(studyMemberRepository.findByStudyIdAndUserId(studyId, userId)).willReturn(Optional.of(member));
+
+        // when
+        studyService.leaveStudy(studyId, userId);
+
+        // then
+        assertThat(member.getStatus()).isEqualTo(StudyMemberStatus.LEFT);
+        assertThat(member.getLeftAt()).isNotNull();
+    }
+
+    @Test
+    void 스터디_생성자는_탈퇴할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long ownerId = 1L;
+        User owner = UserFixture.user(ownerId);
+        Study study = StudyFixture.study(studyId, owner);
+        StudyMember ownerMember = StudyMember.createOwner(owner, study);
+
+        given(studyMemberRepository.findByStudyIdAndUserId(studyId, ownerId)).willReturn(Optional.of(ownerMember));
+
+        // when & then
+        assertThatThrownBy(() -> studyService.leaveStudy(studyId, ownerId))
+                .isInstanceOf(StudyOwnerCannotLeaveException.class);
+    }
+
+    @Test
+    void 강퇴된_사용자는_재신청할_수_없다() {
+        // given
+        Long studyId = 10L;
+        Long userId = 2L;
+        User owner = UserFixture.user(1L);
+        Study study = StudyFixture.study(studyId, owner);
+
+        given(studyRepository.findActiveStudyById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(studyId, userId, StudyMemberStatus.KICKED))
+                .willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> studyService.applyStudy(
+                studyId,
+                userId,
+                new StudyApplicationCreateRequest("다시 참여하고 싶습니다.")
+        )).isInstanceOf(StudyKickedMemberCannotApplyException.class);
+
+        verify(studyApplicationRepository, never()).save(any());
     }
 }

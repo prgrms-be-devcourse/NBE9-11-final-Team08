@@ -5,6 +5,7 @@ import com.team08.backend.domain.study.dto.request.StudyCreateRequest;
 import com.team08.backend.domain.study.dto.request.StudyUpdateRequest;
 import com.team08.backend.domain.study.dto.response.StudyApplicationResponse;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.*;
 import com.team08.backend.domain.study.exception.*;
@@ -218,8 +219,14 @@ public class StudyService {
 
         application.approve();
 
-        StudyMember studyMember = StudyMember.createMember(application.getUser(), application.getStudy());
-        studyMemberRepository.save(studyMember);
+        studyMemberRepository.findByStudyIdAndUserId(id, applicantId)
+                .ifPresentOrElse(
+                        StudyMember::rejoinAsMember,
+                        () -> {
+                            StudyMember studyMember = StudyMember.createMember(application.getUser(), application.getStudy());
+                            studyMemberRepository.save(studyMember);
+                        }
+                );
 
         log.debug("스터디 참여 신청 승인 studyId={}, applicationId={}, ownerId={}", id, applicationId, userId);
     }
@@ -234,6 +241,36 @@ public class StudyService {
         log.debug("스터디 참여 신청 거절 studyId={}, applicationId={}, ownerId={}", id, applicationId, userId);
     }
 
+    @Transactional(readOnly = true)
+    public List<StudyMemberResponse> getStudyMembers(Long id, Long userId) {
+        getOwnedStudy(id, userId);
+
+        return studyMemberRepository.findByStudyIdAndStatusOrderByJoinedAtAsc(id, StudyMemberStatus.ACTIVE)
+                .stream()
+                .map(StudyMemberResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void kickStudyMember(Long id, Long memberId, Long userId) {
+        getOwnedStudy(id, userId);
+
+        StudyMember member = getStudyMember(id, memberId);
+        member.kick();
+
+        log.debug("스터디 멤버 강퇴 studyId={}, memberId={}, ownerId={}", id, memberId, userId);
+    }
+
+    @Transactional
+    public void leaveStudy(Long id, Long userId) {
+        StudyMember member = studyMemberRepository.findByStudyIdAndUserId(id, userId)
+                .orElseThrow(StudyMemberNotFoundException::new);
+
+        member.leave();
+
+        log.debug("스터디 탈퇴 studyId={}, userId={}, memberId={}", id, userId, member.getId());
+    }
+
     private Study getOwnedStudy(Long id, Long userId) {
         Study study = studyRepository.findActiveStudyByIdWithOwner(id)
                 .orElseThrow(StudyNotFoundException::new);
@@ -245,6 +282,10 @@ public class StudyService {
 
     private void validateCanApply(Long id, Long userId, Study study) {
         study.validateCanReceiveApplicationFrom(userId);
+
+        if (studyMemberRepository.existsByStudyIdAndUserIdAndStatus(id, userId, StudyMemberStatus.KICKED)) {
+            throw new StudyKickedMemberCannotApplyException();
+        }
 
         if (studyMemberRepository.existsByStudyIdAndUserIdAndStatus(id, userId, StudyMemberStatus.ACTIVE)) {
             throw new StudyAlreadyMemberException();
@@ -258,5 +299,10 @@ public class StudyService {
     private StudyApplication getStudyApplication(Long id, Long applicationId) {
         return studyApplicationRepository.findByIdAndStudyId(applicationId, id)
                 .orElseThrow(StudyApplicationNotFoundException::new);
+    }
+
+    private StudyMember getStudyMember(Long id, Long memberId) {
+        return studyMemberRepository.findByIdAndStudyId(memberId, id)
+                .orElseThrow(StudyMemberNotFoundException::new);
     }
 }
