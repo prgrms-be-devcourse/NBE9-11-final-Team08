@@ -13,6 +13,7 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.service.OrderService;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.payment.service.PaymentService;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -53,6 +54,9 @@ class OrderPaymentMvpIntegrationTest {
 
     @Autowired
     private EnrollmentRepository enrollmentRepository;
+
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Test
     void addCartItemPreventsDuplicateCourse() {
@@ -107,12 +111,27 @@ class OrderPaymentMvpIntegrationTest {
         cartService.addItem(user.getId(), course.getId());
         OrderDetailResponse order = orderService.createFromCart(user.getId());
 
-        PaymentResponse payment = paymentService.mockFail(user.getId(), order.orderId(), "카드 승인 실패");
+        PaymentResponse payment = paymentService.mockFail(user.getId(), order.orderId(), "Mock payment failed");
         OrderDetailResponse currentOrder = orderService.getMyOrder(user.getId(), order.orderId());
 
         assertThat(payment.status()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(payment.failedReason()).isEqualTo("카드 승인 실패");
+        assertThat(payment.failedReason()).isEqualTo("Mock payment failed");
         assertThat(currentOrder.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+    }
+
+    @Test
+    void cancelOrderCancelsFailedPayment() {
+        User user = saveUser("cancel@example.com");
+        Course course = saveCourse(user, "Cancel Course", 20000);
+        cartService.addItem(user.getId(), course.getId());
+        OrderDetailResponse order = orderService.createFromCart(user.getId());
+        paymentService.mockFail(user.getId(), order.orderId(), "Mock payment failed");
+
+        OrderDetailResponse canceledOrder = orderService.cancel(user.getId(), order.orderId());
+
+        assertThat(canceledOrder.status()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(paymentRepository.findByOrderId(order.orderId()).orElseThrow().getStatus())
+                .isEqualTo(PaymentStatus.CANCELED);
     }
 
     private User saveUser(String email) {
@@ -142,7 +161,7 @@ class OrderPaymentMvpIntegrationTest {
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("테스트 엔티티 생성에 실패했습니다.", e);
+            throw new IllegalStateException("Failed to create test entity.", e);
         }
     }
 }
