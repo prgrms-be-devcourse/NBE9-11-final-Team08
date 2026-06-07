@@ -43,18 +43,18 @@ public class OrderService {
     @Transactional
     public OrderDetailResponse createFromCart(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
         List<CartItem> cartItems = cartItemRepository.findAllByCartUserIdOrderByCreatedAtDesc(userId);
 
         if (cartItems.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "장바구니가 비어 있습니다.");
         }
 
         Integer totalPrice = cartItems.stream()
                 .mapToInt(CartItem::getPrice)
                 .sum();
 
-        // TODO: Apply coupons after Coupon domain policies are finalized.
+        // TODO: Coupon 도메인의 할인 정책이 확정되면 주문 생성 시 쿠폰 검증과 할인 계산을 연동한다.
         Order order = orderRepository.save(Order.create(user, generateOrderNumber(), totalPrice, 0, clock));
         List<OrderItem> orderItems = cartItems.stream()
                 .map(cartItem -> OrderItem.create(order, cartItem.getCourse(), 0, clock))
@@ -85,14 +85,15 @@ public class OrderService {
         Order order = getOrder(userId, orderId);
 
         if (order.getStatus() == OrderStatus.PAID) {
-            // TODO: Implement refund flow after PG/refund policies are finalized.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid orders cannot be canceled in this MVP.");
+            // TODO: 실제 PG 환불 정책이 확정되면 결제 취소와 수강권 회수를 함께 처리한다.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "결제 완료 주문은 MVP에서 취소할 수 없습니다.");
         }
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order status cannot be canceled.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "취소할 수 없는 주문 상태입니다.");
         }
 
         order.cancel(clock);
+        // 주문과 결제 상태가 엇갈리지 않도록 미완료 결제는 함께 취소한다.
         paymentRepository.findByOrderId(order.getId())
                 .filter(payment -> payment.getStatus() == PaymentStatus.READY || payment.getStatus() == PaymentStatus.FAILED)
                 .ifPresent(payment -> payment.cancel(clock));
@@ -101,7 +102,7 @@ public class OrderService {
 
     private Order getOrder(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
     }
 
     private OrderDetailResponse toDetailResponse(Order order) {
@@ -118,5 +119,5 @@ public class OrderService {
         return "ORD-" + timestamp + "-" + suffix;
     }
 
-    // TODO: Add direct single-course order creation if this remains in Issue #14 scope after API policy review.
+    // TODO: 바로 주문 API는 장바구니 우선 MVP 검증 후 요청 DTO와 구매 정책을 확정해 추가한다.
 }

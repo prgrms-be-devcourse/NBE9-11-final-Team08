@@ -39,8 +39,9 @@ public class CartService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "강의를 찾을 수 없습니다."));
 
-        // TODO: Course 도메인 정책 확정 후 판매중/삭제 여부 검증을 Course 서비스로 위임합니다.
+        // TODO: Course 도메인의 판매 가능 정책이 확정되면 구매 가능 여부 검증을 위임한다.
         if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE)) {
+            // 이미 수강권이 있는 강의는 중복 구매로 이어질 수 있어 장바구니 단계에서 차단한다.
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 수강 중인 강의입니다.");
         }
 

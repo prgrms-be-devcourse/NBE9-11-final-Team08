@@ -35,6 +35,7 @@ public class OrderItem {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    // 주문 이후 강의 정보가 바뀌어도 결제 당시 강의명과 가격을 보존한다.
     @Column(nullable = false)
     private String courseTitle;
 
