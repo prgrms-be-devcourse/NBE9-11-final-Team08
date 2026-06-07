@@ -38,4 +38,16 @@ public class User {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    private User(String email, String password, String nickname) {
+        this.email = email;
+        this.password = password;
+        this.nickname = nickname;
+        this.role = "USER";
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public static User create(String email, String password, String nickname) {
+        return new User(email, password, nickname);
+    }
 }

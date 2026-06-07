@@ -56,4 +56,16 @@ public class StudyMember {
     private LocalDateTime leftAt;
 
     private LocalDateTime kickedAt;
+
+    private StudyMember(User user, Study study, StudyMemberRole role) {
+        this.user = user;
+        this.study = study;
+        this.role = role;
+        status = StudyMemberStatus.ACTIVE;
+        joinedAt = LocalDateTime.now();
+    }
+
+    public static StudyMember createOwner(User owner, Study study) {
+        return new StudyMember(owner, study, StudyMemberRole.OWNER);
+    }
 }
