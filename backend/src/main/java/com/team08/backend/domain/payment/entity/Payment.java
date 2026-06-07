@@ -77,4 +77,9 @@ public class Payment {
         this.failedReason = failedReason;
         this.updatedAt = LocalDateTime.now(clock);
     }
+
+    public void cancel(Clock clock) {
+        this.status = PaymentStatus.CANCELED;
+        this.updatedAt = LocalDateTime.now(clock);
+    }
 }

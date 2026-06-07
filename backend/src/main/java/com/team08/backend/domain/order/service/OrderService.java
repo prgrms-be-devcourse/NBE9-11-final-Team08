@@ -11,6 +11,8 @@ import com.team08.backend.domain.order.entity.OrderItem;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderItemRepository;
 import com.team08.backend.domain.order.repository.OrderRepository;
+import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,23 +37,24 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
+    private final PaymentRepository paymentRepository;
     private final Clock clock;
 
     @Transactional
     public OrderDetailResponse createFromCart(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
         List<CartItem> cartItems = cartItemRepository.findAllByCartUserIdOrderByCreatedAtDesc(userId);
 
         if (cartItems.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "장바구니가 비어 있습니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cart is empty.");
         }
 
         Integer totalPrice = cartItems.stream()
                 .mapToInt(CartItem::getPrice)
                 .sum();
 
-        // TODO: 쿠폰 적용은 MVP 이후 Coupon 도메인 정책 확정 후 연동합니다.
+        // TODO: Apply coupons after Coupon domain policies are finalized.
         Order order = orderRepository.save(Order.create(user, generateOrderNumber(), totalPrice, 0, clock));
         List<OrderItem> orderItems = cartItems.stream()
                 .map(cartItem -> OrderItem.create(order, cartItem.getCourse(), 0, clock))
@@ -82,20 +85,23 @@ public class OrderService {
         Order order = getOrder(userId, orderId);
 
         if (order.getStatus() == OrderStatus.PAID) {
-            // TODO: 결제 완료 주문 환불은 실제 PG/환불 정책 확정 후 구현합니다.
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "결제 완료 주문은 MVP에서 취소할 수 없습니다.");
+            // TODO: Implement refund flow after PG/refund policies are finalized.
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Paid orders cannot be canceled in this MVP.");
         }
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "취소할 수 없는 주문 상태입니다.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Order status cannot be canceled.");
         }
 
         order.cancel(clock);
+        paymentRepository.findByOrderId(order.getId())
+                .filter(payment -> payment.getStatus() == PaymentStatus.READY || payment.getStatus() == PaymentStatus.FAILED)
+                .ifPresent(payment -> payment.cancel(clock));
         return toDetailResponse(order);
     }
 
     private Order getOrder(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found."));
     }
 
     private OrderDetailResponse toDetailResponse(Order order) {
@@ -111,4 +117,6 @@ public class OrderService {
         String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         return "ORD-" + timestamp + "-" + suffix;
     }
+
+    // TODO: Add direct single-course order creation if this remains in Issue #14 scope after API policy review.
 }
