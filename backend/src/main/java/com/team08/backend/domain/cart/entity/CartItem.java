@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "cart_items",
         indexes = @Index(name = "idx_cart_items_cart_course", columnList = "cart_id, course_id"),
+        // 서비스 검증과 DB 제약을 함께 둬 동시 요청에서도 같은 강의 중복 담기를 막는다.
         uniqueConstraints = @UniqueConstraint(name = "uk_cart_items_cart_course", columnNames = {"cart_id", "course_id"})
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

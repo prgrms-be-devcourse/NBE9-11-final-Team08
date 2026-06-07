@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "enrollments",
         indexes = @Index(name = "idx_enrollments_user_course", columnList = "user_id, course_id"),
-        // TODO: Revisit this unique key when refund/expiration and re-purchase policies are defined.
+        // TODO: 환불/만료 후 재구매 정책이 확정되면 ACTIVE 상태 기준 중복 제약으로 재검토한다.
         uniqueConstraints = @UniqueConstraint(name = "uk_enrollments_user_course", columnNames = {"user_id", "course_id"})
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
