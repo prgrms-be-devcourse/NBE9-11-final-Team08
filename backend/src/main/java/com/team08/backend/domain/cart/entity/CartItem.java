@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -45,4 +46,13 @@ public class CartItem {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    public static CartItem create(Cart cart, Course course, Clock clock) {
+        CartItem cartItem = new CartItem();
+        cartItem.cart = cart;
+        cartItem.course = course;
+        cartItem.price = course.getPrice();
+        cartItem.createdAt = LocalDateTime.now(clock);
+        return cartItem;
+    }
 }

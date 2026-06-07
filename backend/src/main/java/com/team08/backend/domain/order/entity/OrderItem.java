@@ -14,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -50,4 +51,18 @@ public class OrderItem {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    public static OrderItem create(Order order, Course course, Integer discountPrice, Clock clock) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.order = order;
+        orderItem.course = course;
+        orderItem.courseTitle = course.getTitle();
+        orderItem.price = course.getPrice();
+        orderItem.discountPrice = discountPrice;
+        orderItem.finalPrice = course.getPrice() - discountPrice;
+        orderItem.createdAt = now;
+        return orderItem;
+    }
 }
