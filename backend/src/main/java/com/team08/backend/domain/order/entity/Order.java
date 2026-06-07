@@ -17,6 +17,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -68,4 +69,33 @@ public class Order {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    public static Order create(User user, String orderNumber, Integer totalPrice, Integer discountPrice, Clock clock) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        Order order = new Order();
+        order.user = user;
+        order.orderNumber = orderNumber;
+        order.totalPrice = totalPrice;
+        order.discountPrice = discountPrice;
+        order.finalPrice = totalPrice - discountPrice;
+        order.status = OrderStatus.PENDING_PAYMENT;
+        order.orderedAt = now;
+        order.createdAt = now;
+        return order;
+    }
+
+    public void markPaid(Clock clock) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        this.status = OrderStatus.PAID;
+        this.paidAt = now;
+        this.updatedAt = now;
+    }
+
+    public void cancel(Clock clock) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        this.status = OrderStatus.CANCELED;
+        this.canceledAt = now;
+        this.updatedAt = now;
+    }
 }
