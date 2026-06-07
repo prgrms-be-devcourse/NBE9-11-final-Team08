@@ -88,6 +88,35 @@ class OrderPaymentMvpIntegrationTest {
     }
 
     @Test
+    void createDirectOrderStoresSingleSnapshotWithoutClearingCart() {
+        User user = saveUser("direct@example.com");
+        Course cartCourse = saveCourse(user, "Cart Course", 10000);
+        Course directCourse = saveCourse(user, "Direct Course", 25000);
+        cartService.addItem(user.getId(), cartCourse.getId());
+
+        OrderDetailResponse order = orderService.createDirect(user.getId(), directCourse.getId());
+
+        assertThat(order.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(order.totalPrice()).isEqualTo(25000);
+        assertThat(order.items()).hasSize(1);
+        assertThat(order.items().get(0).courseId()).isEqualTo(directCourse.getId());
+        assertThat(order.items().get(0).courseTitle()).isEqualTo("Direct Course");
+        assertThat(order.items().get(0).price()).isEqualTo(25000);
+        assertThat(cartService.getMyCart(user.getId()).items()).hasSize(1);
+    }
+
+    @Test
+    void createDirectOrderPreventsAlreadyEnrolledCourse() {
+        User user = saveUser("direct-enrolled@example.com");
+        Course course = saveCourse(user, "Already Enrolled Course", 25000);
+        OrderDetailResponse order = orderService.createDirect(user.getId(), course.getId());
+        paymentService.mockSuccess(user.getId(), order.orderId(), "pay-direct-1", "CARD");
+
+        assertThatThrownBy(() -> orderService.createDirect(user.getId(), course.getId()))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void mockPaymentSuccessIssuesEnrollmentOnlyOnce() {
         User user = saveUser("payment@example.com");
         Course course = saveCourse(user, "Payment Course", 55000);
