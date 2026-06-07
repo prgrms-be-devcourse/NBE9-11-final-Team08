@@ -3,6 +3,10 @@ package com.team08.backend.domain.order.service;
 import com.team08.backend.domain.cart.entity.CartItem;
 import com.team08.backend.domain.cart.repository.CartItemRepository;
 import com.team08.backend.domain.cart.repository.CartRepository;
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
+import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
 import com.team08.backend.domain.order.dto.OrderItemResponse;
 import com.team08.backend.domain.order.dto.OrderSummaryResponse;
@@ -37,33 +41,46 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
+    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
     private final PaymentRepository paymentRepository;
     private final Clock clock;
 
     @Transactional
     public OrderDetailResponse createFromCart(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        User user = getUser(userId);
         List<CartItem> cartItems = cartItemRepository.findAllByCartUserIdOrderByCreatedAtDesc(userId);
 
         if (cartItems.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "장바구니가 비어 있습니다.");
         }
 
+        List<Course> courses = cartItems.stream()
+                .map(CartItem::getCourse)
+                .toList();
         Integer totalPrice = cartItems.stream()
                 .mapToInt(CartItem::getPrice)
                 .sum();
-
-        // TODO: Coupon 도메인의 할인 정책이 확정되면 주문 생성 시 쿠폰 검증과 할인 계산을 연동한다.
-        Order order = orderRepository.save(Order.create(user, generateOrderNumber(), totalPrice, 0, clock));
-        List<OrderItem> orderItems = cartItems.stream()
-                .map(cartItem -> OrderItem.create(order, cartItem.getCourse(), 0, clock))
-                .toList();
-        orderItemRepository.saveAll(orderItems);
+        Order order = createOrder(user, courses, totalPrice);
 
         cartItemRepository.deleteAllByCartUserId(userId);
         cartRepository.findByUserId(userId).ifPresent(cart -> cart.touch(clock));
 
+        return toDetailResponse(order);
+    }
+
+    @Transactional
+    public OrderDetailResponse createDirect(Long userId, Long courseId) {
+        User user = getUser(userId);
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "강의를 찾을 수 없습니다."));
+
+        // TODO: Course 도메인의 판매 가능/삭제/무료 강의 정책이 확정되면 바로 주문 검증에 반영한다.
+        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 수강 중인 강의입니다.");
+        }
+
+        Order order = createOrder(user, List.of(course), course.getPrice());
         return toDetailResponse(order);
     }
 
@@ -100,9 +117,24 @@ public class OrderService {
         return toDetailResponse(order);
     }
 
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+    }
+
     private Order getOrder(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+    }
+
+    private Order createOrder(User user, List<Course> courses, Integer totalPrice) {
+        // TODO: Coupon 도메인의 할인 정책이 확정되면 주문 생성 시 쿠폰 검증과 할인 계산을 연동한다.
+        Order order = orderRepository.save(Order.create(user, generateOrderNumber(), totalPrice, 0, clock));
+        List<OrderItem> orderItems = courses.stream()
+                .map(course -> OrderItem.create(order, course, 0, clock))
+                .toList();
+        orderItemRepository.saveAll(orderItems);
+        return order;
     }
 
     private OrderDetailResponse toDetailResponse(Order order) {
@@ -118,6 +150,4 @@ public class OrderService {
         String suffix = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         return "ORD-" + timestamp + "-" + suffix;
     }
-
-    // TODO: 바로 주문 API는 장바구니 우선 MVP 검증 후 요청 DTO와 구매 정책을 확정해 추가한다.
 }
