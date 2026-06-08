@@ -39,7 +39,7 @@ public class BookController {
             @AuthenticationPrincipal LoginUserPrincipal principal
     ) {
         bookService.updateBook(bookId, request, principal.user().id());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{bookId}")

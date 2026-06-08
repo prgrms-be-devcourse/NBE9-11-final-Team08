@@ -41,7 +41,7 @@ public class CourseController {
             @AuthenticationPrincipal LoginUserPrincipal principal
     ) {
         courseService.updateCourse(courseId, request, principal.user().id());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{courseId}")
