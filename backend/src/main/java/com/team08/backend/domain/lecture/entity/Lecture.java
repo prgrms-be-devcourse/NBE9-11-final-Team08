@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -50,4 +51,25 @@ public class Lecture {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @Builder
+    public Lecture(Chapter chapter, String youtubeVideoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
+        this.chapter = chapter;
+        this.youtubeVideoId = youtubeVideoId;
+        this.title = title;
+        this.durationSeconds = durationSeconds;
+        this.orderNo = orderNo;
+        this.isFreePreview = isFreePreview != null ? isFreePreview : false;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void update(String youtubeVideoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
+        if (youtubeVideoId != null && !youtubeVideoId.isBlank()) this.youtubeVideoId = youtubeVideoId;
+        if (title != null && !title.isBlank()) this.title = title;
+        if (durationSeconds != null && durationSeconds >= 0) this.durationSeconds = durationSeconds;
+        if (orderNo != null && orderNo >= 0) this.orderNo = orderNo;
+        if (isFreePreview != null) this.isFreePreview = isFreePreview;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
