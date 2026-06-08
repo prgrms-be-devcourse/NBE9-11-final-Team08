@@ -14,3 +14,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             "where c.id = :courseId and c.deletedAt is null")
     Optional<Course> findWithCurriculumById(@Param("courseId") Long courseId);
 }
+
+public interface CourseRepository extends JpaRepository<Course, Long> {
+}
