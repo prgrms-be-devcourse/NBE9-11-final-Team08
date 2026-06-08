@@ -43,8 +43,8 @@ public class LectureReflection {
     @Column(nullable = false)
     private String content;
 
-//    @Column(nullable = false)
-//    private LocalDateTime createdAt;
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
@@ -55,7 +55,7 @@ public class LectureReflection {
         reflection.lecture = lecture;
         reflection.user = user;
         reflection.content = content;
-//        reflection.createdAt = now;
+        reflection.createdAt = now;
         reflection.updatedAt = now;
         return reflection;
     }
