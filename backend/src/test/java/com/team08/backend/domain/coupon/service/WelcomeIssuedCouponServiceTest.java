@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -24,8 +25,7 @@ import static org.hibernate.validator.internal.util.Contracts.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -89,11 +89,10 @@ class WelcomeIssuedCouponServiceTest {
         CouponPolicy mockPolicy = CouponPolicy.builder()
                 .name("작가의 날 기념 도서 10% 할인 쿠폰")
                 .couponTarget(CouponTarget.BOOK)
-                .couponType(CouponType.NORMAL) // 이 부분을 추가해야 합니다
+                .couponType(CouponType.NORMAL)
                 .validDays(7)
                 .build();
 
-        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(mockPolicy));
 
@@ -110,8 +109,18 @@ class WelcomeIssuedCouponServiceTest {
         // given
         Long userId = 1L;
         Long policyId = 10L;
+        User mockUser = User.create("test@test.com", "password", "테스터");
+        CouponPolicy mockPolicy = CouponPolicy.builder()
+                .name("작가의 날 기념 도서 10% 할인 쿠폰")
+                .couponTarget(CouponTarget.BOOK)
+                .couponType(CouponType.NORMAL)
+                .validDays(7)
+                .build();
 
-        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(true);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mockUser));
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(mockPolicy));
+        // DB 제약 조건 위반 발생 모의
+        doThrow(DataIntegrityViolationException.class).when(issuedCouponRepository).save(any());
 
         // when & then
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
@@ -119,8 +128,5 @@ class WelcomeIssuedCouponServiceTest {
         });
 
         assertEquals("이미 발급받은 쿠폰입니다.", exception.getMessage());
-
-        verify(userRepository, never()).findById(anyLong());
-        verify(issuedCouponRepository, never()).save(any());
     }
 }

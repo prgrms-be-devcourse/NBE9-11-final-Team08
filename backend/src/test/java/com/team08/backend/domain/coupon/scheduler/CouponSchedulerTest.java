@@ -41,8 +41,18 @@ class CouponSchedulerTest {
     void expireCoupons_RealStateChange() {
         // given
         User user = userRepository.save(User.create("test@test.com", "password", "테스트유저"));
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.builder()
-                .name("테스트정책")
+        CouponPolicy policy1 = couponPolicyRepository.save(CouponPolicy.builder()
+                .name("테스트정책1")
+                .validDays(7)
+                .couponTarget(CouponTarget.ALL)
+                .couponType(CouponType.NORMAL)
+                .discountType(DiscountType.AMOUNT)
+                .discountValue(1000)
+                .totalQuantity(100)
+                .build());
+
+        CouponPolicy policy2 = couponPolicyRepository.save(CouponPolicy.builder()
+                .name("테스트정책2")
                 .validDays(7)
                 .couponTarget(CouponTarget.ALL)
                 .couponType(CouponType.NORMAL)
@@ -55,7 +65,7 @@ class CouponSchedulerTest {
         IssuedCoupon expiredCoupon = issuedCouponRepository.save(
                 IssuedCoupon.builder()
                         .user(user)
-                        .policy(policy)
+                        .policy(policy1)
                         .expiredAt(LocalDateTime.now().minusDays(1))
                         .build()
         );
@@ -64,7 +74,7 @@ class CouponSchedulerTest {
         IssuedCoupon validCoupon = issuedCouponRepository.save(
                 IssuedCoupon.builder()
                         .user(user)
-                        .policy(policy)
+                        .policy(policy2)
                         .expiredAt(LocalDateTime.now().plusDays(1))
                         .build()
         );

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -49,21 +51,21 @@ class FcfsIssuedCouponServiceTest {
         CouponPolicy policy = CouponPolicy.builder()
                 .totalQuantity(1)
                 .validDays(7)
-                .couponType(CouponType.FCFS) // [추가됨] 타입 통과용
-                .issueStartDate(LocalDateTime.now().minusDays(1)) // [추가됨] 기간 통과용
+                .couponType(CouponType.FCFS)
+                .issueStartDate(LocalDateTime.now().minusDays(1))
                 .issueEndDate(LocalDateTime.now().plusDays(1))
                 .build();
         User mockUser = User.create("test@test.com", "password", "test");
 
-        given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
         given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
 
         // when
         issuedCouponService.downloadFcfsCoupon(userId, policyId);
 
         // then
-        assertEquals(0, policy.getTotalQuantity()); // 재고가 0이 되었는지 확인
+        assertEquals(0, policy.getTotalQuantity());
         verify(issuedCouponRepository, times(1)).save(any());
     }
 
@@ -76,14 +78,14 @@ class FcfsIssuedCouponServiceTest {
         CouponPolicy policy = CouponPolicy.builder()
                 .totalQuantity(0)
                 .validDays(7)
-                .couponType(CouponType.FCFS) // [추가됨] 타입 통과용
-                .issueStartDate(LocalDateTime.now().minusDays(1)) // [추가됨] 기간 통과용
+                .couponType(CouponType.FCFS)
+                .issueStartDate(LocalDateTime.now().minusDays(1))
                 .issueEndDate(LocalDateTime.now().plusDays(1))
                 .build();
         User mockUser = User.create("test@test.com", "password", "test");
 
-        given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
         given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
 
         // when & then
@@ -91,10 +93,6 @@ class FcfsIssuedCouponServiceTest {
             issuedCouponService.downloadFcfsCoupon(userId, policyId);
         });
     }
-
-    // ==========================================
-    // 2. 엣지 케이스 검증 테스트 (새로 다듬은 코드)
-    // ==========================================
 
     @Test
     @DisplayName("실패: 쿠폰 발급 시작 시간 이전에 요청하면 예외가 발생한다.")
@@ -107,12 +105,11 @@ class FcfsIssuedCouponServiceTest {
         ReflectionTestUtils.setField(user, "id", userId);
         CouponPolicy policy = CouponPolicy.builder()
                 .couponType(CouponType.FCFS)
-                .issueStartDate(LocalDateTime.now().plusHours(1)) // 1시간 뒤에 오픈됨!
+                .issueStartDate(LocalDateTime.now().plusHours(1))
                 .build();
 
-        given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
 
         // when & then
         assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
@@ -126,9 +123,20 @@ class FcfsIssuedCouponServiceTest {
         // given
         Long userId = 1L;
         Long policyId = 100L;
+        CouponPolicy policy = CouponPolicy.builder()
+                .totalQuantity(10)
+                .validDays(7)
+                .couponType(CouponType.FCFS)
+                .issueStartDate(LocalDateTime.now().minusDays(1))
+                .issueEndDate(LocalDateTime.now().plusDays(1))
+                .build();
+        User user = User.create("test@test.com", "password", "test");
 
-        // 이미 발급받았다고 모킹
-        given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(true);
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
+        // DB 제약 조건 위반 발생 모의
+        doThrow(DataIntegrityViolationException.class).when(issuedCouponRepository).save(any());
 
         // when & then
         assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
@@ -146,14 +154,13 @@ class FcfsIssuedCouponServiceTest {
         User user = User.create("test@test.com", "password", "test");
         ReflectionTestUtils.setField(user, "id", userId);
         CouponPolicy policy = CouponPolicy.builder()
-                .couponType(CouponType.NORMAL) // 선착순 타입이 아님!
+                .couponType(CouponType.NORMAL)
                 .issueStartDate(LocalDateTime.now().minusDays(1))
                 .issueEndDate(LocalDateTime.now().plusDays(1))
                 .build();
 
-        given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
 
         // when & then
         assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
