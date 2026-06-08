@@ -123,8 +123,8 @@ class CourseServiceTest {
 
         given(courseRepository.findWithCurriculumById(100L)).willReturn(Optional.of(course));
 
-        List<LectureSaveDto> lectures = List.of(new LectureSaveDto("vid-1", "첫 번째 영상", 600, 1, true));
-        List<ChapterSaveDto> chapters = List.of(new ChapterSaveDto("새로운 챕터", 1, lectures));
+        List<LectureSaveDto> lectures = List.of(new LectureSaveDto(null, "vid-1", "첫 번째 영상", 600, 1, true));
+        List<ChapterSaveDto> chapters = List.of(new ChapterSaveDto(null, "새로운 챕터", 1, lectures));
         CurriculumSaveRequest request = new CurriculumSaveRequest(chapters);
 
         courseService.saveCurriculum(100L, request, 1L);

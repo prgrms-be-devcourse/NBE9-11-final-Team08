@@ -19,9 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -104,65 +102,75 @@ public class CourseService {
             throw new AccessDeniedException("본인이 등록한 강의 상품의 커리큘럼만 관리할 수 있습니다.");
         }
 
-        if (request.chapters() == null || request.chapters().isEmpty()) {
-            course.clearChapters();
-            return;
-        }
+        List<ChapterSaveDto> chapterDtos = request.chapters() == null
+                ? List.of()
+                : request.chapters();
 
-        Map<String, Chapter> existingChapterMap = course.getChapters().stream()
-                .collect(Collectors.toMap(Chapter::getTitle, Function.identity(), (o1, o2) -> o1));
+        // 요청에 포함된 챕터 ID 집합
+        Set<Long> incomingChapterIds = chapterDtos.stream()
+                .map(ChapterSaveDto::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
-        List<Chapter> updatedChapters = new ArrayList<>();
+        // 기존 챕터 중 요청에 없는 것은 삭제
+        course.getChapters().removeIf(ch -> !incomingChapterIds.contains(ch.getId()));
 
-        for (ChapterSaveDto chapterDto : request.chapters()) {
-            Chapter chapter = existingChapterMap.get(chapterDto.title());
+        // 기존 챕터를 ID로 빠르게 조회
+        Map<Long, Chapter> existingChapterById = course.getChapters().stream()
+                .collect(Collectors.toMap(Chapter::getId, Function.identity()));
 
-            if (chapter != null) {
+        for (ChapterSaveDto chapterDto : chapterDtos) {
+            if (chapterDto.id() != null && existingChapterById.containsKey(chapterDto.id())) {
+                // 수정
+                Chapter chapter = existingChapterById.get(chapterDto.id());
                 chapter.update(chapterDto.title(), chapterDto.orderNo());
+                syncLectures(chapter, chapterDto.lectures());
             } else {
-                chapter = Chapter.builder()
+                // 신규 추가
+                Chapter newChapter = Chapter.builder()
                         .course(course)
                         .title(chapterDto.title())
                         .orderNo(chapterDto.orderNo())
                         .build();
-                chapter.setCourse(course);
+                syncLectures(newChapter, chapterDto.lectures());
+                course.getChapters().add(newChapter);
             }
+        }
+    }
 
-            if (chapterDto.lectures() != null) {
-                Map<String, Lecture> existingLectureMap = chapter.getLectures().stream()
-                        .collect(Collectors.toMap(Lecture::getTitle, Function.identity(), (o1, o2) -> o1));
-
-                List<Lecture> updatedLectures = new ArrayList<>();
-
-                for (LectureSaveDto lectureDto : chapterDto.lectures()) {
-                    Lecture lecture = existingLectureMap.get(lectureDto.title());
-
-                    if (lecture != null) {
-                        lecture.update(lectureDto.videoId(), lectureDto.title(), lectureDto.durationSeconds(), lectureDto.orderNo(), lectureDto.isFreePreview());
-                    } else {
-                        lecture = Lecture.builder()
-                                .chapter(chapter)
-                                .videoId(lectureDto.videoId())
-                                .title(lectureDto.title())
-                                .durationSeconds(lectureDto.durationSeconds())
-                                .orderNo(lectureDto.orderNo())
-                                .isFreePreview(lectureDto.isFreePreview())
-                                .build();
-                    }
-                    updatedLectures.add(lecture);
-                }
-
-                chapter.getLectures().clear();
-                chapter.getLectures().addAll(updatedLectures);
-            } else {
-                chapter.getLectures().clear();
-            }
-
-            updatedChapters.add(chapter);
+    private void syncLectures(Chapter chapter, List<LectureSaveDto> lectureDtos) {
+        if (lectureDtos == null) {
+            lectureDtos = List.of();
         }
 
-        course.getChapters().clear();
-        course.getChapters().addAll(updatedChapters);
+        Set<Long> incomingLectureIds = lectureDtos.stream()
+                .map(LectureSaveDto::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // 요청에 없는 강의 삭제
+        chapter.getLectures().removeIf(lec -> !incomingLectureIds.contains(lec.getId()));
+
+        Map<Long, Lecture> existingLectureById = chapter.getLectures().stream()
+                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
+
+        for (LectureSaveDto dto : lectureDtos) {
+            if (dto.id() != null && existingLectureById.containsKey(dto.id())) {
+                // 수정
+                existingLectureById.get(dto.id())
+                        .update(dto.videoId(), dto.title(), dto.durationSeconds(), dto.orderNo(), dto.isFreePreview());
+            } else {
+                // 신규 추가
+                chapter.getLectures().add(Lecture.builder()
+                        .chapter(chapter)
+                        .videoId(dto.videoId())
+                        .title(dto.title())
+                        .durationSeconds(dto.durationSeconds())
+                        .orderNo(dto.orderNo())
+                        .isFreePreview(dto.isFreePreview())
+                        .build());
+            }
+        }
     }
 
     private Category getCategoryOrNull(Long categoryId) {

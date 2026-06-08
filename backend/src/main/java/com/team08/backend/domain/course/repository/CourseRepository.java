@@ -10,6 +10,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("select distinct c from Course c " +
             "left join fetch c.chapters ch " +
+            "left join fetch ch.lectures " +
             "where c.id = :courseId and c.deletedAt is null")
     Optional<Course> findWithCurriculumById(@Param("courseId") Long courseId);
 }
