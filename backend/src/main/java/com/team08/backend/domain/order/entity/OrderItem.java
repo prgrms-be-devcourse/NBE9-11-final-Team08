@@ -14,6 +14,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -34,6 +35,7 @@ public class OrderItem {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    // 주문 이후 강의 정보가 바뀌어도 결제 당시 강의명과 가격을 보존한다.
     @Column(nullable = false)
     private String courseTitle;
 
@@ -50,4 +52,18 @@ public class OrderItem {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    public static OrderItem create(Order order, Course course, Integer discountPrice, Clock clock) {
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.order = order;
+        orderItem.course = course;
+        orderItem.courseTitle = course.getTitle();
+        orderItem.price = course.getPrice();
+        orderItem.discountPrice = discountPrice;
+        orderItem.finalPrice = course.getPrice() - discountPrice;
+        orderItem.createdAt = now;
+        return orderItem;
+    }
 }
