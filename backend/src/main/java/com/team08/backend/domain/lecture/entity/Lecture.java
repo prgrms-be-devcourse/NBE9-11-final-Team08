@@ -31,7 +31,7 @@ public class Lecture {
     private Chapter chapter;
 
     @Column(nullable = false)
-    private String youtubeVideoId;
+    private String videoId;
 
     @Column(nullable = false)
     private String title;

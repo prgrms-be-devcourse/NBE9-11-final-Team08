@@ -11,18 +11,25 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "study_reports")
+@Table(
+        name = "daily_lecture_stats",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_daily_lecture_stats_user_course_date",
+                columnNames = {"user_id", "course_id", "stat_date"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StudyReport {
+public class DailyLectureStat {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,30 +43,26 @@ public class StudyReport {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    private Integer totalWatchTime = 0;
-
-    private Integer totalComments = 0;
-
-    @Column(precision = 5, scale = 2)
-    private BigDecimal progressRate;
+    @Column(name = "stat_date", nullable = false)
+    private LocalDate statDate;
 
     @Column(nullable = false)
-    private LocalDateTime generatedAt;
+    private Integer completedLectureCount = 0;
 
-    public static StudyReport generate(
-            User user,
-            Course course,
-            Integer totalWatchTime,
-            Integer totalComments,
-            BigDecimal progressRate
-    ) {
-        StudyReport report = new StudyReport();
-        report.user = user;
-        report.course = course;
-        report.totalWatchTime = totalWatchTime;
-        report.totalComments = totalComments;
-        report.progressRate = progressRate;
-        report.generatedAt = LocalDateTime.now();
-        return report;
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    public static DailyLectureStat create(User user, Course course, LocalDate statDate) {
+        DailyLectureStat stat = new DailyLectureStat();
+        stat.user = user;
+        stat.course = course;
+        stat.statDate = statDate;
+        stat.updatedAt = LocalDateTime.now();
+        return stat;
+    }
+
+    public void increaseCompletedLectureCount() {
+        this.completedLectureCount++;
+        this.updatedAt = LocalDateTime.now();
     }
 }

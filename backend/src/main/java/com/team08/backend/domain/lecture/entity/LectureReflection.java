@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,9 +20,12 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "lecture_comments")
+@Table(
+        name = "lecture_reflections",
+        uniqueConstraints = @UniqueConstraint(name = "uk_lecture_reflections_user_lecture", columnNames = {"user_id", "lecture_id"})
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class LectureComment {
+public class LectureReflection {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,18 +39,9 @@ public class LectureComment {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private LectureComment parent;
-
     @Lob
     @Column(nullable = false)
     private String content;
-
-    private Integer timestampSeconds;
-
-    @Column(nullable = false)
-    private Boolean deleted = false;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -54,22 +49,19 @@ public class LectureComment {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public static LectureComment create(
-            Lecture lecture,
-            User user,
-            LectureComment parent,
-            String content,
-            Integer timestampSeconds
-    ) {
+    public static LectureReflection create(Lecture lecture, User user, String content) {
         LocalDateTime now = LocalDateTime.now();
-        LectureComment comment = new LectureComment();
-        comment.lecture = lecture;
-        comment.user = user;
-        comment.parent = parent;
-        comment.content = content;
-        comment.timestampSeconds = timestampSeconds;
-        comment.createdAt = now;
-        comment.updatedAt = now;
-        return comment;
+        LectureReflection reflection = new LectureReflection();
+        reflection.lecture = lecture;
+        reflection.user = user;
+        reflection.content = content;
+        reflection.createdAt = now;
+        reflection.updatedAt = now;
+        return reflection;
+    }
+
+    public void update(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
     }
 }
