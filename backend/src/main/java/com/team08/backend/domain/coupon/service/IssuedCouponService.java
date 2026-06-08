@@ -11,6 +11,7 @@ import com.team08.backend.domain.coupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,11 +70,6 @@ public class IssuedCouponService {
     // [사용자] 일반 쿠폰 다운로드
     @Transactional
     public void downloadCoupon(Long userId, Long policyId) {
-        // 중복 발급 검증
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
-        }
-
         // 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
@@ -94,38 +90,47 @@ public class IssuedCouponService {
                 .expiredAt(policy.calculateExpirationDate())
                 .build();
 
-        issuedCouponRepository.save(newCoupon);
+        // 중복 발급 검증
+        try {
+            issuedCouponRepository.save(newCoupon);
+            issuedCouponRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
+        }
     }
-    
-    // TODO 락 범위 조절
+
     // [사용자] 선착순 쿠폰 다운로드
     @Transactional
     public void downloadFcfsCoupon(Long userId, Long policyId) {
-        // 중복 발급 검증
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
-        }
-
         // 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없음"));
 
-        // 비관적 락을 적용한 쿠폰 정책 조회
-        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+        // 쿠폰 정책 사전 검증
+        CouponPolicy validationPolicy = couponPolicyRepository.findById(policyId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
 
         // 선착순 쿠폰 여부 검증
-        if (policy.getCouponType() != CouponType.FCFS) {
+        if (validationPolicy.getCouponType() != CouponType.FCFS) {
             throw new IllegalArgumentException("선착순 발급 전용 쿠폰이 아닙니다.");
         }
 
         // 쿠폰 발급 기간 검증
         LocalDateTime now = LocalDateTime.now();
-        if (policy.getIssueStartDate() != null && now.isBefore(policy.getIssueStartDate())) {
+        if (validationPolicy.getIssueStartDate() != null && now.isBefore(validationPolicy.getIssueStartDate())) {
             throw new IllegalStateException("아직 쿠폰 발급 기간이 시작되지 않았습니다.");
         }
-        if (policy.getIssueEndDate() != null && now.isAfter(policy.getIssueEndDate())) {
+        if (validationPolicy.getIssueEndDate() != null && now.isAfter(validationPolicy.getIssueEndDate())) {
             throw new IllegalStateException("쿠폰 발급 기간이 종료되었습니다.");
+        }
+
+        // 비관적 락을 적용한 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 쿠폰입니다."));
+
+        // 쿠폰 재고 소진 검증
+        if (policy.getTotalQuantity() != null && policy.getTotalQuantity() <= 0) {
+            throw new IllegalStateException("선착순 쿠폰이 모두 소진되었습니다.");
         }
 
         // 쿠폰 수량 차감
@@ -138,7 +143,13 @@ public class IssuedCouponService {
                 .expiredAt(policy.calculateExpirationDate())
                 .build();
 
-        issuedCouponRepository.save(newCoupon);
+        // 중복 발급 검증
+        try {
+            issuedCouponRepository.save(newCoupon);
+            issuedCouponRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new IllegalStateException("이미 발급받은 쿠폰입니다.");
+        }
     }
 
     // [사용자] 내 쿠폰 목록 조회 (나중에 수정 필요할 수도)
