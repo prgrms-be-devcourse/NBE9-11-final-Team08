@@ -1,7 +1,11 @@
 package com.team08.backend.domain.study.entity;
 
 public enum StudyStatus {
-    RECRUITING,
+    READY,
     IN_PROGRESS,
-    CLOSED
+    CLOSED;
+
+    public boolean isEditable() {
+        return this != CLOSED;
+    }
 }
