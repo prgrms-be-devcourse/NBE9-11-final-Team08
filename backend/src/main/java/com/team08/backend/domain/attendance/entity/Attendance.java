@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -22,12 +23,12 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @Table(
-        name = "attendance_logs",
-        indexes = @Index(name = "idx_attendance_logs_user_date", columnList = "user_id, attendance_date"),
-        uniqueConstraints = @UniqueConstraint(name = "uk_attendance_logs_user_date", columnNames = {"user_id", "attendance_date"})
+        name = "attendances",
+        indexes = @Index(name = "idx_attendances_user_date", columnList = "user_id, attendance_date"), // 인덱스 이름도 함께 변경
+        uniqueConstraints = @UniqueConstraint(name = "uk_attendances_user_date", columnNames = {"user_id", "attendance_date"}) // 제약조건 이름도 함께 변경
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AttendanceLog {
+public class Attendance {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,4 +49,13 @@ public class AttendanceLog {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    @Builder
+    public Attendance(User user, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays) {
+        this.user = user;
+        this.attendanceDate = attendanceDate;
+        this.consecutiveDays = consecutiveDays;
+        this.monthlyTotalDays = monthlyTotalDays;
+        this.createdAt = LocalDateTime.now();
+    }
 }

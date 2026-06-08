@@ -74,6 +74,18 @@ Enum coupon_status {
   EXPIRED
 }
 
+Enum coupon_type {
+  AUTO
+  NORMAL
+  FCFS
+}
+
+Enum coupon_target {
+  ALL
+  COURSE
+  BOOK
+}
+
 // =====================================
 // USERS
 // =====================================
@@ -339,6 +351,14 @@ Table coupon_policies {
   total_quantity int
 
   category_id bigint
+  
+  coupon_type coupon_type [not null]
+  
+  coupon_target coupon_target [not null]
+  
+  issue_start_date datetime
+  
+  issue_end_date datetime
 
   created_at datetime [not null]
 
@@ -359,13 +379,17 @@ Table issued_coupons {
   expired_at datetime [not null]
 
   used_at datetime
+  
+  indexes {
+      (user_id, policy_id) [unique]
+    }
 }
 
 // =====================================
 // ATTENDANCE
 // =====================================
 
-Table attendance_logs {
+Table attendances {
   id bigint [pk, increment]
 
   user_id bigint [not null]
@@ -636,7 +660,7 @@ Ref: coupon_policies.category_id > categories.id
 Ref: issued_coupons.policy_id > coupon_policies.id
 Ref: issued_coupons.user_id > users.id
 
-Ref: attendance_logs.user_id > users.id
+Ref: attendances.user_id > users.id
 
 Ref: orders.user_id > users.id
 Ref: orders.issued_coupon_id > issued_coupons.id
