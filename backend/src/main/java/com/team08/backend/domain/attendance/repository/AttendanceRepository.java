@@ -8,9 +8,6 @@ import java.util.Optional;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
-    // 당일 출석 여부 확인
-    boolean existsByUserIdAndAttendanceDate(Long userId, LocalDate date);
-
     // 특정 날짜의 출석 기록 조회
     Optional<Attendance> findByUserIdAndAttendanceDate(Long userId, LocalDate date);
 

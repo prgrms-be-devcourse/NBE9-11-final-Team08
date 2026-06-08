@@ -28,11 +28,6 @@ public class AttendanceService {
     @Transactional
     public Attendance checkIn(Long userId, LocalDate today) {
 
-        // 당일 출석 여부 확인
-        if (attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "오늘은 이미 출석하셨습니다.");
-        }
-
         // 사용자 검증
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "존재하지 않는 유저입니다."));

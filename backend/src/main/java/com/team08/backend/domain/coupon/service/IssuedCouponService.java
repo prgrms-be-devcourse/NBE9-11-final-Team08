@@ -96,7 +96,8 @@ public class IssuedCouponService {
 
         issuedCouponRepository.save(newCoupon);
     }
-
+    
+    // TODO 락 범위 조절
     // [사용자] 선착순 쿠폰 다운로드
     @Transactional
     public void downloadFcfsCoupon(Long userId, Long policyId) {

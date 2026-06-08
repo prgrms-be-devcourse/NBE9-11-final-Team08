@@ -11,6 +11,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -20,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -56,8 +60,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(1)
                 .build();
 
-        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mock(User.class)));
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         // 이번 달 누적 출석 수가 1번이었다고 가정
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(1L);
@@ -85,14 +88,16 @@ class ConsecutiveAttendanceServiceTest {
         Long userId = 1L;
         LocalDate today = LocalDate.now();
 
-        // 이미 출석했다고 설정
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(true);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mock(User.class)));
+        // DB 제약 조건 위반 발생 모의
+        doThrow(DataIntegrityViolationException.class).when(attendanceRepository).save(any(Attendance.class));
 
         // when & then
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> {
             attendanceService.checkIn(userId, today);
         });
-        assertEquals("오늘은 이미 출석하셨습니다.", exception.getMessage());
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("오늘은 이미 출석하셨습니다.", exception.getReason());
 
         // 중복 출석 시 쿠폰 로직은 실행되면 안 됨
         verify(issuedCouponService, never()).issueAttendanceCoupon(anyLong());
@@ -113,8 +118,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(6)
                 .build();
 
-        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mock(User.class)));
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(6L);
 
@@ -145,8 +149,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(7)
                 .build();
 
-        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mock(User.class)));
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(7L);
 
@@ -169,8 +172,7 @@ class ConsecutiveAttendanceServiceTest {
         LocalDate yesterday = today.minusDays(1);
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
-        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(mock(User.class)));
         // 어제 출석 기록이 없음 (결석)
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
         // 이번 달 기존 누적 출석 수는 3번이었다고 가정
