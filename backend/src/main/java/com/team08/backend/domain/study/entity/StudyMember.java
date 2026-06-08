@@ -1,19 +1,10 @@
 package com.team08.backend.domain.study.entity;
 
+import com.team08.backend.domain.study.exception.InvalidStudyMemberStatusException;
+import com.team08.backend.domain.study.exception.StudyOwnerCannotBeKickedException;
+import com.team08.backend.domain.study.exception.StudyOwnerCannotLeaveException;
 import com.team08.backend.domain.user.entity.User;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -56,4 +47,63 @@ public class StudyMember {
     private LocalDateTime leftAt;
 
     private LocalDateTime kickedAt;
+
+    private StudyMember(User user, Study study, StudyMemberRole role) {
+        this.user = user;
+        this.study = study;
+        this.role = role;
+        status = StudyMemberStatus.ACTIVE;
+        joinedAt = LocalDateTime.now();
+    }
+
+    public static StudyMember createOwner(User owner, Study study) {
+        return new StudyMember(owner, study, StudyMemberRole.OWNER);
+    }
+
+    public static StudyMember createMember(User user, Study study) {
+        return new StudyMember(user, study, StudyMemberRole.MEMBER);
+    }
+
+    public void kick() {
+        validateActive();
+
+        if (isOwner()) {
+            throw new StudyOwnerCannotBeKickedException();
+        }
+
+        status = StudyMemberStatus.KICKED;
+        kickedAt = LocalDateTime.now();
+    }
+
+    public void leave() {
+        validateActive();
+
+        if (isOwner()) {
+            throw new StudyOwnerCannotLeaveException();
+        }
+
+        status = StudyMemberStatus.LEFT;
+        leftAt = LocalDateTime.now();
+    }
+
+    public void rejoinAsMember() {
+        if (status == StudyMemberStatus.KICKED) {
+            throw new InvalidStudyMemberStatusException();
+        }
+
+        role = StudyMemberRole.MEMBER;
+        status = StudyMemberStatus.ACTIVE;
+        joinedAt = LocalDateTime.now();
+        leftAt = null;
+    }
+
+    private void validateActive() {
+        if (status != StudyMemberStatus.ACTIVE) {
+            throw new InvalidStudyMemberStatusException();
+        }
+    }
+
+    private boolean isOwner() {
+        return role == StudyMemberRole.OWNER;
+    }
 }

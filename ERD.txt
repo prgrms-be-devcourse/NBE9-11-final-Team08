@@ -26,8 +26,13 @@ Enum course_status {
 }
 
 Enum study_status {
-  RECRUITING
+  READY
   IN_PROGRESS
+  CLOSED
+}
+
+Enum study_recruitment_status {
+  RECRUITING
   CLOSED
 }
 
@@ -467,7 +472,7 @@ Table payments {
 Table studies {
   id bigint [pk, increment]
 
-  course_id bigint [not null]
+  course_id bigint
 
   owner_id bigint [not null]
 
@@ -477,17 +482,25 @@ Table studies {
 
   status study_status [not null]
 
+  recruitment_status study_recruitment_status [not null]
+
   visibility study_visibility [not null]
 
   max_member_count int
 
-  start_date date
+  planned_start_date date
 
-  end_date date
+  planned_end_date date
+
+  actual_start_date date
+
+  actual_end_date date
 
   created_at datetime [not null]
 
   updated_at datetime [not null]
+
+  deleted_at datetime
 }
 
 // =====================================
