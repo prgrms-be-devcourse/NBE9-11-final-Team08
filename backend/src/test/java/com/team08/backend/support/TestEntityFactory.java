@@ -83,8 +83,8 @@ public final class TestEntityFactory {
         ReflectionTestUtils.setField(study, "title", title);
         ReflectionTestUtils.setField(study, "status", StudyStatus.CLOSED);
         ReflectionTestUtils.setField(study, "visibility", StudyVisibility.PUBLIC);
-        ReflectionTestUtils.setField(study, "startDate", startDate);
-        ReflectionTestUtils.setField(study, "endDate", endDate);
+        ReflectionTestUtils.setField(study, "plannedStartDate", startDate);
+        ReflectionTestUtils.setField(study, "plannedEndDate", endDate);
         LocalDateTime now = LocalDateTime.now();
         ReflectionTestUtils.setField(study, "createdAt", now);
         ReflectionTestUtils.setField(study, "updatedAt", now);
