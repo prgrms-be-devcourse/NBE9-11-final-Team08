@@ -379,6 +379,10 @@ Table issued_coupons {
   expired_at datetime [not null]
 
   used_at datetime
+  
+  indexes {
+      (user_id, policy_id) [unique]
+    }
 }
 
 // =====================================
