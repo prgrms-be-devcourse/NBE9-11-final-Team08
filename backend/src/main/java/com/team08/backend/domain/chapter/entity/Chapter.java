@@ -36,9 +36,9 @@ public class Chapter {
     @Column(nullable = false)
     private Integer orderNo;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+//    @Column(nullable = false)
+//    private LocalDateTime createdAt;
+//
+//    @Column(nullable = false)
+//    private LocalDateTime updatedAt;
 }
