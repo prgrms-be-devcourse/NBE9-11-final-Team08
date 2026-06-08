@@ -16,6 +16,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Getter
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "cart_items",
         indexes = @Index(name = "idx_cart_items_cart_course", columnList = "cart_id, course_id"),
+        // 서비스 검증과 DB 제약을 함께 둬 동시 요청에서도 같은 강의 중복 담기를 막는다.
         uniqueConstraints = @UniqueConstraint(name = "uk_cart_items_cart_course", columnNames = {"cart_id", "course_id"})
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -45,4 +47,13 @@ public class CartItem {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    public static CartItem create(Cart cart, Course course, Clock clock) {
+        CartItem cartItem = new CartItem();
+        cartItem.cart = cart;
+        cartItem.course = course;
+        cartItem.price = course.getPrice();
+        cartItem.createdAt = LocalDateTime.now(clock);
+        return cartItem;
+    }
 }

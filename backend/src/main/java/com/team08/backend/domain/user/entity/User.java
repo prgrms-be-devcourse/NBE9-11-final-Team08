@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -39,16 +38,16 @@ public class User {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-    
-    @Builder
-    public User(Long id, String email, String password, String nickname, String profileImage, String role) {
-        this.id = id;
+
+    private User(String email, String password, String nickname) {
         this.email = email;
-        this.password = password != null ? password : "default_password";
+        this.password = password;
         this.nickname = nickname;
-        this.profileImage = profileImage;
-        this.role = role != null ? role : "ROLE_USER";
+        this.role = "USER";
         this.createdAt = LocalDateTime.now();
     }
 
+    public static User create(String email, String password, String nickname) {
+        return new User(email, password, nickname);
+    }
 }
