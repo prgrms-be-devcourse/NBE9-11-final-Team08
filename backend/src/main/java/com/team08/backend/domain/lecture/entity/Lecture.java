@@ -32,7 +32,7 @@ public class Lecture {
     private Chapter chapter;
 
     @Column(nullable = false)
-    private String youtubeVideoId;
+    private String videoId;
 
     @Column(nullable = false)
     private String title;
@@ -53,9 +53,9 @@ public class Lecture {
     private LocalDateTime updatedAt;
 
     @Builder
-    public Lecture(Chapter chapter, String youtubeVideoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
+    public Lecture(Chapter chapter, String videoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
         this.chapter = chapter;
-        this.youtubeVideoId = youtubeVideoId;
+        this.videoId = videoId;
         this.title = title;
         this.durationSeconds = durationSeconds;
         this.orderNo = orderNo;
@@ -64,8 +64,8 @@ public class Lecture {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void update(String youtubeVideoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
-        if (youtubeVideoId != null && !youtubeVideoId.isBlank()) this.youtubeVideoId = youtubeVideoId;
+    public void update(String videoId, String title, Integer durationSeconds, Integer orderNo, Boolean isFreePreview) {
+        if (videoId != null && !videoId.isBlank()) this.videoId = videoId;
         if (title != null && !title.isBlank()) this.title = title;
         if (durationSeconds != null && durationSeconds >= 0) this.durationSeconds = durationSeconds;
         if (orderNo != null && orderNo >= 0) this.orderNo = orderNo;

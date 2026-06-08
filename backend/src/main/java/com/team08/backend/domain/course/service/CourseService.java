@@ -138,11 +138,11 @@ public class CourseService {
                     Lecture lecture = existingLectureMap.get(lectureDto.title());
 
                     if (lecture != null) {
-                        lecture.update(lectureDto.youtubeVideoId(), lectureDto.title(), lectureDto.durationSeconds(), lectureDto.orderNo(), lectureDto.isFreePreview());
+                        lecture.update(lectureDto.videoId(), lectureDto.title(), lectureDto.durationSeconds(), lectureDto.orderNo(), lectureDto.isFreePreview());
                     } else {
                         lecture = Lecture.builder()
                                 .chapter(chapter)
-                                .youtubeVideoId(lectureDto.youtubeVideoId())
+                                .videoId(lectureDto.videoId())
                                 .title(lectureDto.title())
                                 .durationSeconds(lectureDto.durationSeconds())
                                 .orderNo(lectureDto.orderNo())

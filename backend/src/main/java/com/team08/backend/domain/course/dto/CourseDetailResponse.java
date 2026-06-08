@@ -30,7 +30,7 @@ public record CourseDetailResponse(
                                 chapter.getLectures().stream()
                                         .map(lecture -> new LectureResponse(
                                                 lecture.getTitle(),
-                                                lecture.getYoutubeVideoId(),
+                                                lecture.getVideoId(),
                                                 lecture.getDurationSeconds(),
                                                 lecture.getIsFreePreview()
                                         )).collect(Collectors.toList())
