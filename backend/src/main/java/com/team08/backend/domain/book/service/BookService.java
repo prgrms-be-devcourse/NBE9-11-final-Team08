@@ -32,11 +32,7 @@ public class BookService {
             throw new AccessDeniedException("판매자(SELLER) 권한이 필요합니다.");
         }
 
-        Category category = null;
-        if (request.categoryId() != null) {
-            category = categoryRepository.findById(request.categoryId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
-        }
+        Category category = getCategoryOrNull(request.categoryId());
 
         Book book = Book.builder()
                 .seller(loginUser)
@@ -68,11 +64,7 @@ public class BookService {
             throw new AccessDeniedException("본인이 등록한 도서만 수정할 수 있습니다.");
         }
 
-        Category category = null;
-        if (request.categoryId() != null) {
-            category = categoryRepository.findById(request.categoryId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
-        }
+        Category category = getCategoryOrNull(request.categoryId());
 
         book.update(
                 request.title(),
@@ -95,5 +87,13 @@ public class BookService {
         }
 
         book.delete();
+    }
+
+    private Category getCategoryOrNull(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
     }
 }
