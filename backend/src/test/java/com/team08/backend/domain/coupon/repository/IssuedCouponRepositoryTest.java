@@ -33,7 +33,7 @@ class IssuedCouponRepositoryTest {
     @DisplayName("만료 시간이 지난 쿠폰은 EXPIRED 상태로 업데이트되어야 한다")
     void expirePastCoupons_test() {
         // 1. Given: 테스트 데이터 준비
-        User user = User.builder().nickname("테스터").email("test@test.com").build();
+        User user = User.create("test@test.com", "password", "테스터");
         userRepository.save(user);
 
         CouponPolicy policy = CouponPolicy.builder()

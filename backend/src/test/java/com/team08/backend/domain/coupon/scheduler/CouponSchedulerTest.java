@@ -40,10 +40,7 @@ class CouponSchedulerTest {
     @DisplayName("스케줄러 실행 시 만료일이 지난 쿠폰의 상태가 EXPIRED로 변경된다")
     void expireCoupons_RealStateChange() {
         // given
-        User user = userRepository.save(User.builder()
-                .email("test@test.com")
-                .nickname("테스트유저")
-                .build());
+        User user = userRepository.save(User.create("test@test.com", "password", "테스트유저"));
         CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.builder()
                 .name("테스트정책")
                 .validDays(7)

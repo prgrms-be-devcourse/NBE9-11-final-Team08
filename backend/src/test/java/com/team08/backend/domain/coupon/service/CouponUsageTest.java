@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -38,7 +39,8 @@ class CouponUsageTest {
         Long issuedCouponId = 100L;
         int originalPrice = 50000;
 
-        User user = User.builder().id(userId).build();
+        User user = User.create("test@test.com", "password", "test");
+        ReflectionTestUtils.setField(user, "id", userId);
 
         CouponPolicy policy = CouponPolicy.builder()
                 .name("여름 휴가 3천원 할인")
@@ -73,7 +75,8 @@ class CouponUsageTest {
         Long ownerId = 2L; // 소유자가 다름
         Long issuedCouponId = 100L;
 
-        User owner = User.builder().id(ownerId).build();
+        User owner = User.create("owner@test.com", "password", "owner");
+        ReflectionTestUtils.setField(owner, "id", ownerId);
         IssuedCoupon issuedCoupon = IssuedCoupon.builder()
                 .user(owner)
                 .build();
@@ -93,7 +96,8 @@ class CouponUsageTest {
         Long userId = 1L;
         Long issuedCouponId = 100L;
 
-        User user = User.builder().id(userId).build();
+        User user = User.create("test@test.com", "password", "test");
+        ReflectionTestUtils.setField(user, "id", userId);
         IssuedCoupon issuedCoupon = IssuedCoupon.builder()
                 .user(user)
                 .expiredAt(LocalDateTime.now().plusDays(1)) // 사용(use) 처리를 위해 만료일 세팅
@@ -117,7 +121,8 @@ class CouponUsageTest {
         Long issuedCouponId = 100L;
         int originalPrice = 50000;
 
-        User user = User.builder().id(userId).build();
+        User user = User.create("test@test.com", "password", "test");
+        ReflectionTestUtils.setField(user, "id", userId);
 
         CouponPolicy policy = CouponPolicy.builder()
                 .name("10% 할인 쿠폰")

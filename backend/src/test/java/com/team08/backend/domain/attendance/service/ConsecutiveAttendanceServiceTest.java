@@ -3,6 +3,8 @@ package com.team08.backend.domain.attendance.service;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.coupon.service.IssuedCouponService;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,6 +34,9 @@ class ConsecutiveAttendanceServiceTest {
 
     @Mock
     private IssuedCouponService issuedCouponService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -50,6 +56,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(1)
                 .build();
 
+        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
         when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         // 이번 달 누적 출석 수가 1번이었다고 가정
@@ -106,6 +113,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(6)
                 .build();
 
+        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
         when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(6L);
@@ -137,6 +145,7 @@ class ConsecutiveAttendanceServiceTest {
                 .consecutiveDays(7)
                 .build();
 
+        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
         when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(7L);
@@ -160,6 +169,7 @@ class ConsecutiveAttendanceServiceTest {
         LocalDate yesterday = today.minusDays(1);
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
+        when(userRepository.getReferenceById(userId)).thenReturn(mock(User.class));
         when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         // 어제 출석 기록이 없음 (결석)
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());

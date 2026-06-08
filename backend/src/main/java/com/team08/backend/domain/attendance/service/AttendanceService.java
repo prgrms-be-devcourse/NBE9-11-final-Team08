@@ -4,6 +4,7 @@ import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.coupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final IssuedCouponService issuedCouponService;
+    private final UserRepository userRepository;
 
     // [사용자] 출석체크 및 보상 지급
     @Transactional
@@ -42,7 +44,7 @@ public class AttendanceService {
         long currentMonthCount = attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today);
         int monthlyTotalDays = (int) currentMonthCount + 1;
 
-        User user = User.builder().id(userId).build();
+        User user = userRepository.getReferenceById(userId);
 
         // 출석 기록 세팅 및 저장
         Attendance todayLog = Attendance.builder()

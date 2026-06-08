@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -52,7 +53,7 @@ class FcfsIssuedCouponServiceTest {
                 .issueStartDate(LocalDateTime.now().minusDays(1)) // [추가됨] 기간 통과용
                 .issueEndDate(LocalDateTime.now().plusDays(1))
                 .build();
-        User mockUser = User.builder().build();
+        User mockUser = User.create("test@test.com", "password", "test");
 
         given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
@@ -79,7 +80,7 @@ class FcfsIssuedCouponServiceTest {
                 .issueStartDate(LocalDateTime.now().minusDays(1)) // [추가됨] 기간 통과용
                 .issueEndDate(LocalDateTime.now().plusDays(1))
                 .build();
-        User mockUser = User.builder().build();
+        User mockUser = User.create("test@test.com", "password", "test");
 
         given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
@@ -102,7 +103,8 @@ class FcfsIssuedCouponServiceTest {
         Long userId = 1L;
         Long policyId = 100L;
 
-        User user = User.builder().id(userId).build();
+        User user = User.create("test@test.com", "password", "test");
+        ReflectionTestUtils.setField(user, "id", userId);
         CouponPolicy policy = CouponPolicy.builder()
                 .couponType(CouponType.FCFS)
                 .issueStartDate(LocalDateTime.now().plusHours(1)) // 1시간 뒤에 오픈됨!
@@ -141,7 +143,8 @@ class FcfsIssuedCouponServiceTest {
         Long userId = 1L;
         Long policyId = 100L;
 
-        User user = User.builder().id(userId).build();
+        User user = User.create("test@test.com", "password", "test");
+        ReflectionTestUtils.setField(user, "id", userId);
         CouponPolicy policy = CouponPolicy.builder()
                 .couponType(CouponType.NORMAL) // 선착순 타입이 아님!
                 .issueStartDate(LocalDateTime.now().minusDays(1))

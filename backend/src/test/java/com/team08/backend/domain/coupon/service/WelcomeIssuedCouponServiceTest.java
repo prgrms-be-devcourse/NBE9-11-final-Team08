@@ -50,7 +50,7 @@ class WelcomeIssuedCouponServiceTest {
     void issueSignUpCoupon_success() {
         // given
         Long userId = 1L;
-        User mockUser = User.builder().build();
+        User mockUser = User.create("test@test.com", "password", "테스터");
         CouponPolicy welcomePolicy = CouponPolicy.builder()
                 .name("신규가입 쿠폰")
                 .couponType(CouponType.AUTO)
@@ -85,7 +85,7 @@ class WelcomeIssuedCouponServiceTest {
         // given
         Long userId = 1L;
         Long policyId = 10L;
-        User mockUser = User.builder().build();
+        User mockUser = User.create("test@test.com", "password", "테스터");
         CouponPolicy mockPolicy = CouponPolicy.builder()
                 .name("작가의 날 기념 도서 10% 할인 쿠폰")
                 .couponTarget(CouponTarget.BOOK)
