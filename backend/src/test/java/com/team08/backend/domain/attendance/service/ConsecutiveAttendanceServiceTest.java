@@ -2,7 +2,7 @@ package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
-import com.team08.backend.domain.coupon.service.CouponIssueService;
+import com.team08.backend.domain.coupon.service.IssuedCouponService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +30,7 @@ class ConsecutiveAttendanceServiceTest {
     private AttendanceRepository attendanceRepository;
 
     @Mock
-    private CouponIssueService couponIssueService;
+    private IssuedCouponService issuedCouponService;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -68,7 +68,7 @@ class ConsecutiveAttendanceServiceTest {
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
 
         // 4. 7일 연속이 아니므로 쿠폰 발급 로직은 절대 실행되지 않아야 함! (중요)
-        verify(couponIssueService, never()).issueAttendanceCoupon(anyLong());
+        verify(issuedCouponService, never()).issueAttendanceCoupon(anyLong());
     }
 
     @Test
@@ -88,7 +88,7 @@ class ConsecutiveAttendanceServiceTest {
         assertEquals("오늘은 이미 출석하셨습니다.", exception.getMessage());
 
         // 중복 출석 시 쿠폰 로직은 실행되면 안 됨
-        verify(couponIssueService, never()).issueAttendanceCoupon(anyLong());
+        verify(issuedCouponService, never()).issueAttendanceCoupon(anyLong());
     }
 
 
@@ -120,7 +120,7 @@ class ConsecutiveAttendanceServiceTest {
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
 
         // 7일 연속이므로 이벤트 쿠폰 발급 로직이 1번 호출되었는지 확인!
-        verify(couponIssueService, times(1)).issueAttendanceCoupon(userId);
+        verify(issuedCouponService, times(1)).issueAttendanceCoupon(userId);
     }
 
     @Test
@@ -148,7 +148,7 @@ class ConsecutiveAttendanceServiceTest {
         assertEquals(8, todayLog.getConsecutiveDays()); // 8일 차 출석 성공
 
         // 7일 차가 아니므로 쿠폰 발급 로직은 실행되지 않아야 함!
-        verify(couponIssueService, never()).issueAttendanceCoupon(anyLong());
+        verify(issuedCouponService, never()).issueAttendanceCoupon(anyLong());
     }
 
     @Test
@@ -174,6 +174,6 @@ class ConsecutiveAttendanceServiceTest {
         assertEquals(4, todayLog.getMonthlyTotalDays()); // 누적 출석일은 기존 3 + 1 = 4로 정상 증가
 
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
-        verify(couponIssueService, never()).issueAttendanceCoupon(anyLong()); // 쿠폰 발급 안 됨
+        verify(issuedCouponService, never()).issueAttendanceCoupon(anyLong()); // 쿠폰 발급 안 됨
     }
 }

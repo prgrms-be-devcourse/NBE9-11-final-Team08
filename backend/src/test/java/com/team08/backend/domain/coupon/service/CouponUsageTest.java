@@ -25,7 +25,7 @@ import static org.mockito.BDDMockito.given;
 class CouponUsageTest {
 
     @InjectMocks
-    private CouponIssueService couponIssueService;
+    private IssuedCouponService issuedCouponService;
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
@@ -50,14 +50,13 @@ class CouponUsageTest {
         IssuedCoupon issuedCoupon = IssuedCoupon.builder()
                 .user(user)
                 .policy(policy)
-                .status(CouponStatus.ISSUED)
                 .expiredAt(LocalDateTime.now().plusDays(7))
                 .build();
 
         given(issuedCouponRepository.findById(issuedCouponId)).willReturn(Optional.of(issuedCoupon));
 
         // when
-        ExpectedDiscountResponse response = couponIssueService.calculateExpectedDiscount(userId, issuedCouponId, originalPrice);
+        ExpectedDiscountResponse response = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, originalPrice);
 
         // then
         assertThat(response.couponName()).isEqualTo("여름 휴가 3천원 할인");
@@ -82,7 +81,7 @@ class CouponUsageTest {
         given(issuedCouponRepository.findById(issuedCouponId)).willReturn(Optional.of(issuedCoupon));
 
         // when & then
-        assertThatThrownBy(() -> couponIssueService.calculateExpectedDiscount(requesterId, issuedCouponId, 50000))
+        assertThatThrownBy(() -> issuedCouponService.calculateExpectedDiscount(requesterId, issuedCouponId, 50000))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("본인의 쿠폰만 사용할 수 있습니다.");
     }
@@ -97,13 +96,15 @@ class CouponUsageTest {
         User user = User.builder().id(userId).build();
         IssuedCoupon issuedCoupon = IssuedCoupon.builder()
                 .user(user)
-                .status(CouponStatus.USED) // 이미 사용됨!
+                .expiredAt(LocalDateTime.now().plusDays(1)) // 사용(use) 처리를 위해 만료일 세팅
                 .build();
+        
+        issuedCoupon.use(); // 객체의 행위를 통해 USED 상태로 변경!
 
         given(issuedCouponRepository.findById(issuedCouponId)).willReturn(Optional.of(issuedCoupon));
 
         // when & then
-        assertThatThrownBy(() -> couponIssueService.calculateExpectedDiscount(userId, issuedCouponId, 50000))
+        assertThatThrownBy(() -> issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, 50000))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("사용할 수 없는 쿠폰 상태입니다.");
     }
@@ -129,18 +130,17 @@ class CouponUsageTest {
         IssuedCoupon issuedCoupon = IssuedCoupon.builder()
                 .user(user)
                 .policy(policy)
-                .status(CouponStatus.ISSUED) // 발급 상태
                 .expiredAt(LocalDateTime.now().plusDays(7))
                 .build();
 
         given(issuedCouponRepository.findById(issuedCouponId)).willReturn(Optional.of(issuedCoupon));
 
         // when
-        int discountAmount = couponIssueService.useCouponForOrder(userId, issuedCouponId, originalPrice);
+        int discountAmount = issuedCouponService.useCouponForOrder(userId, issuedCouponId, originalPrice);
 
         // then
         assertThat(discountAmount).isEqualTo(5000); // 50,000원의 10%
         assertThat(issuedCoupon.getStatus()).isEqualTo(CouponStatus.USED); // 상태가 USED로 변경되었는지 확인
         assertThat(issuedCoupon.getUsedAt()).isNotNull(); // 사용 시간이 기록되었는지 확인
-    }
-}
+        }
+        }

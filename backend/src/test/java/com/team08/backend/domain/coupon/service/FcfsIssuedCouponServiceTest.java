@@ -25,7 +25,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
-class FcfsCouponIssueServiceTest {
+class FcfsIssuedCouponServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
@@ -37,7 +37,7 @@ class FcfsCouponIssueServiceTest {
     private UserRepository userRepository;
 
     @InjectMocks
-    private CouponIssueService couponIssueService;
+    private IssuedCouponService issuedCouponService;
     
     @Test
     @DisplayName("성공: 선착순 쿠폰 재고가 1개일 때 마지막 사람이 성공하고 재고가 0이 된다")
@@ -59,7 +59,7 @@ class FcfsCouponIssueServiceTest {
         given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
 
         // when
-        couponIssueService.downloadFcfsCoupon(userId, policyId);
+        issuedCouponService.downloadFcfsCoupon(userId, policyId);
 
         // then
         assertEquals(0, policy.getTotalQuantity()); // 재고가 0이 되었는지 확인
@@ -87,7 +87,7 @@ class FcfsCouponIssueServiceTest {
 
         // when & then
         assertThrows(IllegalStateException.class, () -> {
-            couponIssueService.downloadFcfsCoupon(userId, policyId);
+            issuedCouponService.downloadFcfsCoupon(userId, policyId);
         });
     }
 
@@ -113,7 +113,7 @@ class FcfsCouponIssueServiceTest {
         given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
 
         // when & then
-        assertThatThrownBy(() -> couponIssueService.downloadFcfsCoupon(userId, policyId))
+        assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("아직 쿠폰 발급 기간이 시작되지 않았습니다.");
     }
@@ -129,7 +129,7 @@ class FcfsCouponIssueServiceTest {
         given(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).willReturn(true);
 
         // when & then
-        assertThatThrownBy(() -> couponIssueService.downloadFcfsCoupon(userId, policyId))
+        assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("이미 발급받은 쿠폰입니다.");
     }
@@ -153,7 +153,7 @@ class FcfsCouponIssueServiceTest {
         given(couponPolicyRepository.findByIdWithLock(policyId)).willReturn(Optional.of(policy));
 
         // when & then
-        assertThatThrownBy(() -> couponIssueService.downloadFcfsCoupon(userId, policyId))
+        assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("선착순 발급 전용 쿠폰이 아닙니다.");
     }

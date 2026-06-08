@@ -2,7 +2,7 @@ package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
-import com.team08.backend.domain.coupon.service.CouponIssueService;
+import com.team08.backend.domain.coupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,7 @@ import java.util.Optional;
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
-    private final CouponIssueService couponIssueService;
+    private final IssuedCouponService issuedCouponService;
 
     // [사용자] 출석체크 및 보상 지급
     @Transactional
@@ -56,7 +56,7 @@ public class AttendanceService {
 
         if (consecutiveDays == 7) {
             // [시스템] 출석 보상 쿠폰 자동 발급
-            couponIssueService.issueAttendanceCoupon(userId);
+            issuedCouponService.issueAttendanceCoupon(userId);
         }
 
         return todayLog;
