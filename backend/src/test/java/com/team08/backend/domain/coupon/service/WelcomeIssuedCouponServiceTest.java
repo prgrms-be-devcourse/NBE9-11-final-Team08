@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class WelcomeCouponIssueServiceTest {
+class WelcomeIssuedCouponServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
@@ -43,7 +43,7 @@ class WelcomeCouponIssueServiceTest {
     private UserRepository userRepository;
 
     @InjectMocks
-    private CouponIssueService couponIssueService;
+    private IssuedCouponService issuedCouponService;
 
     @Test
     @DisplayName("신규 회원 가입 시 WELCOME 쿠폰이 정상적으로 발급된다")
@@ -62,7 +62,7 @@ class WelcomeCouponIssueServiceTest {
         when(couponPolicyRepository.findByCouponType(CouponType.AUTO)).thenReturn(Optional.of(welcomePolicy));
 
         // when
-        couponIssueService.issueSignUpCoupon(userId);
+        issuedCouponService.issueSignUpCoupon(userId);
 
         // then
         verify(userRepository).findById(userId);
@@ -98,7 +98,7 @@ class WelcomeCouponIssueServiceTest {
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(mockPolicy));
 
         // when
-        couponIssueService.downloadCoupon(userId, policyId);
+        issuedCouponService.downloadCoupon(userId, policyId);
 
         // then
         verify(issuedCouponRepository, times(1)).save(any(IssuedCoupon.class));
@@ -115,7 +115,7 @@ class WelcomeCouponIssueServiceTest {
 
         // when & then
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            couponIssueService.downloadCoupon(userId, policyId);
+            issuedCouponService.downloadCoupon(userId, policyId);
         });
 
         assertEquals("이미 발급받은 쿠폰입니다.", exception.getMessage());

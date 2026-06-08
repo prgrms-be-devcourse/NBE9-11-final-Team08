@@ -59,7 +59,6 @@ class CouponSchedulerTest {
                 IssuedCoupon.builder()
                         .user(user)
                         .policy(policy)
-                        .status(CouponStatus.ISSUED)
                         .expiredAt(LocalDateTime.now().minusDays(1))
                         .build()
         );
@@ -69,7 +68,6 @@ class CouponSchedulerTest {
                 IssuedCoupon.builder()
                         .user(user)
                         .policy(policy)
-                        .status(CouponStatus.ISSUED)
                         .expiredAt(LocalDateTime.now().plusDays(1))
                         .build()
         );

@@ -50,7 +50,6 @@ public class Attendance {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    // 테스트 코드에서 쓰는 중
     @Builder
     public Attendance(User user, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays) {
         this.user = user;

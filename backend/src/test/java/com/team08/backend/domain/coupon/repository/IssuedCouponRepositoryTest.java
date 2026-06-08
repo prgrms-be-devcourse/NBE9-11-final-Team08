@@ -50,7 +50,6 @@ class IssuedCouponRepositoryTest {
         IssuedCoupon coupon = IssuedCoupon.builder()
                 .user(user)
                 .policy(policy)
-                .status(CouponStatus.ISSUED)
                 .expiredAt(LocalDateTime.now().minusDays(1))
                 .build();
         issuedCouponRepository.save(coupon);

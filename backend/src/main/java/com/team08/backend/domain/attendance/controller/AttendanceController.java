@@ -1,5 +1,6 @@
 package com.team08.backend.domain.attendance.controller;
 
+import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.service.AttendanceService;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +21,10 @@ public class AttendanceController {
 
     // [사용자] 출석 체크 /api/v1/attendances
     @PostMapping
-    public ResponseEntity<String> checkIn(@RequestParam Long userId) {
+    public ResponseEntity<AttendanceResponse> checkIn(@RequestParam Long userId) {
         LocalDate today = LocalDate.now();
         // [사용자] 출석체크 및 보상 지급
         Attendance log = attendanceService.checkIn(userId, today);
-        return ResponseEntity.ok("출석이 완료되었습니다! 현재 연속 출석일: " + log.getConsecutiveDays() + "일");
+        return ResponseEntity.ok(AttendanceResponse.from(log));
     }
 }

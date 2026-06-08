@@ -19,7 +19,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class CouponIssueService {
+public class IssuedCouponService {
 
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;

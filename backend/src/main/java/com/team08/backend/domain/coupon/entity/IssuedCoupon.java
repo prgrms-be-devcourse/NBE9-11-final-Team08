@@ -50,16 +50,12 @@ public class IssuedCoupon {
     private LocalDateTime usedAt;
 
     @Builder
-    public IssuedCoupon(Long id, CouponPolicy policy, User user, CouponStatus status, LocalDateTime issuedAt, LocalDateTime expiredAt, LocalDateTime usedAt) {
-        this.id = id;
+    public IssuedCoupon(CouponPolicy policy, User user, LocalDateTime expiredAt) {
         this.policy = policy;
         this.user = user;
-        // 쿠폰 상태가 안 들어오면 기본값으로 'ISSUED(발급됨)' 상태를 넣음 (CouponStatus에 ISSUED가 있다고 가정)
-        this.status = status != null ? status : CouponStatus.ISSUED;
-        // 발급 시간은 현재 시간으로 고정
-        this.issuedAt = issuedAt != null ? issuedAt : LocalDateTime.now();
+        this.status = CouponStatus.ISSUED;
+        this.issuedAt = LocalDateTime.now();
         this.expiredAt = expiredAt;
-        this.usedAt = usedAt;
     }
 
     // [시스템] 쿠폰 사용 처리 (ISSUED -> USED)
