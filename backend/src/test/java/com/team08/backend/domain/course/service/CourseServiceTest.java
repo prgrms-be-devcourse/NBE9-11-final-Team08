@@ -2,7 +2,6 @@ package com.team08.backend.domain.course.service;
 
 import com.team08.backend.domain.category.entity.Category;
 import com.team08.backend.domain.category.repository.CategoryRepository;
-import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.dto.CurriculumSaveRequest;
@@ -10,8 +9,9 @@ import com.team08.backend.domain.course.dto.ChapterSaveDto;
 import com.team08.backend.domain.course.dto.LectureSaveDto;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.instructor.entity.InstructorProfile;
+import com.team08.backend.domain.instructor.repository.InstructorProfileRepository;
 import com.team08.backend.domain.user.entity.User;
-import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,13 +43,15 @@ class CourseServiceTest {
     private CategoryRepository categoryRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private InstructorProfileRepository instructorProfileRepository;
 
     @Test
     void 강의등록_성공() {
-        User seller = mock(User.class);
-        given(seller.isSeller()).willReturn(true);
-        given(userRepository.findById(1L)).willReturn(Optional.of(seller));
+        InstructorProfile profile = mock(InstructorProfile.class);
+        User instructor = mock(User.class);
+        given(instructorProfileRepository.existsByUserIdAndApprovedAtIsNotNull(1L)).willReturn(true);
+        given(instructorProfileRepository.findByUserId(1L)).willReturn(Optional.of(profile));
+        given(profile.getUser()).willReturn(instructor);
 
         Category category = mock(Category.class);
         given(categoryRepository.findById(10L)).willReturn(Optional.of(category));
@@ -66,9 +68,7 @@ class CourseServiceTest {
 
     @Test
     void 강의등록_실패_판매자권한없음() {
-        User buyer = mock(User.class);
-        given(buyer.isSeller()).willReturn(false);
-        given(userRepository.findById(1L)).willReturn(Optional.of(buyer));
+        given(instructorProfileRepository.existsByUserIdAndApprovedAtIsNotNull(1L)).willReturn(false);
 
         CourseCreateRequest request = new CourseCreateRequest(10L, "스프링 마스터", "설명", "thumb.png", 50000);
 
