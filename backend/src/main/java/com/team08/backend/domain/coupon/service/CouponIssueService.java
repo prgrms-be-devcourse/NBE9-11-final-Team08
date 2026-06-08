@@ -172,12 +172,12 @@ public class CouponIssueService {
         int finalPrice = Math.max(0, originalPrice - discountAmount);
 
         // 결과 DTO 반환
-        return ExpectedDiscountResponse.builder()
-                .couponName(issuedCoupon.getPolicy().getName())
-                .originalPrice(originalPrice)
-                .discountAmount(discountAmount)
-                .finalPrice(finalPrice)
-                .build();
+        return new ExpectedDiscountResponse(
+                issuedCoupon.getPolicy().getName(),
+                originalPrice,
+                discountAmount,
+                finalPrice
+        );
     }
 
     // TODO 나중에 결제 로직에 추가

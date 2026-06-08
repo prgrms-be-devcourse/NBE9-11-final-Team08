@@ -1,8 +1,5 @@
 package com.team08.backend.domain.coupon.dto;
 
-import lombok.Builder;
-
-@Builder
 public record ExpectedDiscountResponse(
         String couponName,  // 쿠폰 이름
         int originalPrice,  // 원래 가격

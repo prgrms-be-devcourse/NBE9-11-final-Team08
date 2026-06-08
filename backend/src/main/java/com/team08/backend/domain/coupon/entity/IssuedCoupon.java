@@ -49,7 +49,6 @@ public class IssuedCoupon {
 
     private LocalDateTime usedAt;
 
-
     @Builder
     public IssuedCoupon(Long id, CouponPolicy policy, User user, CouponStatus status, LocalDateTime issuedAt, LocalDateTime expiredAt, LocalDateTime usedAt) {
         this.id = id;

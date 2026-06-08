@@ -1,6 +1,6 @@
 package com.team08.backend.domain.attendance.service;
 
-import com.team08.backend.domain.attendance.entity.AttendanceLog;
+import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.coupon.service.CouponIssueService;
 import com.team08.backend.domain.user.entity.User;
@@ -21,16 +21,16 @@ public class AttendanceService {
 
     // [사용자] 출석체크 및 보상 지급
     @Transactional
-    public AttendanceLog checkIn(Long userId, LocalDate today) {
+    public Attendance checkIn(Long userId, LocalDate today) {
 
-        // 오늘 이미 출석했는지 검증 (중복 출석 방지)
+        // 당일 출석 여부 확인
         if (attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)) {
             throw new IllegalStateException("오늘은 이미 출석하셨습니다.");
         }
 
         // 어제 출석 기록 조회
         LocalDate yesterday = today.minusDays(1);
-        Optional<AttendanceLog> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
+        Optional<Attendance> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
 
         // 연속 출석일 계산
         int consecutiveDays = yesterdayAttendance
@@ -45,7 +45,7 @@ public class AttendanceService {
         User user = User.builder().id(userId).build();
 
         // 출석 기록 세팅 및 저장
-        AttendanceLog todayLog = AttendanceLog.builder()
+        Attendance todayLog = Attendance.builder()
                 .user(user)
                 .attendanceDate(today)
                 .consecutiveDays(consecutiveDays)

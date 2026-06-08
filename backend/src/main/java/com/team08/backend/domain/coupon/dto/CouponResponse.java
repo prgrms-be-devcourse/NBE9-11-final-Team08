@@ -1,8 +1,5 @@
 package com.team08.backend.domain.coupon.dto;
 
-import lombok.Builder;
-
-@Builder
 public record CouponResponse(
         String message
 ) {

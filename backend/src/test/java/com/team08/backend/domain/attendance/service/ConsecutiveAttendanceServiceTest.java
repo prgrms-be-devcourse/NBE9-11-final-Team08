@@ -1,6 +1,6 @@
 package com.team08.backend.domain.attendance.service;
 
-import com.team08.backend.domain.attendance.entity.AttendanceLog;
+import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.coupon.service.CouponIssueService;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ class ConsecutiveAttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         // 어제 1일 차 출석을 완료했다고 가정
-        AttendanceLog yesterdayLog = AttendanceLog.builder()
+        Attendance yesterdayLog = Attendance.builder()
                 .consecutiveDays(1)
                 .build();
 
@@ -56,7 +56,7 @@ class ConsecutiveAttendanceServiceTest {
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(1L);
 
         // when
-        AttendanceLog todayLog = attendanceService.checkIn(userId, today);
+        Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
         // 1. 연속 출석일이 2일로 계산되었는지 확인
@@ -65,7 +65,7 @@ class ConsecutiveAttendanceServiceTest {
         assertEquals(2, todayLog.getMonthlyTotalDays());
 
         // 3. DB에 잘 저장되었는지 확인
-        verify(attendanceRepository, times(1)).save(any(AttendanceLog.class));
+        verify(attendanceRepository, times(1)).save(any(Attendance.class));
 
         // 4. 7일 연속이 아니므로 쿠폰 발급 로직은 절대 실행되지 않아야 함! (중요)
         verify(couponIssueService, never()).issueAttendanceCoupon(anyLong());
@@ -102,7 +102,7 @@ class ConsecutiveAttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         // 어제까지 6일 연속 출석했다고 가정
-        AttendanceLog yesterdayLog = AttendanceLog.builder()
+        Attendance yesterdayLog = Attendance.builder()
                 .consecutiveDays(6)
                 .build();
 
@@ -111,13 +111,13 @@ class ConsecutiveAttendanceServiceTest {
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(6L);
 
         // when
-        AttendanceLog todayLog = attendanceService.checkIn(userId, today);
+        Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
         assertEquals(7, todayLog.getConsecutiveDays());
         assertEquals(7, todayLog.getMonthlyTotalDays());
 
-        verify(attendanceRepository, times(1)).save(any(AttendanceLog.class));
+        verify(attendanceRepository, times(1)).save(any(Attendance.class));
 
         // 7일 연속이므로 이벤트 쿠폰 발급 로직이 1번 호출되었는지 확인!
         verify(couponIssueService, times(1)).issueAttendanceCoupon(userId);
@@ -133,7 +133,7 @@ class ConsecutiveAttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         // 어제까지 7일 연속 출석했다고 가정 (오늘은 8일 차)
-        AttendanceLog yesterdayLog = AttendanceLog.builder()
+        Attendance yesterdayLog = Attendance.builder()
                 .consecutiveDays(7)
                 .build();
 
@@ -142,7 +142,7 @@ class ConsecutiveAttendanceServiceTest {
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(7L);
 
         // when
-        AttendanceLog todayLog = attendanceService.checkIn(userId, today);
+        Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
         assertEquals(8, todayLog.getConsecutiveDays()); // 8일 차 출석 성공
@@ -167,13 +167,13 @@ class ConsecutiveAttendanceServiceTest {
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(3L);
 
         // when
-        AttendanceLog todayLog = attendanceService.checkIn(userId, today);
+        Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
         assertEquals(1, todayLog.getConsecutiveDays()); // 연속 출석일은 1로 초기화됨
         assertEquals(4, todayLog.getMonthlyTotalDays()); // 누적 출석일은 기존 3 + 1 = 4로 정상 증가
 
-        verify(attendanceRepository, times(1)).save(any(AttendanceLog.class));
+        verify(attendanceRepository, times(1)).save(any(Attendance.class));
         verify(couponIssueService, never()).issueAttendanceCoupon(anyLong()); // 쿠폰 발급 안 됨
     }
 }
