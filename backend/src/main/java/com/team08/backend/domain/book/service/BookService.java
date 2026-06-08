@@ -7,6 +7,7 @@ import com.team08.backend.domain.book.entity.Book;
 import com.team08.backend.domain.book.repository.BookRepository;
 import com.team08.backend.domain.category.entity.Category;
 import com.team08.backend.domain.category.repository.CategoryRepository;
+import com.team08.backend.domain.instructor.repository.InstructorProfileRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,22 +22,24 @@ public class BookService {
 
     private final BookRepository bookRepository;
     private final CategoryRepository categoryRepository;
-    private final UserRepository userRepository;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     @Transactional
     public Long createBook(BookCreateRequest request, Long userId) {
-        User loginUser = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저 정보를 찾을 수 없습니다."));
-
-        if (!loginUser.isSeller()) {
-            throw new AccessDeniedException("판매자(SELLER) 권한이 필요합니다.");
+        if (!instructorProfileRepository.existsByUserIdAndApprovedAtIsNotNull(userId)) {
+            throw new AccessDeniedException("판매자(강사) 등록 및 승인이 필요한 서비스입니다.");
         }
 
-        Category category = getCategoryOrNull(request.categoryId());
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
+
+        User seller = instructorProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AccessDeniedException("판매자 프로필을 찾을 수 없습니다."))
+                .getUser();
 
         Book book = Book.builder()
-                .seller(loginUser)
                 .category(category)
+                .seller(seller)
                 .title(request.title())
                 .author(request.author())
                 .publisher(request.publisher())

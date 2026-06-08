@@ -11,6 +11,7 @@ import com.team08.backend.domain.course.dto.ChapterSaveDto;
 import com.team08.backend.domain.course.dto.LectureSaveDto;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.instructor.repository.InstructorProfileRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -30,22 +31,24 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final CategoryRepository categoryRepository;
-    private final UserRepository userRepository;
+    private final InstructorProfileRepository instructorProfileRepository;
 
     @Transactional
     public Long createCourse(CourseCreateRequest request, Long userId) {
-        User loginUser = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("유저 정보를 찾을 수 없습니다."));
-
-        if (!loginUser.isSeller()) {
-            throw new AccessDeniedException("판매자(SELLER) 권한이 필요합니다.");
+        if (!instructorProfileRepository.existsByUserIdAndApprovedAtIsNotNull(userId)) {
+            throw new AccessDeniedException("강사 등록 및 승인이 필요한 서비스입니다.");
         }
 
-        Category category = getCategoryOrNull(request.categoryId());
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
+
+        User instructor = instructorProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AccessDeniedException("강사 프로필을 찾을 수 없습니다."))
+                .getUser();
 
         Course course = Course.builder()
-                .instructor(loginUser)
                 .category(category)
+                .instructor(instructor)
                 .title(request.title())
                 .description(request.description())
                 .thumbnail(request.thumbnail())
