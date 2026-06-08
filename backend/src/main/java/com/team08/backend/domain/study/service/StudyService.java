@@ -71,16 +71,16 @@ public class StudyService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudySummaryResponse> getStudies() {
-        List<Study> studies = studyRepository.findVisibleStudiesWithOwner();
+    public List<StudySummaryResponse> getStudies(Long userId) {
+        List<Study> studies = studyRepository.findVisibleStudiesWithOwner(userId);
         return studies.stream()
                 .map(StudySummaryResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public StudyDetailResponse findStudy(Long id) {
-        Study study = studyRepository.findVisibleStudyByIdWithOwnerAndCourse(id)
+    public StudyDetailResponse findStudy(Long id, Long userId) {
+        Study study = studyRepository.findVisibleStudyByIdWithOwnerAndCourse(id, userId)
                 .orElseThrow(StudyNotFoundException::new);
 
         return StudyDetailResponse.from(study);

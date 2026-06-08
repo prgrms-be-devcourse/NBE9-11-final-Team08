@@ -33,13 +33,26 @@ public class StudyController {
     }
 
     @GetMapping
-    public List<StudySummaryResponse> getStudies() {
-        return studyService.getStudies();
+    public List<StudySummaryResponse> getStudies(
+            @AuthenticationPrincipal LoginUserPrincipal principal
+    ) {
+        Long userId = principal == null
+                ? null
+                : principal.user().id();
+
+        return studyService.getStudies(userId);
     }
 
     @GetMapping("/{id}")
-    public StudyDetailResponse getStudy(@PathVariable Long id) {
-        return studyService.findStudy(id);
+    public StudyDetailResponse getStudy(
+            @AuthenticationPrincipal LoginUserPrincipal principal,
+            @PathVariable Long id
+    ) {
+        Long userId = principal == null
+                ? null
+                : principal.user().id();
+
+        return studyService.findStudy(id, userId);
     }
 
     @PatchMapping("/{id}")

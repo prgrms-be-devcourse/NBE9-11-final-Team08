@@ -158,16 +158,17 @@ public class StudyServiceTest {
     @Test
     void 스터디_목록을_조회한다() {
         // given
+        Long ownerId = 1L;
         Long studyId = 1L;
-        User owner = UserFixture.user(1L);
+        User owner = UserFixture.user(ownerId);
         Study study = StudyFixture.study(studyId, owner);
         List<Study> studies = List.of(study);
 
-        given(studyRepository.findVisibleStudiesWithOwner())
+        given(studyRepository.findVisibleStudiesWithOwner(ownerId))
                 .willReturn(studies);
 
         // when
-        List<StudySummaryResponse> responses = studyService.getStudies();
+        List<StudySummaryResponse> responses = studyService.getStudies(ownerId);
 
         // then
         assertThat(responses).hasSize(studies.size());
@@ -177,21 +178,22 @@ public class StudyServiceTest {
         assertThat(response.id()).isEqualTo(studyId);
         assertThat(response.title()).isEqualTo(study.getTitle());
 
-        verify(studyRepository).findVisibleStudiesWithOwner();
+        verify(studyRepository).findVisibleStudiesWithOwner(ownerId);
     }
 
     @Test
     void 스터디를_상세_조회한다() {
         // given
+        Long ownerId = 1L;
         Long studyId = 1L;
-        User owner = UserFixture.user(1L);
+        User owner = UserFixture.user(ownerId);
         Study study = StudyFixture.study(studyId, owner);
 
-        given(studyRepository.findVisibleStudyByIdWithOwnerAndCourse(studyId))
+        given(studyRepository.findVisibleStudyByIdWithOwnerAndCourse(studyId, ownerId))
                 .willReturn(Optional.of(study));
 
         // when
-        StudyDetailResponse response = studyService.findStudy(studyId);
+        StudyDetailResponse response = studyService.findStudy(studyId, ownerId);
 
         // then
         assertThat(response.id()).isEqualTo(studyId);
@@ -203,11 +205,11 @@ public class StudyServiceTest {
         // given
         Long studyId = 1L;
 
-        given(studyRepository.findVisibleStudyByIdWithOwnerAndCourse(studyId))
+        given(studyRepository.findVisibleStudyByIdWithOwnerAndCourse(studyId, null))
                 .willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> studyService.findStudy(studyId))
+        assertThatThrownBy(() -> studyService.findStudy(studyId, null))
                 .isInstanceOf(StudyNotFoundException.class);
     }
 
