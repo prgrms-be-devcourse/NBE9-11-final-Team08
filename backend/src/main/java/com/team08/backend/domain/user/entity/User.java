@@ -38,4 +38,8 @@ public class User {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    public boolean isSeller() {
+        return "SELLER".equals(this.role);
+    }
 }

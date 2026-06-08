@@ -21,8 +21,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -39,7 +37,7 @@ public class CourseService {
         User loginUser = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("유저 정보를 찾을 수 없습니다."));
 
-        if (!"SELLER".equals(loginUser.getRole())) {
+        if (!loginUser.isSeller()) {
             throw new AccessDeniedException("판매자(SELLER) 권한이 필요합니다.");
         }
 
@@ -111,13 +109,6 @@ public class CourseService {
         if (!course.getInstructor().getId().equals(userId)) {
             throw new AccessDeniedException("본인이 등록한 강의 상품의 커리큘럼만 관리할 수 있습니다.");
         }
-
-        List<Chapter> oldChapters = chapterRepository.findByCourseIdOrderByOrderNoAsc(courseId);
-        for (Chapter oldChapter : oldChapters) {
-            List<Lecture> oldLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(oldChapter.getId());
-            lectureRepository.deleteAllInBatch(oldLectures);
-        }
-        chapterRepository.deleteAllInBatch(oldChapters);
 
         course.clearChapters();
 
