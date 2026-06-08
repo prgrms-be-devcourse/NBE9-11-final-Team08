@@ -3,6 +3,7 @@ package com.team08.backend.domain.course.service;
 import com.team08.backend.domain.category.entity.Category;
 import com.team08.backend.domain.category.repository.CategoryRepository;
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
@@ -12,12 +13,15 @@ import com.team08.backend.domain.course.dto.LectureSaveDto;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,8 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
+    private final ChapterRepository chapterRepository;
+    private final LectureRepository lectureRepository;
 
     @Transactional
     public Long createCourse(CourseCreateRequest request, Long userId) {
@@ -56,8 +62,7 @@ public class CourseService {
     }
 
     public CourseDetailResponse getCourseDetail(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .filter(c -> c.getDeletedAt() == null)
+        Course course = courseRepository.findWithCurriculumById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않거나 삭제된 강의입니다."));
         return CourseDetailResponse.from(course);
     }
@@ -107,6 +112,13 @@ public class CourseService {
             throw new AccessDeniedException("본인이 등록한 강의 상품의 커리큘럼만 관리할 수 있습니다.");
         }
 
+        List<Chapter> oldChapters = chapterRepository.findByCourseIdOrderByOrderNoAsc(courseId);
+        for (Chapter oldChapter : oldChapters) {
+            List<Lecture> oldLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(oldChapter.getId());
+            lectureRepository.deleteAllInBatch(oldLectures);
+        }
+        chapterRepository.deleteAllInBatch(oldChapters);
+
         course.clearChapters();
 
         if (request.chapters() != null) {
@@ -117,6 +129,7 @@ public class CourseService {
                         .orderNo(chapterDto.orderNo())
                         .build();
 
+                newChapter.setCourse(course);
                 course.getChapters().add(newChapter);
 
                 if (chapterDto.lectures() != null) {

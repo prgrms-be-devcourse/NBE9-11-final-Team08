@@ -1,7 +1,9 @@
 package com.team08.backend.domain.course.dto;
 
+import com.team08.backend.domain.category.entity.Category;
 import com.team08.backend.domain.course.entity.Course;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public record CourseDetailResponse(
@@ -20,7 +22,7 @@ public record CourseDetailResponse(
                 course.getDescription(),
                 course.getThumbnail(),
                 course.getPrice(),
-                course.getCategory() != null ? course.getCategory().getName() : "미분류",
+                getCategoryName(course.getCategory()),
                 course.getChapters().stream()
                         .map(chapter -> new ChapterResponse(
                                 chapter.getTitle(),
@@ -34,6 +36,12 @@ public record CourseDetailResponse(
                                         )).collect(Collectors.toList())
                         )).collect(Collectors.toList())
         );
+    }
+
+    private static String getCategoryName(Category category) {
+        return Optional.ofNullable(category)
+                .map(Category::getName)
+                .orElse("미분류");
     }
 
     public record ChapterResponse(String title, Integer orderNo, List<LectureResponse> lectures) {}

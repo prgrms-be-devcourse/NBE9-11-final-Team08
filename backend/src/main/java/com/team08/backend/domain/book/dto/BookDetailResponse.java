@@ -1,6 +1,8 @@
 package com.team08.backend.domain.book.dto;
 
 import com.team08.backend.domain.book.entity.Book;
+import com.team08.backend.domain.category.entity.Category;
+import java.util.Optional;
 
 public record BookDetailResponse(
         Long id,
@@ -22,8 +24,14 @@ public record BookDetailResponse(
                 book.getDescription(),
                 book.getPrice(),
                 book.getIsEbook(),
-                book.getCategory() != null ? book.getCategory().getName() : "미분류",
+                getCategoryName(book.getCategory()),
                 book.getViewCount()
         );
+    }
+
+    private static String getCategoryName(Category category) {
+        return Optional.ofNullable(category)
+                .map(Category::getName)
+                .orElse("미분류");
     }
 }

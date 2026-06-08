@@ -55,4 +55,8 @@ public class Chapter {
 
     @OneToMany(mappedBy = "chapter", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Lecture> lectures = new ArrayList<>();
+
+    public void setCourse(Course course) {
+        this.course = course;
+    }
 }

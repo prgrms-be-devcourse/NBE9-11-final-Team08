@@ -5,6 +5,7 @@ import com.team08.backend.domain.book.dto.BookDetailResponse;
 import com.team08.backend.domain.book.dto.BookUpdateRequest;
 import com.team08.backend.domain.book.service.BookService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,7 @@ public class BookController {
 
     @PostMapping
     public ResponseEntity<Long> createBook(
-            @RequestBody BookCreateRequest request,
+            @Valid @RequestBody BookCreateRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(bookService.createBook(request, principal.user().id()));

@@ -6,6 +6,7 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.dto.CurriculumSaveRequest;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,7 +22,7 @@ public class CourseController {
 
     @PostMapping
     public ResponseEntity<Long> createCourse(
-            @RequestBody CourseCreateRequest request,
+            @Valid @RequestBody CourseCreateRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal
     ) {
         Long courseId = courseService.createCourse(request, principal.user().id());
