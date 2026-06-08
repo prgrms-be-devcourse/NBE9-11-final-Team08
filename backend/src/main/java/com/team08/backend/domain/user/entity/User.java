@@ -50,4 +50,8 @@ public class User {
     public static User create(String email, String password, String nickname) {
         return new User(email, password, nickname);
     }
+
+    public boolean isSeller() {
+        return "SELLER".equals(this.role);
+    }
 }
