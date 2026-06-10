@@ -1,0 +1,20 @@
+package com.team08.backend.domain.ordercouponusage.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Entity
+@Table(name = "order_coupon_usages")
+@Getter
+@AllArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class OrderCouponUsage {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable = false)
+    private Long orderId;
+    @Column(nullable = false)
+    private Long issuedCouponId;
+    @Column(nullable = false)
+    private Integer discountAmount;
+}
