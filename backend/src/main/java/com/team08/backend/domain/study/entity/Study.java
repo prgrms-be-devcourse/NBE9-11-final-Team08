@@ -33,7 +33,15 @@ public class Study extends BaseTimeEntity {
     @Enumerated(EnumType.STRING) @Column(nullable = false)
     private StudyStatus status;
 
+    private Study(User owner, Course course, String title, String description, StudyStatus status) {
+        this.owner = owner;
+        this.course = course;
+        this.title = title;
+        this.description = description;
+        this.status = status;
+    }
+
     public static Study createForCourse(User owner, Course course, String title, String description) {
-        return new Study();
+        return new Study(owner, course, title, description, StudyStatus.DRAFT);
     }
 }

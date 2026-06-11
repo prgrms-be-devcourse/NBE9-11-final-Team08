@@ -38,7 +38,15 @@ public class StudyMember {
 
     private LocalDateTime kickedAt;
 
+    private StudyMember(User user, Study study, StudyMemberRole role) {
+        this.user = user;
+        this.study = study;
+        this.role = role;
+        this.status = StudyMemberStatus.ACTIVE;
+        this.joinedAt = LocalDateTime.now();
+    }
+
     public static StudyMember owner(User user, Study study) {
-        return new StudyMember();
+        return new StudyMember(user, study, StudyMemberRole.OWNER);
     }
 }
