@@ -2,6 +2,7 @@ package com.team08.backend.domain.chapter.entity;
 
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import java.util.List;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Chapter {
+public class Chapter extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,12 +25,6 @@ public class Chapter {
 
     @Column(name = "order_no", nullable = false)
     private int orderNo;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
 
     private LocalDateTime deletedAt;
 

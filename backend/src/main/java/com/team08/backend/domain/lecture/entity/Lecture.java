@@ -1,6 +1,7 @@
 package com.team08.backend.domain.lecture.entity;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Lecture {
+public class Lecture extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,12 +33,6 @@ public class Lecture {
 
     @Column(nullable = false)
     private boolean isFreePreview = false;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
 
     private LocalDateTime deletedAt;
 

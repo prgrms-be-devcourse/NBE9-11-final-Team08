@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lecturemodificationrequest.entity;
 
+import com.team08.backend.domain.lecture.entity.Lecture;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -15,8 +16,9 @@ public class LectureModificationRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Long lectureId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lecture_id", nullable = false)
+    private Lecture lecture;
 
     @Column(nullable = false)
     private Long instructorId;
