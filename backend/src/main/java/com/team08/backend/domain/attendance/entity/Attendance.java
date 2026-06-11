@@ -1,32 +1,59 @@
 package com.team08.backend.domain.attendance.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "attendances", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "attendance_date"}))
 @Getter
-@Builder
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Attendance {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(nullable = false)
     private Long userId;
+
     @Column(nullable = false)
     private LocalDate attendanceDate;
+
     @Column(nullable = false)
     private Integer consecutiveDays;
+
     @Column(nullable = false)
     private Integer monthlyTotalDays;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    @PrePersist
-    protected void onCreate() {
+    private Attendance(Long userId, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays) {
+        this.userId = userId;
+        this.attendanceDate = attendanceDate;
+        this.consecutiveDays = consecutiveDays;
+        this.monthlyTotalDays = monthlyTotalDays;
         this.createdAt = LocalDateTime.now();
+    }
+
+    // 엔티티 내부에서 생성 로직을 캡슐화
+    public static Attendance create(Long userId, LocalDate today, int consecutive, int monthly) {
+        return new Attendance(
+                userId,
+                today,
+                consecutive,
+                monthly);
     }
 }

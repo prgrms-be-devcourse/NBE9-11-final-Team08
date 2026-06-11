@@ -6,7 +6,6 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +29,11 @@ public class AttendanceService {
             throw new CustomException(ErrorCode.USER_NOT_FOUND); // USER_001
         }
 
+        // 동시성 중복 출석 방어
+        if (attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)) {
+            throw new CustomException(ErrorCode.ATTENDANCE_ALREADY_EXISTS); // ATTENDANCE_001
+        }
+
         // 어제 출석 기록 조회
         LocalDate yesterday = today.minusDays(1);
         Optional<Attendance> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
@@ -45,21 +49,13 @@ public class AttendanceService {
         int monthlyTotalDays = (int) currentMonthCount + 1;
 
         // 출석 기록 세팅
-        Attendance todayLog = Attendance.builder()
-                .userId(userId)
-                .attendanceDate(today)
-                .consecutiveDays(consecutiveDays)
-                .monthlyTotalDays(monthlyTotalDays)
-                .build();
+        Attendance todayLog = Attendance.create(
+                userId,
+                today,
+                consecutiveDays,
+                monthlyTotalDays);
 
-        // 출석 기록 저장 (동시성 중복 출석 방어)
-        try {
-            attendanceRepository.save(todayLog);
-            attendanceRepository.flush();
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.ATTENDANCE_ALREADY_EXISTS); // ATTENDANCE_001
-        }
-
-        return todayLog;
+        // 출석 기록 저장
+        return attendanceRepository.save(todayLog);
     }
 }

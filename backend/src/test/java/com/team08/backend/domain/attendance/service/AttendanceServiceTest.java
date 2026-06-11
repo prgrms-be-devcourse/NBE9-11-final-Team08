@@ -11,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -20,7 +19,9 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceServiceTest {
@@ -43,29 +44,26 @@ class AttendanceServiceTest {
         LocalDate yesterday = today.minusDays(1);
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
-        // 어제 1일 차 출석을 완료했다고 가정
-        Attendance yesterdayLog = Attendance.builder()
-                .userId(userId)
-                .attendanceDate(yesterday)
-                .consecutiveDays(1)
-                .monthlyTotalDays(1)
-                .build();
+        Attendance yesterdayLog = Attendance.create(
+                userId,
+                yesterday,
+                1,
+                1);
 
         when(userRepository.existsById(userId)).thenReturn(true);
+        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
-        // 이번 달 누적 출석 수가 1번이었다고 가정
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(1L);
+
+        // save()가 호출되면 저장된 객체(인자)를 그대로 반환하도록 설정
+        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
         Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
-        // 1. 연속 출석일이 2일로 계산되었는지 확인
         assertEquals(2, todayLog.getConsecutiveDays());
-        // 2. 누적 출석일이 2일로 계산되었는지 확인
         assertEquals(2, todayLog.getMonthlyTotalDays());
-
-        // 3. DB에 잘 저장되었는지 확인
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
     }
 
@@ -77,8 +75,7 @@ class AttendanceServiceTest {
         LocalDate today = LocalDate.now();
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        // DB 제약 조건 위반 발생 모의
-        doThrow(DataIntegrityViolationException.class).when(attendanceRepository).save(any(Attendance.class));
+        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(true);
 
         // when & then
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -97,18 +94,18 @@ class AttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        // 어제 출석 기록이 없음 (결석)
+        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
-        // 이번 달 기존 누적 출석 수는 3번이었다고 가정
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(3L);
+
+        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
         Attendance todayLog = attendanceService.checkIn(userId, today);
 
         // then
-        assertEquals(1, todayLog.getConsecutiveDays()); // 연속 출석일은 1로 초기화됨
-        assertEquals(4, todayLog.getMonthlyTotalDays()); // 누적 출석일은 기존 3 + 1 = 4로 정상 증가
-
+        assertEquals(1, todayLog.getConsecutiveDays());
+        assertEquals(4, todayLog.getMonthlyTotalDays());
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
     }
 }
