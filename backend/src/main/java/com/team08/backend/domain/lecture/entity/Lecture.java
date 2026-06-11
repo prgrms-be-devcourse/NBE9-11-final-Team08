@@ -58,4 +58,12 @@ public class Lecture extends BaseTimeEntity {
     public void assignChapter(Chapter chapter) {
         this.chapter = chapter;
     }
+
+    public void updateGeneralInfo(String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview) {
+        this.title = title;
+        this.summary = summary;
+        this.durationSeconds = durationSeconds;
+        this.orderNo = orderNo;
+        this.isFreePreview = isFreePreview;
+    }
 }

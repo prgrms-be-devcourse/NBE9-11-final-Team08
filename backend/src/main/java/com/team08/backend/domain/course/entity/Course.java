@@ -1,7 +1,10 @@
 package com.team08.backend.domain.course.entity;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
@@ -10,6 +13,8 @@ import org.hibernate.annotations.Where;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "courses")
@@ -61,6 +66,49 @@ public class Course extends BaseTimeEntity {
 
     public void increaseViewCount() {
         this.viewCount++;
+    }
+
+    public void validateOwner(Long requestUserId) {
+        if (!this.instructorId.equals(requestUserId)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+        }
+    }
+
+    public void updateGeneralInfo(CourseUpdateRequest request) {
+        this.categoryId = request.categoryId();
+        this.title = request.title();
+        this.description = request.description();
+        this.thumbnail = request.thumbnail();
+        this.price = request.price();
+
+        updateChapters(request.chapters());
+    }
+
+    private void updateChapters(List<CourseUpdateRequest.ChapterUpdateRequest> chapterRequests) {
+        Map<Long, Chapter> existingChapterMap = this.chapters.stream()
+                .filter(c -> c.getId() != null)
+                .collect(Collectors.toMap(Chapter::getId, c -> c));
+
+        List<Chapter> updatedChapters = new ArrayList<>();
+
+        for (CourseUpdateRequest.ChapterUpdateRequest chapterReq : chapterRequests) {
+            if (chapterReq.id() != null && existingChapterMap.containsKey(chapterReq.id())) {
+                Chapter existingChapter = existingChapterMap.get(chapterReq.id());
+                existingChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
+                updatedChapters.add(existingChapter);
+            } else {
+                Chapter newChapter = Chapter.builder()
+                        .title(chapterReq.title())
+                        .orderNo(chapterReq.orderNo())
+                        .course(this)
+                        .build();
+                newChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
+                updatedChapters.add(newChapter);
+            }
+        }
+
+        this.chapters.clear();
+        this.chapters.addAll(updatedChapters);
     }
 
     @Builder
