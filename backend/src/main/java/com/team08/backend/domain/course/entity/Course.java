@@ -15,6 +15,8 @@ import java.util.List;
 @Table(name = "courses")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
 @SQLDelete(sql = "UPDATE courses SET deleted_at = NOW() WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
 public class Course extends BaseTimeEntity {
@@ -53,18 +55,6 @@ public class Course extends BaseTimeEntity {
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapters = new ArrayList<>();
-
-    @Builder
-    public Course(Long instructorId, Long categoryId, String title, String description,
-                  String thumbnail, int price, CourseStatus status) {
-        this.instructorId = instructorId;
-        this.categoryId = categoryId;
-        this.title = title;
-        this.description = description;
-        this.thumbnail = thumbnail;
-        this.price = price;
-        this.status = status;
-    }
 
     public void addChapter(Chapter chapter) {
         chapters.add(chapter);
