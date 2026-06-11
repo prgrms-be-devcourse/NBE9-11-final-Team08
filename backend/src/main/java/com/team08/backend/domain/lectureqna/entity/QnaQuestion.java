@@ -26,8 +26,8 @@ public class QnaQuestion {
     private LocalDateTime deletedAt;
 
     private QnaQuestion(
-            Long lectureId,
             Long userId,
+            Long lectureId,
             String title,
             String content
     ) {
@@ -42,14 +42,14 @@ public class QnaQuestion {
     }
 
     public static QnaQuestion create(
-            Long lectureId,
             Long userId,
+            Long lectureId,
             String title,
             String content
     ) {
         return new QnaQuestion(
-                lectureId,
                 userId,
+                lectureId,
                 title,
                 content
         );
