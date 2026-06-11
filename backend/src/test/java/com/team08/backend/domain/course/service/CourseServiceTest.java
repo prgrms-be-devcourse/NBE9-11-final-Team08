@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,8 +79,8 @@ class CourseServiceTest {
         assertThat(response.id()).isEqualTo(courseId);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
-        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
     @Test
@@ -106,8 +107,8 @@ class CourseServiceTest {
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
-        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
     @Test
@@ -120,7 +121,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(courseViewCountManager).increaseViewCountRequiresNew(invalidCourseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
+        verify(courseViewCountManager, never()).increaseViewCountRequiresNew(invalidCourseId);
     }
 }
