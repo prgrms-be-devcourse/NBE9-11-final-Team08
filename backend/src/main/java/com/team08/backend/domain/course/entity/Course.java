@@ -66,22 +66,6 @@ public class Course extends BaseTimeEntity {
         this.status = status;
     }
 
-    // 테스트 전용 - id를 직접 세팅
-    public static Course forTest(Long id, Long instructorId, Long categoryId, String title,
-                                 String description, String thumbnail, int price, CourseStatus status) {
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .categoryId(categoryId)
-                .title(title)
-                .description(description)
-                .thumbnail(thumbnail)
-                .price(price)
-                .status(status)
-                .build();
-        course.id = id;
-        return course;
-    }
-
     public void addChapter(Chapter chapter) {
         chapters.add(chapter);
         chapter.assignCourse(this);

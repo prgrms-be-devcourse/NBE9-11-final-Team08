@@ -3,6 +3,7 @@ package com.team08.backend.domain.course.service;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
+import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
@@ -42,16 +43,7 @@ class CourseServiceTest {
                 CourseStatus.DRAFT
         );
 
-        Course savedCourse = Course.forTest(
-                100L,
-                instructorId,
-                request.categoryId(),
-                request.title(),
-                request.description(),
-                request.thumbnail(),
-                request.price(),
-                request.status()
-                );
+        Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
         given(courseStudyManager.createForCourse(any())).willReturn(1L);
