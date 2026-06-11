@@ -1,9 +1,9 @@
 package com.team08.backend.domain.study.service;
 
-import com.team08.backend.domain.study.dto.StudySummaryResponse;
+import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.repository.StudyRepository;
-import com.team08.backend.support.TestEntityFactory;
+import com.team08.backend.domain.study.fixture.StudyFixture;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,8 +29,7 @@ public class StudyServiceTest {
     void 스터디_목록을_조회하면_참여중인_Active_상태의_스터디_목록이_조회된다() {
         // given
         Long userId = 1L;
-
-        Study study = TestEntityFactory.activeStudy(10L);
+        Study study = StudyFixture.activeStudy();
         List<Study> studies = List.of(study);
 
         given(studyRepository.findActiveStudiesByMemberUserId(userId))

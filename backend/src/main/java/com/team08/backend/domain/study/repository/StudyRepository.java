@@ -12,6 +12,7 @@ public interface StudyRepository extends JpaRepository<Study, Long> {
     @Query("""
         SELECT s
         FROM Study s
+        JOIN FETCH s.owner
         JOIN StudyMember sm ON sm.study = s
         WHERE sm.user.id = :userId
             AND sm.status = 'ACTIVE'
