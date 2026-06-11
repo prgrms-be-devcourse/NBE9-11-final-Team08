@@ -47,6 +47,10 @@ public enum ErrorCode {
     RETROSPECTION_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_005", "회고를 찾을 수 없습니다."),
     INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST,   "LECTURE_006", "부모 댓글이 올바르지 않습니다."),
 
+    // ── Course ───────────────────────────────────────────────────────────
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "COURSE_001", "강의를 찾을 수 없습니다."),
+    COURSE_NOT_ON_SALE(HttpStatus.CONFLICT, "COURSE_002", "판매 중인 강의만 장바구니에 담을 수 있습니다."),
+
     // ── Order ────────────────────────────────────────────────────────────
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND,       "ORDER_001", "주문을 찾을 수 없습니다."),
     EMPTY_CART(HttpStatus.BAD_REQUEST,     "ORDER_002", "장바구니가 비어 있습니다."),
