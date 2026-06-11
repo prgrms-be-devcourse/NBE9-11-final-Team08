@@ -355,6 +355,8 @@ Table studies {
   title varchar(255) [not null]
   description text
   status study_status [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
 }
 Table study_members {
   id bigint [pk, increment]
@@ -362,6 +364,9 @@ Table study_members {
   user_id bigint [not null]
   role study_member_role [not null]
   status study_member_status [not null]
+  joined_at datetime [not null]
+  kicked_at datetime
+  left_at datetime
   indexes {
     (study_id, user_id) [unique]
   }

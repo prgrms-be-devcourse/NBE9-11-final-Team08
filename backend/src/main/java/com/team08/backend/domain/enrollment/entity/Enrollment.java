@@ -1,5 +1,7 @@
 package com.team08.backend.domain.enrollment.entity;
 
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -27,4 +29,24 @@ public class Enrollment {
     @Column(nullable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public void cancel(LocalDateTime canceledAt) {
+        validateStatus(EnrollmentStatus.ACTIVE);
+        this.status = EnrollmentStatus.CANCELED;
+        this.canceledAt = canceledAt;
+        this.updatedAt = canceledAt;
+    }
+
+    public void expire(LocalDateTime expiredAt) {
+        validateStatus(EnrollmentStatus.ACTIVE);
+        this.status = EnrollmentStatus.EXPIRED;
+        this.expiredAt = expiredAt;
+        this.updatedAt = expiredAt;
+    }
+
+    private void validateStatus(EnrollmentStatus expectedStatus) {
+        if (this.status != expectedStatus) {
+            throw new CustomException(ErrorCode.INVALID_ENROLLMENT_STATUS_TRANSITION);
+        }
+    }
 }
