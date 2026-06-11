@@ -33,4 +33,24 @@ public class Order {
     @Column(nullable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public void markPaid(LocalDateTime paidAt) {
+        this.status = OrderStatus.PAID;
+        this.paidAt = paidAt;
+    }
+
+    public void cancel(LocalDateTime canceledAt) {
+        this.status = OrderStatus.CANCELED;
+        this.canceledAt = canceledAt;
+    }
+
+    public void refund(LocalDateTime refundedAt) {
+        this.status = OrderStatus.REFUNDED;
+        this.refundedAt = refundedAt;
+    }
+
+    public void expire(LocalDateTime expiredAt) {
+        this.status = OrderStatus.EXPIRED;
+        this.expiredAt = expiredAt;
+    }
 }

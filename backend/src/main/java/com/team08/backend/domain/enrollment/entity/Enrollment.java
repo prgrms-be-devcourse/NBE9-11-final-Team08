@@ -27,4 +27,14 @@ public class Enrollment {
     @Column(nullable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public void cancel(LocalDateTime canceledAt) {
+        this.status = EnrollmentStatus.CANCELED;
+        this.canceledAt = canceledAt;
+    }
+
+    public void expire(LocalDateTime expiredAt) {
+        this.status = EnrollmentStatus.EXPIRED;
+        this.expiredAt = expiredAt;
+    }
 }

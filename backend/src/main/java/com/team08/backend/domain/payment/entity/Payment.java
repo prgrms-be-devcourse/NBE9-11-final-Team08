@@ -27,4 +27,27 @@ public class Payment {
     @Column(nullable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public void succeed(String paymentKey, String method, LocalDateTime paidAt) {
+        this.paymentKey = paymentKey;
+        this.method = method;
+        this.status = PaymentStatus.SUCCESS;
+        this.paidAt = paidAt;
+        this.failedReason = null;
+    }
+
+    public void fail(String failedReason) {
+        this.status = PaymentStatus.FAILED;
+        this.failedReason = failedReason;
+    }
+
+    public void cancel(LocalDateTime canceledAt) {
+        this.status = PaymentStatus.CANCELED;
+        this.canceledAt = canceledAt;
+    }
+
+    public void refund(LocalDateTime refundedAt) {
+        this.status = PaymentStatus.REFUNDED;
+        this.refundedAt = refundedAt;
+    }
 }
