@@ -11,7 +11,6 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -50,10 +49,7 @@ public class CourseService {
     }
 
     public List<CourseCardResponse> getCourses(CourseSortType sortType) {
-        Sort finalSort = Sort.by(sortType.getDirection(), sortType.getProperty())
-                .and(Sort.by(Sort.Direction.DESC, "createdAt"));
-
-        return courseRepository.findAllByStatus(CourseStatus.ON_SALE, finalSort).stream()
+        return courseRepository.findAllByStatus(CourseStatus.ON_SALE, sortType.getSort()).stream()
                 .map(CourseCardResponse::from)
                 .toList();
     }

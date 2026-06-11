@@ -15,4 +15,9 @@ public enum CourseSortType {
 
     private final String property;
     private final Sort.Direction direction;
+
+    public Sort getSort() {
+        return Sort.by(direction, property)
+                .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
 }
