@@ -1,11 +1,12 @@
 package com.team08.backend.domain.study.entity;
 
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.study.exception.InvalidStudyStatusTransitionException;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 public class StudyTest {
 
@@ -25,5 +26,30 @@ public class StudyTest {
 
         // then
         assertThat(study.getStatus()).isEqualTo(StudyStatus.DRAFT);
+    }
+
+    @Test
+    void DRAFT_상태인_스터디는_ACTIVE_상태로_변경할_수_있다() {
+        // given
+        Study study = TestEntityFactory.draftStudy(1L);
+
+        // when
+        study.activate();
+
+        // then
+        assertThat(study.getStatus()).isEqualTo(StudyStatus.ACTIVE);
+    }
+
+    @Test
+    void DRAFT_상태가_아닌_스터디는_ACTIVE_상태로_변경할_수_없다() {
+        // given
+        Study study = TestEntityFactory.readOnlyStudy(1L);
+
+        // when
+        Throwable thrown = catchThrowable(study::activate);
+
+        // then
+        assertThat(thrown)
+                .isInstanceOf(InvalidStudyStatusTransitionException.class);
     }
 }

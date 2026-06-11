@@ -44,4 +44,8 @@ public class Study extends BaseTimeEntity {
     public static Study createForCourse(User owner, Course course, String title, String description) {
         return new Study(owner, course, title, description, StudyStatus.DRAFT);
     }
+
+    public void activate() {
+
+    }
 }

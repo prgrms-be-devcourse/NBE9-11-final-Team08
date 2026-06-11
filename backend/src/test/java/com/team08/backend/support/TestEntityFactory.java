@@ -2,6 +2,7 @@ package com.team08.backend.support;
 
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.study.entity.Study;
+import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.user.entity.User;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,6 +38,27 @@ public final class TestEntityFactory {
     public static Study study(Long studyId) {
         Study study = newInstance(Study.class);
         ReflectionTestUtils.setField(study, "id", studyId);
+
+        return study;
+    }
+
+    public static Study draftStudy(Long studyId) {
+        Study study = study(studyId);
+        ReflectionTestUtils.setField(study, "status", StudyStatus.DRAFT);
+
+        return study;
+    }
+
+    public static Study readOnlyStudy(Long studyId) {
+        Study study = study(studyId);
+        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
+
+        return study;
+    }
+
+    public static Study activeStudy(Long studyId) {
+        Study study = study(studyId);
+        ReflectionTestUtils.setField(study, "status", StudyStatus.ACTIVE);
 
         return study;
     }
