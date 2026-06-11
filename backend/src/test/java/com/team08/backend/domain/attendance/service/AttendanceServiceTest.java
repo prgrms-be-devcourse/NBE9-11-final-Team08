@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -44,19 +45,18 @@ class AttendanceServiceTest {
         LocalDate yesterday = today.minusDays(1);
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
-        Attendance yesterdayLog = Attendance.create(
+        Attendance yesterdayLog = Attendance.record(
                 userId,
                 yesterday,
-                1,
-                1);
+                0,
+                0);
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(1L);
 
-        // save()가 호출되면 저장된 객체(인자)를 그대로 반환하도록 설정
-        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
+        // saveAndFlush()가 호출되면 저장된 객체(인자)를 그대로 반환하도록 설정
+        when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
         Attendance todayLog = attendanceService.checkIn(userId, today);
@@ -64,7 +64,7 @@ class AttendanceServiceTest {
         // then
         assertEquals(2, todayLog.getConsecutiveDays());
         assertEquals(2, todayLog.getMonthlyTotalDays());
-        verify(attendanceRepository, times(1)).save(any(Attendance.class));
+        verify(attendanceRepository, times(1)).saveAndFlush(any(Attendance.class));
     }
 
     @Test
@@ -73,9 +73,15 @@ class AttendanceServiceTest {
         // given
         Long userId = 1L;
         LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(true);
+        when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(0L);
+
+        when(attendanceRepository.saveAndFlush(any(Attendance.class)))
+                .thenThrow(new DataIntegrityViolationException("DB Unique Constraint Violation"));
 
         // when & then
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -94,11 +100,10 @@ class AttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(attendanceRepository.existsByUserIdAndAttendanceDate(userId, today)).thenReturn(false);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
         when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(3L);
 
-        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
+        when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
         Attendance todayLog = attendanceService.checkIn(userId, today);
@@ -106,6 +111,6 @@ class AttendanceServiceTest {
         // then
         assertEquals(1, todayLog.getConsecutiveDays());
         assertEquals(4, todayLog.getMonthlyTotalDays());
-        verify(attendanceRepository, times(1)).save(any(Attendance.class));
+        verify(attendanceRepository, times(1)).saveAndFlush(any(Attendance.class));
     }
 }

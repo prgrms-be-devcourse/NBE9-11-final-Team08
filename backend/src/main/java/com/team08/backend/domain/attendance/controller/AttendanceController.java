@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -26,13 +25,13 @@ public class AttendanceController {
     // [사용자] 출석 체크 /api/attendances
     @PostMapping
     @Operation(summary = "출석 체크", description = "당일 출석을 수행하고 연속/누적 출석일수를 반환합니다.")
-    public ResponseEntity<AttendanceResponse> checkIn(
+    public AttendanceResponse checkIn(
             @Parameter(description = "출석을 수행할 사용자의 ID", example = "1")
             @RequestParam Long userId) {
         LocalDate today = LocalDate.now();
-        
+
         // [사용자] 출석체크
         Attendance log = attendanceService.checkIn(userId, today);
-        return ResponseEntity.ok(AttendanceResponse.from(log));
+        return AttendanceResponse.from(log);
     }
 }

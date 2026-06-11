@@ -48,12 +48,11 @@ public class Attendance {
         this.createdAt = LocalDateTime.now();
     }
 
-    // 엔티티 내부에서 생성 로직을 캡슐화
-    public static Attendance create(Long userId, LocalDate today, int consecutive, int monthly) {
-        return new Attendance(
-                userId,
-                today,
-                consecutive,
-                monthly);
+    // 오늘 자 출석 기록 생성
+    public static Attendance record(Long userId, LocalDate today, int lastConsecutiveDays, int currentMonthCount) {
+        int consecutive = lastConsecutiveDays + 1;
+        int monthly = currentMonthCount + 1;
+
+        return new Attendance(userId, today, consecutive, monthly);
     }
 }
