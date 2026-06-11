@@ -49,12 +49,13 @@ class CourseControllerTest {
         given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class))).willReturn(55L);
 
         mockMvc.perform(post("/api/courses")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token") // 여기 수정
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("200"))
+                // Todo: 응답 형식 바꾸면 이 내용도 바꿈
                 .andExpect(jsonPath("$.message").value("요청 성공"))
                 .andExpect(jsonPath("$.result").value(55L));
     }
