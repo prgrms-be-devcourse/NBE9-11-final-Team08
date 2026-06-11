@@ -4,19 +4,18 @@ import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Slf4j
 @Service
@@ -48,10 +47,9 @@ public class CourseService {
         return CourseDetailResponse.from(course);
     }
 
-    public List<CourseCardResponse> getCourses(CourseSortType sortType) {
-        return courseRepository.findAllByStatus(CourseStatus.ON_SALE, sortType.getSort()).stream()
-                .map(CourseCardResponse::from)
-                .toList();
+    public Page<CourseCardResponse> getCourses(Pageable pageable) {
+        return courseRepository.findAllByStatus(CourseStatus.ON_SALE, pageable)
+                .map(CourseCardResponse::from);
     }
 
     @Component

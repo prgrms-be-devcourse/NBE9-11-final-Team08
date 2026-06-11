@@ -2,13 +2,13 @@ package com.team08.backend.domain.course.repository;
 
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
@@ -24,5 +24,5 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("update Course c set c.viewCount = c.viewCount + 1 where c.id = :courseId")
     void increaseViewCountAtomic(@Param("courseId") Long courseId);
 
-    List<Course> findAllByStatus(CourseStatus status, Sort sort);
+    Page<Course> findAllByStatus(CourseStatus status, Pageable pageable);
 }

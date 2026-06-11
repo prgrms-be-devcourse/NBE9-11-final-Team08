@@ -8,11 +8,13 @@ import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -26,7 +28,6 @@ public class CourseController {
     public Long createCourse(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
             @Valid @RequestBody CourseCreateRequest request) {
-
         return courseService.createCourse(loginUserPrincipal.user().id(), request);
     }
 
@@ -38,8 +39,10 @@ public class CourseController {
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    public List<CourseCardResponse> getCourses(
-            @RequestParam(name = "sort", defaultValue = "VIEW_DESC") CourseSortType sortType) {
-        return courseService.getCourses(sortType);
+    public Page<CourseCardResponse> getCourses(
+            @RequestParam(name = "sort", defaultValue = "VIEW_DESC") CourseSortType sortType,
+            @PageableDefault(size = 10) Pageable pageable) {
+        Pageable pagedWithSort = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.getSort());
+        return courseService.getCourses(pagedWithSort);
     }
 }
