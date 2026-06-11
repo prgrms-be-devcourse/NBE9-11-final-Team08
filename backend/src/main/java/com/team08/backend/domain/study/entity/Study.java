@@ -32,4 +32,8 @@ public class Study extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING) @Column(nullable = false)
     private StudyStatus status;
+
+    public static Study createForCourse(User owner, Course course, String title, String description) {
+        return new Study();
+    }
 }

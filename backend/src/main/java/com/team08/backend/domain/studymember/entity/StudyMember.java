@@ -37,4 +37,8 @@ public class StudyMember {
     private LocalDateTime leftAt;
 
     private LocalDateTime kickedAt;
+
+    public static StudyMember owner(User user, Study study) {
+        return new StudyMember();
+    }
 }
