@@ -25,6 +25,8 @@ public class ChapterService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         Chapter chapter = request.toEntity(course);
+        course.addChapter(chapter);
+
         return chapterRepository.save(chapter).getId();
     }
 }

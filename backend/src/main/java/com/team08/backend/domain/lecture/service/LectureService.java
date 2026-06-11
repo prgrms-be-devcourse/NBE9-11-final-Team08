@@ -29,6 +29,8 @@ public class LectureService {
         }
 
         Lecture lecture = request.toEntity(chapter);
+        chapter.addLecture(lecture);
+
         return lectureRepository.save(lecture).getId();
     }
 }
