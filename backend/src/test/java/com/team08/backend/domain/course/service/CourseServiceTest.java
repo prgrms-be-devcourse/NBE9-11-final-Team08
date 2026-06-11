@@ -15,7 +15,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +31,7 @@ class CourseServiceTest {
 
     @Test
     void 강좌를_성공적으로_생성하고_ID를_반환한다() {
+        // given
         Long instructorId = 1L;
         CourseCreateRequest request = new CourseCreateRequest(
                 "테스트 강좌",
@@ -42,31 +42,24 @@ class CourseServiceTest {
                 CourseStatus.DRAFT
         );
 
-        Course savedCourse = Course.builder()
-                .instructorId(instructorId)
-                .categoryId(request.getCategoryId())
-                .title(request.getTitle())
-                .description(request.getDescription())
-                .thumbnail(request.getThumbnail())
-                .price(request.getPrice())
-                .status(request.getStatus())
-                .build();
-
-        java.lang.reflect.Field idField;
-        try {
-            idField = Course.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(savedCourse, 100L);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        Course savedCourse = Course.forTest(
+                100L,
+                instructorId,
+                request.categoryId(),
+                request.title(),
+                request.description(),
+                request.thumbnail(),
+                request.price(),
+                request.status()
+                );
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
-
         given(courseStudyManager.createForCourse(any())).willReturn(1L);
 
+        // when
         Long courseId = courseService.createCourse(instructorId, request);
 
+        // then
         assertThat(courseId).isEqualTo(100L);
         verify(courseRepository).save(any(Course.class));
         verify(courseStudyManager).createForCourse(any(CourseStudyCreateCommand.class));
