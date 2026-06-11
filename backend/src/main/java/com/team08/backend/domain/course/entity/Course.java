@@ -59,6 +59,10 @@ public class Course extends BaseTimeEntity {
         chapter.assignCourse(this);
     }
 
+    public void increaseViewCount() {
+        this.viewCount++;
+    }
+
     @Builder
     public Course(Long instructorId, Long categoryId, String title, String description,
                   String thumbnail, int price, CourseStatus status) {
