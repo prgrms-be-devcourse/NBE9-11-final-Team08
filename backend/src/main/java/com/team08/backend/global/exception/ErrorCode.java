@@ -43,6 +43,8 @@ public enum ErrorCode {
     RECENT_LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_004", "최근 수강한 강의가 없습니다."),
     RETROSPECTION_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_005", "회고를 찾을 수 없습니다."),
     INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST,   "LECTURE_006", "부모 댓글이 올바르지 않습니다."),
+    REFLECTION_ALREADY_EXISTS(HttpStatus.CONFLICT,    "LECTURE_007", "이미 작성된 회고가 있습니다."),
+    REFLECTION_ACCESS_DENIED(HttpStatus.FORBIDDEN,    "LECTURE_008", "회고를 수정할 권한이 없습니다."),
 
     // ── Order ────────────────────────────────────────────────────────────
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND,       "ORDER_001", "주문을 찾을 수 없습니다."),
