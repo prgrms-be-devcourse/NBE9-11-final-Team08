@@ -69,6 +69,5 @@ public class Course extends BaseTimeEntity {
         this.thumbnail = thumbnail;
         this.price = price;
         this.status = status;
-        this.viewCount = 0;
     }
 }

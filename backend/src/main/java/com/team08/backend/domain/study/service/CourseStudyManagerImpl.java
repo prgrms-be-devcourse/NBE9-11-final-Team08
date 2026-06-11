@@ -14,6 +14,7 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -24,14 +25,13 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
     private final CourseRepository courseRepository;
     private final StudyMemberRepository studyMemberRepository;
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // 스터디가 롤백되어도 강좌는 사라지지 않도록
     @Override
     public Long createForCourse(CourseStudyCreateCommand command) {
         if (studyRepository.existsByCourseId(command.courseId())) {
             throw new DuplicateStudyException();
         }
 
-        // TODO: Exception 확인 필요
         User owner = userRepository.findById(command.ownerId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
