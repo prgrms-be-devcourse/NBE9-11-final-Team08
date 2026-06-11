@@ -7,6 +7,7 @@ import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.global.exception.CustomException;
@@ -31,6 +32,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private CourseViewCountManager courseViewCountManager;
 
     @InjectMocks
     private CourseService courseService;
@@ -74,7 +78,7 @@ class CourseServiceTest {
         assertThat(response.id()).isEqualTo(courseId);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
-        verify(courseRepository).increaseViewCountAtomic(courseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
     }
 
@@ -102,7 +106,7 @@ class CourseServiceTest {
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
-        verify(courseRepository).increaseViewCountAtomic(courseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
     }
 
@@ -116,7 +120,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(courseRepository).increaseViewCountAtomic(invalidCourseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(invalidCourseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
     }
 }
