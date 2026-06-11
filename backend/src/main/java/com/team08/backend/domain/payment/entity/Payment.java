@@ -29,25 +29,42 @@ public class Payment {
     private LocalDateTime updatedAt;
 
     public void succeed(String paymentKey, String method, LocalDateTime paidAt) {
+        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
         this.paymentKey = paymentKey;
         this.method = method;
         this.status = PaymentStatus.SUCCESS;
         this.paidAt = paidAt;
         this.failedReason = null;
+        this.updatedAt = paidAt;
     }
 
-    public void fail(String failedReason) {
+    public void fail(String failedReason, LocalDateTime failedAt) {
+        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
         this.status = PaymentStatus.FAILED;
         this.failedReason = failedReason;
+        this.updatedAt = failedAt;
     }
 
     public void cancel(LocalDateTime canceledAt) {
+        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
         this.status = PaymentStatus.CANCELED;
         this.canceledAt = canceledAt;
+        this.updatedAt = canceledAt;
     }
 
     public void refund(LocalDateTime refundedAt) {
+        validateStatus(PaymentStatus.SUCCESS);
         this.status = PaymentStatus.REFUNDED;
         this.refundedAt = refundedAt;
+        this.updatedAt = refundedAt;
+    }
+
+    private void validateStatus(PaymentStatus... expectedStatuses) {
+        for (PaymentStatus expectedStatus : expectedStatuses) {
+            if (this.status == expectedStatus) {
+                return;
+            }
+        }
+        throw new IllegalStateException("Invalid payment status transition.");
     }
 }

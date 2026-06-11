@@ -35,22 +35,36 @@ public class Order {
     private LocalDateTime updatedAt;
 
     public void markPaid(LocalDateTime paidAt) {
+        validateStatus(OrderStatus.PENDING_PAYMENT);
         this.status = OrderStatus.PAID;
         this.paidAt = paidAt;
+        this.updatedAt = paidAt;
     }
 
     public void cancel(LocalDateTime canceledAt) {
+        validateStatus(OrderStatus.PENDING_PAYMENT);
         this.status = OrderStatus.CANCELED;
         this.canceledAt = canceledAt;
+        this.updatedAt = canceledAt;
     }
 
     public void refund(LocalDateTime refundedAt) {
+        validateStatus(OrderStatus.PAID);
         this.status = OrderStatus.REFUNDED;
         this.refundedAt = refundedAt;
+        this.updatedAt = refundedAt;
     }
 
     public void expire(LocalDateTime expiredAt) {
+        validateStatus(OrderStatus.PENDING_PAYMENT);
         this.status = OrderStatus.EXPIRED;
         this.expiredAt = expiredAt;
+        this.updatedAt = expiredAt;
+    }
+
+    private void validateStatus(OrderStatus expectedStatus) {
+        if (this.status != expectedStatus) {
+            throw new IllegalStateException("Invalid order status transition.");
+        }
     }
 }

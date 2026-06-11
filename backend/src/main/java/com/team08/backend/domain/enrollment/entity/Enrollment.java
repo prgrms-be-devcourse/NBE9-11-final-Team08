@@ -29,12 +29,22 @@ public class Enrollment {
     private LocalDateTime updatedAt;
 
     public void cancel(LocalDateTime canceledAt) {
+        validateStatus(EnrollmentStatus.ACTIVE);
         this.status = EnrollmentStatus.CANCELED;
         this.canceledAt = canceledAt;
+        this.updatedAt = canceledAt;
     }
 
     public void expire(LocalDateTime expiredAt) {
+        validateStatus(EnrollmentStatus.ACTIVE);
         this.status = EnrollmentStatus.EXPIRED;
         this.expiredAt = expiredAt;
+        this.updatedAt = expiredAt;
+    }
+
+    private void validateStatus(EnrollmentStatus expectedStatus) {
+        if (this.status != expectedStatus) {
+            throw new IllegalStateException("Invalid enrollment status transition.");
+        }
     }
 }

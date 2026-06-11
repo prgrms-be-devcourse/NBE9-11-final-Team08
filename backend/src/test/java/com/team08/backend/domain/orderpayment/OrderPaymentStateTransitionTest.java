@@ -11,115 +11,218 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OrderPaymentStateTransitionTest {
 
+    private static final LocalDateTime CREATED_AT = LocalDateTime.parse("2026-06-11T10:00:00");
+
     @Test
     void orderStatusTransitions() {
-        Order order = new Order(
+        LocalDateTime paidAt = LocalDateTime.parse("2026-06-11T10:01:00");
+        Order paidOrder = order(OrderStatus.PENDING_PAYMENT);
+
+        paidOrder.markPaid(paidAt);
+
+        assertThat(paidOrder.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(paidOrder.getPaidAt()).isEqualTo(paidAt);
+        assertThat(paidOrder.getUpdatedAt()).isEqualTo(paidAt);
+
+        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:02:00");
+        Order canceledOrder = order(OrderStatus.PENDING_PAYMENT);
+
+        canceledOrder.cancel(canceledAt);
+
+        assertThat(canceledOrder.getStatus()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(canceledOrder.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(canceledOrder.getUpdatedAt()).isEqualTo(canceledAt);
+
+        LocalDateTime refundedAt = LocalDateTime.parse("2026-06-11T10:03:00");
+        Order refundedOrder = order(OrderStatus.PAID);
+
+        refundedOrder.refund(refundedAt);
+
+        assertThat(refundedOrder.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(refundedOrder.getRefundedAt()).isEqualTo(refundedAt);
+        assertThat(refundedOrder.getUpdatedAt()).isEqualTo(refundedAt);
+
+        LocalDateTime expiredAt = LocalDateTime.parse("2026-06-11T10:04:00");
+        Order expiredOrder = order(OrderStatus.PENDING_PAYMENT);
+
+        expiredOrder.expire(expiredAt);
+
+        assertThat(expiredOrder.getStatus()).isEqualTo(OrderStatus.EXPIRED);
+        assertThat(expiredOrder.getExpiredAt()).isEqualTo(expiredAt);
+        assertThat(expiredOrder.getUpdatedAt()).isEqualTo(expiredAt);
+    }
+
+    @Test
+    void invalidOrderStatusTransitionsThrowException() {
+        LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
+
+        assertThatThrownBy(() -> order(OrderStatus.PAID).markPaid(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> order(OrderStatus.PAID).cancel(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> order(OrderStatus.PENDING_PAYMENT).refund(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> order(OrderStatus.PAID).expire(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void paymentStatusTransitions() {
+        LocalDateTime paidAt = LocalDateTime.parse("2026-06-11T10:01:00");
+        Payment succeededPayment = payment(PaymentStatus.READY, "previous failure");
+
+        succeededPayment.succeed("payment-key", "CARD", paidAt);
+
+        assertThat(succeededPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(succeededPayment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(succeededPayment.getMethod()).isEqualTo("CARD");
+        assertThat(succeededPayment.getPaidAt()).isEqualTo(paidAt);
+        assertThat(succeededPayment.getFailedReason()).isNull();
+        assertThat(succeededPayment.getUpdatedAt()).isEqualTo(paidAt);
+
+        LocalDateTime retryPaidAt = LocalDateTime.parse("2026-06-11T10:01:30");
+        Payment retrySucceededPayment = payment(PaymentStatus.FAILED, "network error");
+
+        retrySucceededPayment.succeed("retry-payment-key", "CARD", retryPaidAt);
+
+        assertThat(retrySucceededPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(retrySucceededPayment.getPaymentKey()).isEqualTo("retry-payment-key");
+        assertThat(retrySucceededPayment.getFailedReason()).isNull();
+        assertThat(retrySucceededPayment.getUpdatedAt()).isEqualTo(retryPaidAt);
+
+        LocalDateTime failedAt = LocalDateTime.parse("2026-06-11T10:02:00");
+        Payment failedPayment = payment(PaymentStatus.READY, null);
+
+        failedPayment.fail("network error", failedAt);
+
+        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(failedPayment.getFailedReason()).isEqualTo("network error");
+        assertThat(failedPayment.getUpdatedAt()).isEqualTo(failedAt);
+
+        LocalDateTime retryFailedAt = LocalDateTime.parse("2026-06-11T10:02:30");
+
+        failedPayment.fail("timeout", retryFailedAt);
+
+        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(failedPayment.getFailedReason()).isEqualTo("timeout");
+        assertThat(failedPayment.getUpdatedAt()).isEqualTo(retryFailedAt);
+
+        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:03:00");
+        Payment canceledPayment = payment(PaymentStatus.FAILED, "network error");
+
+        canceledPayment.cancel(canceledAt);
+
+        assertThat(canceledPayment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(canceledPayment.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(canceledPayment.getUpdatedAt()).isEqualTo(canceledAt);
+
+        LocalDateTime refundedAt = LocalDateTime.parse("2026-06-11T10:04:00");
+        Payment refundedPayment = payment(PaymentStatus.SUCCESS, null);
+
+        refundedPayment.refund(refundedAt);
+
+        assertThat(refundedPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(refundedPayment.getRefundedAt()).isEqualTo(refundedAt);
+        assertThat(refundedPayment.getUpdatedAt()).isEqualTo(refundedAt);
+    }
+
+    @Test
+    void invalidPaymentStatusTransitionsThrowException() {
+        LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
+
+        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).succeed("payment-key", "CARD", changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).fail("network error", changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).cancel(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> payment(PaymentStatus.READY, null).refund(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void enrollmentStatusTransitions() {
+        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:01:00");
+        Enrollment canceledEnrollment = enrollment(EnrollmentStatus.ACTIVE);
+
+        canceledEnrollment.cancel(canceledAt);
+
+        assertThat(canceledEnrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELED);
+        assertThat(canceledEnrollment.getCanceledAt()).isEqualTo(canceledAt);
+        assertThat(canceledEnrollment.getUpdatedAt()).isEqualTo(canceledAt);
+
+        LocalDateTime expiredAt = LocalDateTime.parse("2026-06-11T10:02:00");
+        Enrollment expiredEnrollment = enrollment(EnrollmentStatus.ACTIVE);
+
+        expiredEnrollment.expire(expiredAt);
+
+        assertThat(expiredEnrollment.getStatus()).isEqualTo(EnrollmentStatus.EXPIRED);
+        assertThat(expiredEnrollment.getExpiredAt()).isEqualTo(expiredAt);
+        assertThat(expiredEnrollment.getUpdatedAt()).isEqualTo(expiredAt);
+    }
+
+    @Test
+    void invalidEnrollmentStatusTransitionsThrowException() {
+        LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
+
+        assertThatThrownBy(() -> enrollment(EnrollmentStatus.CANCELED).cancel(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> enrollment(EnrollmentStatus.EXPIRED).expire(changedAt))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    private Order order(OrderStatus status) {
+        return new Order(
                 1L,
                 1L,
                 "ORDER-1",
                 10_000,
                 0,
                 10_000,
-                OrderStatus.PENDING_PAYMENT,
-                LocalDateTime.parse("2026-06-11T10:00:00"),
+                status,
+                CREATED_AT,
                 null,
                 null,
                 null,
                 null,
-                LocalDateTime.parse("2026-06-11T10:00:00"),
+                CREATED_AT,
                 null
         );
-
-        LocalDateTime paidAt = LocalDateTime.parse("2026-06-11T10:01:00");
-        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:02:00");
-        LocalDateTime refundedAt = LocalDateTime.parse("2026-06-11T10:03:00");
-        LocalDateTime expiredAt = LocalDateTime.parse("2026-06-11T10:04:00");
-
-        order.markPaid(paidAt);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(order.getPaidAt()).isEqualTo(paidAt);
-
-        order.cancel(canceledAt);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
-        assertThat(order.getCanceledAt()).isEqualTo(canceledAt);
-
-        order.refund(refundedAt);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
-        assertThat(order.getRefundedAt()).isEqualTo(refundedAt);
-
-        order.expire(expiredAt);
-        assertThat(order.getStatus()).isEqualTo(OrderStatus.EXPIRED);
-        assertThat(order.getExpiredAt()).isEqualTo(expiredAt);
     }
 
-    @Test
-    void paymentStatusTransitions() {
-        Payment payment = new Payment(
+    private Payment payment(PaymentStatus status, String failedReason) {
+        return new Payment(
                 1L,
                 1L,
                 null,
                 null,
                 10_000,
-                PaymentStatus.READY,
+                status,
                 null,
-                "previous failure",
+                failedReason,
                 null,
                 null,
-                LocalDateTime.parse("2026-06-11T10:00:00"),
+                CREATED_AT,
                 null
         );
-
-        LocalDateTime paidAt = LocalDateTime.parse("2026-06-11T10:01:00");
-        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:02:00");
-        LocalDateTime refundedAt = LocalDateTime.parse("2026-06-11T10:03:00");
-
-        payment.succeed("payment-key", "CARD", paidAt);
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(payment.getPaymentKey()).isEqualTo("payment-key");
-        assertThat(payment.getMethod()).isEqualTo("CARD");
-        assertThat(payment.getPaidAt()).isEqualTo(paidAt);
-        assertThat(payment.getFailedReason()).isNull();
-
-        payment.fail("network error");
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(payment.getFailedReason()).isEqualTo("network error");
-
-        payment.cancel(canceledAt);
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
-        assertThat(payment.getCanceledAt()).isEqualTo(canceledAt);
-
-        payment.refund(refundedAt);
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
-        assertThat(payment.getRefundedAt()).isEqualTo(refundedAt);
     }
 
-    @Test
-    void enrollmentStatusTransitions() {
-        Enrollment enrollment = new Enrollment(
+    private Enrollment enrollment(EnrollmentStatus status) {
+        return new Enrollment(
                 1L,
                 1L,
                 1L,
                 1L,
-                EnrollmentStatus.ACTIVE,
-                LocalDateTime.parse("2026-06-11T10:00:00"),
+                status,
+                CREATED_AT,
                 null,
                 null,
-                LocalDateTime.parse("2026-06-11T10:00:00"),
+                CREATED_AT,
                 null
         );
-
-        LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:01:00");
-        LocalDateTime expiredAt = LocalDateTime.parse("2026-06-11T10:02:00");
-
-        enrollment.cancel(canceledAt);
-        assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELED);
-        assertThat(enrollment.getCanceledAt()).isEqualTo(canceledAt);
-
-        enrollment.expire(expiredAt);
-        assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.EXPIRED);
-        assertThat(enrollment.getExpiredAt()).isEqualTo(expiredAt);
     }
 }
