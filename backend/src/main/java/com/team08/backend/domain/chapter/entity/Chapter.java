@@ -15,7 +15,6 @@ import java.util.List;
 @Entity
 @Table(name = "chapters")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE chapters SET deleted_at = NOW() WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
@@ -43,6 +42,13 @@ public class Chapter extends BaseTimeEntity {
             orphanRemoval = true
     )
     private List<Lecture> lectures = new ArrayList<>();
+
+    @Builder
+    public Chapter(String title, int orderNo, Course course) {
+        this.title = title;
+        this.orderNo = orderNo;
+        this.course = course;
+    }
 
     public void addLecture(Lecture lecture) {
         lectures.add(lecture);
