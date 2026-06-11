@@ -1,24 +1,35 @@
 package com.team08.backend.domain.study.entity;
 
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "studies")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Study {
+public class Study extends BaseTimeEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, unique = true)
-    private Long courseId;
-    @Column(nullable = false)
-    private Long ownerId;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User owner;
+
     @Column(nullable = false, length = 255)
     private String title;
+
     @Lob
     private String description;
+
     @Enumerated(EnumType.STRING) @Column(nullable = false)
     private StudyStatus status;
 }
