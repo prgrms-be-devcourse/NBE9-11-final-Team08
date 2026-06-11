@@ -31,6 +31,7 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
             throw new DuplicateStudyException();
         }
 
+        // TODO: Exception 확인 필요
         User owner = userRepository.findById(command.ownerId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
