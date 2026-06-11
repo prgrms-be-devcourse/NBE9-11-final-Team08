@@ -1,6 +1,7 @@
 package com.team08.backend.domain.lecturemodificationrequest.entity;
 
 import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class LectureModificationRequest {
+public class LectureModificationRequest extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,9 +42,14 @@ public class LectureModificationRequest {
 
     private Long managedBy;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
+    public void reject(String reason, Long managedBy) {
+        this.status = RequestStatus.REJECTED;
+        this.rejectedReason = reason;
+        this.managedBy = managedBy;
+    }
 
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    public void approve(Long managedBy) {
+        this.status = RequestStatus.APPROVED;
+        this.managedBy = managedBy;
+    }
 }
