@@ -12,4 +12,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     // 특정 기간 동안의 출석 횟수 조회
     long countByUserIdAndAttendanceDateBetween(Long userId, LocalDate start, LocalDate end);
+    
+    // 동시성 중복 출석 방어
+    boolean existsByUserIdAndAttendanceDate(Long userId, LocalDate date);
 }
