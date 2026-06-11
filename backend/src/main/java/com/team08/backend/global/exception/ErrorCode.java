@@ -69,10 +69,29 @@ public enum ErrorCode {
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND,        "CART_001", "장바구니 항목을 찾을 수 없습니다."),
     LECTURE_ALREADY_IN_CART(HttpStatus.CONFLICT,         "CART_002", "이미 장바구니에 담긴 강의입니다."),
 
+    // ── QnA ──────────────────────────────────────────────────────────────
+    QNA_QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND,   "QNA_001", "QnA 질문을 찾을 수 없습니다."),
+    QNA_ANSWER_NOT_FOUND(HttpStatus.NOT_FOUND,     "QNA_002", "QnA 답변을 찾을 수 없습니다."),
+    QNA_ACCESS_DENIED(HttpStatus.FORBIDDEN,        "QNA_003", "QnA에 접근할 권한이 없습니다."),
+    QNA_ANSWER_ALREADY_EXISTS(HttpStatus.CONFLICT, "QNA_004", "이미 답변이 존재합니다."),
+    INSTRUCTOR_ONLY(HttpStatus.FORBIDDEN,          "QNA_005", "강사만 접근 가능합니다."),
+
+    // ── Reflection ───────────────────────────────────────────────────────
+    REFLECTION_ALREADY_EXISTS(HttpStatus.CONFLICT, "REFLECTION_001", "이미 회고가 존재합니다."),
+    REFLECTION_NOT_FOUND(HttpStatus.NOT_FOUND,     "REFLECTION_002", "회고를 찾을 수 없습니다."),
+
+    // ── LectureProgress ──────────────────────────────────────────────────
+    LECTURE_PROGRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "PROGRESS_001", "강의 진행 정보를 찾을 수 없습니다."),
+
+    // ── LearningEvent ────────────────────────────────────────────────────
+    DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT, "EVENT_001", "중복된 학습 이벤트입니다."),
+
     // ── Report ───────────────────────────────────────────────────────────
     NOT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_001", "스터디 구성원이 아닙니다."),
     NOT_CURRENT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_002", "현재 소속된 스터디 구성원이 아닙니다."),
-    STUDY_NOT_FINISHED(HttpStatus.BAD_REQUEST,    "REPORT_003", "스터디 기간이 아직 완료되지 않았습니다.");
+    STUDY_NOT_FINISHED(HttpStatus.BAD_REQUEST,    "REPORT_003", "스터디 기간이 아직 완료되지 않았습니다."),
+    REPORT_ALREADY_EXISTS_TODAY(HttpStatus.CONFLICT, "REPORT_004", "오늘 이미 레포트를 생성했습니다."),
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND,        "REPORT_005", "레포트를 찾을 수 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
