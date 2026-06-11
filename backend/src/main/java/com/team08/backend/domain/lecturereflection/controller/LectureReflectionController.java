@@ -4,13 +4,13 @@ import com.team08.backend.domain.lecturereflection.dto.LectureReflectionRequest;
 import com.team08.backend.domain.lecturereflection.dto.LectureReflectionResponse;
 import com.team08.backend.domain.lecturereflection.service.LectureReflectionService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
-import com.team08.backend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,17 +27,17 @@ public class LectureReflectionController {
             description = "강의별 회고를 작성합니다. (사용자, 강의) 기준으로 1개만 작성 가능합니다."
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "작성 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "작성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "강의를 찾을 수 없음"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "이미 작성된 회고 존재")
     })
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping
-    public ApiResponse<LectureReflectionResponse> createReflection(
+    public LectureReflectionResponse createReflection(
             @Parameter(description = "강의 ID") @PathVariable Long lectureId,
             @Valid @RequestBody LectureReflectionRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return ApiResponse.success(
-                reflectionService.createReflection(principal.user().id(), lectureId, request.content()));
+        return reflectionService.createReflection(principal.user().id(), lectureId, request.content());
     }
 
     @Operation(
@@ -50,13 +50,12 @@ public class LectureReflectionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "회고를 찾을 수 없음")
     })
     @PutMapping("/{reflectionId}")
-    public ApiResponse<LectureReflectionResponse> updateReflection(
+    public LectureReflectionResponse updateReflection(
             @Parameter(description = "강의 ID") @PathVariable Long lectureId,
             @Parameter(description = "회고 ID") @PathVariable Long reflectionId,
             @Valid @RequestBody LectureReflectionRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return ApiResponse.success(
-                reflectionService.updateReflection(reflectionId, principal.user().id(), request.content()));
+        return reflectionService.updateReflection(reflectionId, principal.user().id(), request.content());
     }
 
     @Operation(
@@ -68,10 +67,9 @@ public class LectureReflectionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "회고를 찾을 수 없음")
     })
     @GetMapping
-    public ApiResponse<LectureReflectionResponse> getReflection(
+    public LectureReflectionResponse getReflection(
             @Parameter(description = "강의 ID") @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return ApiResponse.success(
-                reflectionService.getReflection(principal.user().id(), lectureId));
+        return reflectionService.getReflection(principal.user().id(), lectureId);
     }
 }
