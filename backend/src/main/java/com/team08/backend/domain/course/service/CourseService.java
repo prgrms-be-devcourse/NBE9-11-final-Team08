@@ -1,17 +1,23 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.entity.CourseSortType;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Slf4j
 @Service
@@ -41,6 +47,18 @@ public class CourseService {
         }
 
         return CourseDetailResponse.from(course);
+    }
+
+    public List<CourseCardResponse> getCourses(CourseSortType sortType) {
+        Sort primarySort = sortType.getProperty().equals("title") || sortType.getProperty().equals("price")
+                ? Sort.by(Sort.Direction.ASC, sortType.getProperty())
+                : Sort.by(Sort.Direction.DESC, sortType.getProperty());
+
+        Sort finalSort = primarySort.and(Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        return courseRepository.findAllByStatus(CourseStatus.ON_SALE, finalSort).stream()
+                .map(CourseCardResponse::from)
+                .toList();
     }
 
     @Component
