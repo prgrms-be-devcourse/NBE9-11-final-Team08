@@ -50,11 +50,8 @@ public class CourseService {
     }
 
     public List<CourseCardResponse> getCourses(CourseSortType sortType) {
-        Sort primarySort = sortType.getProperty().equals("title") || sortType.getProperty().equals("price")
-                ? Sort.by(Sort.Direction.ASC, sortType.getProperty())
-                : Sort.by(Sort.Direction.DESC, sortType.getProperty());
-
-        Sort finalSort = primarySort.and(Sort.by(Sort.Direction.DESC, "createdAt"));
+        Sort finalSort = Sort.by(sortType.getDirection(), sortType.getProperty())
+                .and(Sort.by(Sort.Direction.DESC, "createdAt"));
 
         return courseRepository.findAllByStatus(CourseStatus.ON_SALE, finalSort).stream()
                 .map(CourseCardResponse::from)
