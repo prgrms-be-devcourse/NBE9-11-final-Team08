@@ -25,7 +25,7 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
     private final CourseRepository courseRepository;
     private final StudyMemberRepository studyMemberRepository;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW) // 스터디가 롤백되어도 강좌는 사라지지 않도록
+    @Transactional
     @Override
     public Long createForCourse(CourseStudyCreateCommand command) {
         if (studyRepository.existsByCourseId(command.courseId())) {
