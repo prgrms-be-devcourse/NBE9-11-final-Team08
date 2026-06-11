@@ -14,6 +14,7 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +52,7 @@ public class CartService {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_IN_CART);
         }
 
-        cartItemRepository.save(new CartItem(null, cart.getId(), courseId));
+        saveCartItem(cart.getId(), courseId);
 
         return toResponse(cart);
     }
@@ -89,6 +90,14 @@ public class CartService {
     private Cart getOrCreateCart(Long userId) {
         return cartRepository.findByUserId(userId)
                 .orElseGet(() -> cartRepository.save(new Cart(null, userId)));
+    }
+
+    private void saveCartItem(Long cartId, Long courseId) {
+        try {
+            cartItemRepository.saveAndFlush(new CartItem(null, cartId, courseId));
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.LECTURE_ALREADY_IN_CART);
+        }
     }
 
     private CartResponse toResponse(Cart cart) {

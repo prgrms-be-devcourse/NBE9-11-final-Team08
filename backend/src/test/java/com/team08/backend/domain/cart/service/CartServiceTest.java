@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -71,7 +72,7 @@ class CartServiceTest {
         CartResponse response = cartService.addItem(USER_ID, COURSE_ID);
 
         ArgumentCaptor<CartItem> cartItemCaptor = ArgumentCaptor.forClass(CartItem.class);
-        verify(cartItemRepository).save(cartItemCaptor.capture());
+        verify(cartItemRepository).saveAndFlush(cartItemCaptor.capture());
 
         CartItem cartItem = cartItemCaptor.getValue();
         assertThat(cartItem.getCartId()).isEqualTo(CART_ID);
@@ -119,6 +120,24 @@ class CartServiceTest {
                 .willReturn(false);
         given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
         given(cartItemRepository.existsByCartIdAndCourseId(CART_ID, COURSE_ID)).willReturn(true);
+
+        assertThatThrownBy(() -> cartService.addItem(USER_ID, COURSE_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LECTURE_ALREADY_IN_CART));
+    }
+
+    @Test
+    void duplicateCourseByConcurrentRequestIsConvertedToCustomException() {
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Cart cart = cart(CART_ID, USER_ID);
+
+        given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
+        given(cartItemRepository.existsByCartIdAndCourseId(CART_ID, COURSE_ID)).willReturn(false);
+        given(cartItemRepository.saveAndFlush(any(CartItem.class)))
+                .willThrow(new DataIntegrityViolationException("duplicate cart item"));
 
         assertThatThrownBy(() -> cartService.addItem(USER_ID, COURSE_ID))
                 .isInstanceOfSatisfying(CustomException.class,
