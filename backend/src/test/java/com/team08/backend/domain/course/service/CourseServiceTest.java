@@ -2,9 +2,12 @@ package com.team08.backend.domain.course.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
+import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.entity.CourseSortType;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
@@ -15,15 +18,19 @@ import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -123,5 +130,43 @@ class CourseServiceTest {
 
         verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
         verify(courseViewCountManager, never()).increaseViewCountRequiresNew(invalidCourseId);
+    }
+
+    @Test
+    void 강좌_목록을_조회하면_판매_중인_강좌만_지정된_정렬_조건과_2순위_최신순_조건으로_반환한다() {
+        Course course1 = TestEntityFactory.course(1L);
+        Course course2 = TestEntityFactory.course(2L);
+        List<Course> courses = List.of(course1, course2);
+
+        Sort expectedSort = Sort.by(Sort.Direction.DESC, "viewCount")
+                .and(Sort.by(Sort.Direction.DESC, "createdAt"));
+        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Sort.class))).willReturn(courses);
+
+        List<CourseCardResponse> response = courseService.getCourses(CourseSortType.VIEW_DESC);
+
+        assertThat(response).hasSize(2);
+        verify(courseRepository).findAllByStatus(CourseStatus.ON_SALE, expectedSort);
+    }
+
+    @Test
+    void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
+        Course course1 = TestEntityFactory.course(1L);
+        Course course2 = TestEntityFactory.course(2L);
+        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Sort.class))).willReturn(List.of(course1, course2));
+
+        ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
+
+        courseService.getCourses(CourseSortType.VIEW_DESC);
+
+        verify(courseRepository).findAllByStatus(eq(CourseStatus.ON_SALE), sortCaptor.capture());
+        Sort capturedSort = sortCaptor.getValue();
+
+        Sort.Order primaryOrder = capturedSort.getOrderFor("viewCount");
+        Sort.Order secondaryOrder = capturedSort.getOrderFor("createdAt");
+
+        assertThat(primaryOrder).isNotNull();
+        assertThat(primaryOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(secondaryOrder).isNotNull();
+        assertThat(secondaryOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
     }
 }
