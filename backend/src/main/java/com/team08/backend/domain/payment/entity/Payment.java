@@ -3,6 +3,7 @@ package com.team08.backend.domain.payment.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 @Entity
 @Table(name = "payments")
@@ -65,6 +66,9 @@ public class Payment {
                 return;
             }
         }
-        throw new IllegalStateException("Invalid payment status transition.");
+        throw new IllegalStateException(
+                "Invalid payment status transition: current=" + this.status
+                        + ", allowed=" + Arrays.toString(expectedStatuses)
+        );
     }
 }

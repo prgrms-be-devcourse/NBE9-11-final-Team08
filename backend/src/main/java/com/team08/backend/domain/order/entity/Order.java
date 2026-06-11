@@ -64,7 +64,9 @@ public class Order {
 
     private void validateStatus(OrderStatus expectedStatus) {
         if (this.status != expectedStatus) {
-            throw new IllegalStateException("Invalid order status transition.");
+            throw new IllegalStateException(
+                    "Invalid order status transition: current=" + this.status + ", expected=" + expectedStatus
+            );
         }
     }
 }

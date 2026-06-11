@@ -44,7 +44,9 @@ public class Enrollment {
 
     private void validateStatus(EnrollmentStatus expectedStatus) {
         if (this.status != expectedStatus) {
-            throw new IllegalStateException("Invalid enrollment status transition.");
+            throw new IllegalStateException(
+                    "Invalid enrollment status transition: current=" + this.status + ", expected=" + expectedStatus
+            );
         }
     }
 }

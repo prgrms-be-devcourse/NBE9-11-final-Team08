@@ -61,7 +61,9 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> order(OrderStatus.PAID).markPaid(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("current=PAID")
+                .hasMessageContaining("expected=PENDING_PAYMENT");
         assertThatThrownBy(() -> order(OrderStatus.PAID).cancel(changedAt))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> order(OrderStatus.PENDING_PAYMENT).refund(changedAt))
@@ -135,7 +137,9 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).succeed("payment-key", "CARD", changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("current=SUCCESS")
+                .hasMessageContaining("allowed=[READY, FAILED]");
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).fail("network error", changedAt))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).cancel(changedAt))
@@ -170,7 +174,9 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> enrollment(EnrollmentStatus.CANCELED).cancel(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("current=CANCELED")
+                .hasMessageContaining("expected=ACTIVE");
         assertThatThrownBy(() -> enrollment(EnrollmentStatus.EXPIRED).expire(changedAt))
                 .isInstanceOf(IllegalStateException.class);
     }
