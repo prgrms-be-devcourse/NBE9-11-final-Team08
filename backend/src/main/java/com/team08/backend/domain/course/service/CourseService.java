@@ -30,15 +30,15 @@ public class CourseService {
 
     @Transactional
     public CourseDetailResponse getCourseDetail(Long courseId) {
+        Course course = courseRepository.findWithChaptersAndLecturesAsc(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
         // TODO: 대규모 트래픽 발생 시 RDB Write 부하가 우려되므로 차후 Redis를 활용한 쓰기 지연(Write-Behind) 방식으로 고도화 필요
         try {
             courseViewCountManager.increaseViewCountRequiresNew(courseId);
         } catch (Exception e) {
             log.error("Failed to increase course view count for courseId: {}", courseId, e);
         }
-
-        Course course = courseRepository.findWithChaptersAndLecturesAsc(courseId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         return CourseDetailResponse.from(course);
     }
