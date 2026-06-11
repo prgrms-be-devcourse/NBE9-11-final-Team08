@@ -17,25 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class CourseService {
 
     private final CourseRepository courseRepository;
-    private final CourseStudyManager courseStudyManager;
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request) {
+
         Course course = request.toEntity(instructorId);
-        Course savedCourse = courseRepository.save(course);
 
-        try {
-            courseStudyManager.createForCourse(new CourseStudyCreateCommand(
-                    instructorId,
-                    savedCourse.getId(),
-                    savedCourse.getTitle(),
-                    savedCourse.getDescription()
-            ));
-        } catch (Exception e) {
-            log.error("강좌 생성 후 스터디 자동 생성 실패. courseId={}, instructorId={}",
-                    savedCourse.getId(), instructorId, e);
-        }
-
-        return savedCourse.getId();
+        return courseRepository.save(course).getId();
     }
 }

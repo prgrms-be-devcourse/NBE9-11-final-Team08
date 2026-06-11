@@ -24,9 +24,6 @@ class CourseServiceTest {
     @Mock
     private CourseRepository courseRepository;
 
-    @Mock
-    private CourseStudyManager courseStudyManager;
-
     @InjectMocks
     private CourseService courseService;
 
@@ -46,7 +43,6 @@ class CourseServiceTest {
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
-        given(courseStudyManager.createForCourse(any())).willReturn(1L);
 
         // when
         Long courseId = courseService.createCourse(instructorId, request);
@@ -54,6 +50,5 @@ class CourseServiceTest {
         // then
         assertThat(courseId).isEqualTo(100L);
         verify(courseRepository).save(any(Course.class));
-        verify(courseStudyManager).createForCourse(any(CourseStudyCreateCommand.class));
     }
 }
