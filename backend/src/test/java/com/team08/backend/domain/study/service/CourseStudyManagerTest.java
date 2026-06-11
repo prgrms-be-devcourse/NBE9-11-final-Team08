@@ -1,5 +1,7 @@
 package com.team08.backend.domain.study.service;
 
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
@@ -9,12 +11,17 @@ import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberRole;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,9 +30,14 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 public class CourseStudyManagerTest {
+    @Mock
+    private UserRepository userRepository;
 
     @Mock
     private StudyRepository studyRepository;
+
+    @Mock
+    private CourseRepository courseRepository;
 
     @Mock
     private StudyMemberRepository studyMemberRepository;
@@ -37,7 +49,10 @@ public class CourseStudyManagerTest {
     void 강좌용_스터디를_생성하면_스터디와_소유자_멤버가_함께_생성된다() {
         // given
         Long ownerId = 1L;
+        User owner = TestEntityFactory.user(ownerId);
+
         Long courseId = 10L;
+        Course course = TestEntityFactory.course(courseId);
 
         CourseStudyCreateCommand command = new CourseStudyCreateCommand(
                 ownerId,
@@ -45,6 +60,12 @@ public class CourseStudyManagerTest {
                 "스프링 강좌 스터디",
                 "강좌 기반 스터디"
         );
+
+        given(userRepository.findById(ownerId))
+                .willReturn(Optional.of(owner));
+
+        given(courseRepository.findById(courseId))
+                .willReturn(Optional.of(course));
 
         given(studyRepository.existsByCourseId(courseId))
                 .willReturn(false);
