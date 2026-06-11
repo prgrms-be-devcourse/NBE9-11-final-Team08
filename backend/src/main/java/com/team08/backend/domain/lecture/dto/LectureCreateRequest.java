@@ -26,16 +26,14 @@ public record LectureCreateRequest(
         boolean isFreePreview
 ) {
     public Lecture toEntity(Chapter chapter) {
-        return new Lecture(
-                null,
-                this.m3u8Path,
-                this.title,
-                this.summary,
-                this.durationSeconds,
-                this.orderNo,
-                this.isFreePreview,
-                null,
-                chapter
-        );
+        return Lecture.builder()
+                .title(this.title)
+                .m3u8Path(this.m3u8Path)
+                .summary(this.summary)
+                .durationSeconds(this.durationSeconds)
+                .orderNo(this.orderNo)
+                .isFreePreview(this.isFreePreview)
+                .chapter(chapter)
+                .build();
     }
 }

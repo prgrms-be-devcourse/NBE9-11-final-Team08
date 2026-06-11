@@ -21,6 +21,6 @@ public class LectureController {
             @PathVariable Long chapterId,
             @Valid @RequestBody LectureCreateRequest request) {
 
-        return lectureService.createLecture(chapterId, request);
+        return lectureService.createLecture(courseId, chapterId, request);
     }
 }

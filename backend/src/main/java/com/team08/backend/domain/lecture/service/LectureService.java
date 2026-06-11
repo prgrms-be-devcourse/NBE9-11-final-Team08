@@ -20,9 +20,13 @@ public class LectureService {
     private final ChapterRepository chapterRepository;
 
     @Transactional
-    public Long createLecture(Long chapterId, LectureCreateRequest request) {
+    public Long createLecture(Long courseId, Long chapterId, LectureCreateRequest request) {
         Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
+
+        if (!chapter.getCourse().getId().equals(courseId)) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
 
         Lecture lecture = request.toEntity(chapter);
         return lectureRepository.save(lecture).getId();

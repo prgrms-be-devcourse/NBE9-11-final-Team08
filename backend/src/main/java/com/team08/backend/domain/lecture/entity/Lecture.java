@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "lectures")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE lectures SET deleted_at = NOW() WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
@@ -44,6 +43,17 @@ public class Lecture extends BaseTimeEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "chapter_id", nullable = false)
     private Chapter chapter;
+
+    @Builder
+    public Lecture(String m3u8Path, String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
+        this.m3u8Path = m3u8Path;
+        this.title = title;
+        this.summary = summary;
+        this.durationSeconds = durationSeconds;
+        this.orderNo = orderNo;
+        this.isFreePreview = isFreePreview;
+        this.chapter = chapter;
+    }
 
     public void assignChapter(Chapter chapter) {
         this.chapter = chapter;
