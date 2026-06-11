@@ -6,6 +6,7 @@ import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.LectureInfoResponse;
+import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.config.SecurityConfig;
@@ -104,7 +105,7 @@ class CourseControllerTest {
         );
         Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
 
-        given(courseService.getCourses(any(Pageable.class))).willReturn(pagedResponses);
+        given(courseService.getCourses(any(CourseSortType.class), any(Pageable.class))).willReturn(pagedResponses);
 
         mockMvc.perform(get("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -121,7 +122,7 @@ class CourseControllerTest {
         );
         Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
 
-        given(courseService.getCourses(any(Pageable.class))).willReturn(pagedResponses);
+        given(courseService.getCourses(any(CourseSortType.class), any(Pageable.class))).willReturn(pagedResponses);
 
         mockMvc.perform(get("/api/courses")
                         .param("sort", "PRICE_ASC")

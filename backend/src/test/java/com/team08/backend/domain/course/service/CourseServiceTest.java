@@ -142,13 +142,14 @@ class CourseServiceTest {
         Course course2 = TestEntityFactory.course(2L);
         Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
 
-        Pageable pageable = PageRequest.of(0, 10, CourseSortType.VIEW_DESC.getSort());
-        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Pageable.class))).willReturn(pagedCourses);
+        Pageable inputPageable = PageRequest.of(0, 10);
+        Pageable expectedPageable = PageRequest.of(0, 10, CourseSortType.VIEW_DESC.getSort());
+        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), eq(expectedPageable))).willReturn(pagedCourses);
 
-        Page<CourseCardResponse> response = courseService.getCourses(pageable);
+        Page<CourseCardResponse> response = courseService.getCourses(CourseSortType.VIEW_DESC, inputPageable);
 
         assertThat(response.getContent()).hasSize(2);
-        verify(courseRepository).findAllByStatus(CourseStatus.ON_SALE, pageable);
+        verify(courseRepository).findAllByStatus(CourseStatus.ON_SALE, expectedPageable);
     }
 
     @Test
@@ -159,10 +160,10 @@ class CourseServiceTest {
 
         given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Pageable.class))).willReturn(pagedCourses);
 
-        Pageable pageable = PageRequest.of(0, 10, CourseSortType.VIEW_DESC.getSort());
+        Pageable inputPageable = PageRequest.of(0, 10);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
-        courseService.getCourses(pageable);
+        courseService.getCourses(CourseSortType.VIEW_DESC, inputPageable);
 
         verify(courseRepository).findAllByStatus(eq(CourseStatus.ON_SALE), pageableCaptor.capture());
         Sort capturedSort = pageableCaptor.getValue().getSort();
