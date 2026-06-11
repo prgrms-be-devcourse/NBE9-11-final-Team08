@@ -19,15 +19,7 @@ public class CourseService {
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request) {
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .categoryId(request.getCategoryId())
-                .title(request.getTitle())
-                .description(request.getDescription())
-                .thumbnail(request.getThumbnail())
-                .price(request.getPrice())
-                .status(request.getStatus())
-                .build();
+        Course course = request.toEntity(instructorId);
 
         Course savedCourse = courseRepository.save(course);
 
