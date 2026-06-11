@@ -6,7 +6,6 @@ import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.LectureInfoResponse;
-import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.config.SecurityConfig;
@@ -14,6 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -100,15 +102,15 @@ class CourseControllerTest {
         CourseCardResponse courseCard = new CourseCardResponse(
                 1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
         );
-        List<CourseCardResponse> responses = List.of(courseCard);
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
 
-        given(courseService.getCourses(CourseSortType.VIEW_DESC)).willReturn(responses);
+        given(courseService.getCourses(any(Pageable.class))).willReturn(pagedResponses);
 
         mockMvc.perform(get("/api/courses")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1L))
-                .andExpect(jsonPath("$[0].viewCount").value(150));
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].viewCount").value(150));
     }
 
     @Test
@@ -117,15 +119,15 @@ class CourseControllerTest {
         CourseCardResponse courseCard = new CourseCardResponse(
                 1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
         );
-        List<CourseCardResponse> responses = List.of(courseCard);
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
 
-        given(courseService.getCourses(CourseSortType.PRICE_ASC)).willReturn(responses);
+        given(courseService.getCourses(any(Pageable.class))).willReturn(pagedResponses);
 
         mockMvc.perform(get("/api/courses")
                         .param("sort", "PRICE_ASC")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1L))
-                .andExpect(jsonPath("$[0].price").value(30000));
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].price").value(30000));
     }
 }

@@ -22,6 +22,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.util.List;
@@ -136,30 +140,32 @@ class CourseServiceTest {
     void 강좌_목록을_조회하면_판매_중인_강좌만_지정된_정렬_조건과_2순위_최신순_조건으로_반환한다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
-        List<Course> courses = List.of(course1, course2);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
 
-        Sort expectedSort = Sort.by(Sort.Direction.DESC, "viewCount")
-                .and(Sort.by(Sort.Direction.DESC, "createdAt"));
-        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Sort.class))).willReturn(courses);
+        Pageable pageable = PageRequest.of(0, 10, CourseSortType.VIEW_DESC.getSort());
+        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Pageable.class))).willReturn(pagedCourses);
 
-        List<CourseCardResponse> response = courseService.getCourses(CourseSortType.VIEW_DESC);
+        Page<CourseCardResponse> response = courseService.getCourses(pageable);
 
-        assertThat(response).hasSize(2);
-        verify(courseRepository).findAllByStatus(CourseStatus.ON_SALE, expectedSort);
+        assertThat(response.getContent()).hasSize(2);
+        verify(courseRepository).findAllByStatus(CourseStatus.ON_SALE, pageable);
     }
 
     @Test
     void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
-        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Sort.class))).willReturn(List.of(course1, course2));
+        Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
 
-        ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
+        given(courseRepository.findAllByStatus(eq(CourseStatus.ON_SALE), any(Pageable.class))).willReturn(pagedCourses);
 
-        courseService.getCourses(CourseSortType.VIEW_DESC);
+        Pageable pageable = PageRequest.of(0, 10, CourseSortType.VIEW_DESC.getSort());
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
 
-        verify(courseRepository).findAllByStatus(eq(CourseStatus.ON_SALE), sortCaptor.capture());
-        Sort capturedSort = sortCaptor.getValue();
+        courseService.getCourses(pageable);
+
+        verify(courseRepository).findAllByStatus(eq(CourseStatus.ON_SALE), pageableCaptor.capture());
+        Sort capturedSort = pageableCaptor.getValue().getSort();
 
         Sort.Order primaryOrder = capturedSort.getOrderFor("viewCount");
         Sort.Order secondaryOrder = capturedSort.getOrderFor("createdAt");
