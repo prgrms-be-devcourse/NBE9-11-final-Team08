@@ -1,7 +1,12 @@
 package com.team08.backend.domain.lecture.entity;
 
+import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.Where;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -9,25 +14,38 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Lecture {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+@SQLDelete(sql = "UPDATE lectures SET deleted_at = NOW() WHERE id = ?")
+@Where(clause = "deleted_at IS NULL")
+public class Lecture extends BaseTimeEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false)
-    private Long chapterId;
+
     @Column(nullable = false)
     private String m3u8Path;
+
     @Column(nullable = false)
     private String title;
+
     private String summary;
+
     @Column(nullable = false)
-    private Integer durationSeconds;
+    private int durationSeconds;
+
+    @Column(name = "order_no", nullable = false)
+    private int orderNo;
+
     @Column(nullable = false)
-    private Integer orderNo;
-    @Column(nullable = false)
-    private Boolean isFreePreview = false;
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private boolean isFreePreview = false;
+
     private LocalDateTime deletedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chapter_id", nullable = false)
+    private Chapter chapter;
+
+    public void assignChapter(Chapter chapter) {
+        this.chapter = chapter;
+    }
 }
