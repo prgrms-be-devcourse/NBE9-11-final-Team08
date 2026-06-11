@@ -36,7 +36,7 @@ class CourseControllerTest {
     private CourseService courseService;
 
     @Test
-    void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_21_상태코드와_ID를_반환한다() throws Exception {
+    void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest(
                 "스프링 부트 완벽 가이드",
                 "백엔드 개발자를 위한 강의",
@@ -54,9 +54,6 @@ class CourseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value("200"))
-                // Todo: 응답 형식 바꾸면 이 내용도 바꿈
-                .andExpect(jsonPath("$.message").value("요청 성공"))
-                .andExpect(jsonPath("$.result").value(55L));
+                .andExpect(jsonPath("$").value(55L));
     }
 }
