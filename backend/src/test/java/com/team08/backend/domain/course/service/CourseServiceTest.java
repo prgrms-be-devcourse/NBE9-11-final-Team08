@@ -60,7 +60,6 @@ class CourseServiceTest {
     void 강좌를_상세_조회하면_조회수가_1_증가하고_커리큘럼과_함께_반환한다() {
         Long courseId = 100L;
         Course course = TestEntityFactory.course(courseId);
-        int initialViewCount = course.getViewCount();
 
         Chapter chapter = ChapterFixture.chapter(1L, "첫 번째 챕터", 1, course);
         Lecture freeLecture = LectureFixture.lecture(10L, "무료 맛보기 강의", "videos/free.m3u8", 600, 1, chapter);
@@ -73,9 +72,9 @@ class CourseServiceTest {
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.id()).isEqualTo(courseId);
-        assertThat(course.getViewCount()).isEqualTo(initialViewCount + 1);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
+        verify(courseRepository).increaseViewCountAtomic(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
     }
 
@@ -103,6 +102,7 @@ class CourseServiceTest {
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
+        verify(courseRepository).increaseViewCountAtomic(courseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
     }
 
@@ -116,6 +116,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
+        verify(courseRepository).increaseViewCountAtomic(invalidCourseId);
         verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
     }
 }
