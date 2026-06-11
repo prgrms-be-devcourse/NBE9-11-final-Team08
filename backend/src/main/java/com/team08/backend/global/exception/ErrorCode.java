@@ -36,6 +36,9 @@ public enum ErrorCode {
     INVALID_MEMBER_STATUS(HttpStatus.BAD_REQUEST,     "STUDY_019", "처리할 수 없는 멤버 상태입니다."),
     DUPLICATE_STUDY(HttpStatus.CONFLICT, "STUDY_020", "코스의 스터디가 이미 존재합니다."),
 
+    // ── Course ───────────────────────────────────────────────────────────
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
+
     // ── Lecture ──────────────────────────────────────────────────────────
     LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_001", "강의를 찾을 수 없습니다."),
     CHAPTER_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_002", "챕터를 찾을 수 없습니다."),
