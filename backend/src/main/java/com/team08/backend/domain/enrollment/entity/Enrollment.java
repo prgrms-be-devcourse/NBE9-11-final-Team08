@@ -1,5 +1,7 @@
 package com.team08.backend.domain.enrollment.entity;
 
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -44,9 +46,7 @@ public class Enrollment {
 
     private void validateStatus(EnrollmentStatus expectedStatus) {
         if (this.status != expectedStatus) {
-            throw new IllegalStateException(
-                    "Invalid enrollment status transition: current=" + this.status + ", expected=" + expectedStatus
-            );
+            throw new CustomException(ErrorCode.INVALID_ENROLLMENT_STATUS_TRANSITION);
         }
     }
 }

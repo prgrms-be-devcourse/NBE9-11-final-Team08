@@ -1,9 +1,10 @@
 package com.team08.backend.domain.payment.entity;
 
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 
 @Entity
 @Table(name = "payments")
@@ -66,9 +67,6 @@ public class Payment {
                 return;
             }
         }
-        throw new IllegalStateException(
-                "Invalid payment status transition: current=" + this.status
-                        + ", allowed=" + Arrays.toString(expectedStatuses)
-        );
+        throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
     }
 }

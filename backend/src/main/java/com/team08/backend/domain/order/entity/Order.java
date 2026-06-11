@@ -1,5 +1,7 @@
 package com.team08.backend.domain.order.entity;
 
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -64,9 +66,7 @@ public class Order {
 
     private void validateStatus(OrderStatus expectedStatus) {
         if (this.status != expectedStatus) {
-            throw new IllegalStateException(
-                    "Invalid order status transition: current=" + this.status + ", expected=" + expectedStatus
-            );
+            throw new CustomException(ErrorCode.INVALID_ORDER_STATUS_TRANSITION);
         }
     }
 }

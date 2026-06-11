@@ -6,6 +6,8 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -61,15 +63,17 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> order(OrderStatus.PAID).markPaid(changedAt))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("current=PAID")
-                .hasMessageContaining("expected=PENDING_PAYMENT");
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
         assertThatThrownBy(() -> order(OrderStatus.PAID).cancel(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
         assertThatThrownBy(() -> order(OrderStatus.PENDING_PAYMENT).refund(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
         assertThatThrownBy(() -> order(OrderStatus.PAID).expire(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
     }
 
     @Test
@@ -137,15 +141,17 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).succeed("payment-key", "CARD", changedAt))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("current=SUCCESS")
-                .hasMessageContaining("allowed=[READY, FAILED]");
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).fail("network error", changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).cancel(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> payment(PaymentStatus.READY, null).refund(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
     }
 
     @Test
@@ -174,11 +180,11 @@ class OrderPaymentStateTransitionTest {
         LocalDateTime changedAt = LocalDateTime.parse("2026-06-11T10:01:00");
 
         assertThatThrownBy(() -> enrollment(EnrollmentStatus.CANCELED).cancel(changedAt))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("current=CANCELED")
-                .hasMessageContaining("expected=ACTIVE");
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ENROLLMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> enrollment(EnrollmentStatus.EXPIRED).expire(changedAt))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ENROLLMENT_STATUS_TRANSITION));
     }
 
     private Order order(OrderStatus status) {
