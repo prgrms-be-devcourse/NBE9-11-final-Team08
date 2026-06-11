@@ -42,8 +42,7 @@ class CourseControllerTest {
                 "백엔드 개발자를 위한 강의",
                 5L,
                 30000,
-                "images/thumb.jpg",
-                CourseStatus.DRAFT
+                "images/thumb.jpg"
         );
 
         given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class))).willReturn(55L);

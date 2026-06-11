@@ -19,10 +19,7 @@ public record CourseCreateRequest(
         int price,
 
         @NotBlank(message = "썸네일 이미지 경로는 필수입니다.")
-        String thumbnail,
-
-        @NotNull(message = "강좌 상태는 필수입니다.")
-        CourseStatus status
+        String thumbnail
 ) {
     public Course toEntity(Long instructorId) {
         return Course.builder()
@@ -32,7 +29,7 @@ public record CourseCreateRequest(
                 .description(this.description)
                 .thumbnail(this.thumbnail)
                 .price(this.price)
-                .status(this.status)
+                .status(CourseStatus.DRAFT)
                 .build();
     }
 }

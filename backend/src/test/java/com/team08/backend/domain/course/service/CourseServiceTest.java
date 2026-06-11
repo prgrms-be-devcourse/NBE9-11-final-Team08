@@ -36,8 +36,7 @@ class CourseServiceTest {
                 "강좌 설명입니다.",
                 10L,
                 15000,
-                "thumbnail/path.png",
-                CourseStatus.DRAFT
+                "thumbnail/path.png"
         );
 
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
