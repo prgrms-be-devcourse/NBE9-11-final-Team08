@@ -47,7 +47,7 @@ class LectureControllerTest {
                 true
         );
 
-        given(lectureService.createLecture(eq(chapterId), any(LectureCreateRequest.class))).willReturn(50L);
+        given(lectureService.createLecture(eq(courseId), eq(chapterId), any(LectureCreateRequest.class))).willReturn(50L);
 
         mockMvc.perform(post("/api/courses/{courseId}/chapters/{chapterId}/lectures", courseId, chapterId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
