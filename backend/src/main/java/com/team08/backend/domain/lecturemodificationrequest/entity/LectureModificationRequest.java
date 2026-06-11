@@ -4,7 +4,6 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "lecture_modification_requests")
