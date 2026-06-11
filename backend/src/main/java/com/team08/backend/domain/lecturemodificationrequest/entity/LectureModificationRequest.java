@@ -10,27 +10,38 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LectureModificationRequest {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false)
-    private Long courseId;
+
     @Column(nullable = false)
     private Long lectureId;
+
     @Column(nullable = false)
     private Long instructorId;
-    @Lob @Column(nullable = false)
+
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String description;
+
     @Column(nullable = false)
     private String beforeM3u8Path;
+
     @Column(nullable = false)
     private String afterM3u8Path;
-    @Enumerated(EnumType.STRING) @Column(nullable = false)
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private RequestStatus status;
-    @Lob
+
+    @Column(columnDefinition = "TEXT")
     private String rejectedReason;
+
     private Long managedBy;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 }
