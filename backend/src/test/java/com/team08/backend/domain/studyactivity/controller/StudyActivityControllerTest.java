@@ -3,6 +3,7 @@ package com.team08.backend.domain.studyactivity.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityCreateRequest;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
+import com.team08.backend.domain.studyactivity.dto.StudyActivityUpdateRequest;
 import com.team08.backend.domain.studyactivity.service.StudyActivityService;
 import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -182,5 +184,60 @@ class StudyActivityControllerTest {
 
         then(studyActivityService).should()
                 .getActivity(studyId, activityId, userId);
+    }
+
+    @Test
+    @WithMockLoginUser
+    void 작성자가_스터디_활동을_수정한다() throws Exception {
+        Long studyId = 10L;
+        Long activityId = 100L;
+        Long userId = 1L;
+        StudyActivityUpdateRequest request =
+                new StudyActivityUpdateRequest("수정한 이후의 스터디 활동 내용입니다.");
+        StudyActivityResponse response = new StudyActivityResponse(
+                activityId,
+                studyId,
+                userId,
+                request.content(),
+                LocalDateTime.of(2026, 6, 12, 20, 0)
+        );
+
+        given(studyActivityService.updateActivity(
+                studyId, activityId, userId, request.content()
+        )).willReturn(response);
+
+        mockMvc.perform(put(
+                        "/api/studies/{studyId}/activities/{activityId}",
+                        studyId,
+                        activityId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+
+        then(studyActivityService).should()
+                .updateActivity(studyId, activityId, userId, request.content());
+    }
+
+    @Test
+    @WithMockLoginUser
+    void 수정할_활동_내용이_20자보다_짧으면_실패한다() throws Exception {
+        StudyActivityUpdateRequest request =
+                new StudyActivityUpdateRequest("짧은 수정 내용");
+
+        mockMvc.perform(put(
+                        "/api/studies/{studyId}/activities/{activityId}",
+                        10L,
+                        100L
+                )
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        then(studyActivityService).should(never())
+                .updateActivity(10L, 100L, 1L, request.content());
     }
 }

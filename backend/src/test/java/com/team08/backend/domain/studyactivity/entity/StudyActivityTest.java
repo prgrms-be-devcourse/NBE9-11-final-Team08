@@ -19,4 +19,18 @@ class StudyActivityTest {
         assertThat(activity.getContent()).isEqualTo(content);
         assertThat(activity.getDeletedAt()).isNull();
     }
+
+    @Test
+    void 스터디_활동_내용을_수정한다() {
+        StudyActivity activity = StudyActivity.create(
+                1L,
+                2L,
+                "수정하기 전 스터디 활동 내용입니다."
+        );
+
+        activity.update("수정한 이후의 스터디 활동 내용입니다.");
+
+        assertThat(activity.getContent())
+                .isEqualTo("수정한 이후의 스터디 활동 내용입니다.");
+    }
 }
