@@ -1,27 +1,39 @@
 package com.team08.backend.domain.studyactivity.entity;
 
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "study_activities")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StudyActivity {
+public class StudyActivity extends BaseTimeEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(nullable = false)
     private Long studyId;
+
     @Column(nullable = false)
     private Long authorId;
+
     @Lob @Column(nullable = false)
     private String content;
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-    @Column(nullable = false)
+
     private LocalDateTime deletedAt;
+
+    private StudyActivity(Long studyId, Long authorId, String content) {
+        this.studyId = studyId;
+        this.authorId = authorId;
+        this.content = content;
+    }
+
+    public static StudyActivity create(Long studyId, Long authorId, String content) {
+        return new StudyActivity(studyId, authorId, content);
+    }
 }
