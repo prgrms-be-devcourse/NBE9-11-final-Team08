@@ -1,6 +1,7 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.global.common.BaseTimeEntity; // 💡 BaseTimeEntity 임포트
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -20,7 +21,8 @@ import java.time.LocalDateTime;
 @Table(name = "coupon_policies")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CouponPolicy {
+public class CouponPolicy extends BaseTimeEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -62,13 +64,7 @@ public class CouponPolicy {
     private LocalDateTime issueStartDate;
 
     private LocalDateTime issueEndDate;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
+    
     @Builder(access = AccessLevel.PRIVATE)
     private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer validDays, Integer totalQuantity, Long categoryId, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
@@ -84,8 +80,6 @@ public class CouponPolicy {
         this.isStackable = isStackable != null ? isStackable : false;
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     public static CouponPolicy create(CouponPolicyCreateRequest request) {

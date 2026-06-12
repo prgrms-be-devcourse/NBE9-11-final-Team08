@@ -1,7 +1,13 @@
 package com.team08.backend.domain.couponpolicy.dto;
 
-import com.team08.backend.domain.couponpolicy.entity.*;
-import jakarta.validation.constraints.*;
+import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
+import com.team08.backend.domain.couponpolicy.entity.DiscountType;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -41,4 +47,11 @@ public record CouponPolicyCreateRequest(
 
         LocalDateTime issueEndDate
 ) {
+    @AssertTrue(message = "발급 시작일은 종료일보다 이전이어야 합니다.")
+    public boolean isValidIssueDate() {
+        if (issueStartDate == null || issueEndDate == null) {
+            return true;
+        }
+        return issueStartDate.isBefore(issueEndDate);
+    }
 }
