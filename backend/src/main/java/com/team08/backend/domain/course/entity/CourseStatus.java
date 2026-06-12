@@ -4,5 +4,6 @@ public enum CourseStatus {
     DRAFT,
     IN_REVIEW,
     ON_SALE,
-    SUSPENDED
+    SUSPENDED,
+    DELETED
 }

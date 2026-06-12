@@ -41,4 +41,12 @@ public class AdminCourseController {
             @Valid @RequestBody CourseRejectRequest request) {
         courseService.suspendCourseByAdmin(courseId, loginUserPrincipal.user().id(), request.reason());
     }
+
+    @DeleteMapping("/{courseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCourseByAdmin(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        courseService.deleteCourseByAdmin(courseId, loginUserPrincipal.user().id());
+    }
 }
