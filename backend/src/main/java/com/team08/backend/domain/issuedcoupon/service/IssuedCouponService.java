@@ -39,6 +39,48 @@ public class IssuedCouponService {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
 
+        // 쿠폰 발급 기간 검증
+        policy.validateIssuePeriod();
+
+        // 쿠폰 발급 기록 생성
+        IssuedCoupon newCoupon = IssuedCoupon.issue(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
+
+        // 중복 발급 검증 및 저장
+        try {
+            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
+            return IssuedCouponResponse.from(savedCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+    }
+
+    // [사용자] 선착순 쿠폰 다운로드
+    @Transactional
+    public IssuedCouponResponse downloadFcfsCoupon(Long userId, Long policyId) {
+        // 사용자 존재 확인
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 비관적 락을 적용한 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 선착순 쿠폰 여부 검증
+        if (policy.getCouponType() != CouponType.FCFS) {
+            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
+        }
+
+        // 쿠폰 발급 기간 검증
+        policy.validateIssuePeriod();
+
+        // 쿠폰 수량 차감 및 재고 소진 체크
+        policy.decreaseQuantity();
+
         // 쿠폰 발급 기록 생성
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
