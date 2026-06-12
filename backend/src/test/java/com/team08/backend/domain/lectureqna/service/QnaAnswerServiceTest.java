@@ -84,7 +84,6 @@ class QnaAnswerServiceTest {
 
         QnaAnswer answer = QnaAnswer.create(questionId, instructorId, "old content");
         given(qnaAnswerRepository.findByQuestionId(questionId)).willReturn(Optional.of(answer));
-        given(qnaAnswerRepository.save(any())).willReturn(answer);
 
         QnaAnswerResponse response = qnaAnswerService.updateAnswer(questionId, instructorId, "new content");
 

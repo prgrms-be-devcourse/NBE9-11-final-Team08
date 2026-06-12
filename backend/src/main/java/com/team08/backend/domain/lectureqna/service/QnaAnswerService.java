@@ -40,7 +40,7 @@ public class QnaAnswerService {
         }
 
         answer.update(content);
-        return toResponse(qnaAnswerRepository.save(answer));
+        return toResponse(answer);
     }
 
     @Transactional
