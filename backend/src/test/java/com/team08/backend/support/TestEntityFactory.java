@@ -1,7 +1,6 @@
 package com.team08.backend.support;
 
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.user.entity.User;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -32,12 +31,5 @@ public final class TestEntityFactory {
         ReflectionTestUtils.setField(course, "id", courseId);
 
         return course;
-    }
-
-    public static Study study(Long studyId) {
-        Study study = newInstance(Study.class);
-        ReflectionTestUtils.setField(study, "id", studyId);
-
-        return study;
     }
 }
