@@ -17,14 +17,22 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -124,6 +132,150 @@ class StudyActivityServiceTest {
         assertNonActiveMemberCannotCreate(4L);
     }
 
+    @Test
+    void ACTIVE_스터디의_ACTIVE_멤버가_활동_목록을_최신순으로_조회한다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Pageable requestPageable = PageRequest.of(
+                1, 5, Sort.by(Sort.Direction.ASC, "content")
+        );
+        Pageable expectedPageable = PageRequest.of(
+                1,
+                5,
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+        Study study = StudyFixture.activeStudy();
+        StudyActivity activity = activity(100L, studyId, userId);
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findAllByStudyIdAndDeletedAtIsNull(
+                studyId, expectedPageable
+        )).willReturn(new PageImpl<>(List.of(activity), expectedPageable, 1));
+
+        Page<StudyActivityResponse> result =
+                studyActivityService.getActivities(studyId, userId, requestPageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).activityId()).isEqualTo(100L);
+        verify(studyActivityRepository)
+                .findAllByStudyIdAndDeletedAtIsNull(studyId, expectedPageable);
+    }
+
+    @Test
+    void READONLY_스터디의_ACTIVE_멤버도_활동_목록을_조회할_수_있다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Study study = StudyFixture.activeStudy();
+        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findAllByStudyIdAndDeletedAtIsNull(
+                eq(studyId), any(Pageable.class)
+        )).willReturn(Page.empty());
+
+        Page<StudyActivityResponse> result =
+                studyActivityService.getActivities(studyId, userId, pageable);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void 활동이_없으면_빈_페이지를_반환한다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Pageable pageable = PageRequest.of(0, 10);
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findAllByStudyIdAndDeletedAtIsNull(
+                eq(studyId), any(Pageable.class)
+        )).willReturn(Page.empty());
+
+        Page<StudyActivityResponse> result =
+                studyActivityService.getActivities(studyId, userId, pageable);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void 존재하지_않는_스터디의_활동_목록은_조회할_수_없다() {
+        Long studyId = 999L;
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivities(
+                        studyId, 1L, PageRequest.of(0, 10)
+                ))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+
+        verify(studyMemberRepository, never())
+                .existsByStudyIdAndUserIdAndStatus(
+                        any(), any(), any()
+                );
+        verify(studyActivityRepository, never())
+                .findAllByStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void DRAFT_스터디의_활동_목록은_조회할_수_없다() {
+        Long studyId = 1L;
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivities(
+                        studyId, 1L, PageRequest.of(0, 10)
+                ))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+    }
+
+    @Test
+    void ACTIVE_멤버가_아니면_활동_목록을_조회할_수_없다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(false);
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivities(
+                        studyId, userId, PageRequest.of(0, 10)
+                ))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+
+        verify(studyActivityRepository, never())
+                .findAllByStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
     private void assertInactiveStudyCannotCreate(Study study) {
         Long studyId = study.getId();
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
@@ -159,5 +311,18 @@ class StudyActivityServiceTest {
                 .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
 
         verify(studyActivityRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    private StudyActivity activity(Long activityId, Long studyId, Long authorId) {
+        StudyActivity activity = StudyActivity.create(
+                studyId,
+                authorId,
+                "오늘 학습한 내용을 스터디원들과 공유합니다."
+        );
+        ReflectionTestUtils.setField(activity, "id", activityId);
+        ReflectionTestUtils.setField(
+                activity, "createdAt", LocalDateTime.of(2026, 6, 12, 20, 0)
+        );
+        return activity;
     }
 }
