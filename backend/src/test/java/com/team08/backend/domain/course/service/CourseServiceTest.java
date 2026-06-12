@@ -23,12 +23,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 
@@ -232,12 +229,12 @@ class CourseServiceTest {
                 .build();
 
         Chapter chapter = Chapter.builder().title("원래 챕터").orderNo(1).course(course).build();
-        java.lang.reflect.Field chapterIdField = org.springframework.util.ReflectionUtils.findField(Chapter.class, "id");
+        Field chapterIdField = org.springframework.util.ReflectionUtils.findField(Chapter.class, "id");
         org.springframework.util.ReflectionUtils.makeAccessible(chapterIdField);
         org.springframework.util.ReflectionUtils.setField(chapterIdField, chapter, 10L);
 
         Lecture lecture = Lecture.builder().title("원래 강의").m3u8Path("vid.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
-        java.lang.reflect.Field lectureIdField = org.springframework.util.ReflectionUtils.findField(Lecture.class, "id");
+        Field lectureIdField = org.springframework.util.ReflectionUtils.findField(Lecture.class, "id");
         org.springframework.util.ReflectionUtils.makeAccessible(lectureIdField);
         org.springframework.util.ReflectionUtils.setField(lectureIdField, lecture, 20L);
 

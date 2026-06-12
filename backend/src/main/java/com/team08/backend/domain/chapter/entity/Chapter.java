@@ -1,18 +1,20 @@
 package com.team08.backend.domain.chapter.entity;
 
-import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
+import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Entity
@@ -69,11 +71,15 @@ public class Chapter extends BaseTimeEntity {
     }
 
     private void updateLectures(List<CourseUpdateRequest.LectureUpdateRequest> lectureRequests) {
-        Map<Long, Lecture> existingLectureMap = this.lectures.stream()
-                .filter(l -> l.getId() != null)
-                .collect(Collectors.toMap(Lecture::getId, l -> l));
+        Set<Long> requestIds = lectureRequests.stream()
+                .map(CourseUpdateRequest.LectureUpdateRequest::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
-        List<Lecture> updatedLectures = new ArrayList<>();
+        this.lectures.removeIf(lecture -> !requestIds.contains(lecture.getId()));
+
+        Map<Long, Lecture> existingLectureMap = this.lectures.stream()
+                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
 
         for (CourseUpdateRequest.LectureUpdateRequest lectureReq : lectureRequests) {
             if (lectureReq.id() != null && existingLectureMap.containsKey(lectureReq.id())) {
@@ -85,7 +91,6 @@ public class Chapter extends BaseTimeEntity {
                         lectureReq.orderNo(),
                         lectureReq.isFreePreview()
                 );
-                updatedLectures.add(existingLecture);
             } else {
                 Lecture newLecture = Lecture.builder()
                         .title(lectureReq.title())
@@ -95,11 +100,8 @@ public class Chapter extends BaseTimeEntity {
                         .isFreePreview(lectureReq.isFreePreview())
                         .chapter(this)
                         .build();
-                updatedLectures.add(newLecture);
+                this.addLecture(newLecture);
             }
         }
-
-        this.lectures.clear();
-        this.lectures.addAll(updatedLectures);
     }
 }
