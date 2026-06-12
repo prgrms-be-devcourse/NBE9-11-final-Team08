@@ -14,6 +14,7 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -31,7 +32,6 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
             throw new DuplicateStudyException();
         }
 
-        // TODO: Exception 확인 필요
         User owner = userRepository.findById(command.ownerId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 

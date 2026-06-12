@@ -1,20 +1,25 @@
 package com.team08.backend.domain.course.entity;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "courses")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE courses SET deleted_at = NOW() WHERE id = ?")
 @Where(clause = "deleted_at IS NULL")
@@ -49,17 +54,73 @@ public class Course extends BaseTimeEntity {
     @Column(nullable = false)
     private int viewCount = 0;
 
+    @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @OneToMany(
-            mappedBy = "course",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapters = new ArrayList<>();
 
     public void addChapter(Chapter chapter) {
         chapters.add(chapter);
         chapter.assignCourse(this);
+    }
+
+    public void increaseViewCount() {
+        this.viewCount++;
+    }
+
+    public void validateOwner(Long requestUserId) {
+        if (!this.instructorId.equals(requestUserId)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+        }
+    }
+
+    public void updateGeneralInfo(CourseUpdateRequest request) {
+        this.categoryId = request.categoryId();
+        this.title = request.title();
+        this.description = request.description();
+        this.thumbnail = request.thumbnail();
+        this.price = request.price();
+
+        updateChapters(request.chapters());
+    }
+
+    private void updateChapters(List<CourseUpdateRequest.ChapterUpdateRequest> chapterRequests) {
+        Set<Long> requestIds = chapterRequests.stream()
+                .map(CourseUpdateRequest.ChapterUpdateRequest::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        this.chapters.removeIf(chapter -> !requestIds.contains(chapter.getId()));
+
+        Map<Long, Chapter> existingChapterMap = this.chapters.stream()
+                .collect(Collectors.toMap(Chapter::getId, chapter -> chapter));
+
+        for (CourseUpdateRequest.ChapterUpdateRequest chapterReq : chapterRequests) {
+            if (chapterReq.id() != null && existingChapterMap.containsKey(chapterReq.id())) {
+                Chapter existingChapter = existingChapterMap.get(chapterReq.id());
+                existingChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
+            } else {
+                Chapter newChapter = Chapter.builder()
+                        .title(chapterReq.title())
+                        .orderNo(chapterReq.orderNo())
+                        .course(this)
+                        .build();
+                this.addChapter(newChapter);
+                newChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
+            }
+        }
+    }
+
+    @Builder
+    public Course(Long instructorId, Long categoryId, String title, String description,
+                  String thumbnail, int price, CourseStatus status) {
+        this.instructorId = instructorId;
+        this.categoryId = categoryId;
+        this.title = title;
+        this.description = description;
+        this.thumbnail = thumbnail;
+        this.price = price;
+        this.status = status;
     }
 }

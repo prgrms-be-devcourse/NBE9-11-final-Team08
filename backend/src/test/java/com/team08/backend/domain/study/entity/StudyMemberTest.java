@@ -4,6 +4,7 @@ import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberRole;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.study.fixture.StudyFixture;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ public class StudyMemberTest {
     @Test
     void OWNER_멤버가_생성된다() {
         // given
-        Study study = TestEntityFactory.study(null);
+        Study study = StudyFixture.draftStudy();
         User owner = TestEntityFactory.user(1L);
 
         // when
