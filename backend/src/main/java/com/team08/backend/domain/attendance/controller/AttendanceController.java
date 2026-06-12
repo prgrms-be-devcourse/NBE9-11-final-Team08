@@ -1,7 +1,6 @@
 package com.team08.backend.domain.attendance.controller;
 
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
-import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.service.AttendanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,7 +33,6 @@ public class AttendanceController {
         LocalDate today = LocalDate.now();
 
         // [사용자] 출석체크
-        Attendance log = attendanceService.checkIn(userId, today);
-        return AttendanceResponse.from(log);
+        return attendanceService.checkIn(userId, today);
     }
 }

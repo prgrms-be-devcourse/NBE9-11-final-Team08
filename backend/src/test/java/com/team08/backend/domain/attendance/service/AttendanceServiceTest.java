@@ -1,5 +1,6 @@
 package com.team08.backend.domain.attendance.service;
 
+import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -59,11 +60,11 @@ class AttendanceServiceTest {
         when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
-        Attendance todayLog = attendanceService.checkIn(userId, today);
+        AttendanceResponse response = attendanceService.checkIn(userId, today);
 
         // then
-        assertEquals(2, todayLog.getConsecutiveDays());
-        assertEquals(2, todayLog.getMonthlyTotalDays());
+        assertEquals(2, response.consecutiveDays());
+        assertEquals(2, response.monthlyTotalDays());
         verify(attendanceRepository, times(1)).saveAndFlush(any(Attendance.class));
     }
 
@@ -106,11 +107,11 @@ class AttendanceServiceTest {
         when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when
-        Attendance todayLog = attendanceService.checkIn(userId, today);
+        AttendanceResponse response = attendanceService.checkIn(userId, today);
 
         // then
-        assertEquals(1, todayLog.getConsecutiveDays());
-        assertEquals(4, todayLog.getMonthlyTotalDays());
+        assertEquals(1, response.consecutiveDays());
+        assertEquals(4, response.monthlyTotalDays());
         verify(attendanceRepository, times(1)).saveAndFlush(any(Attendance.class));
     }
 }
