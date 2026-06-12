@@ -21,7 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(SecurityConfigTest.TestController.class)
 @Import({
         SecurityConfig.class,
-        JwtProvider.class,
         SecurityConfigTest.TestController.class
 })
 class SecurityConfigTest {
@@ -75,6 +74,16 @@ class SecurityConfigTest {
     void 위조된_토큰으로는_인증할_수_없다() throws Exception {
         mockMvc.perform(get("/test")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer invalid.token.value"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_004"));
+    }
+
+    @Test
+    void bearer_형식이_아니면_인증할_수_없다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(get("/test")
+                        .header(HttpHeaders.AUTHORIZATION, accessToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_004"));
     }

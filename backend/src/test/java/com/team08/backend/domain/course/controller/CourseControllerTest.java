@@ -1,15 +1,12 @@
 package com.team08.backend.domain.course.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team08.backend.domain.course.dto.ChapterInfoResponse;
-import com.team08.backend.domain.course.dto.CourseCardResponse;
-import com.team08.backend.domain.course.dto.CourseCreateRequest;
-import com.team08.backend.domain.course.dto.CourseDetailResponse;
-import com.team08.backend.domain.course.dto.CourseUpdateRequest;
-import com.team08.backend.domain.course.dto.LectureInfoResponse;
+import com.team08.backend.domain.auth.token.JwtProvider;
+import com.team08.backend.domain.course.dto.*;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.auth.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,9 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,6 +42,9 @@ class CourseControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JwtProvider jwtProvider;
 
     @MockitoBean
     private CourseService courseService;
@@ -63,9 +61,15 @@ class CourseControllerTest {
         );
 
         given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class))).willReturn(55L);
+        String accessToken = jwtProvider.generateAccessToken(new LoginUserDto(
+                1L,
+                "seller@example.com",
+                "판매자",
+                "ROLE_SELLER"
+        ));
 
         mockMvc.perform(post("/api/courses")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

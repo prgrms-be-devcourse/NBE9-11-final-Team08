@@ -11,3 +11,9 @@ spring:
       ddl-auto: create-drop
     open-in-view: false
     show-sql: false
+
+app:
+  jwt:
+    secret: test-secret-key-test-secret-key-test-secret-key
+    expiration-millis: 3600000
+    refresh-expiration-millis: 1209600000

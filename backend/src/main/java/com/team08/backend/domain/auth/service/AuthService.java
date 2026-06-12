@@ -10,6 +10,7 @@ import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +46,13 @@ public class AuthService {
 
         validatePassword(password, user);
 
-        TokenPair tokenPair = jwtProvider.generateTokenPair(user.getId());
+        LoginUserDto loginUser = new LoginUserDto(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getRole().name()
+        );
+        TokenPair tokenPair = jwtProvider.generateTokenPair(loginUser);
 
         saveRefreshToken(user, tokenPair.refreshToken());
 

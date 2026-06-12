@@ -8,7 +8,6 @@ import com.team08.backend.domain.auth.dto.response.LoginResponse;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
-import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.global.auth.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,9 +43,6 @@ public class AuthControllerTest {
 
     @MockitoBean
     RefreshTokenCookieFactory refreshTokenCookieFactory;
-
-    @MockitoBean
-    TokenProperties tokenProperties;
 
     @Test
     void 로그인에_성공하면_accessToken을_응답하고_refreshToken을_쿠키로_내려준다() throws Exception {

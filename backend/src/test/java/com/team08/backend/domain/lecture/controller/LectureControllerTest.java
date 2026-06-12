@@ -3,6 +3,8 @@ package com.team08.backend.domain.lecture.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.service.LectureService;
+import com.team08.backend.domain.auth.token.JwtProvider;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.auth.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,9 @@ class LectureControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JwtProvider jwtProvider;
+
     @MockitoBean
     private LectureService lectureService;
 
@@ -48,9 +53,15 @@ class LectureControllerTest {
         );
 
         given(lectureService.createLecture(eq(courseId), eq(chapterId), any(LectureCreateRequest.class))).willReturn(50L);
+        String accessToken = jwtProvider.generateAccessToken(new LoginUserDto(
+                1L,
+                "seller@example.com",
+                "판매자",
+                "ROLE_SELLER"
+        ));
 
         mockMvc.perform(post("/api/courses/{courseId}/chapters/{chapterId}/lectures", courseId, chapterId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
