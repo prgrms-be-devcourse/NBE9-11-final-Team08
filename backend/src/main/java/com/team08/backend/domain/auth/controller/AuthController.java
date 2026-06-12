@@ -11,6 +11,7 @@ import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.response.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class AuthController {
             summary = "로그인",
             description = "이메일과 비밀번호로 로그인하고 액세스 토큰과 리프레시 토큰 쿠키를 발급합니다."
     )
+    @SecurityRequirements
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         TokenPair tokenPair = authService.login(request.email(), request.password());
@@ -56,6 +58,7 @@ public class AuthController {
             summary = "회원가입",
             description = "사용자 정보를 입력받아 새로운 계정을 생성합니다."
     )
+    @SecurityRequirements
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public void signup(@Valid @RequestBody SignupRequest request) {
@@ -66,6 +69,7 @@ public class AuthController {
             summary = "인증 토큰 갱신",
             description = "리프레시 토큰 쿠키를 검증하고 새로운 액세스 토큰과 리프레시 토큰을 발급합니다."
     )
+    @SecurityRequirements
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
             @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
@@ -90,6 +94,7 @@ public class AuthController {
             summary = "로그아웃",
             description = "저장된 리프레시 토큰을 폐기하고 리프레시 토큰 쿠키를 삭제합니다."
     )
+    @SecurityRequirements
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
