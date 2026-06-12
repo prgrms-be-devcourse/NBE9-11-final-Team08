@@ -526,6 +526,125 @@ class StudyActivityServiceTest {
                 .isEqualTo("오늘 학습한 내용을 스터디원들과 공유합니다.");
     }
 
+    @Test
+    void ACTIVE_스터디의_ACTIVE_멤버인_작성자가_활동을_삭제한다() {
+        Long studyId = 1L;
+        Long activityId = 100L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+        StudyActivity activity = activity(activityId, studyId, userId);
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activityId, studyId
+        )).willReturn(Optional.of(activity));
+
+        studyActivityService.deleteActivity(studyId, activityId, userId);
+
+        assertThat(activity.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    void 존재하지_않는_스터디에서는_활동을_삭제할_수_없다() {
+        Long studyId = 999L;
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.deleteActivity(studyId, 100L, 1L))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+
+        verify(studyMemberRepository, never())
+                .existsByStudyIdAndUserIdAndStatus(any(), any(), any());
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void DRAFT_스터디에서는_활동을_삭제할_수_없다() {
+        assertInactiveStudyCannotDelete(StudyFixture.draftStudy());
+    }
+
+    @Test
+    void READONLY_스터디에서는_활동을_삭제할_수_없다() {
+        Study study = StudyFixture.activeStudy();
+        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
+
+        assertInactiveStudyCannotDelete(study);
+    }
+
+    @Test
+    void ACTIVE_멤버가_아니면_활동을_삭제할_수_없다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(false);
+
+        assertThatThrownBy(() ->
+                studyActivityService.deleteActivity(studyId, 100L, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void 삭제되었거나_다른_스터디의_활동은_삭제할_수_없다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                100L, studyId
+        )).willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.deleteActivity(studyId, 100L, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACTIVITY_NOT_FOUND);
+    }
+
+    @Test
+    void 작성자가_아니면_활동을_삭제할_수_없다() {
+        Long studyId = 1L;
+        Long activityId = 100L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+        StudyActivity activity = activity(activityId, studyId, 3L);
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activityId, studyId
+        )).willReturn(Optional.of(activity));
+
+        assertThatThrownBy(() ->
+                studyActivityService.deleteActivity(studyId, activityId, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED);
+
+        assertThat(activity.getDeletedAt()).isNull();
+    }
+
     private void assertInactiveStudyCannotCreate(Study study) {
         Long studyId = study.getId();
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
@@ -603,6 +722,22 @@ class StudyActivityServiceTest {
         assertThatThrownBy(() -> studyActivityService.updateActivity(
                 studyId, 100L, 1L, "수정한 이후의 스터디 활동 내용입니다."
         ))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_ACTIVE);
+
+        verify(studyMemberRepository, never())
+                .existsByStudyIdAndUserIdAndStatus(any(), any(), any());
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    private void assertInactiveStudyCannotDelete(Study study) {
+        Long studyId = study.getId();
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+
+        assertThatThrownBy(() ->
+                studyActivityService.deleteActivity(studyId, 100L, 1L))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.STUDY_NOT_ACTIVE);

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -239,5 +240,24 @@ class StudyActivityControllerTest {
 
         then(studyActivityService).should(never())
                 .updateActivity(10L, 100L, 1L, request.content());
+    }
+
+    @Test
+    @WithMockLoginUser
+    void 작성자가_스터디_활동을_삭제한다() throws Exception {
+        Long studyId = 10L;
+        Long activityId = 100L;
+        Long userId = 1L;
+
+        mockMvc.perform(delete(
+                        "/api/studies/{studyId}/activities/{activityId}",
+                        studyId,
+                        activityId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
+                .andExpect(status().isNoContent());
+
+        then(studyActivityService).should()
+                .deleteActivity(studyId, activityId, userId);
     }
 }
