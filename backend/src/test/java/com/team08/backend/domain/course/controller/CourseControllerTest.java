@@ -16,10 +16,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -261,6 +263,34 @@ class CourseControllerTest {
         mockMvc.perform(delete("/api/courses/{courseId}", courseId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
+    void 인증된_판매자가_강의_비디오_업로드_요청_시_202_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        Long lectureId = 10L;
+        MockMultipartFile file = new MockMultipartFile("file", "test.mp4", MediaType.MULTIPART_FORM_DATA_VALUE, "video content".getBytes());
+
+        doNothing().when(courseService).uploadLectureVideo(eq(courseId), eq(lectureId), eq(1L), any(MultipartFile.class));
+
+        mockMvc.perform(multipart("/api/courses/{courseId}/lectures/{lectureId}/video", courseId, lectureId)
+                        .file(file)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .with(csrf()))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void 비인증_사용자가_강의_비디오_업로드_요청_시_401_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        Long lectureId = 10L;
+        MockMultipartFile file = new MockMultipartFile("file", "test.mp4", MediaType.MULTIPART_FORM_DATA_VALUE, "video content".getBytes());
+
+        mockMvc.perform(multipart("/api/courses/{courseId}/lectures/{lectureId}/video", courseId, lectureId)
+                        .file(file)
+                        .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 }
