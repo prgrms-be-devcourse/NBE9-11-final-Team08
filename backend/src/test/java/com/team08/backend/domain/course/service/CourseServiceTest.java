@@ -6,7 +6,6 @@ import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
-import com.team08.backend.domain.course.dto.CourseReviewSubmitRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -283,11 +282,10 @@ class CourseServiceTest {
     void 존재하지_않는_강좌_ID로_심사_요청_시_예외가_발생한다() {
         Long invalidCourseId = 999L;
         Long instructorId = 1L;
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
 
         given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(invalidCourseId, instructorId, request))
+        assertThatThrownBy(() -> courseService.submitCourseReview(invalidCourseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
     }
@@ -301,11 +299,9 @@ class CourseServiceTest {
                 .status(CourseStatus.DRAFT)
                 .build();
 
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
-
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, hackerId, request))
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, hackerId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
     }
@@ -319,11 +315,9 @@ class CourseServiceTest {
                 .status(CourseStatus.ON_SALE)
                 .build();
 
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
-
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId, request))
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
     }
@@ -337,11 +331,9 @@ class CourseServiceTest {
                 .status(CourseStatus.DRAFT)
                 .build();
 
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
-
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId, request))
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_CURRICULUM_EMPTY.getMessage());
     }
@@ -360,11 +352,9 @@ class CourseServiceTest {
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("심사 요청합니다.");
-
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        courseService.submitCourseReview(courseId, instructorId, request);
+        courseService.submitCourseReview(courseId, instructorId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.IN_REVIEW);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));

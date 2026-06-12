@@ -7,7 +7,6 @@ import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.dto.LectureInfoResponse;
-import com.team08.backend.domain.course.dto.CourseReviewSubmitRequest;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
@@ -56,7 +55,7 @@ class CourseControllerTest {
     @WithMockUser
     void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest(
-                "스프링 부트 완벽 가이드",
+                "스프剩 부트 완벽 가이드",
                 "백엔드 개발자를 위한 강의",
                 5L,
                 30000,
@@ -173,15 +172,13 @@ class CourseControllerTest {
     @WithMockUser
     void 인증된_판매자가_강좌_심사_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("수정 검수 요청드립니다.");
 
-        doNothing().when(courseService).submitCourseReview(eq(courseId), any(Long.class), any(CourseReviewSubmitRequest.class));
+        doNothing().when(courseService).submitCourseReview(eq(courseId), any(Long.class));
 
         mockMvc.perform(post("/api/courses/{courseId}/reviews", courseId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isNoContent());
     }
 
@@ -189,12 +186,10 @@ class CourseControllerTest {
     @WithAnonymousUser
     void 비인증_사용자가_강좌_심사_요청_시_401_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
-        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
 
         mockMvc.perform(post("/api/courses/{courseId}/reviews", courseId)
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
     }
 }
