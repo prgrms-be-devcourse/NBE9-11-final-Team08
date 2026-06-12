@@ -19,8 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -69,7 +67,7 @@ public class CourseService {
     }
 
     @Transactional
-    public void submitCourseReview(Long courseId, Long instructorId, CourseReviewSubmitRequest request) {
+    public void submitCourseReview(Long courseId, Long instructorId) {
         Course course = courseRepository.findWithChaptersAndLecturesAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
@@ -80,9 +78,7 @@ public class CourseService {
                 course.getId(),
                 course.getStatus(),
                 CourseStatus.IN_REVIEW,
-                request.reason(),
-                instructorId,
-                LocalDateTime.now()
+                instructorId
         );
 
         course.submitReview();

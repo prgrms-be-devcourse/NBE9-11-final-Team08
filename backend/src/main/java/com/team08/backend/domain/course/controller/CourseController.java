@@ -55,8 +55,7 @@ public class CourseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void submitCourseReview(
             @PathVariable("courseId") Long courseId,
-            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
-            @Valid @RequestBody CourseReviewSubmitRequest request) {
-        courseService.submitCourseReview(courseId, loginUserPrincipal.user().id(), request);
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        courseService.submitCourseReview(courseId, loginUserPrincipal.user().id());
     }
 }
