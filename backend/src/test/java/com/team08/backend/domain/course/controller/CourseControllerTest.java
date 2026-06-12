@@ -6,6 +6,7 @@ import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.support.security.WithMockLoginUser;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,6 +18,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
 
@@ -25,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,7 +37,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 class CourseControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
 
     @Autowired
@@ -42,8 +45,15 @@ class CourseControllerTest {
     @MockitoBean
     private CourseService courseService;
 
+    @BeforeEach
+    void setUp(WebApplicationContext webApplicationContext) {
+        this.mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
+                .apply(springSecurity())
+                .build();
+    }
+
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest(
                 "스프링 부트 완벽 가이드",
@@ -56,6 +66,7 @@ class CourseControllerTest {
         given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class))).willReturn(55L);
 
         mockMvc.perform(post("/api/courses")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -63,7 +74,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 강좌_ID로_상세_조회_요청_시_인증이_없어도_200_상태코드와_계층형_커리큘럼_데이터를_반환한다() throws Exception {
         Long courseId = 100L;
 
@@ -91,7 +102,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 강좌_목록_조회_요청_시_정렬_파라미터가_없으면_디폴트로_조회수순_정렬된_강좌_목록을_반환한다() throws Exception {
         CourseCardResponse courseCard = new CourseCardResponse(
                 1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
@@ -108,7 +119,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 강좌_목록_조회_요청_시_정렬_파라미터를_지정하면_해당_조건으로_정렬된_강좌_목록을_반환한다() throws Exception {
         CourseCardResponse courseCard = new CourseCardResponse(
                 1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
@@ -126,7 +137,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_유효한_데이터로_강좌_일반_정보_수정_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
         CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
@@ -144,7 +155,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 강좌_일반_정보_수정_요청_시_필수_데이터가_누락되면_400_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
         CourseUpdateRequest request = new CourseUpdateRequest("", "설명", 5L, 50000, "new.png", List.of());
@@ -158,7 +169,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_강좌_심사_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
 
@@ -182,7 +193,7 @@ class CourseControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_강좌_심사_취소_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
 
