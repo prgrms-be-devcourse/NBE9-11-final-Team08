@@ -179,7 +179,7 @@ class CartServiceTest {
     }
 
     @Test
-    void removingOtherUsersCartItemFails() {
+    void removingCartItemNotInMyCartFails() {
         Cart myCart = cart(CART_ID, USER_ID);
 
         given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(myCart));
