@@ -6,6 +6,7 @@ import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -29,7 +30,7 @@ public class AuthController {
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
          TokenPair tokenPair = authService.login(request.email(), request.password());
 
         ResponseCookie cookie = refreshTokenCookieFactory.create(

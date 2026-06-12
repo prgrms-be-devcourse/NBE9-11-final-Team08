@@ -77,4 +77,19 @@ public class AuthControllerTest {
         then(authService).should()
                 .login(request.email(), request.password());
     }
+
+    @Test
+    void 이메일이_없으면_400을_반환한다() throws Exception {
+        // given
+        LoginRequest request = new LoginRequest(
+                "",
+                "password"
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
 }
