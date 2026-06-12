@@ -53,9 +53,9 @@ public class CourseController {
 
     @PostMapping("/{courseId}/reviews")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void submitCourseReview(
+    public void requestCourseReview(
             @PathVariable("courseId") Long courseId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        courseService.submitCourseReview(courseId, loginUserPrincipal.user().id());
+        courseService.requestCourseReview(courseId, loginUserPrincipal.user().id());
     }
 }

@@ -67,21 +67,14 @@ public class CourseService {
     }
 
     @Transactional
-    public void submitCourseReview(Long courseId, Long instructorId) {
+    public void requestCourseReview(Long courseId, Long instructorId) {
         Course course = courseRepository.findWithChaptersAndLecturesAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         course.validateOwner(instructorId);
 
-        CourseStatusHistory history = new CourseStatusHistory(
-                null,
-                course.getId(),
-                course.getStatus(),
-                CourseStatus.IN_REVIEW,
-                instructorId
-        );
+        CourseStatusHistory history = course.requestReview(instructorId);
 
-        course.submitReview();
         courseStatusHistoryRepository.save(history);
     }
 

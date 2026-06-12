@@ -2,6 +2,7 @@ package com.team08.backend.domain.course.entity;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
+import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.global.common.BaseTimeEntity;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -112,7 +113,7 @@ public class Course extends BaseTimeEntity {
         }
     }
 
-    public void submitReview() {
+    public CourseStatusHistory requestReview(Long requestUserId) {
         if (this.status != CourseStatus.DRAFT) {
             throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
         }
@@ -121,7 +122,16 @@ public class Course extends BaseTimeEntity {
             throw new CustomException(ErrorCode.COURSE_CURRICULUM_EMPTY);
         }
 
+        CourseStatusHistory history = CourseStatusHistory.builder()
+                .courseId(this.id)
+                .fromStatus(this.status)
+                .toStatus(CourseStatus.IN_REVIEW)
+                .changedBy(requestUserId)
+                .build();
+
         this.status = CourseStatus.IN_REVIEW;
+
+        return history;
     }
 
     @Builder

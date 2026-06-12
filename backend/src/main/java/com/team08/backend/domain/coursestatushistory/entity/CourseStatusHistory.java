@@ -8,7 +8,6 @@ import lombok.*;
 @Entity
 @Table(name = "course_status_histories")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CourseStatusHistory extends BaseTimeEntity {
 
@@ -31,12 +30,13 @@ public class CourseStatusHistory extends BaseTimeEntity {
     @Column(nullable = false)
     private Long changedBy;
 
-    public CourseStatusHistory(Long id, Long courseId, CourseStatus fromStatus, CourseStatus toStatus, Long changedBy) {
+    @Builder
+    public CourseStatusHistory(Long id, Long courseId, CourseStatus fromStatus, CourseStatus toStatus, String reason, Long changedBy) {
         this.id = id;
         this.courseId = courseId;
         this.fromStatus = fromStatus;
         this.toStatus = toStatus;
-        this.reason = null;
+        this.reason = reason;
         this.changedBy = changedBy;
     }
 }
