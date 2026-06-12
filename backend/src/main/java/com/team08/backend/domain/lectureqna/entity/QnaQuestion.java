@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lectureqna.entity;
 
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -8,7 +9,8 @@ import java.time.LocalDateTime;
 @Table(name = "qna_questions")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class QnaQuestion {
+public class QnaQuestion extends BaseTimeEntity {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false)
@@ -19,46 +21,24 @@ public class QnaQuestion {
     private String title;
     @Lob @Column(nullable = false)
     private String content;
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
+
     private LocalDateTime deletedAt;
 
-    private QnaQuestion(
-            Long userId,
-            Long lectureId,
-            String title,
-            String content
-    ) {
+    private QnaQuestion(Long userId, Long lectureId, String title, String content) {
         this.lectureId = lectureId;
         this.userId = userId;
         this.title = title;
         this.content = content;
-
-        LocalDateTime now = LocalDateTime.now();
-        this.createdAt = now;
-        this.updatedAt = now;
     }
 
-    public static QnaQuestion create(
-            Long userId,
-            Long lectureId,
-            String title,
-            String content
-    ) {
-        return new QnaQuestion(
-                userId,
-                lectureId,
-                title,
-                content
-        );
+    public static QnaQuestion create(Long userId, Long lectureId, String title, String content) {
+        return new QnaQuestion(userId, lectureId, title, content);
     }
 
     public void update(String title, String content) {
         this.title = title;
         this.content = content;
-        this.updatedAt = LocalDateTime.now();
+        // updatedAt은 @LastModifiedDate가 자동 갱신
     }
 
     public void delete() {
