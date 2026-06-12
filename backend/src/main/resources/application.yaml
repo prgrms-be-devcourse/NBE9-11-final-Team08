@@ -7,6 +7,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
 
 springdoc:
   api-docs:
@@ -21,3 +25,6 @@ app:
       name: refreshToken
       secure: ${IS_COOKIE_SECURE:true}
       same-site: ${SAME_SITE:Lax}
+
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:./videos-local}

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,6 +39,8 @@ class VideoHlsEncodingServiceTest {
         File sourceFile = tempDir.resolve("video.mp4").toFile();
         sourceFile.createNewFile();
 
+        ReflectionTestUtils.setField(videoHlsEncodingService, "uploadDir", tempDir.toString());
+
         given(lectureRepository.findById(invalidLectureId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> videoHlsEncodingService.encodeToHls(sourceFile, targetDirName, invalidLectureId))
@@ -49,10 +52,12 @@ class VideoHlsEncodingServiceTest {
     }
 
     @Test
-    void 원본_비디오_파일이_존재하지_않으면_인코딩_과정에서_예외가_발생한다() {
+    void 원본_비디오_파일이_존재하지_않으면_인코딩_과정에서_예외가_발생한다(@TempDir Path tempDir) {
         Long lectureId = 1L;
         String targetDirName = "test-dir";
         File nonExistentFile = new File("invalid/path/video.mp4");
+
+        ReflectionTestUtils.setField(videoHlsEncodingService, "uploadDir", tempDir.toString());
 
         Lecture lecture = Lecture.builder()
                 .title("테스트 강의")
