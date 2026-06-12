@@ -40,4 +40,8 @@ public class StudyActivity extends BaseTimeEntity {
     public void update(String content) {
         this.content = content;
     }
+
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+    }
 }

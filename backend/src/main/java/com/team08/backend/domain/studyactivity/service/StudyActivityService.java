@@ -93,6 +93,17 @@ public class StudyActivityService {
         return StudyActivityResponse.from(activity);
     }
 
+    @Transactional
+    public void deleteActivity(Long studyId, Long activityId, Long userId) {
+        Study study = findStudy(studyId);
+        validateActiveStudy(study);
+        validateActiveMember(studyId, userId);
+
+        StudyActivity activity = findActivity(studyId, activityId);
+        validateAuthor(activity, userId);
+        activity.delete();
+    }
+
     private Study findStudy(Long studyId) {
         return studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
