@@ -133,7 +133,6 @@ class QnaQuestionServiceTest {
         Long userId = 1L;
         QnaQuestion question = QnaQuestion.create(userId, 1L, "title", "content");
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
-        given(qnaQuestionRepository.save(any())).willReturn(question);
 
         // when & then
         assertThatCode(() -> qnaQuestionService.deleteQuestion(questionId, userId))
