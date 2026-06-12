@@ -83,7 +83,10 @@ public enum ErrorCode {
     // ── Report ───────────────────────────────────────────────────────────
     NOT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_001", "스터디 구성원이 아닙니다."),
     NOT_CURRENT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_002", "현재 소속된 스터디 구성원이 아닙니다."),
-    STUDY_NOT_FINISHED(HttpStatus.BAD_REQUEST,    "REPORT_003", "스터디 기간이 아직 완료되지 않았습니다.");
+    STUDY_NOT_FINISHED(HttpStatus.BAD_REQUEST,    "REPORT_003", "스터디 기간이 아직 완료되지 않았습니다."),
+
+    // ── Attendance ───────────────────────────────────────────────────────
+    ATTENDANCE_ALREADY_EXISTS(HttpStatus.CONFLICT, "ATTENDANCE_001", "오늘은 이미 출석하셨습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
