@@ -85,7 +85,6 @@ class QnaQuestionServiceTest {
         QnaQuestion question = QnaQuestion.create(userId, 1L, "old title", "old content");
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
         given(qnaQuestionRepository.save(any())).willReturn(question);
-        given(qnaAnswerRepository.findByQuestionId(questionId)).willReturn(Optional.empty());
 
         // when
         QnaQuestionResponse response = qnaQuestionService.updateQuestion(questionId, userId, "new title", "new content");
@@ -126,6 +125,23 @@ class QnaQuestionServiceTest {
     }
 
     @Test
+    @DisplayName("질문 수정 실패 - 이미 답변 존재")
+    void updateQuestion_alreadyAnswered() {
+        // given
+        Long questionId = 1L;
+        Long userId = 1L;
+        QnaQuestion question = QnaQuestion.create(userId, 1L, "title", "content");
+        given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
+        given(qnaAnswerRepository.existsByQuestionId(questionId)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> qnaQuestionService.updateQuestion(questionId, userId, "new title", "new content"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.QNA_ALREADY_ANSWERED);
+    }
+
+    @Test
     @DisplayName("질문 삭제 성공")
     void deleteQuestion_success() {
         // given
@@ -133,7 +149,6 @@ class QnaQuestionServiceTest {
         Long userId = 1L;
         QnaQuestion question = QnaQuestion.create(userId, 1L, "title", "content");
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
-        given(qnaQuestionRepository.save(any())).willReturn(question);
 
         // when & then
         assertThatCode(() -> qnaQuestionService.deleteQuestion(questionId, userId))
@@ -153,6 +168,23 @@ class QnaQuestionServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);
+    }
+
+    @Test
+    @DisplayName("질문 삭제 실패 - 이미 답변 존재")
+    void deleteQuestion_alreadyAnswered() {
+        // given
+        Long questionId = 1L;
+        Long userId = 1L;
+        QnaQuestion question = QnaQuestion.create(userId, 1L, "title", "content");
+        given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
+        given(qnaAnswerRepository.existsByQuestionId(questionId)).willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> qnaQuestionService.deleteQuestion(questionId, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.QNA_ALREADY_ANSWERED);
     }
 
     @Test

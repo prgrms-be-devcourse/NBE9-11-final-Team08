@@ -53,10 +53,8 @@ public class QnaQuestionService {
 
         question.update(title, content);
         QnaQuestion saved = qnaQuestionRepository.save(question);
-        QnaAnswerSummary answerSummary = qnaAnswerRepository.findByQuestionId(questionId)
-                .map(a -> new QnaAnswerSummary(a.getId(), a.getContent(), a.getCreatedAt()))
-                .orElse(null);
-        return toResponse(saved, answerSummary);
+
+        return toResponse(saved, null);
     }
 
     @Transactional
@@ -73,7 +71,6 @@ public class QnaQuestionService {
         }
 
         question.delete();
-        qnaQuestionRepository.save(question);
     }
 
     @Transactional(readOnly = true)
