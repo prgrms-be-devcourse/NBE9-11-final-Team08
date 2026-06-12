@@ -7,6 +7,8 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
+import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
+import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final CourseViewCountManager courseViewCountManager;
+    private final CourseStudyManager courseStudyManager;
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request) {
@@ -86,6 +89,33 @@ public class CourseService {
         course.validateOwner(instructorId);
 
         CourseStatusHistory history = course.cancelReview(instructorId);
+
+        courseStatusHistoryRepository.save(history);
+    }
+
+    @Transactional
+    public void approveCourseReview(Long courseId, Long adminId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        CourseStatusHistory history = course.approve(adminId);
+        courseStatusHistoryRepository.save(history);
+
+        CourseStudyCreateCommand command = new CourseStudyCreateCommand(
+                course.getInstructorId(),
+                course.getId(),
+                course.getTitle(),
+                course.getDescription()
+        );
+        courseStudyManager.createForCourse(command);
+    }
+
+    @Transactional
+    public void rejectCourseReview(Long courseId, Long adminId, String reason) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        CourseStatusHistory history = course.reject(adminId, reason);
 
         courseStatusHistoryRepository.save(history);
     }
