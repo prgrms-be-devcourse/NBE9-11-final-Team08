@@ -4,6 +4,7 @@ import com.team08.backend.domain.course.dto.*;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
+import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
@@ -13,6 +14,7 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +33,7 @@ public class CourseService {
     private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final CourseViewCountManager courseViewCountManager;
     private final CourseStudyManager courseStudyManager;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request) {
@@ -128,7 +131,8 @@ public class CourseService {
         CourseStatusHistory history = course.close(instructorId);
 
         courseStatusHistoryRepository.save(history);
-        courseStudyManager.closeForCourse(courseId);
+
+        eventPublisher.publishEvent(new CourseClosedEvent(courseId));
 
         // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
     }
