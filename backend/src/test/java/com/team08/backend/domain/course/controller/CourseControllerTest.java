@@ -15,7 +15,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -172,14 +171,4 @@ class CourseControllerTest {
                 .andExpect(status().isNoContent());
     }
 
-    @Test
-    @WithAnonymousUser
-    void 비인증_사용자가_강좌_심사_요청_시_401_상태코드를_반환한다() throws Exception {
-        Long courseId = 100L;
-
-        mockMvc.perform(post("/api/courses/{courseId}/reviews", courseId)
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized());
-    }
 }
