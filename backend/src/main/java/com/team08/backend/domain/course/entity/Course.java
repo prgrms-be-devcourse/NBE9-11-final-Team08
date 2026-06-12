@@ -112,6 +112,18 @@ public class Course extends BaseTimeEntity {
         }
     }
 
+    public void submitReview() {
+        if (this.status != CourseStatus.DRAFT) {
+            throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
+        }
+
+        if (this.chapters.isEmpty() || this.chapters.stream().anyMatch(c -> c.getLectures().isEmpty())) {
+            throw new CustomException(ErrorCode.COURSE_CURRICULUM_EMPTY);
+        }
+
+        this.status = CourseStatus.IN_REVIEW;
+    }
+
     @Builder
     public Course(Long instructorId, Long categoryId, String title, String description,
                   String thumbnail, int price, CourseStatus status) {

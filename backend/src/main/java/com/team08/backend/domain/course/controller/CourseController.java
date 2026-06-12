@@ -1,9 +1,6 @@
 package com.team08.backend.domain.course.controller;
 
-import com.team08.backend.domain.course.dto.CourseCardResponse;
-import com.team08.backend.domain.course.dto.CourseCreateRequest;
-import com.team08.backend.domain.course.dto.CourseDetailResponse;
-import com.team08.backend.domain.course.dto.CourseUpdateRequest;
+import com.team08.backend.domain.course.dto.*;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -52,5 +49,14 @@ public class CourseController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
             @Valid @RequestBody CourseUpdateRequest request) {
         courseService.updateCourseGeneralInfo(courseId, loginUserPrincipal.user().id(), request);
+    }
+
+    @PostMapping("/{courseId}/reviews")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void submitCourseReview(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            @Valid @RequestBody CourseReviewSubmitRequest request) {
+        courseService.submitCourseReview(courseId, loginUserPrincipal.user().id(), request);
     }
 }
