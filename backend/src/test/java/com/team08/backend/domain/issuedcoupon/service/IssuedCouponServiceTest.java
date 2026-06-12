@@ -3,7 +3,7 @@ package com.team08.backend.domain.issuedcoupon.service;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
-import com.team08.backend.domain.issuedcoupon.dto.CouponResponse;
+import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -22,11 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponServiceTest {
@@ -55,12 +51,15 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
         when(policy.getId()).thenReturn(policyId);
+        
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        CouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
+        IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
 
         // then
-        assertThat(response.message()).isEqualTo("쿠폰이 성공적으로 발급되었습니다!");
+        assertThat(response).isNotNull();
+        assertThat(response.policyId()).isEqualTo(policyId);
         verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
     }
 

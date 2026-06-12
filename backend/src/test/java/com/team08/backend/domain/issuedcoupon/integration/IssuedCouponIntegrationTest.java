@@ -1,11 +1,7 @@
 package com.team08.backend.domain.issuedcoupon.integration;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
-import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
-import com.team08.backend.domain.couponpolicy.entity.CouponType;
-import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
-import com.team08.backend.domain.couponpolicy.entity.DiscountType;
+import com.team08.backend.domain.couponpolicy.entity.*;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -16,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -51,18 +48,17 @@ class IssuedCouponIntegrationTest {
     void downloadCoupon_IntegrationTest() throws Exception {
         // given
         saveUser();
-
         CouponPolicy policy = savePolicy("일반 할인 쿠폰", CouponType.NORMAL);
 
         // when
         mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download")
                         .header("Authorization", "Bearer dummy-token"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("쿠폰이 성공적으로 발급되었습니다!"));
+                .andExpect(jsonPath("$.policyId").value(policy.getId()))
+                .andExpect(jsonPath("$.status").value("ISSUED"));
 
         // then
         assertThat(issuedCouponRepository.findAll()).hasSize(1);
-        assertThat(issuedCouponRepository.findAll().get(0).getPolicyId()).isEqualTo(policy.getId());
     }
 
     private void saveUser() {
