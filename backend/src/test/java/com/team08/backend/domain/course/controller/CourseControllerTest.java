@@ -2,9 +2,11 @@ package com.team08.backend.domain.course.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.course.dto.ChapterInfoResponse;
+import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.LectureInfoResponse;
+import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.config.SecurityConfig;
@@ -12,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -90,5 +95,40 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.chapters[0].id").value(1L))
                 .andExpect(jsonPath("$.chapters[0].lectures[0].id").value(10L))
                 .andExpect(jsonPath("$.chapters[0].lectures[0].m3u8Path").value("videos/free.m3u8"));
+    }
+
+    @Test
+    @WithMockUser
+    void 강좌_목록_조회_요청_시_정렬_파라미터가_없으면_디폴트로_조회수순_정렬된_강좌_목록을_반환한다() throws Exception {
+        CourseCardResponse courseCard = new CourseCardResponse(
+                1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
+        );
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
+
+        given(courseService.getCourses(any(CourseSortType.class), any(Pageable.class))).willReturn(pagedResponses);
+
+        mockMvc.perform(get("/api/courses")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].viewCount").value(150));
+    }
+
+    @Test
+    @WithMockUser
+    void 강좌_목록_조회_요청_시_정렬_파라미터를_지정하면_해당_조건으로_정렬된_강좌_목록을_반환한다() throws Exception {
+        CourseCardResponse courseCard = new CourseCardResponse(
+                1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
+        );
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
+
+        given(courseService.getCourses(any(CourseSortType.class), any(Pageable.class))).willReturn(pagedResponses);
+
+        mockMvc.perform(get("/api/courses")
+                        .param("sort", "PRICE_ASC")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].price").value(30000));
     }
 }
