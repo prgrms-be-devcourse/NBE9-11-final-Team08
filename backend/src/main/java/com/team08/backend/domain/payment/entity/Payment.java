@@ -30,6 +30,23 @@ public class Payment {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public static Payment createReady(Long orderId, Integer amount, LocalDateTime requestedAt) {
+        return new Payment(
+                null,
+                orderId,
+                null,
+                null,
+                amount,
+                PaymentStatus.READY,
+                null,
+                null,
+                null,
+                null,
+                requestedAt,
+                null
+        );
+    }
+
     public void succeed(String paymentKey, String method, LocalDateTime paidAt) {
         validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
         this.paymentKey = paymentKey;
