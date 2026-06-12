@@ -1,10 +1,9 @@
 package com.team08.backend.domain.lectureqna.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
-import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
@@ -34,7 +33,7 @@ class QnaAnswerServiceTest {
 
     @Mock private QnaAnswerRepository qnaAnswerRepository;
     @Mock private QnaQuestionRepository qnaQuestionRepository;
-    @Mock private LectureRepository lectureRepository;
+    @Mock private CourseRepository courseRepository;
 
     @InjectMocks
     private QnaAnswerService qnaAnswerService;
@@ -48,17 +47,15 @@ class QnaAnswerServiceTest {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
-    private QnaQuestion givenQuestion(Long questionId, Long lectureId) {
-        QnaQuestion question = mock(QnaQuestion.class);
-        given(question.getLectureId()).willReturn(lectureId);
+    private void givenQuestion(Long questionId) {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId))
-                .willReturn(Optional.of(question));
-        return question;
+                .willReturn(Optional.of(mock(com.team08.backend.domain.lectureqna.entity.QnaQuestion.class)));
     }
 
-    private void givenLectureOwnedBy(Long lectureId, Long instructorId) {
-        Lecture lecture = mockLectureOwnedBy(instructorId);
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+    private void givenCourseOwnedBy(Long courseId, Long instructorId) {
+        Course course = mock(Course.class);
+        given(course.getInstructorId()).willReturn(instructorId);
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
     }
 
     // ── 답변 작성 ─────────────────────────────────────────────────────────
@@ -66,12 +63,12 @@ class QnaAnswerServiceTest {
     @Test
     @DisplayName("답변 작성 성공")
     void createAnswer_success() {
-        givenQuestion(question_id, lecture_id);
-        givenLectureOwnedBy(lecture_id, instructor_id);
+        givenQuestion(question_id);
+        givenCourseOwnedBy(course_id, instructor_id);
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(false);
         given(qnaAnswerRepository.save(any())).willReturn(answer);
 
-        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, instructor_id, INSTRUCTOR_ROLE, "답변 내용");
+        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "답변 내용");
 
         assertThat(response.content()).isEqualTo("답변 내용");
         assertThat(response.instructorId()).isEqualTo(instructor_id);
@@ -80,7 +77,7 @@ class QnaAnswerServiceTest {
     @Test
     @DisplayName("답변 작성 실패 - 강사 아님")
     void createAnswer_notInstructor() {
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, instructor_id, USER_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, USER_ROLE, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INSTRUCTOR_ONLY);
@@ -91,19 +88,31 @@ class QnaAnswerServiceTest {
     void createAnswer_questionNotFound() {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(any())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_QUESTION_NOT_FOUND);
     }
 
     @Test
+    @DisplayName("답변 작성 실패 - 코스 없음")
+    void createAnswer_courseNotFound() {
+        givenQuestion(question_id);
+        given(courseRepository.findById(course_id)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("답변 작성 실패 - 해당 코스 강사 아님")
     void createAnswer_notCourseInstructor() {
-        givenQuestion(question_id, lecture_id);
-        givenLectureOwnedBy(lecture_id, instructor_id);
+        givenQuestion(question_id);
+        givenCourseOwnedBy(course_id, instructor_id);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, 99L, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, 99L, INSTRUCTOR_ROLE, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);
@@ -112,11 +121,11 @@ class QnaAnswerServiceTest {
     @Test
     @DisplayName("답변 작성 실패 - 이미 답변 존재")
     void createAnswer_alreadyExists() {
-        givenQuestion(question_id, lecture_id);
-        givenLectureOwnedBy(lecture_id, instructor_id);
+        givenQuestion(question_id);
+        givenCourseOwnedBy(course_id, instructor_id);
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(true);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ANSWER_ALREADY_EXISTS);

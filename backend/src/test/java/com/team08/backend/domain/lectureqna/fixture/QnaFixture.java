@@ -1,14 +1,8 @@
 package com.team08.backend.domain.lectureqna.fixture;
 
-import com.team08.backend.domain.chapter.entity.Chapter;
-import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
 
 public final class QnaFixture {
 
@@ -16,6 +10,7 @@ public final class QnaFixture {
 
     public static final Long question_id = 1L;
     public static final Long lecture_id = 5L;
+    public static final Long course_id = 3L;
     public static final Long instructor_id = 10L;
     public static final Long user_id = 1L;
     public static final Long other_user_id = 2L;
@@ -54,17 +49,4 @@ public final class QnaFixture {
         return a;
     }
 
-    // ── Lecture 강사 체인 mock ─────────────────────────────────────────────
-    public static Lecture mockLectureOwnedBy(Long instructorId) {
-        Course course = mock(Course.class);
-        given(course.getInstructorId()).willReturn(instructorId);
-
-        Chapter chapter = mock(Chapter.class);
-        given(chapter.getCourse()).willReturn(course);
-
-        Lecture lecture = mock(Lecture.class);
-        given(lecture.getChapter()).willReturn(chapter);
-
-        return lecture;
-    }
 }

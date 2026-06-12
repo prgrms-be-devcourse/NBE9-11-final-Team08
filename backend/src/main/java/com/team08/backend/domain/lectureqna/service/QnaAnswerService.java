@@ -1,10 +1,9 @@
 package com.team08.backend.domain.lectureqna.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
-import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -21,18 +20,21 @@ public class QnaAnswerService {
 
     private final QnaAnswerRepository qnaAnswerRepository;
     private final QnaQuestionRepository qnaQuestionRepository;
-    private final LectureRepository lectureRepository;
+    private final CourseRepository courseRepository;
 
     @Transactional
-    public QnaAnswerResponse createAnswer(Long questionId, Long instructorId, String role, String content) {
+    public QnaAnswerResponse createAnswer(Long questionId, Long courseId, Long instructorId, String role, String content) {
+        //답변자검사 1차: role_seller 검증
         validateInstructor(role);
 
-        QnaQuestion question = qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)
+        //질문 존재 검증
+        qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.QNA_QUESTION_NOT_FOUND));
 
-        Lecture lecture = lectureRepository.findById(question.getLectureId())
-                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
-        if (!lecture.getChapter().getCourse().getInstructorId().equals(instructorId)) {
+        //답변자검사 2차: 강좌 존재 및 요청자-강좌강사 대조
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        if (!course.getInstructorId().equals(instructorId)) {
             throw new CustomException(ErrorCode.QNA_ACCESS_DENIED);
         }
 
@@ -51,6 +53,7 @@ public class QnaAnswerService {
         QnaAnswer answer = qnaAnswerRepository.findByQuestionId(questionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.QNA_ANSWER_NOT_FOUND));
 
+        //요청자와 기존 답변자(강사)와 대조
         if (!answer.getInstructorId().equals(instructorId)) {
             throw new CustomException(ErrorCode.QNA_ACCESS_DENIED);
         }
@@ -73,6 +76,7 @@ public class QnaAnswerService {
         qnaAnswerRepository.delete(answer);
     }
 
+    //강사권한 확인
     private void validateInstructor(String role) {
         if (!INSTRUCTOR_ROLE.equals(role)) {
             throw new CustomException(ErrorCode.INSTRUCTOR_ONLY);
