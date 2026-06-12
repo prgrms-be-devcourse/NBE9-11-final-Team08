@@ -10,6 +10,8 @@ import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.response.ErrorResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 
+@Tag(name = "인증", description = "회원가입, 로그인 및 인증 토큰 관리 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/auth")
@@ -31,6 +34,10 @@ public class AuthController {
 
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
+    @Operation(
+            summary = "로그인",
+            description = "이메일과 비밀번호로 로그인하고 액세스 토큰과 리프레시 토큰 쿠키를 발급합니다."
+    )
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         TokenPair tokenPair = authService.login(request.email(), request.password());
@@ -45,12 +52,20 @@ public class AuthController {
                 .body(LoginResponse.from(tokenPair));
     }
 
+    @Operation(
+            summary = "회원가입",
+            description = "사용자 정보를 입력받아 새로운 계정을 생성합니다."
+    )
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public void signup(@Valid @RequestBody SignupRequest request) {
         authService.signup(request);
     }
 
+    @Operation(
+            summary = "인증 토큰 갱신",
+            description = "리프레시 토큰 쿠키를 검증하고 새로운 액세스 토큰과 리프레시 토큰을 발급합니다."
+    )
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(
             @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
@@ -71,6 +86,10 @@ public class AuthController {
                 .body(LoginResponse.from(tokenPair));
     }
 
+    @Operation(
+            summary = "로그아웃",
+            description = "저장된 리프레시 토큰을 폐기하고 리프레시 토큰 쿠키를 삭제합니다."
+    )
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
