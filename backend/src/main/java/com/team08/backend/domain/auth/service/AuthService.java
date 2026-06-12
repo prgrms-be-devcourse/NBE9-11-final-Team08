@@ -13,6 +13,7 @@ import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,7 +69,11 @@ public class AuthService {
             default -> throw new InvalidSignupRoleException();
         }
 
-        userRepository.save(user);
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEmailException();
+        }
     }
 
     private void validatePassword(String rawPassword, User user) {
