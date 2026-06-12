@@ -8,8 +8,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -19,11 +17,9 @@ public class CouponScheduler {
 
     // [시스템] 매일 자정에 만료된 쿠폰 자동 처리 (ISSUED -> EXPIRED)
     @Transactional
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     public void expireCoupons() {
-        LocalDateTime now = LocalDateTime.now();
         int updatedCount = issuedCouponRepository.expirePastCoupons(
-                now,
                 CouponStatus.ISSUED,
                 CouponStatus.EXPIRED
         );

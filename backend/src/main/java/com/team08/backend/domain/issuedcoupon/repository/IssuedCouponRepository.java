@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long> {
@@ -19,10 +18,10 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
 
     // [벌크] 만료일이 지난 미사용 쿠폰을 만료(EXPIRED) 상태로 한 번에 업데이트
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE IssuedCoupon c SET c.status = :expiredStatus WHERE c.status = :issuedStatus AND c.expiredAt < :now")
+    @Query("UPDATE IssuedCoupon c SET c.status = :expiredStatus WHERE c.status = :issuedStatus AND c.expiredAt < CURRENT_TIMESTAMP")
     int expirePastCoupons(
-            @Param("now") LocalDateTime now,
             @Param("issuedStatus") CouponStatus issuedStatus,
             @Param("expiredStatus") CouponStatus expiredStatus
     );
+
 }
