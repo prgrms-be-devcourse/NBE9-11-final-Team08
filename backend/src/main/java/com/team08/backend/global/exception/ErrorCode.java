@@ -46,6 +46,10 @@ public enum ErrorCode {
     STUDY_NOT_ACTIVE(HttpStatus.CONFLICT, "STUDY_021", "활성화된 스터디가 아닙니다."),
     STUDY_ACTIVITY_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_022", "스터디 활동을 찾을 수 없습니다."),
     STUDY_ACTIVITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "STUDY_023", "스터디 활동을 수정할 권한이 없습니다."),
+    AI_FEEDBACK_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_024", "AI 피드백을 찾을 수 없습니다."),
+    AI_FEEDBACK_REQUEST_DENIED(HttpStatus.FORBIDDEN, "STUDY_025", "AI 피드백을 요청할 권한이 없습니다."),
+    AI_FEEDBACK_GENERATION_IN_PROGRESS(HttpStatus.CONFLICT, "STUDY_026", "AI 피드백을 생성 중입니다."),
+    AI_FEEDBACK_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "STUDY_027", "AI 피드백 생성에 실패했습니다."),
 
     // ── Course ───────────────────────────────────────────────────────────
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
