@@ -38,7 +38,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/h2-console/**",
                                 "/api/auth/login",
-                                "/api/auth/signup"
+                                "/api/auth/signup",
+                                "/api/auth/refresh"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

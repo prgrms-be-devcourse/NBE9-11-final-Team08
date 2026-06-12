@@ -17,6 +17,7 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_002", "이미 존재하는 이메일입니다."),
     INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "AUTH_003", "회원가입에 불가능한 역할입니다."),
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_004", "인증이 필요합니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_005", "유효하지 않은 refresh token입니다."),
 
     // ── User ─────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,   "USER_001", "사용자를 찾을 수 없습니다."),

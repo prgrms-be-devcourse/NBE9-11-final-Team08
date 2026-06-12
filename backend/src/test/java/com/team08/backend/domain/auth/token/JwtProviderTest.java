@@ -162,4 +162,12 @@ public class JwtProviderTest {
         assertThat(jwtProvider.validateAccessToken(tokenPair.accessToken())).isTrue();
         assertThat(jwtProvider.validateRefreshToken(tokenPair.refreshToken())).isTrue();
     }
+
+    @Test
+    void 같은_사용자에게_연속_발급한_refreshToken은_서로_다르다() {
+        String firstToken = jwtProvider.generateRefreshToken(loginUser.id());
+        String secondToken = jwtProvider.generateRefreshToken(loginUser.id());
+
+        assertThat(secondToken).isNotEqualTo(firstToken);
+    }
 }
