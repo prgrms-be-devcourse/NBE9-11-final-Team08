@@ -15,6 +15,8 @@ import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
@@ -29,6 +31,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -41,6 +48,8 @@ public class CourseService {
     private final CourseViewCountManager courseViewCountManager;
     private final CourseStudyManager courseStudyManager;
     private final EnrollmentRepository enrollmentRepository;
+    private final LectureRepository lectureRepository;
+    private final MediaEncodingService mediaEncodingService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -184,6 +193,36 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new CourseDeletedEvent(courseId));
+    }
+
+    @Transactional
+    public void uploadLectureVideo(Long courseId, Long lectureId, Long instructorId, MultipartFile file) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        course.validateOwner(instructorId);
+
+        Lecture lecture = lectureRepository.findById(lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+
+        if (!lecture.getChapter().getCourse().getId().equals(courseId)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        if (file.isEmpty()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String targetDirName = UUID.randomUUID().toString();
+        String tempFileName = targetDirName + "_tmp.mp4";
+        File tempFile = new File(System.getProperty("java.io.tmpdir"), tempFileName);
+
+        try {
+            file.transferTo(tempFile);
+        } catch (IOException e) {
+            throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+        }
+
+        mediaEncodingService.encodeToHls(tempFile, targetDirName, lecture.getId());
     }
 
     private void validateActiveEnrollments(Long courseId) {

@@ -69,6 +69,8 @@ public enum ErrorCode {
     INVALID_PARENT_COMMENT(HttpStatus.BAD_REQUEST,   "LECTURE_006", "부모 댓글이 올바르지 않습니다."),
     REFLECTION_ALREADY_EXISTS(HttpStatus.CONFLICT,    "LECTURE_007", "이미 작성된 회고가 있습니다."),
     REFLECTION_ACCESS_DENIED(HttpStatus.FORBIDDEN,    "LECTURE_008", "회고를 수정할 권한이 없습니다."),
+    INVALID_VIDEO_FORMAT(HttpStatus.BAD_REQUEST, "LECTURE_009", "올바르지 않은 비디오 파일 형식입니다."),
+    VIDEO_ENCODING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "LECTURE_010", "비디오 인코딩 연산 처리에 실패했습니다."),
 
     // ── Order ────────────────────────────────────────────────────────────
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND,       "ORDER_001", "주문을 찾을 수 없습니다."),
