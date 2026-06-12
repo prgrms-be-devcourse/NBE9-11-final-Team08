@@ -4,7 +4,9 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
+import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
+import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -16,7 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,12 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponServiceTest {
@@ -192,11 +191,11 @@ class IssuedCouponServiceTest {
         // given
         Long userId = 1L;
         Long policyId = 10L;
-
+        
         IssuedCoupon coupon = mock(IssuedCoupon.class);
         when(coupon.getPolicyId()).thenReturn(policyId);
         when(coupon.getId()).thenReturn(100L);
-
+        
         CouponPolicy policy = mock(CouponPolicy.class);
         when(policy.getId()).thenReturn(policyId);
         when(policy.getName()).thenReturn("테스트 쿠폰");
@@ -212,5 +211,61 @@ class IssuedCouponServiceTest {
         assertThat(responses.get(0).couponName()).isEqualTo("테스트 쿠폰");
         verify(issuedCouponRepository).findByUserIdOrderByExpiredAtAsc(userId);
         verify(couponPolicyRepository).findAllById(anyList());
+    }
+
+    @Test
+    @DisplayName("성공: 쿠폰 적용 시 예상 할인 금액을 정확히 계산한다")
+    void calculateExpectedDiscount_success() {
+        // given
+        Long userId = 1L;
+        Long issuedCouponId = 100L;
+        int originalPrice = 10000;
+
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        when(issuedCoupon.getUserId()).thenReturn(userId);
+        when(issuedCoupon.getStatus()).thenReturn(CouponStatus.ISSUED);
+        when(issuedCoupon.getPolicyId()).thenReturn(1L);
+
+        CouponPolicy policy = mock(CouponPolicy.class);
+        when(policy.getName()).thenReturn("10% 할인 쿠폰");
+        when(policy.calculateDiscountAmount(originalPrice)).thenReturn(1000);
+
+        when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
+        when(couponPolicyRepository.findById(1L)).thenReturn(Optional.of(policy));
+
+        // when
+        ExpectedDiscountResponse response = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, originalPrice);
+
+        // then
+        assertThat(response.discountAmount()).isEqualTo(1000);
+        assertThat(response.finalPrice()).isEqualTo(9000);
+    }
+
+    @Test
+    @DisplayName("성공: 단회성 쿠폰 사용 시 상태가 USED로 변경된다")
+    void useCouponForOrder_singleUse_success() {
+        // given
+        Long userId = 1L;
+        Long issuedCouponId = 100L;
+        int originalPrice = 10000;
+
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        when(issuedCoupon.getUserId()).thenReturn(userId);
+        when(issuedCoupon.getStatus()).thenReturn(CouponStatus.ISSUED);
+        when(issuedCoupon.getPolicyId()).thenReturn(1L);
+
+        CouponPolicy policy = mock(CouponPolicy.class);
+        when(policy.getUsageType()).thenReturn(com.team08.backend.domain.couponpolicy.entity.CouponUsageType.SINGLE_USE);
+        when(policy.calculateDiscountAmount(originalPrice)).thenReturn(1000);
+
+        when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
+        when(couponPolicyRepository.findById(1L)).thenReturn(Optional.of(policy));
+
+        // when
+        int discountAmount = issuedCouponService.useCouponForOrder(userId, issuedCouponId, originalPrice);
+
+        // then
+        assertThat(discountAmount).isEqualTo(1000);
+        verify(issuedCoupon).use();
     }
 }
