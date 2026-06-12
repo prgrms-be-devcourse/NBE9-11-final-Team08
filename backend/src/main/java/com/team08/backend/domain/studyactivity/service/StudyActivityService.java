@@ -70,11 +70,25 @@ public class StudyActivityService {
         validateVisibleStudy(studyId);
         validateActiveMember(studyId, userId);
 
-        StudyActivity activity = studyActivityRepository
-                .findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId)
-                .orElseThrow(() ->
-                        new CustomException(ErrorCode.STUDY_ACTIVITY_NOT_FOUND)
-                );
+        StudyActivity activity = findActivity(studyId, activityId);
+
+        return StudyActivityResponse.from(activity);
+    }
+
+    @Transactional
+    public StudyActivityResponse updateActivity(
+            Long studyId,
+            Long activityId,
+            Long userId,
+            String content
+    ) {
+        Study study = findStudy(studyId);
+        validateActiveStudy(study);
+        validateActiveMember(studyId, userId);
+
+        StudyActivity activity = findActivity(studyId, activityId);
+        validateAuthor(activity, userId);
+        activity.update(content);
 
         return StudyActivityResponse.from(activity);
     }
@@ -104,6 +118,20 @@ public class StudyActivityService {
 
         if (!isActiveMember) {
             throw new CustomException(ErrorCode.STUDY_ACCESS_DENIED);
+        }
+    }
+
+    private StudyActivity findActivity(Long studyId, Long activityId) {
+        return studyActivityRepository
+                .findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId)
+                .orElseThrow(() ->
+                        new CustomException(ErrorCode.STUDY_ACTIVITY_NOT_FOUND)
+                );
+    }
+
+    private void validateAuthor(StudyActivity activity, Long userId) {
+        if (!activity.getAuthorId().equals(userId)) {
+            throw new CustomException(ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED);
         }
     }
 }
