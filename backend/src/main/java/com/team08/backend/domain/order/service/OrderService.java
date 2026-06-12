@@ -11,6 +11,7 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
 import com.team08.backend.domain.order.dto.OrderItemResponse;
+import com.team08.backend.domain.order.dto.OrderSummaryResponse;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
@@ -72,6 +73,31 @@ public class OrderService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         return createPendingPaymentOrder(userId, List.of(course));
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderSummaryResponse> getMyOrders(Long userId) {
+        return orderRepository.findAllByUserIdOrderByOrderedAtDescIdDesc(userId).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrderDetailResponse getMyOrder(Long userId, Long orderId) {
+        Order order = findMyOrder(userId, orderId);
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+
+        return toDetailResponse(order, orderItems);
+    }
+
+    @Transactional
+    public OrderDetailResponse cancelMyOrder(Long userId, Long orderId) {
+        Order order = findMyOrder(userId, orderId);
+
+        order.cancel(LocalDateTime.now());
+
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        return toDetailResponse(order, orderItems);
     }
 
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
@@ -167,6 +193,18 @@ public class OrderService {
         );
     }
 
+    private OrderSummaryResponse toSummaryResponse(Order order) {
+        return new OrderSummaryResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getTotalPrice(),
+                order.getDiscountPrice(),
+                order.getFinalPrice(),
+                order.getStatus(),
+                order.getOrderedAt()
+        );
+    }
+
     private OrderItemResponse toItemResponse(OrderItem item) {
         return new OrderItemResponse(
                 item.getId(),
@@ -180,5 +218,10 @@ public class OrderService {
 
     private String createOrderNumber(LocalDateTime orderedAt) {
         return "ORD-" + orderedAt.format(ORDER_NUMBER_TIME_FORMATTER) + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+    }
+
+    private Order findMyOrder(Long userId, Long orderId) {
+        return orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 }
