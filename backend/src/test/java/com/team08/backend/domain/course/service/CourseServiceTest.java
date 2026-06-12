@@ -359,4 +359,65 @@ class CourseServiceTest {
         assertThat(course.getStatus()).isEqualTo(CourseStatus.IN_REVIEW);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
     }
+
+    @Test
+    void 존재하지_않는_강좌_ID로_심사_취소_시_예외가_발생한다() {
+        Long invalidCourseId = 999L;
+        Long instructorId = 1L;
+
+        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.cancelCourseReview(invalidCourseId, instructorId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 소유자가_아닌_사용자가_심사_취소_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long hackerId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.IN_REVIEW)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.cancelCourseReview(courseId, hackerId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+    }
+
+    @Test
+    void IN_REVIEW_상태가_아닌_강좌_심사_취소_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.cancelCourseReview(courseId, instructorId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_심사_취소_상태로_전이되고_이력이_남는다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.IN_REVIEW)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        courseService.cancelCourseReview(courseId, instructorId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DRAFT);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+    }
 }

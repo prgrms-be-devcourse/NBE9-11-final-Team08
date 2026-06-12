@@ -32,6 +32,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -188,6 +189,31 @@ class CourseControllerTest {
         Long courseId = 100L;
 
         mockMvc.perform(post("/api/courses/{courseId}/reviews", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void 인증된_판매자가_강좌_심사_취소_요청_시_204_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+
+        doNothing().when(courseService).cancelCourseReview(eq(courseId), any(Long.class));
+
+        mockMvc.perform(delete("/api/courses/{courseId}/reviews", courseId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void 비인증_사용자가_강좌_심사_취소_요청_시_401_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+
+        mockMvc.perform(delete("/api/courses/{courseId}/reviews", courseId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
