@@ -2,6 +2,8 @@ package com.team08.backend.domain.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.auth.dto.request.LoginRequest;
+import com.team08.backend.domain.auth.dto.request.SignupRequest;
+import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.dto.response.LoginResponse;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
@@ -91,5 +93,25 @@ public class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 회원가입에_성공하면_201을_반환한다() throws Exception {
+        // given
+        SignupRequest request = new SignupRequest(
+                "test@email.com",
+                "password",
+                "nickname",
+                null,
+                SignupRole.USER
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        then(authService).should().signup(any(SignupRequest.class));
     }
 }

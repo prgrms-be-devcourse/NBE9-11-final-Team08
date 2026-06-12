@@ -1,5 +1,7 @@
 package com.team08.backend.domain.auth.service;
 
+import com.team08.backend.domain.auth.dto.request.SignupRequest;
+import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.entity.RefreshToken;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.model.TokenPair;
@@ -9,6 +11,8 @@ import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.fixture.UserFixture;
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.entity.UserRole;
+import com.team08.backend.domain.auth.exception.DuplicateEmailException;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,8 +30,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
@@ -144,5 +150,87 @@ public class AuthServiceTest {
 
         then(jwtProvider).shouldHaveNoInteractions();
         then(refreshTokenRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void 회원가입에_성공한다() {
+        // given
+        SignupRequest request = new SignupRequest(
+                "test@email.com",
+                "password",
+                "nickname",
+                null,
+                SignupRole.USER
+        );
+
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(false);
+        given(passwordEncoder.encode(request.password()))
+                .willReturn("encoded-password");
+
+        // when
+        authService.signup(request);
+
+        // then
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        then(userRepository).should().save(captor.capture());
+
+        User savedUser = captor.getValue();
+
+        assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
+        assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+        assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_USER);
+    }
+
+    @Test
+    void SELLER로_회원가입하면_SELLER로_저장된다() {
+        // given
+        SignupRequest request = new SignupRequest(
+                "test@email.com",
+                "password",
+                "nickname",
+                null,
+                SignupRole.SELLER
+        );
+
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(false);
+        given(passwordEncoder.encode(request.password()))
+                .willReturn("encoded-password");
+
+        // when
+        authService.signup(request);
+
+        // then
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        then(userRepository).should().save(captor.capture());
+
+        User savedUser = captor.getValue();
+
+        assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
+        assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
+        assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_SELLER);
+    }
+
+    @Test
+    void 이미_가입된_이메일이면_회원가입에_실패한다() {
+        // given
+        SignupRequest request = new SignupRequest(
+                "test@email.com",
+                "password",
+                "nickname",
+                null,
+                SignupRole.USER
+        );
+
+        given(userRepository.existsByEmail(request.email()))
+                .willReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> authService.signup(request))
+                .isInstanceOf(DuplicateEmailException.class);
+
+        then(passwordEncoder).shouldHaveNoInteractions();
+        then(userRepository).should(never()).save(any());
     }
 }

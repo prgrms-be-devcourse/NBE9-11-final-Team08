@@ -19,5 +19,6 @@ springdoc:
 app:
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
-  cookie:
-    secure: false
+    refresh-cookie:
+      secure: false
+      same-site: None

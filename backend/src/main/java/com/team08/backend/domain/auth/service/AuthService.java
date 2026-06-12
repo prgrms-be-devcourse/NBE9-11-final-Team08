@@ -1,6 +1,9 @@
 package com.team08.backend.domain.auth.service;
 
+import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.entity.RefreshToken;
+import com.team08.backend.domain.auth.exception.DuplicateEmailException;
+import com.team08.backend.domain.auth.exception.InvalidSignupRoleException;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
@@ -46,6 +49,26 @@ public class AuthService {
         saveRefreshToken(user, tokenPair.refreshToken());
 
         return tokenPair;
+    }
+
+    @Transactional
+    public void signup(SignupRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new DuplicateEmailException();
+        }
+
+        String encodedPassword = passwordEncoder.encode(request.password());
+
+        User user;
+        switch (request.userRole()) {
+            case USER ->
+                user = User.createUser(request.email(), encodedPassword, request.nickname(), request.profileImage());
+            case SELLER ->
+                user = User.createSeller(request.email(), encodedPassword, request.nickname(), request.profileImage());
+            default -> throw new InvalidSignupRoleException();
+        }
+
+        userRepository.save(user);
     }
 
     private void validatePassword(String rawPassword, User user) {
