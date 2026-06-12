@@ -148,4 +148,35 @@ public class CourseStudyManagerTest {
         // then
         assertThat(study.getStatus()).isEqualTo(StudyStatus.READONLY);
     }
+
+    @Test
+    void 연관된_스터디가_존재하지_않으면_반려_요청_시_예외가_발생한다() {
+        // given
+        Long courseId = 10L;
+
+        given(studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.ACTIVE))
+                .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                courseStudyManager.rejectForCourse(courseId)
+        ).isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.STUDY_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 정상_조건에서_강좌_심사_반려_요청_시_연관된_스터디가_비활성화_상태로_전이된다() {
+        // given
+        Long courseId = 10L;
+        Study study = TestEntityFactory.study(100L, StudyStatus.DRAFT);
+
+        given(studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.ACTIVE))
+                .willReturn(Optional.of(study));
+
+        // when
+        courseStudyManager.rejectForCourse(courseId);
+
+        // then
+        assertThat(study.getStatus()).isEqualTo(StudyStatus.INACTIVE);
+    }
 }

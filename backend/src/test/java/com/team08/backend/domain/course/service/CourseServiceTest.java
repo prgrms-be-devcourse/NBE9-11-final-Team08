@@ -9,6 +9,7 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
+import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
@@ -502,7 +503,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_조건을_충족하면_심사_반려_상태로_전이되고_이력이_남는다() {
+    void 정상_조건을_충족하면_심사_반려_상태로_전이되고_이력_저장_및_반려_이벤트가_발행된다() {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
@@ -517,6 +518,7 @@ class CourseServiceTest {
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(AdminCourseRejectedEvent.class));
     }
 
     @Test
