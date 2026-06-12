@@ -9,11 +9,10 @@ import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
-import com.team08.backend.global.auth.config.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
@@ -30,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@AutoConfigureMockMvc(addFilters = false)
 public class AuthControllerTest {
 
     @Autowired

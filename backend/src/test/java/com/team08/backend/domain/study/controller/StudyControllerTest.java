@@ -3,11 +3,11 @@ package com.team08.backend.domain.study.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.service.StudyService;
-import com.team08.backend.global.auth.config.SecurityConfig;
+import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(StudyController.class)
-@Import(SecurityConfig.class)
+@AutoConfigureMockMvc(addFilters = false)
 public class StudyControllerTest {
 
     @Autowired
@@ -34,6 +34,7 @@ public class StudyControllerTest {
     private StudyService studyService;
 
     @Test
+    @WithMockLoginUser()
     void 내_스터디_목록을_조회한다() throws Exception {
         // given
         Long userId = 1L;
