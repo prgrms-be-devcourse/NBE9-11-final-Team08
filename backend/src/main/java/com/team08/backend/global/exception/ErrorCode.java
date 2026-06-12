@@ -38,6 +38,7 @@ public enum ErrorCode {
 
     // ── Course ───────────────────────────────────────────────────────────
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
+    COURSE_NOT_ON_SALE(HttpStatus.CONFLICT, "COURSE_002", "판매 중인 강의만 장바구니에 담을 수 있습니다."),
 
     // ── Lecture ──────────────────────────────────────────────────────────
     LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_001", "강의를 찾을 수 없습니다."),
