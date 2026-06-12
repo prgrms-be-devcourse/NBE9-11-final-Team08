@@ -99,4 +99,10 @@ public class CouponPolicy extends BaseTimeEntity {
                 .issueEndDate(request.issueEndDate())
                 .build();
     }
+
+    public LocalDateTime calculateExpirationDate() {
+        return java.time.LocalDate.now()
+                .plusDays(this.validDays)
+                .atTime(java.time.LocalTime.MAX);
+    }
 }
