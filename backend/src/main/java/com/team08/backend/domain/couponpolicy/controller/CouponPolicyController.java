@@ -7,7 +7,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/coupons")
@@ -22,6 +26,7 @@ public class CouponPolicyController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "쿠폰 정책 생성", description = "새로운 쿠폰 정책(할인액, 유효기간, 발급방식 등)을 생성합니다.")
     public CouponPolicyResponse createCoupon(@RequestBody CouponPolicyCreateRequest request) {
+        // TODO 관리자 인증 추가
         return couponPolicyService.createCouponPolicy(request);
     }
 }
