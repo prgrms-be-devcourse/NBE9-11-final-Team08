@@ -29,6 +29,51 @@ public class IssuedCouponService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
 
+    // TODO 나중에 회원가입에 추가
+    // [시스템] 가입 기념 쿠폰 자동 발급
+    @Transactional
+    public void issueSignUpCoupon(Long userId) {
+        // 사용자 존재 확인
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 쿠폰 타입으로 정책 단건 조회 (주로 자동 발급용 AUTO 타입 조회 시 사용)
+        CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 쿠폰 발급 기록 생성 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.issue(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
+
+        issuedCouponRepository.save(newCoupon);
+    }
+
+    // [시스템] 출석 보상 쿠폰 자동 발급
+    @Transactional
+    public void issueAttendanceCoupon(Long userId) {
+        // 사용자 존재 확인
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 쿠폰 이름으로 정책 단건 조회 (고정된 이름 정책 사용)
+        CouponPolicy policy = couponPolicyRepository.findByName("연속 출석 보상 쿠폰")
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 쿠폰 발급 기록 생성 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.issue(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
+
+        issuedCouponRepository.save(newCoupon);
+    }
+
     // [사용자] 일반 쿠폰 다운로드
     @Transactional
     public IssuedCouponResponse downloadCoupon(Long userId, Long policyId) {
