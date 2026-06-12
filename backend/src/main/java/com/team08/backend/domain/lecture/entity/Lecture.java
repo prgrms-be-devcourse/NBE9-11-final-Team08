@@ -55,6 +55,17 @@ public class Lecture extends BaseTimeEntity {
         this.chapter = chapter;
     }
 
+    public static Lecture create(String title, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
+        return Lecture.builder()
+                .title(title)
+                .m3u8Path("")
+                .durationSeconds(durationSeconds)
+                .orderNo(orderNo)
+                .isFreePreview(isFreePreview)
+                .chapter(chapter)
+                .build();
+    }
+
     public void assignChapter(Chapter chapter) {
         this.chapter = chapter;
     }

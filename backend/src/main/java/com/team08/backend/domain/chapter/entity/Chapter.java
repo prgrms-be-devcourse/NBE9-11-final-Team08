@@ -91,15 +91,13 @@ public class Chapter extends BaseTimeEntity {
                         lectureReq.isFreePreview()
                 );
             } else {
-                Lecture newLecture = Lecture.builder()
-                        .title(lectureReq.title())
-                        .m3u8Path("")
-                        .durationSeconds(lectureReq.durationSeconds())
-                        .orderNo(lectureReq.orderNo())
-                        .isFreePreview(lectureReq.isFreePreview())
-                        .chapter(this)
-                        .build();
-                this.addLecture(newLecture);
+                this.addLecture(Lecture.create(
+                        lectureReq.title(),
+                        lectureReq.durationSeconds(),
+                        lectureReq.orderNo(),
+                        lectureReq.isFreePreview(),
+                        this
+                ));
             }
         }
     }
