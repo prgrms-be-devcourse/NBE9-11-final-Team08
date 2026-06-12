@@ -85,7 +85,6 @@ class QnaQuestionServiceTest {
         QnaQuestion question = QnaQuestion.create(userId, 1L, "old title", "old content");
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)).willReturn(Optional.of(question));
         given(qnaQuestionRepository.save(any())).willReturn(question);
-        given(qnaAnswerRepository.findByQuestionId(questionId)).willReturn(Optional.empty());
 
         // when
         QnaQuestionResponse response = qnaQuestionService.updateQuestion(questionId, userId, "new title", "new content");
