@@ -36,6 +36,20 @@ public class ChapterController {
     }
 
     @Operation(
+            summary = "강좌 내 최근 수강 강의 조회",
+            description = "해당 강좌에서 사용자가 가장 최근에 수강한 강의를 반환합니다. 수강 이력이 없으면 null을 반환합니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공 (수강 이력 없으면 null)")
+    })
+    @GetMapping("/api/courses/{courseId}/lectures/last-watched")
+    public LectureEnterResponse getLastWatchedLecture(
+            @Parameter(description = "강좌 ID") @PathVariable Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal principal) {
+        return chapterService.getLastWatchedLecture(courseId, principal.user().id());
+    }
+
+    @Operation(
             summary = "챕터 첫 강의 입장",
             description = "선택한 챕터의 첫 번째 강의 러닝 스페이스로 입장합니다. 학습 진행 정보(progress)가 포함됩니다."
     )
@@ -50,18 +64,4 @@ public class ChapterController {
         return chapterService.enterFirstLecture(chapterId, principal.user().id());
     }
 
-    @Operation(
-            summary = "최근 수강 강의 입장",
-            description = "챕터 내에서 사용자가 가장 최근 학습한 강의 러닝 스페이스로 입장합니다."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "입장 성공"),
-            @ApiResponse(responseCode = "404", description = "챕터 / 강의 / 최근 학습 이력을 찾을 수 없음")
-    })
-    @GetMapping("/api/chapters/{chapterId}/lectures/recent")
-    public LectureEnterResponse enterRecentLecture(
-            @Parameter(description = "챕터 ID") @PathVariable Long chapterId,
-            @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return chapterService.enterRecentLecture(chapterId, principal.user().id());
-    }
 }
