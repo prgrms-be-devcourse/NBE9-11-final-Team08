@@ -1,6 +1,9 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.course.dto.*;
+import com.team08.backend.domain.course.dto.CourseCardResponse;
+import com.team08.backend.domain.course.dto.CourseCreateRequest;
+import com.team08.backend.domain.course.dto.CourseDetailResponse;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -130,6 +133,19 @@ public class CourseService {
 
         CourseStatusHistory history = course.close(instructorId);
 
+        courseStatusHistoryRepository.save(history);
+
+        eventPublisher.publishEvent(new CourseClosedEvent(courseId));
+
+        // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
+    }
+
+    @Transactional
+    public void suspendCourseByAdmin(Long courseId, Long adminId, String reason) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        CourseStatusHistory history = course.suspendByAdmin(adminId, reason);
         courseStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new CourseClosedEvent(courseId));
