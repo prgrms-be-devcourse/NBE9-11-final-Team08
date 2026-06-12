@@ -30,6 +30,21 @@ public class Enrollment {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public static Enrollment createActive(Long userId, Long courseId, Long orderId, LocalDateTime enrolledAt) {
+        return new Enrollment(
+                null,
+                userId,
+                courseId,
+                orderId,
+                EnrollmentStatus.ACTIVE,
+                enrolledAt,
+                null,
+                null,
+                enrolledAt,
+                null
+        );
+    }
+
     public void cancel(LocalDateTime canceledAt) {
         validateStatus(EnrollmentStatus.ACTIVE);
         this.status = EnrollmentStatus.CANCELED;
