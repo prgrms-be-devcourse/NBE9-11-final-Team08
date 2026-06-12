@@ -376,4 +376,57 @@ public class AuthServiceTest {
                 .isInstanceOf(InvalidRefreshTokenException.class);
         verify(jwtProvider, times(1)).generateTokenPair(any(LoginUserDto.class));
     }
+
+    @Test
+    void 로그아웃하면_저장된_refreshToken을_폐기한다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+
+        authService.logout("refresh-token");
+
+        assertThat(storedToken.isRevoked()).isTrue();
+        assertThat(storedToken.getRevokedAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 9, 0));
+    }
+
+    @Test
+    void 이미_폐기된_refreshToken으로_로그아웃해도_폐기시각을_변경하지_않는다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        LocalDateTime revokedAt = LocalDateTime.of(2026, 6, 12, 8, 0);
+        storedToken.revoke(revokedAt);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+
+        authService.logout("refresh-token");
+
+        assertThat(storedToken.getRevokedAt()).isEqualTo(revokedAt);
+    }
+
+    @Test
+    void 저장되지_않은_refreshToken으로_로그아웃해도_성공한다() {
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("unknown-token")))
+                .willReturn(Optional.empty());
+
+        authService.logout("unknown-token");
+
+        then(jwtProvider).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void refreshToken이_없어도_로그아웃은_성공한다() {
+        authService.logout(null);
+
+        then(refreshTokenRepository).shouldHaveNoInteractions();
+        then(jwtProvider).shouldHaveNoInteractions();
+    }
 }
