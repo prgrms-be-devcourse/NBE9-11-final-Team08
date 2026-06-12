@@ -20,6 +20,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -82,5 +84,91 @@ class IssuedCouponServiceTest {
             issuedCouponService.downloadCoupon(userId, policyId);
         });
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.COUPON_ALREADY_ISSUED);
+    }
+
+    @Test
+    @DisplayName("실패: 일반 쿠폰 발급 기간 전일 때 예외 발생")
+    void downloadCoupon_fail_notStarted() {
+        // given
+        Long userId = 1L;
+        Long policyId = 1L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
+
+        // 기간 검증 예외 발생 모사
+        doThrow(new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED)).when(policy).validateIssuePeriod();
+
+        // when & then
+        assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
+    }
+
+    @Test
+    @DisplayName("성공: 선착순 쿠폰 재고가 1개일 때 마지막 사람이 성공하고 재고가 0이 된다")
+    void downloadFcfsCoupon_success_lastOne() {
+        // given
+        Long userId = 1L;
+        Long policyId = 100L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(policy.getCouponType()).thenReturn(CouponType.FCFS);
+        when(policy.getId()).thenReturn(policyId);
+
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        issuedCouponService.downloadFcfsCoupon(userId, policyId);
+
+        // then
+        verify(policy, times(1)).decreaseQuantity();
+        verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
+    }
+
+    @Test
+    @DisplayName("실패: 재고가 0일 때 선착순 쿠폰 발급 요청 시 예외가 발생한다")
+    void downloadFcfsCoupon_fail_soldOut() {
+        // given
+        Long userId = 1L;
+        Long policyId = 100L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(policy.getCouponType()).thenReturn(CouponType.FCFS);
+
+        // decreaseQuantity에서 예외 발생 모사
+        doThrow(new CustomException(ErrorCode.COUPON_EXHAUSTED)).when(policy).decreaseQuantity();
+
+        // when & then
+        CustomException exception = assertThrows(CustomException.class, () -> {
+            issuedCouponService.downloadFcfsCoupon(userId, policyId);
+        });
+        assertEquals(ErrorCode.COUPON_EXHAUSTED, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("실패: 선착순 쿠폰 이미 발급받은 유저가 요청하면 중복 발급 예외가 발생한다")
+    void downloadFcfsCoupon_fail_duplicated() {
+        // given
+        Long userId = 1L;
+        Long policyId = 100L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(policy.getCouponType()).thenReturn(CouponType.FCFS);
+
+        doThrow(DataIntegrityViolationException.class).when(issuedCouponRepository).saveAndFlush(any(IssuedCoupon.class));
+
+        // when & then
+        assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_ISSUED);
     }
 }
