@@ -429,4 +429,23 @@ public class AuthServiceTest {
         then(refreshTokenRepository).shouldHaveNoInteractions();
         then(jwtProvider).shouldHaveNoInteractions();
     }
+
+    @Test
+    void 로그아웃한_refreshToken으로는_재발급할_수_없다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+
+        authService.logout("refresh-token");
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        then(jwtProvider).should(never()).generateTokenPair(any(LoginUserDto.class));
+    }
 }
