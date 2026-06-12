@@ -11,6 +11,10 @@ import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,8 +38,36 @@ public class StudyActivityService {
         return StudyActivityResponse.from(savedActivity);
     }
 
+    @Transactional(readOnly = true)
+    public Page<StudyActivityResponse> getActivities(
+            Long studyId,
+            Long userId,
+            Pageable pageable
+    ) {
+        validateVisibleStudy(studyId);
+        validateActiveMember(studyId, userId);
+
+        Pageable latestFirstPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+
+        return studyActivityRepository
+                .findAllByStudyIdAndDeletedAtIsNull(studyId, latestFirstPageable)
+                .map(StudyActivityResponse::from);
+    }
+
     private Study findStudy(Long studyId) {
         return studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
+    }
+
+    private void validateVisibleStudy(Long studyId) {
+        studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
     }
 
