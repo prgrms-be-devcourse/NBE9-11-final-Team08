@@ -1,5 +1,6 @@
 package com.team08.backend.domain.order.dto;
 
+import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -21,4 +22,15 @@ public record OrderSummaryResponse(
         @Schema(description = "주문 일시")
         LocalDateTime orderedAt
 ) {
+    public static OrderSummaryResponse from(Order order) {
+        return new OrderSummaryResponse(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getTotalPrice(),
+                order.getDiscountPrice(),
+                order.getFinalPrice(),
+                order.getStatus(),
+                order.getOrderedAt()
+        );
+    }
 }

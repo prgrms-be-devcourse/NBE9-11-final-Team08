@@ -1,5 +1,6 @@
 package com.team08.backend.domain.order.dto;
 
+import com.team08.backend.domain.orderitem.entity.OrderItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record OrderItemResponse(
@@ -16,4 +17,14 @@ public record OrderItemResponse(
         @Schema(description = "최종 결제 예정 금액", example = "30000")
         int finalPrice
 ) {
+    public static OrderItemResponse from(OrderItem orderItem) {
+        return new OrderItemResponse(
+                orderItem.getId(),
+                orderItem.getCourseId(),
+                orderItem.getCourseTitle(),
+                orderItem.getPrice(),
+                orderItem.getDiscountPrice(),
+                orderItem.getFinalPrice()
+        );
+    }
 }

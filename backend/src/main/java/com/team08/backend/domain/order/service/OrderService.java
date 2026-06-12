@@ -10,7 +10,6 @@ import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
-import com.team08.backend.domain.order.dto.OrderItemResponse;
 import com.team08.backend.domain.order.dto.OrderSummaryResponse;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
@@ -78,7 +77,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public List<OrderSummaryResponse> getMyOrders(Long userId) {
         return orderRepository.findAllByUserIdOrderByOrderedAtDescIdDesc(userId).stream()
-                .map(this::toSummaryResponse)
+                .map(OrderSummaryResponse::from)
                 .toList();
     }
 
@@ -87,7 +86,7 @@ public class OrderService {
         Order order = findMyOrder(userId, orderId);
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
 
-        return toDetailResponse(order, orderItems);
+        return OrderDetailResponse.from(order, orderItems);
     }
 
     @Transactional
@@ -97,7 +96,7 @@ public class OrderService {
         order.cancel(LocalDateTime.now());
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
-        return toDetailResponse(order, orderItems);
+        return OrderDetailResponse.from(order, orderItems);
     }
 
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
@@ -125,7 +124,7 @@ public class OrderService {
                 .toList();
         List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
 
-        return toDetailResponse(order, savedItems);
+        return OrderDetailResponse.from(order, savedItems);
     }
 
     private Map<Long, Course> findCourseMap(List<CartItem> cartItems) {
@@ -172,45 +171,6 @@ public class OrderService {
                 discountPrice,
                 finalPrice,
                 createdAt
-        );
-    }
-
-    private OrderDetailResponse toDetailResponse(Order order, List<OrderItem> orderItems) {
-        return new OrderDetailResponse(
-                order.getId(),
-                order.getOrderNumber(),
-                order.getTotalPrice(),
-                order.getDiscountPrice(),
-                order.getFinalPrice(),
-                order.getStatus(),
-                order.getOrderedAt(),
-                order.getCanceledAt(),
-                orderItems.stream()
-                        .map(this::toItemResponse)
-                        .toList()
-        );
-    }
-
-    private OrderSummaryResponse toSummaryResponse(Order order) {
-        return new OrderSummaryResponse(
-                order.getId(),
-                order.getOrderNumber(),
-                order.getTotalPrice(),
-                order.getDiscountPrice(),
-                order.getFinalPrice(),
-                order.getStatus(),
-                order.getOrderedAt()
-        );
-    }
-
-    private OrderItemResponse toItemResponse(OrderItem item) {
-        return new OrderItemResponse(
-                item.getId(),
-                item.getCourseId(),
-                item.getCourseTitle(),
-                item.getPrice(),
-                item.getDiscountPrice(),
-                item.getFinalPrice()
         );
     }
 
