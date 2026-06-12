@@ -11,11 +11,14 @@ import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
+import com.team08.backend.domain.course.event.CourseDeletedEvent;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
+import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
@@ -59,6 +62,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseStudyManager courseStudyManager;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -613,5 +619,101 @@ class CourseServiceTest {
         assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseClosedEvent.class));
+    }
+
+    @Test
+    void 관리자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long adminId = 1L;
+        Course course = Course.builder()
+                .instructorId(10L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(true);
+
+        assertThatThrownBy(() -> courseService.deleteCourseByAdmin(courseId, adminId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_HAS_ACTIVE_ENROLLMENTS.getMessage());
+
+        verify(courseStatusHistoryRepository, never()).save(any(CourseStatusHistory.class));
+        verify(eventPublisher, never()).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 관리자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+        Long courseId = 100L;
+        Long adminId = 1L;
+        Course course = Course.builder()
+                .instructorId(10L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        courseService.deleteCourseByAdmin(courseId, adminId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 판매자가_삭제_요청_시_소유자가_아니면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long hackerId = 999L;
+        Course course = Course.builder()
+                .instructorId(10L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.deleteCourseByInstructor(courseId, hackerId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+
+        verify(enrollmentRepository, never()).existsByCourseIdAndStatus(any(Long.class), any(EnrollmentStatus.class));
+    }
+
+    @Test
+    void 판매자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long instructorId = 10L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(true);
+
+        assertThatThrownBy(() -> courseService.deleteCourseByInstructor(courseId, instructorId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_HAS_ACTIVE_ENROLLMENTS.getMessage());
+
+        verify(courseStatusHistoryRepository, never()).save(any(CourseStatusHistory.class));
+        verify(eventPublisher, never()).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+        Long courseId = 100L;
+        Long instructorId = 10L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        courseService.deleteCourseByInstructor(courseId, instructorId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
     }
 }

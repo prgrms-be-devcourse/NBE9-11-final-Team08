@@ -18,6 +18,7 @@ import org.springframework.web.context.WebApplicationContext;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -140,6 +141,29 @@ class AdminCourseControllerTest {
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_ADMIN")
+    void 인증된_관리자가_강좌_삭제_요청_시_204_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+
+        doNothing().when(courseService).deleteCourseByAdmin(courseId, 1L);
+
+        mockMvc.perform(delete("/api/admin/courses/{courseId}", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void 비인증_사용자가_강좌_삭제_요청_시_401_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+
+        mockMvc.perform(delete("/api/admin/courses/{courseId}", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isUnauthorized());
     }
 }
