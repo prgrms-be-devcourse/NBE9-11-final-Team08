@@ -10,6 +10,7 @@ import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.fixture.UserFixture;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
 import com.team08.backend.domain.auth.exception.DuplicateEmailException;
@@ -91,7 +92,12 @@ public class AuthServiceTest {
 
         given(userRepository.findByEmail(email)).willReturn(Optional.of(user));
         given(passwordEncoder.matches(password, user.getPassword())).willReturn(true);
-        given(jwtProvider.generateTokenPair(user.getId())).willReturn(tokenPair);
+        given(jwtProvider.generateTokenPair(new LoginUserDto(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getRole().name()
+        ))).willReturn(tokenPair);
 
         // when
         TokenPair result = authService.login(email, password);
@@ -173,7 +179,7 @@ public class AuthServiceTest {
 
         // then
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        then(userRepository).should().save(captor.capture());
+        then(userRepository).should().saveAndFlush(captor.capture());
 
         User savedUser = captor.getValue();
 
@@ -203,7 +209,7 @@ public class AuthServiceTest {
 
         // then
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-        then(userRepository).should().save(captor.capture());
+        then(userRepository).should().saveAndFlush(captor.capture());
 
         User savedUser = captor.getValue();
 
@@ -231,6 +237,6 @@ public class AuthServiceTest {
                 .isInstanceOf(DuplicateEmailException.class);
 
         then(passwordEncoder).shouldHaveNoInteractions();
-        then(userRepository).should(never()).save(any());
+        then(userRepository).should(never()).saveAndFlush(any());
     }
 }
