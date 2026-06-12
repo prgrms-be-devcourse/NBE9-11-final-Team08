@@ -66,4 +66,12 @@ public class CourseController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         courseService.cancelCourseReview(courseId, loginUserPrincipal.user().id());
     }
+
+    @PostMapping("/{courseId}/closing")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void closeCourse(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        courseService.closeCourse(courseId, loginUserPrincipal.user().id());
+    }
 }

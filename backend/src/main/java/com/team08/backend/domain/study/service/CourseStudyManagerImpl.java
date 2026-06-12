@@ -4,6 +4,7 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.entity.Study;
+import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.exception.DuplicateStudyException;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studymember.entity.StudyMember;
@@ -14,7 +15,6 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -45,5 +45,14 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
         studyMemberRepository.save(studyMember);
 
         return study.getId();
+    }
+
+    @Transactional
+    @Override
+    public void closeForCourse(Long courseId) {
+        Study study = studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.DRAFT)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
+
+        study.changeToReadOnly();
     }
 }
