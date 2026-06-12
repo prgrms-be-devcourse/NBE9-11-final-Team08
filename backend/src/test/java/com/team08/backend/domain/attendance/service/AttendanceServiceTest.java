@@ -3,6 +3,7 @@ package com.team08.backend.domain.attendance.service;
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -33,6 +34,9 @@ class AttendanceServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private IssuedCouponService issuedCouponService;
 
     @InjectMocks
     private AttendanceService attendanceService;
@@ -113,5 +117,30 @@ class AttendanceServiceTest {
         assertEquals(1, response.consecutiveDays());
         assertEquals(4, response.monthlyTotalDays());
         verify(attendanceRepository, times(1)).saveAndFlush(any(Attendance.class));
+    }
+
+    @Test
+    @DisplayName("7일 연속 출석 시 보상 쿠폰이 자동 발급된다")
+    void checkIn_consecutive7Days_issuesCoupon() {
+        // given
+        Long userId = 1L;
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
+
+        // 어제 자 기록의 연속 출석일수가 6일이어야 오늘이 7일째가 됨
+        Attendance yesterdayLog = Attendance.record(userId, yesterday, 5, 10);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(10L);
+        when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
+
+        // when
+        AttendanceResponse response = attendanceService.checkIn(userId, today);
+
+        // then
+        assertEquals(7, response.consecutiveDays());
+        verify(issuedCouponService, times(1)).issueAttendanceCoupon(userId);
     }
 }
