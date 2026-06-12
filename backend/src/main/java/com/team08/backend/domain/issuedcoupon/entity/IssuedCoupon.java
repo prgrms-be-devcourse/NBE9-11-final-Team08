@@ -55,4 +55,15 @@ public class IssuedCoupon {
     public static IssuedCoupon issue(Long policyId, Long userId, LocalDateTime expiredAt) {
         return new IssuedCoupon(policyId, userId, expiredAt);
     }
+
+    // 쿠폰 사용 처리 (단회성)
+    public void use() {
+        this.status = CouponStatus.USED;
+        this.usedAt = LocalDateTime.now();
+    }
+
+    // 쿠폰 사용 기록 (다회성)
+    public void recordUsage() {
+        this.usedAt = LocalDateTime.now();
+    }
 }
