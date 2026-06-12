@@ -28,9 +28,6 @@ import static org.mockito.Mockito.mock;
 @ExtendWith(MockitoExtension.class)
 class QnaAnswerServiceTest {
 
-    private static final String INSTRUCTOR_ROLE = "ROLE_SELLER";
-    private static final String USER_ROLE = "ROLE_USER";
-
     @Mock private QnaAnswerRepository qnaAnswerRepository;
     @Mock private QnaQuestionRepository qnaQuestionRepository;
     @Mock private CourseRepository courseRepository;
@@ -68,19 +65,10 @@ class QnaAnswerServiceTest {
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(false);
         given(qnaAnswerRepository.save(any())).willReturn(answer);
 
-        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "답변 내용");
+        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "답변 내용");
 
         assertThat(response.content()).isEqualTo("답변 내용");
         assertThat(response.instructorId()).isEqualTo(instructor_id);
-    }
-
-    @Test
-    @DisplayName("답변 작성 실패 - 강사 아님")
-    void createAnswer_notInstructor() {
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, USER_ROLE, "content"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INSTRUCTOR_ONLY);
     }
 
     @Test
@@ -88,7 +76,7 @@ class QnaAnswerServiceTest {
     void createAnswer_questionNotFound() {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(any())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_QUESTION_NOT_FOUND);
@@ -100,7 +88,7 @@ class QnaAnswerServiceTest {
         givenQuestion(question_id);
         given(courseRepository.findById(course_id)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
@@ -112,7 +100,7 @@ class QnaAnswerServiceTest {
         givenQuestion(question_id);
         givenCourseOwnedBy(course_id, instructor_id);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, 99L, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, 99L, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);
@@ -125,7 +113,7 @@ class QnaAnswerServiceTest {
         givenCourseOwnedBy(course_id, instructor_id);
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(true);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ANSWER_ALREADY_EXISTS);
@@ -138,19 +126,10 @@ class QnaAnswerServiceTest {
     void updateAnswer_success() {
         given(qnaAnswerRepository.findByQuestionId(question_id)).willReturn(Optional.of(answer));
 
-        QnaAnswerResponse response = qnaAnswerService.updateAnswer(question_id, instructor_id, INSTRUCTOR_ROLE, "new content");
+        QnaAnswerResponse response = qnaAnswerService.updateAnswer(question_id, instructor_id, "new content");
 
         assertThat(response).isNotNull();
         assertThat(response.content()).isEqualTo("new content");
-    }
-
-    @Test
-    @DisplayName("답변 수정 실패 - 강사 아님")
-    void updateAnswer_notInstructor() {
-        assertThatThrownBy(() -> qnaAnswerService.updateAnswer(question_id, instructor_id, USER_ROLE, "content"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INSTRUCTOR_ONLY);
     }
 
     @Test
@@ -158,7 +137,7 @@ class QnaAnswerServiceTest {
     void updateAnswer_notFound() {
         given(qnaAnswerRepository.findByQuestionId(any())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> qnaAnswerService.updateAnswer(question_id, instructor_id, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.updateAnswer(question_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ANSWER_NOT_FOUND);
@@ -169,7 +148,7 @@ class QnaAnswerServiceTest {
     void updateAnswer_accessDenied() {
         given(qnaAnswerRepository.findByQuestionId(question_id)).willReturn(Optional.of(answer));
 
-        assertThatThrownBy(() -> qnaAnswerService.updateAnswer(question_id, 99L, INSTRUCTOR_ROLE, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.updateAnswer(question_id, 99L, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);
@@ -182,17 +161,8 @@ class QnaAnswerServiceTest {
     void deleteAnswer_success() {
         given(qnaAnswerRepository.findByQuestionId(question_id)).willReturn(Optional.of(answer));
 
-        assertThatCode(() -> qnaAnswerService.deleteAnswer(question_id, instructor_id, INSTRUCTOR_ROLE))
+        assertThatCode(() -> qnaAnswerService.deleteAnswer(question_id, instructor_id))
                 .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("답변 삭제 실패 - 강사 아님")
-    void deleteAnswer_notInstructor() {
-        assertThatThrownBy(() -> qnaAnswerService.deleteAnswer(question_id, instructor_id, USER_ROLE))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.INSTRUCTOR_ONLY);
     }
 
     @Test
@@ -200,7 +170,7 @@ class QnaAnswerServiceTest {
     void deleteAnswer_accessDenied() {
         given(qnaAnswerRepository.findByQuestionId(question_id)).willReturn(Optional.of(answer));
 
-        assertThatThrownBy(() -> qnaAnswerService.deleteAnswer(question_id, 99L, INSTRUCTOR_ROLE))
+        assertThatThrownBy(() -> qnaAnswerService.deleteAnswer(question_id, 99L))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);

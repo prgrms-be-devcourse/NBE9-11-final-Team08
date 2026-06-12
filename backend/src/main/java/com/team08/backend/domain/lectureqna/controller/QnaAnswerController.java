@@ -27,7 +27,7 @@ public class QnaAnswerController {
             @Valid @RequestBody QnaAnswerRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
         return qnaAnswerService.createAnswer(
-                questionId, request.courseId(), principal.user().id(), principal.user().role(), request.content());
+                questionId, request.courseId(), principal.user().id(), request.content());
     }
 
     @Operation(summary = "QnA 답변 수정 (강사 전용)")
@@ -37,7 +37,7 @@ public class QnaAnswerController {
             @Valid @RequestBody QnaAnswerRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
         return qnaAnswerService.updateAnswer(
-                questionId, principal.user().id(), principal.user().role(), request.content());
+                questionId, principal.user().id(), request.content());
     }
 
     @Operation(summary = "QnA 답변 삭제 (강사 전용)")
@@ -46,6 +46,6 @@ public class QnaAnswerController {
     public void deleteAnswer(
             @PathVariable Long questionId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        qnaAnswerService.deleteAnswer(questionId, principal.user().id(), principal.user().role());
+        qnaAnswerService.deleteAnswer(questionId, principal.user().id());
     }
 }
