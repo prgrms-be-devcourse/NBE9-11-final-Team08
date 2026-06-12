@@ -12,6 +12,13 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 파라미터 요청입니다. 입력 값을 확인해주세요."),
 
+    // ── Auth ─────────────────────────────────────────────────────────────
+    LOGIN_FAILED(HttpStatus.BAD_REQUEST, "AUTH_001", "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_002", "이미 존재하는 이메일입니다."),
+    INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "AUTH_003", "회원가입에 불가능한 역할입니다."),
+    AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_004", "인증이 필요합니다."),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_005", "유효하지 않은 refresh token입니다."),
+
     // ── User ─────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,   "USER_001", "사용자를 찾을 수 없습니다."),
 
@@ -90,7 +97,12 @@ public enum ErrorCode {
     STUDY_NOT_FINISHED(HttpStatus.BAD_REQUEST,    "REPORT_003", "스터디 기간이 아직 완료되지 않았습니다."),
 
     // ── Attendance ───────────────────────────────────────────────────────
-    ATTENDANCE_ALREADY_EXISTS(HttpStatus.CONFLICT, "ATTENDANCE_001", "오늘은 이미 출석하셨습니다.");
+    ATTENDANCE_ALREADY_EXISTS(HttpStatus.CONFLICT, "ATTENDANCE_001", "오늘은 이미 출석하셨습니다."),
+
+    // ── Coupon ───────────────────────────────────────────────────────────
+    COUPON_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_001", "쿠폰 정책을 찾을 수 없습니다."),
+    COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "COUPON_002", "이미 발급받은 쿠폰입니다."),
+    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
