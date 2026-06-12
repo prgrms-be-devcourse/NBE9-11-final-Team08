@@ -171,4 +171,37 @@ public class AuthControllerTest {
 
         then(authService).shouldHaveNoInteractions();
     }
+
+    @Test
+    void 로그아웃하면_refreshToken을_폐기하고_쿠키를_삭제한다() throws Exception {
+        given(refreshTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .cookie(new MockCookie("refreshToken", "refresh-token")))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("refreshToken", 0));
+
+        then(authService).should().logout("refresh-token");
+    }
+
+    @Test
+    void refreshToken_쿠키가_없어도_로그아웃은_성공하고_쿠키를_삭제한다() throws Exception {
+        given(refreshTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
+
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("refreshToken", 0));
+
+        then(authService).should().logout(null);
+    }
 }
