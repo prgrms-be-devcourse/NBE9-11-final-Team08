@@ -24,15 +24,14 @@ public class CourseStatusHistory extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     private CourseStatus toStatus;
 
-    @Lob
+    @Column(length = 1000)
     private String reason;
 
     @Column(nullable = false)
     private Long changedBy;
 
     @Builder
-    public CourseStatusHistory(Long id, Long courseId, CourseStatus fromStatus, CourseStatus toStatus, String reason, Long changedBy) {
-        this.id = id;
+    public CourseStatusHistory(Long courseId, CourseStatus fromStatus, CourseStatus toStatus, String reason, Long changedBy) {
         this.courseId = courseId;
         this.fromStatus = fromStatus;
         this.toStatus = toStatus;
