@@ -30,4 +30,14 @@ public class CouponController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         return issuedCouponService.downloadCoupon(loginUserPrincipal.user().id(), policyId);
     }
+
+    // [사용자] 선착순 쿠폰 다운로드 /api/coupons/{policyId}/download-fcfs
+    @PostMapping("/{policyId}/download-fcfs")
+    @Operation(summary = "선착순 쿠폰 다운로드", description = "재고가 제한된 선착순 쿠폰을 다운로드합니다.")
+    public IssuedCouponResponse downloadFcfsCoupon(
+            @Parameter(description = "다운로드할 쿠폰 정책 ID")
+            @PathVariable Long policyId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        return issuedCouponService.downloadFcfsCoupon(loginUserPrincipal.user().id(), policyId);
+    }
 }

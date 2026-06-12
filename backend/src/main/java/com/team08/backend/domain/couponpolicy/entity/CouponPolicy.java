@@ -1,7 +1,9 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
-import com.team08.backend.global.common.BaseTimeEntity; // 💡 BaseTimeEntity 임포트
+import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -64,7 +66,7 @@ public class CouponPolicy extends BaseTimeEntity {
     private LocalDateTime issueStartDate;
 
     private LocalDateTime issueEndDate;
-    
+
     @Builder(access = AccessLevel.PRIVATE)
     private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer validDays, Integer totalQuantity, Long categoryId, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
@@ -104,5 +106,27 @@ public class CouponPolicy extends BaseTimeEntity {
         return java.time.LocalDate.now()
                 .plusDays(this.validDays)
                 .atTime(java.time.LocalTime.MAX);
+    }
+
+    // 쿠폰 발급 기간 검증
+    public void validateIssuePeriod() {
+        LocalDateTime now = LocalDateTime.now();
+        if (issueStartDate != null && now.isBefore(issueStartDate)) {
+            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
+        }
+        if (issueEndDate != null && now.isAfter(issueEndDate)) {
+            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_ENDED);
+        }
+    }
+
+    // 선착순 쿠폰 수량 차감
+    public void decreaseQuantity() {
+        if (this.totalQuantity == null) {
+            return;
+        }
+        if (this.totalQuantity <= 0) {
+            throw new CustomException(ErrorCode.COUPON_EXHAUSTED);
+        }
+        this.totalQuantity--;
     }
 }

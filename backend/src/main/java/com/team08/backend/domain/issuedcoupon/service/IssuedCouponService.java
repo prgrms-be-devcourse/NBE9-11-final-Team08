@@ -10,7 +10,6 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,19 +38,61 @@ public class IssuedCouponService {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
 
-        // 쿠폰 발급 기록 생성
+        // 중복 발급 체크
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
+        // 쿠폰 발급 기간 검증
+        policy.validateIssuePeriod();
+
+        // 쿠폰 발급 기록 생성 및 저장
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        // 중복 발급 검증 및 저장
-        try {
-            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
-            return IssuedCouponResponse.from(savedCoupon);
-        } catch (DataIntegrityViolationException e) {
+        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
+        return IssuedCouponResponse.from(savedCoupon);
+    }
+
+    // [사용자] 선착순 쿠폰 다운로드
+    @Transactional
+    public IssuedCouponResponse downloadFcfsCoupon(Long userId, Long policyId) {
+        // 사용자 존재 확인
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        // 비관적 락을 적용한 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 선착순 쿠폰 여부 검증
+        if (policy.getCouponType() != CouponType.FCFS) {
+            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
+        }
+
+        // 중복 발급 체크
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
             throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
         }
+
+        // 쿠폰 발급 기간 검증
+        policy.validateIssuePeriod();
+
+        // 쿠폰 수량 차감 및 재고 소진 체크
+        policy.decreaseQuantity();
+
+        // 쿠폰 발급 기록 생성 및 저장
+        IssuedCoupon newCoupon = IssuedCoupon.issue(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
+
+        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
+        return IssuedCouponResponse.from(savedCoupon);
     }
 }

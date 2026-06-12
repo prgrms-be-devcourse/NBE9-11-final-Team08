@@ -105,7 +105,10 @@ public enum ErrorCode {
     // ── Coupon ───────────────────────────────────────────────────────────
     COUPON_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_001", "쿠폰 정책을 찾을 수 없습니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "COUPON_002", "이미 발급받은 쿠폰입니다."),
-    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다.");
+    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다."),
+    COUPON_EXHAUSTED(HttpStatus.CONFLICT, "COUPON_004", "선착순 쿠폰이 모두 소진되었습니다."),
+    COUPON_ISSUE_PERIOD_NOT_STARTED(HttpStatus.BAD_REQUEST, "COUPON_005", "아직 쿠폰 발급 기간이 시작되지 않았습니다."),
+    COUPON_ISSUE_PERIOD_ENDED(HttpStatus.BAD_REQUEST, "COUPON_006", "쿠폰 발급 기간이 종료되었습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
