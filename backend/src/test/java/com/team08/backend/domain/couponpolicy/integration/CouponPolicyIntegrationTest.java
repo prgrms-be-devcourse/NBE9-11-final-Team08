@@ -57,6 +57,7 @@ class CouponPolicyIntegrationTest {
 
         // when
         mockMvc.perform(post("/api/admin/coupons")
+                        .header("Authorization", "Bearer dummy-token") // 보안 필터 통과용 헤더
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
