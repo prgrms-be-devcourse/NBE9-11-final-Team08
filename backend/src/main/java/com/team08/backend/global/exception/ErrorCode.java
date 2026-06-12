@@ -44,6 +44,8 @@ public enum ErrorCode {
     INVALID_MEMBER_STATUS(HttpStatus.BAD_REQUEST,     "STUDY_019", "처리할 수 없는 멤버 상태입니다."),
     DUPLICATE_STUDY(HttpStatus.CONFLICT, "STUDY_020", "코스의 스터디가 이미 존재합니다."),
     STUDY_NOT_ACTIVE(HttpStatus.CONFLICT, "STUDY_021", "활성화된 스터디가 아닙니다."),
+    STUDY_ACTIVITY_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_022", "스터디 활동을 찾을 수 없습니다."),
+    STUDY_ACTIVITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "STUDY_023", "스터디 활동을 수정할 권한이 없습니다."),
 
     // ── Course ───────────────────────────────────────────────────────────
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
@@ -104,7 +106,10 @@ public enum ErrorCode {
     // ── Coupon ───────────────────────────────────────────────────────────
     COUPON_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_001", "쿠폰 정책을 찾을 수 없습니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "COUPON_002", "이미 발급받은 쿠폰입니다."),
-    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다.");
+    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다."),
+    COUPON_EXHAUSTED(HttpStatus.CONFLICT, "COUPON_004", "선착순 쿠폰이 모두 소진되었습니다."),
+    COUPON_ISSUE_PERIOD_NOT_STARTED(HttpStatus.BAD_REQUEST, "COUPON_005", "아직 쿠폰 발급 기간이 시작되지 않았습니다."),
+    COUPON_ISSUE_PERIOD_ENDED(HttpStatus.BAD_REQUEST, "COUPON_006", "쿠폰 발급 기간이 종료되었습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
