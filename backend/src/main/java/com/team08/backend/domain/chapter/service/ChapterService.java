@@ -11,8 +11,6 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +29,9 @@ public class ChapterService {
     private final LectureRepository lectureRepository;
     private final LectureProgressRepository lectureProgressRepository;
 
+    /**
+     * 챕터 생성
+     */
     @Transactional
     public Long createChapter(Long courseId, ChapterCreateRequest request) {
         Course course = courseRepository.findById(courseId)

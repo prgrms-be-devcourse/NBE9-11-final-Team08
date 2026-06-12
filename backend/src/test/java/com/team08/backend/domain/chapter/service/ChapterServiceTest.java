@@ -21,18 +21,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -55,8 +51,11 @@ class ChapterServiceTest {
     @Mock
     private LectureProgressRepository lectureProgressRepository;
 
+    // ── 챕터 생성 ──────────────────────────────────────────────────
+
     @Test
-    void 챕터를_성공적으로_생성하고_ID를_반환한다() {
+    @DisplayName("챕터 생성 성공")
+    void createChapter_success() {
         Long courseId = 1L;
         ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
         Course course = TestEntityFactory.course(courseId);
@@ -74,7 +73,8 @@ class ChapterServiceTest {
     }
 
     @Test
-    void 존재하지_않는_강좌_ID로_챕터_생성_요청_시_예외가_발생한다() {
+    @DisplayName("챕터 생성 실패 - 존재하지 않는 강좌로 챕터 생성 시")
+    void createChapter_courseNotFound(){
         Long invalidCourseId = 999L;
         ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
 
@@ -137,7 +137,7 @@ class ChapterServiceTest {
                 .willReturn(Optional.of(progress));
 
         Lecture lecture = mockLecture(lectureId, 10L, "강의1", 1);
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findById(progress.getLectureId())).willReturn(Optional.of(lecture));
 
         LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
 
@@ -261,20 +261,16 @@ class ChapterServiceTest {
         given(lecture.getOrderNo()).willReturn(orderNo);
         given(lecture.getM3u8Path()).willReturn("/path/to/video.m3u8");
         given(lecture.getDurationSeconds()).willReturn(600);
-        given(lecture.isFreePreview()).willReturn(false);
         given(lecture.getChapter()).willReturn(chapter);
         return lecture;
     }
 
     private LectureProgress mockProgress(Long userId, Long lectureId, int lastPos, boolean completed) {
         LectureProgress progress = mock(LectureProgress.class);
-        given(progress.getLectureId()).willReturn(lectureId);
-        given(progress.getUserId()).willReturn(userId);
         given(progress.getLastPositionSeconds()).willReturn(lastPos);
         given(progress.getWatchedSeconds()).willReturn(lastPos);
         given(progress.getProgressRate()).willReturn(BigDecimal.valueOf(50.00));
         given(progress.getCompleted()).willReturn(completed);
-        given(progress.getUpdatedAt()).willReturn(LocalDateTime.now());
         return progress;
     }
 }
