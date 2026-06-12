@@ -12,6 +12,11 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 파라미터 요청입니다. 입력 값을 확인해주세요."),
 
+    // ── Auth ─────────────────────────────────────────────────────────────
+    LOGIN_FAILED(HttpStatus.BAD_REQUEST, "AUTH_001", "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_002", "이미 존재하는 이메일입니다."),
+    INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "AUTH_003", "회원가입에 불가능한 역할입니다."),
+
     // ── User ─────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,   "USER_001", "사용자를 찾을 수 없습니다."),
 
