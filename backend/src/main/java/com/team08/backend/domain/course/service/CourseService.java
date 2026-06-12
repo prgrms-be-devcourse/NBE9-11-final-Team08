@@ -120,6 +120,19 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
     }
 
+    @Transactional
+    public void closeCourse(Long courseId, Long instructorId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        CourseStatusHistory history = course.close(instructorId);
+
+        courseStatusHistoryRepository.save(history);
+        courseStudyManager.closeForCourse(courseId);
+
+        // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
+    }
+
     @Component
     @RequiredArgsConstructor
     public static class CourseViewCountManager {
