@@ -4,6 +4,7 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
+import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
@@ -46,7 +47,7 @@ class QnaAnswerServiceTest {
 
     private void givenQuestion(Long questionId) {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId))
-                .willReturn(Optional.of(mock(com.team08.backend.domain.lectureqna.entity.QnaQuestion.class)));
+                .willReturn(Optional.of(mock(QnaQuestion.class)));
     }
 
     private void givenCourseOwnedBy(Long courseId, Long instructorId) {
