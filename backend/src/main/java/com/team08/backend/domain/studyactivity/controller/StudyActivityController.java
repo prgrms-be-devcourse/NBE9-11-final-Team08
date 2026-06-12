@@ -52,4 +52,17 @@ public class StudyActivityController {
                 pageable
         );
     }
+
+    @GetMapping("/{activityId}")
+    public StudyActivityResponse getActivity(
+            @PathVariable Long studyId,
+            @PathVariable Long activityId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
+    ) {
+        return studyActivityService.getActivity(
+                studyId,
+                activityId,
+                loginUserPrincipal.user().id()
+        );
+    }
 }

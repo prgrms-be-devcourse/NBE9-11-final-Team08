@@ -61,6 +61,24 @@ public class StudyActivityService {
                 .map(StudyActivityResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public StudyActivityResponse getActivity(
+            Long studyId,
+            Long activityId,
+            Long userId
+    ) {
+        validateVisibleStudy(studyId);
+        validateActiveMember(studyId, userId);
+
+        StudyActivity activity = studyActivityRepository
+                .findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId)
+                .orElseThrow(() ->
+                        new CustomException(ErrorCode.STUDY_ACTIVITY_NOT_FOUND)
+                );
+
+        return StudyActivityResponse.from(activity);
+    }
+
     private Study findStudy(Long studyId) {
         return studyRepository.findById(studyId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
