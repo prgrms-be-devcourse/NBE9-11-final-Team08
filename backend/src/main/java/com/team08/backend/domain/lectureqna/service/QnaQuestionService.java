@@ -73,7 +73,6 @@ public class QnaQuestionService {
         }
 
         question.delete();
-//        qnaQuestionRepository.save(question);
     }
 
     @Transactional(readOnly = true)
