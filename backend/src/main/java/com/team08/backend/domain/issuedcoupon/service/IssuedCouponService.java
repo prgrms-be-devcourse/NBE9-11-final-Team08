@@ -2,9 +2,12 @@ package com.team08.backend.domain.issuedcoupon.service;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
+import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
+import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -125,5 +128,73 @@ public class IssuedCouponService {
                     return CouponListResponse.of(coupon, policy);
                 })
                 .toList();
+    }
+
+    // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 (결제 전 화면 용 API)
+    @Transactional(readOnly = true)
+    public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_NOT_FOUND));
+
+        // 본인 쿠폰인지 검증
+        if (!issuedCoupon.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.COUPON_NOT_OWNED);
+        }
+
+        // 상태/만료일 검증
+        if (issuedCoupon.getStatus() != CouponStatus.ISSUED) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_USED_OR_EXPIRED);
+        }
+
+        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 할인 예상 금액 계산
+        int discountAmount = policy.calculateDiscountAmount(originalPrice);
+
+        // 할인된 최종 가격 계산 (0원 이하 방어)
+        int finalPrice = Math.max(0, originalPrice - discountAmount);
+
+        // 결과 DTO 반환
+        return new ExpectedDiscountResponse(
+                policy.getName(),
+                originalPrice,
+                discountAmount,
+                finalPrice
+        );
+    }
+
+    // TODO 나중에 결제에 추가
+    // [시스템] 결제 시 쿠폰 사용 처리
+    @Transactional
+    public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_NOT_FOUND));
+
+        // 본인 쿠폰인지 검증
+        if (!issuedCoupon.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.COUPON_NOT_OWNED);
+        }
+
+        // 상태/만료일 검증 (사용 전 다시 한번 체크)
+        if (issuedCoupon.getStatus() != CouponStatus.ISSUED) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_USED_OR_EXPIRED);
+        }
+
+        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 할인 금액 계산
+        int discountAmount = policy.calculateDiscountAmount(originalPrice);
+
+        // 쿠폰 사용 처리
+        if (policy.getUsageType() == CouponUsageType.SINGLE_USE) {
+            issuedCoupon.use();
+        } else {
+            issuedCoupon.recordUsage();
+        }
+
+        // 최종 할인된 금액 반환
+        return discountAmount;
     }
 }

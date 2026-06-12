@@ -5,6 +5,8 @@ import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityUpdateRequest;
 import com.team08.backend.domain.studyactivity.service.StudyActivityService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "스터디 활동", description = "스터디 활동 생성·조회·수정·삭제 API")
 @RestController
 @RequestMapping("/api/studies/{studyId}/activities")
 @RequiredArgsConstructor
@@ -29,6 +32,10 @@ public class StudyActivityController {
 
     private final StudyActivityService studyActivityService;
 
+    @Operation(
+            summary = "스터디 활동 생성",
+            description = "ACTIVE 스터디의 ACTIVE 멤버가 새로운 활동을 작성합니다."
+    )
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public StudyActivityResponse createActivity(
@@ -43,6 +50,10 @@ public class StudyActivityController {
         );
     }
 
+    @Operation(
+            summary = "스터디 활동 목록 조회",
+            description = "DRAFT가 아닌 스터디의 미삭제 활동을 최신순으로 조회합니다."
+    )
     @GetMapping
     public Page<StudyActivityResponse> getActivities(
             @PathVariable Long studyId,
@@ -56,6 +67,10 @@ public class StudyActivityController {
         );
     }
 
+    @Operation(
+            summary = "스터디 활동 상세 조회",
+            description = "DRAFT가 아닌 스터디의 미삭제 활동 상세 정보를 조회합니다."
+    )
     @GetMapping("/{activityId}")
     public StudyActivityResponse getActivity(
             @PathVariable Long studyId,
@@ -69,6 +84,10 @@ public class StudyActivityController {
         );
     }
 
+    @Operation(
+            summary = "스터디 활동 수정",
+            description = "ACTIVE 스터디에서 작성자 본인이 활동 내용을 수정합니다."
+    )
     @PutMapping("/{activityId}")
     public StudyActivityResponse updateActivity(
             @PathVariable Long studyId,
@@ -84,6 +103,10 @@ public class StudyActivityController {
         );
     }
 
+    @Operation(
+            summary = "스터디 활동 삭제",
+            description = "ACTIVE 스터디에서 작성자 본인이 활동을 소프트 삭제합니다."
+    )
     @DeleteMapping("/{activityId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteActivity(

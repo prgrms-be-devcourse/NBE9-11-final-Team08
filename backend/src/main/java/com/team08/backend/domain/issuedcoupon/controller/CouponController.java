@@ -1,6 +1,7 @@
 package com.team08.backend.domain.issuedcoupon.controller;
 
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
+import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -9,11 +10,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -51,5 +48,17 @@ public class CouponController {
     public List<CouponListResponse> getMyCoupons(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         return issuedCouponService.getMyCoupons(loginUserPrincipal.user().id());
+    }
+
+    // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 /api/coupons/{issuedCouponId}/discount
+    @GetMapping("/{issuedCouponId}/discount")
+    @Operation(summary = "예상 할인 금액 조회", description = "결제 전 특정 쿠폰을 적용했을 때의 예상 할인 금액과 최종 가격을 조회합니다.")
+    public ExpectedDiscountResponse calculateExpectedDiscount(
+            @Parameter(description = "적용할 발급 쿠폰 ID")
+            @PathVariable Long issuedCouponId,
+            @Parameter(description = "상품 원가")
+            @RequestParam int originalPrice,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        return issuedCouponService.calculateExpectedDiscount(loginUserPrincipal.user().id(), issuedCouponId, originalPrice);
     }
 }
