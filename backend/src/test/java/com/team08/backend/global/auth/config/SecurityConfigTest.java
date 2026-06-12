@@ -10,12 +10,16 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,6 +51,12 @@ class SecurityConfigTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_004"))
                 .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void refresh_요청은_accessToken_없이_접근할_수_있다() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -121,6 +131,11 @@ class SecurityConfigTest {
                     user.role(),
                     principal.authorities().iterator().next().getAuthority()
             );
+        }
+
+        @PostMapping("/api/auth/refresh")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void refresh() {
         }
     }
 

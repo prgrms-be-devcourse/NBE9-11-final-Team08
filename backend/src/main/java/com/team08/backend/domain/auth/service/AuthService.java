@@ -3,6 +3,7 @@ package com.team08.backend.domain.auth.service;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.entity.RefreshToken;
 import com.team08.backend.domain.auth.exception.DuplicateEmailException;
+import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.exception.InvalidSignupRoleException;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.model.TokenPair;
@@ -46,14 +47,34 @@ public class AuthService {
 
         validatePassword(password, user);
 
-        LoginUserDto loginUser = new LoginUserDto(
-                user.getId(),
-                user.getEmail(),
-                user.getNickname(),
-                user.getRole().name()
-        );
+        LoginUserDto loginUser = toLoginUser(user);
         TokenPair tokenPair = jwtProvider.generateTokenPair(loginUser);
 
+        saveRefreshToken(user, tokenPair.refreshToken());
+
+        return tokenPair;
+    }
+
+    @Transactional
+    public TokenPair refresh(String refreshToken) {
+        if (!jwtProvider.validateRefreshToken(refreshToken)) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        RefreshToken storedToken = refreshTokenRepository
+                .findByTokenHashForUpdate(TokenHasher.hash(refreshToken))
+                .orElseThrow(InvalidRefreshTokenException::new);
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (storedToken.isRevoked() || storedToken.isExpired(now)) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        User user = storedToken.getUser();
+        validateRefreshTokenOwner(refreshToken, user);
+        storedToken.revoke(now);
+
+        TokenPair tokenPair = jwtProvider.generateTokenPair(toLoginUser(user));
         saveRefreshToken(user, tokenPair.refreshToken());
 
         return tokenPair;
@@ -87,6 +108,28 @@ public class AuthService {
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new LoginFailedException();
         }
+    }
+
+    private void validateRefreshTokenOwner(String refreshToken, User user) {
+        try {
+            Long tokenUserId = jwtProvider.extractUserId(refreshToken);
+            if (!user.getId().equals(tokenUserId)) {
+                throw new InvalidRefreshTokenException();
+            }
+        } catch (InvalidRefreshTokenException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new InvalidRefreshTokenException();
+        }
+    }
+
+    private LoginUserDto toLoginUser(User user) {
+        return new LoginUserDto(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getRole().name()
+        );
     }
 
     private void saveRefreshToken(User user, String refreshToken) {
