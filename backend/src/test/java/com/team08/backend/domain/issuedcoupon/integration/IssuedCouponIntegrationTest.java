@@ -7,13 +7,12 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
 import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +42,7 @@ class IssuedCouponIntegrationTest {
     private UserRepository userRepository;
 
     @Test
-    @WithMockUser(username = "1", roles = "USER")
+    @WithMockLoginUser()
     @DisplayName("사용자가 일반 쿠폰을 다운로드하는 통합 테스트")
     void downloadCoupon_IntegrationTest() throws Exception {
         // given
@@ -51,8 +50,7 @@ class IssuedCouponIntegrationTest {
         CouponPolicy policy = savePolicy("일반 할인 쿠폰", CouponType.NORMAL);
 
         // when
-        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download")
-                        .header("Authorization", "Bearer dummy-token"))
+        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
                 .andExpect(jsonPath("$.status").value("ISSUED"));

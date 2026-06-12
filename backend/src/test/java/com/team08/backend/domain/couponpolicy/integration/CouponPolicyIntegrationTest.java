@@ -7,13 +7,13 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +36,7 @@ class CouponPolicyIntegrationTest {
     private CouponPolicyRepository couponPolicyRepository;
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockLoginUser(role = "ROLE_ADMIN")
     @DisplayName("관리자 쿠폰 정책 생성 API 통합 테스트")
     void createCouponPolicy_IntegrationTest() throws Exception {
         // given
@@ -57,7 +57,6 @@ class CouponPolicyIntegrationTest {
 
         // when
         mockMvc.perform(post("/api/admin/coupons")
-                        .header("Authorization", "Bearer dummy-token") // 보안 필터 통과용 헤더
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
