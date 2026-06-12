@@ -4,6 +4,7 @@ import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.entity.RefreshToken;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
+import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
@@ -35,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
@@ -238,5 +240,116 @@ public class AuthServiceTest {
 
         then(passwordEncoder).shouldHaveNoInteractions();
         then(userRepository).should(never()).saveAndFlush(any());
+    }
+
+    @Test
+    void refreshToken을_재발급하면_기존_토큰을_폐기하고_새_토큰을_저장한다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("old-refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        LoginUserDto loginUser = new LoginUserDto(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getRole().name()
+        );
+        TokenPair newTokenPair = new TokenPair("new-access-token", "new-refresh-token");
+
+        given(jwtProvider.validateRefreshToken("old-refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("old-refresh-token")))
+                .willReturn(Optional.of(storedToken));
+        given(jwtProvider.extractUserId("old-refresh-token")).willReturn(user.getId());
+        given(jwtProvider.generateTokenPair(loginUser)).willReturn(newTokenPair);
+
+        TokenPair result = authService.refresh("old-refresh-token");
+
+        assertThat(result).isEqualTo(newTokenPair);
+        assertThat(storedToken.isRevoked()).isTrue();
+        assertThat(storedToken.getRevokedAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 9, 0));
+
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        then(refreshTokenRepository).should().save(captor.capture());
+        RefreshToken newStoredToken = captor.getValue();
+        assertThat(newStoredToken.getUser()).isEqualTo(user);
+        assertThat(newStoredToken.getTokenHash()).isEqualTo(TokenHasher.hash("new-refresh-token"));
+        assertThat(newStoredToken.getExpiresAt()).isEqualTo(LocalDateTime.of(2026, 6, 26, 9, 0));
+    }
+
+    @Test
+    void JWT_검증에_실패한_refreshToken은_재발급할_수_없다() {
+        given(jwtProvider.validateRefreshToken("invalid-refresh-token")).willReturn(false);
+
+        assertThatThrownBy(() -> authService.refresh("invalid-refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        then(refreshTokenRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void DB에_저장되지_않은_refreshToken은_재발급할_수_없다() {
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void 폐기된_refreshToken은_재발급할_수_없다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        storedToken.revoke(LocalDateTime.of(2026, 6, 12, 8, 0));
+
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void DB_만료시간이_지난_refreshToken은_재발급할_수_없다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 12, 8, 59)
+        );
+
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void JWT_사용자와_저장된_사용자가_다르면_재발급할_수_없다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+        given(jwtProvider.extractUserId("refresh-token")).willReturn(999L);
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        verify(jwtProvider, never()).generateTokenPair(any());
     }
 }
