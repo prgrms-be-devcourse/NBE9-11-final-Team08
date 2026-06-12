@@ -6,12 +6,15 @@ import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
+import com.team08.backend.domain.course.dto.CourseReviewSubmitRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
+import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
+import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.global.exception.CustomException;
@@ -36,12 +39,16 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.util.ReflectionUtils.*;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private CourseStatusHistoryRepository courseStatusHistoryRepository;
 
     @Mock
     private CourseViewCountManager courseViewCountManager;
@@ -229,14 +236,14 @@ class CourseServiceTest {
                 .build();
 
         Chapter chapter = Chapter.builder().title("원래 챕터").orderNo(1).course(course).build();
-        Field chapterIdField = org.springframework.util.ReflectionUtils.findField(Chapter.class, "id");
-        org.springframework.util.ReflectionUtils.makeAccessible(chapterIdField);
-        org.springframework.util.ReflectionUtils.setField(chapterIdField, chapter, 10L);
+        Field chapterIdField = findField(Chapter.class, "id");
+        makeAccessible(chapterIdField);
+        setField(chapterIdField, chapter, 10L);
 
         Lecture lecture = Lecture.builder().title("원래 강의").m3u8Path("vid.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
-        Field lectureIdField = org.springframework.util.ReflectionUtils.findField(Lecture.class, "id");
-        org.springframework.util.ReflectionUtils.makeAccessible(lectureIdField);
-        org.springframework.util.ReflectionUtils.setField(lectureIdField, lecture, 20L);
+        Field lectureIdField = findField(Lecture.class, "id");
+        makeAccessible(lectureIdField);
+        setField(lectureIdField, lecture, 20L);
 
         chapter.addLecture(lecture);
         course.addChapter(chapter);
@@ -270,5 +277,96 @@ class CourseServiceTest {
         assertThat(newlyAddedLecture.getTitle()).isEqualTo("신규 강의");
         assertThat(newlyAddedLecture.getDurationSeconds()).isEqualTo(500);
         assertThat(newlyAddedLecture.isFreePreview()).isFalse();
+    }
+
+    @Test
+    void 존재하지_않는_강좌_ID로_심사_요청_시_예외가_발생한다() {
+        Long invalidCourseId = 999L;
+        Long instructorId = 1L;
+        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
+
+        given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.submitCourseReview(invalidCourseId, instructorId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 소유자가_아닌_사용자가_심사_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long hackerId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
+
+        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, hackerId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+    }
+
+    @Test
+    void DRAFT_상태가_아닌_강좌_심사_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
+
+        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
+    }
+
+    @Test
+    void 커리큘럼_조건_미달_시_심사_요청하면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("사유");
+
+        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_CURRICULUM_EMPTY.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_심사_요청_상태로_전이되고_이력이_남는다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        Chapter chapter = Chapter.builder().title("챕터").orderNo(1).course(course).build();
+        Lecture lecture = Lecture.builder().title("강의").m3u8Path("path.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
+        chapter.addLecture(lecture);
+        course.addChapter(chapter);
+
+        CourseReviewSubmitRequest request = new CourseReviewSubmitRequest("심사 요청합니다.");
+
+        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+
+        courseService.submitCourseReview(courseId, instructorId, request);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.IN_REVIEW);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
     }
 }
