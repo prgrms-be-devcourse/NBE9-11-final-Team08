@@ -7,3 +7,15 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+springdoc:
+  api-docs:
+    enabled: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-millis: ${JWT_EXPIRATION_MILLIS:3600000}
+    refresh-expiration-millis: ${JWT_REFRESH_EXPIRATION_MILLIS:1209600000}
+  cookie:
+    secure: ${IS_COOKIE_SECURE:true}
