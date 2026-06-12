@@ -183,6 +183,21 @@ public class Course extends BaseTimeEntity {
         return history;
     }
 
+    public CourseStatusHistory suspendByAdmin(Long adminId, String reason) {
+        if (this.status != CourseStatus.ON_SALE) {
+            throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
+        }
+
+        if (reason == null || reason.isBlank()) {
+            throw new CustomException(ErrorCode.REJECT_REASON_REQUIRED);
+        }
+
+        CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.SUSPENDED, adminId, reason);
+        this.status = CourseStatus.SUSPENDED;
+
+        return history;
+    }
+
     @Builder
     public Course(Long instructorId, Long categoryId, String title, String description,
                   String thumbnail, int price, CourseStatus status) {

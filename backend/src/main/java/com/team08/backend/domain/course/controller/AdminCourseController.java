@@ -32,4 +32,13 @@ public class AdminCourseController {
             @Valid @RequestBody CourseRejectRequest request) {
         courseService.rejectCourseReview(courseId, loginUserPrincipal.user().id(), request.reason());
     }
+
+    @PostMapping("/{courseId}/suspension")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void suspendCourseByAdmin(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            @Valid @RequestBody CourseRejectRequest request) {
+        courseService.suspendCourseByAdmin(courseId, loginUserPrincipal.user().id(), request.reason());
+    }
 }
