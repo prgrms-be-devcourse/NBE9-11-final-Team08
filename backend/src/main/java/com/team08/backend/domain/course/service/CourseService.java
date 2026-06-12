@@ -8,6 +8,7 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
+import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
@@ -122,8 +123,9 @@ public class CourseService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         CourseStatusHistory history = course.reject(adminId, reason);
-
         courseStatusHistoryRepository.save(history);
+
+        eventPublisher.publishEvent(new AdminCourseRejectedEvent(courseId));
     }
 
     @Transactional

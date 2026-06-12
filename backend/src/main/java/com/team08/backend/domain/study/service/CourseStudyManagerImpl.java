@@ -55,4 +55,13 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
 
         study.changeToReadOnly();
     }
+
+    @Transactional
+    @Override
+    public void rejectForCourse(Long courseId) {
+        Study study = studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.ACTIVE)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
+
+        study.changeToInactive();
+    }
 }
