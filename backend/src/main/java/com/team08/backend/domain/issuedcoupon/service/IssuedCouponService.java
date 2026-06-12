@@ -3,7 +3,7 @@ package com.team08.backend.domain.issuedcoupon.service;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
-import com.team08.backend.domain.issuedcoupon.dto.CouponResponse;
+import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -24,7 +24,7 @@ public class IssuedCouponService {
 
     // [사용자] 일반 쿠폰 다운로드
     @Transactional
-    public CouponResponse downloadCoupon(Long userId, Long policyId) {
+    public IssuedCouponResponse downloadCoupon(Long userId, Long policyId) {
         // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
@@ -48,11 +48,10 @@ public class IssuedCouponService {
 
         // 중복 발급 검증 및 저장
         try {
-            issuedCouponRepository.saveAndFlush(newCoupon);
+            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
+            return IssuedCouponResponse.from(savedCoupon);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
         }
-
-        return CouponResponse.success("쿠폰이 성공적으로 발급되었습니다!");
     }
 }
