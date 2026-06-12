@@ -7,6 +7,7 @@ import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,8 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SecurityConfigTest.TestController.class)
+@EnableConfigurationProperties(TokenProperties.class)
 @Import({
         SecurityConfig.class,
+        JwtProvider.class,
         SecurityConfigTest.TestController.class
 })
 class SecurityConfigTest {
@@ -55,7 +58,7 @@ class SecurityConfigTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(LOGIN_USER.id()))
                 .andExpect(jsonPath("$.email").value(LOGIN_USER.email()))
-                .andExpect(jsonPath("$.name").value(LOGIN_USER.name()))
+                .andExpect(jsonPath("$.name").value(LOGIN_USER.nickname()))
                 .andExpect(jsonPath("$.role").value(LOGIN_USER.role()))
                 .andExpect(jsonPath("$.authority").value(LOGIN_USER.role()));
     }
@@ -114,7 +117,7 @@ class SecurityConfigTest {
             return new TestAuthenticationResponse(
                     user.id(),
                     user.email(),
-                    user.name(),
+                    user.nickname(),
                     user.role(),
                     principal.authorities().iterator().next().getAuthority()
             );

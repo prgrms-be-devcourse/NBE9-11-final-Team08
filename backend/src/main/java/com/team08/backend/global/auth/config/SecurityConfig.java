@@ -2,13 +2,10 @@ package com.team08.backend.global.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.auth.token.JwtProvider;
-import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.team08.backend.global.auth.handler.JwtAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,8 +17,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(TokenProperties.class)
-@Import(JwtProvider.class)
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(

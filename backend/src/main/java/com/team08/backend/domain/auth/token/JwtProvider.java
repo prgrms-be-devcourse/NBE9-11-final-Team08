@@ -49,7 +49,7 @@ public class JwtProvider {
         return Jwts.builder()
                 .subject(String.valueOf(loginUser.id()))
                 .claim(EMAIL_CLAIM, loginUser.email())
-                .claim(NAME_CLAIM, loginUser.name())
+                .claim(NAME_CLAIM, loginUser.nickname())
                 .claim(ROLE_CLAIM, loginUser.role())
                 .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .issuedAt(now)
