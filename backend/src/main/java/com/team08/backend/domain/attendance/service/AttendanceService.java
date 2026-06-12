@@ -1,5 +1,6 @@
 package com.team08.backend.domain.attendance.service;
 
+import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -23,7 +24,7 @@ public class AttendanceService {
 
     // [사용자] 출석체크
     @Transactional
-    public Attendance checkIn(Long userId, LocalDate today) {
+    public AttendanceResponse checkIn(Long userId, LocalDate today) {
 
         // 사용자 검증
         if (!userRepository.existsById(userId)) {
@@ -42,13 +43,14 @@ public class AttendanceService {
         int lastConsecutive = yesterdayAttendance
                 .map(Attendance::getConsecutiveDays)
                 .orElse(0);
-        
+
         // 오늘 자 출석 기록 생성
         Attendance todayLog = Attendance.record(userId, today, lastConsecutive, (int) currentMonthCount);
 
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
-            return attendanceRepository.saveAndFlush(todayLog);
+            Attendance savedLog = attendanceRepository.saveAndFlush(todayLog);
+            return AttendanceResponse.from(savedLog);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.ATTENDANCE_ALREADY_EXISTS);
         }
