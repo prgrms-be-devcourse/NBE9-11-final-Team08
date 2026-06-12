@@ -8,6 +8,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +49,9 @@ class IssuedCouponIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private IssuedCouponService issuedCouponService;
 
     @Test
     @DisplayName("사용자가 일반 쿠폰을 다운로드하는 통합 테스트")
@@ -82,6 +87,25 @@ class IssuedCouponIntegrationTest {
 
         // then
         assertThat(issuedCouponRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("사용자의 보유 쿠폰 목록 조회 통합 테스트")
+    void getMyCoupons_IntegrationTest() throws Exception {
+        // given
+        User user = saveUser("list_test@example.com");
+        setUpSecurityContext(user);
+        CouponPolicy policy = savePolicy("조회용 쿠폰", CouponType.NORMAL);
+        issuedCouponService.downloadCoupon(user.getId(), policy.getId());
+
+        // when
+        mockMvc.perform(get("/api/coupons/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].couponName").value("조회용 쿠폰"))
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // then
+        assertThat(issuedCouponRepository.findByUserIdOrderByExpiredAtAsc(user.getId())).hasSize(1);
     }
 
     private User saveUser(String email) {
