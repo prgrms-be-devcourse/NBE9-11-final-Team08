@@ -60,6 +60,12 @@ class SecurityConfigTest {
     }
 
     @Test
+    void logout_요청은_accessToken_없이_접근할_수_있다() throws Exception {
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void 유효한_accessToken이면_사용자_정보와_권한으로_인증한다() throws Exception {
         String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
 
@@ -136,6 +142,11 @@ class SecurityConfigTest {
         @PostMapping("/api/auth/refresh")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void refresh() {
+        }
+
+        @PostMapping("/api/auth/logout")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void logout() {
         }
     }
 

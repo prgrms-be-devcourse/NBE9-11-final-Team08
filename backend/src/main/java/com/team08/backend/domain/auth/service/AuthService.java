@@ -81,6 +81,18 @@ public class AuthService {
     }
 
     @Transactional
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+
+        refreshTokenRepository
+                .findByTokenHashForUpdate(TokenHasher.hash(refreshToken))
+                .filter(token -> !token.isRevoked())
+                .ifPresent(token -> token.revoke(LocalDateTime.now(clock)));
+    }
+
+    @Transactional
     public void signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new DuplicateEmailException();

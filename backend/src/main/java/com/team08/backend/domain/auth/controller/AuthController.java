@@ -71,6 +71,19 @@ public class AuthController {
                 .body(LoginResponse.from(tokenPair));
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
+            String refreshToken
+    ) {
+        authService.logout(refreshToken);
+        ResponseCookie deleteCookie = refreshTokenCookieFactory.delete();
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                .build();
+    }
+
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ErrorResponse> handleInvalidRefreshToken(
             InvalidRefreshTokenException exception
