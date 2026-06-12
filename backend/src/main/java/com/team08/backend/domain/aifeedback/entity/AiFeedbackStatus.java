@@ -4,5 +4,6 @@ public enum AiFeedbackStatus {
     PENDING,
     PROCESSING,
     COMPLETED,
-    FAILED
+    FAILED,
+    STALE
 }

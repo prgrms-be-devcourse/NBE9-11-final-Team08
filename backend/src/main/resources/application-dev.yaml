@@ -1,4 +1,13 @@
 spring:
+  ai:
+    model:
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
   h2:
     console:
       enabled: true
@@ -17,6 +26,9 @@ springdoc:
     enabled: true
 
 app:
+  ai:
+    model: stub
+    prompt-version: v1
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
     refresh-cookie:

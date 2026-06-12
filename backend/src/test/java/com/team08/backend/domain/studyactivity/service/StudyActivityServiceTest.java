@@ -1,5 +1,6 @@
 package com.team08.backend.domain.studyactivity.service;
 
+import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.fixture.StudyFixture;
@@ -47,6 +48,9 @@ class StudyActivityServiceTest {
 
     @Mock
     private StudyMemberRepository studyMemberRepository;
+
+    @Mock
+    private AiFeedbackInvalidator aiFeedbackInvalidator;
 
     @InjectMocks
     private StudyActivityService studyActivityService;
@@ -421,6 +425,7 @@ class StudyActivityServiceTest {
 
         assertThat(activity.getContent()).isEqualTo(updatedContent);
         assertThat(result.content()).isEqualTo(updatedContent);
+        verify(aiFeedbackInvalidator).markStale(activityId);
     }
 
     @Test

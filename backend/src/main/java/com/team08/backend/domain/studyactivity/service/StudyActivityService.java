@@ -1,5 +1,6 @@
 package com.team08.backend.domain.studyactivity.service;
 
+import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
@@ -25,6 +26,7 @@ public class StudyActivityService {
     private final StudyActivityRepository studyActivityRepository;
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final AiFeedbackInvalidator aiFeedbackInvalidator;
 
     @Transactional
     public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
@@ -89,6 +91,7 @@ public class StudyActivityService {
         StudyActivity activity = findActivity(studyId, activityId);
         validateAuthor(activity, userId);
         activity.update(content);
+        aiFeedbackInvalidator.markStale(activityId);
 
         return StudyActivityResponse.from(activity);
     }

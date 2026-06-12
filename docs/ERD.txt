@@ -387,6 +387,7 @@ Table ai_feedbacks {
   study_activity_id bigint [not null]
   status ai_feedback_status [not null]
   feedback text
+  activity_content_snapshot text [not null]
   model_name varchar [not null]
   prompt_version varchar [not null]
   created_at datetime [not null]
