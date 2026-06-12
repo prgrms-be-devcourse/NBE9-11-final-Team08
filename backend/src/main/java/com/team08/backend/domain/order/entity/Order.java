@@ -36,6 +36,25 @@ public class Order {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    public static Order createPendingPayment(Long userId, String orderNumber, int totalPrice, int discountPrice, int finalPrice, LocalDateTime orderedAt) {
+        return new Order(
+                null,
+                userId,
+                orderNumber,
+                totalPrice,
+                discountPrice,
+                finalPrice,
+                OrderStatus.PENDING_PAYMENT,
+                orderedAt,
+                null,
+                null,
+                null,
+                null,
+                orderedAt,
+                null
+        );
+    }
+
     public void markPaid(LocalDateTime paidAt) {
         validateStatus(OrderStatus.PENDING_PAYMENT);
         this.status = OrderStatus.PAID;

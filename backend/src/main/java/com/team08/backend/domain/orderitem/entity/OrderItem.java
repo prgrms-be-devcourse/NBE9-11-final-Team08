@@ -27,4 +27,18 @@ public class OrderItem {
     @Column(nullable = false)
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    public static OrderItem createSnapshot(Long orderId, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
+        return new OrderItem(
+                null,
+                orderId,
+                courseId,
+                courseTitle,
+                price,
+                discountPrice,
+                finalPrice,
+                createdAt,
+                null
+        );
+    }
 }
