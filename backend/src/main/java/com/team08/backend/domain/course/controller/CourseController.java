@@ -80,4 +80,12 @@ public class CourseController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         courseService.closeCourse(courseId, loginUserPrincipal.user().id());
     }
+
+    @DeleteMapping("/{courseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCourseByInstructor(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        courseService.deleteCourseByInstructor(courseId, loginUserPrincipal.user().id());
+    }
 }

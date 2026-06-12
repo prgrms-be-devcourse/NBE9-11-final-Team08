@@ -7,11 +7,14 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
-import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
+import com.team08.backend.domain.course.event.CourseClosedEvent;
+import com.team08.backend.domain.course.event.CourseDeletedEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
+import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
@@ -37,6 +40,7 @@ public class CourseService {
     private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final CourseViewCountManager courseViewCountManager;
     private final CourseStudyManager courseStudyManager;
+    private final EnrollmentRepository enrollmentRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -153,6 +157,39 @@ public class CourseService {
         eventPublisher.publishEvent(new CourseClosedEvent(courseId));
 
         // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
+    }
+
+    @Transactional
+    public void deleteCourseByAdmin(Long courseId, Long adminId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        validateActiveEnrollments(courseId);
+
+        CourseStatusHistory history = course.delete(adminId);
+        courseStatusHistoryRepository.save(history);
+
+        eventPublisher.publishEvent(new CourseDeletedEvent(courseId));
+    }
+
+    @Transactional
+    public void deleteCourseByInstructor(Long courseId, Long instructorId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        course.validateOwner(instructorId);
+        validateActiveEnrollments(courseId);
+
+        CourseStatusHistory history = course.delete(instructorId);
+        courseStatusHistoryRepository.save(history);
+
+        eventPublisher.publishEvent(new CourseDeletedEvent(courseId));
+    }
+
+    private void validateActiveEnrollments(Long courseId) {
+        if (enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)) {
+            throw new CustomException(ErrorCode.COURSE_HAS_ACTIVE_ENROLLMENTS);
+        }
     }
 
     @Component
