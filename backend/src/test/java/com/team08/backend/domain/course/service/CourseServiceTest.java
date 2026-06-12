@@ -9,6 +9,7 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
+import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
@@ -27,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 
 import java.lang.reflect.Field;
@@ -56,6 +58,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseStudyManager courseStudyManager;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private CourseService courseService;
@@ -543,7 +548,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_조건을_충족하면_강좌가_판매_중지_상태로_전이되고_연관된_스터디도_폐쇄_요청된다() {
+    void 정상_조건을_충족하면_강좌가_판매_중지_상태로_전이되고_강좌_폐쇄_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
         Course course = Course.builder()
@@ -557,6 +562,6 @@ class CourseServiceTest {
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
-        verify(courseStudyManager).closeForCourse(courseId);
+        verify(eventPublisher).publishEvent(any(CourseClosedEvent.class));
     }
 }
