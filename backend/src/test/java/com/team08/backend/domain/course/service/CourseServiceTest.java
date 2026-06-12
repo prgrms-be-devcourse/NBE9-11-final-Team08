@@ -211,7 +211,9 @@ class CourseServiceTest {
 
         assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request))
                 .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage())
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
     }
 
     @Test

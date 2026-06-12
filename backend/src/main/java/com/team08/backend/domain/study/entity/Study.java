@@ -1,6 +1,7 @@
 package com.team08.backend.domain.study.entity;
 
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.study.exception.InvalidStudyStatusTransitionException;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -43,5 +44,17 @@ public class Study extends BaseTimeEntity {
 
     public static Study createForCourse(User owner, Course course, String title, String description) {
         return new Study(owner, course, title, description, StudyStatus.DRAFT);
+    }
+
+    public void activate() {
+        if (status != StudyStatus.DRAFT) {
+            throw new InvalidStudyStatusTransitionException();
+        }
+
+        status = StudyStatus.ACTIVE;
+    }
+
+    public String getOwnerNickname() {
+        return owner.getNickname();
     }
 }
