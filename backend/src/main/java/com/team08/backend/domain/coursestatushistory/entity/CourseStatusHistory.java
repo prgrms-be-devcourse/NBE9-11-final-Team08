@@ -31,11 +31,20 @@ public class CourseStatusHistory extends BaseTimeEntity {
     private Long changedBy;
 
     @Builder
-    public CourseStatusHistory(Long courseId, CourseStatus fromStatus, CourseStatus toStatus, String reason, Long changedBy) {
+    private CourseStatusHistory(Long courseId, CourseStatus fromStatus, CourseStatus toStatus, String reason, Long changedBy) {
         this.courseId = courseId;
         this.fromStatus = fromStatus;
         this.toStatus = toStatus;
         this.reason = reason;
         this.changedBy = changedBy;
+    }
+
+    public static CourseStatusHistory of(Long courseId, CourseStatus fromStatus, CourseStatus toStatus, Long changedBy) {
+        return CourseStatusHistory.builder()
+                .courseId(courseId)
+                .fromStatus(fromStatus)
+                .toStatus(toStatus)
+                .changedBy(changedBy)
+                .build();
     }
 }

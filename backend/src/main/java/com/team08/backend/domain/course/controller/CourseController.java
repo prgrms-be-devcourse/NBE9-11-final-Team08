@@ -58,4 +58,12 @@ public class CourseController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         courseService.requestCourseReview(courseId, loginUserPrincipal.user().id());
     }
+
+    @DeleteMapping("/{courseId}/reviews")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelCourseReview(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        courseService.cancelCourseReview(courseId, loginUserPrincipal.user().id());
+    }
 }

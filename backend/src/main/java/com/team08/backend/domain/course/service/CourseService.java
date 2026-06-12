@@ -78,6 +78,18 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
     }
 
+    @Transactional
+    public void cancelCourseReview(Long courseId, Long instructorId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        course.validateOwner(instructorId);
+
+        CourseStatusHistory history = course.cancelReview(instructorId);
+
+        courseStatusHistoryRepository.save(history);
+    }
+
     @Component
     @RequiredArgsConstructor
     public static class CourseViewCountManager {

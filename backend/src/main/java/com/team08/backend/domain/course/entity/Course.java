@@ -122,14 +122,21 @@ public class Course extends BaseTimeEntity {
             throw new CustomException(ErrorCode.COURSE_CURRICULUM_EMPTY);
         }
 
-        CourseStatusHistory history = CourseStatusHistory.builder()
-                .courseId(this.id)
-                .fromStatus(this.status)
-                .toStatus(CourseStatus.IN_REVIEW)
-                .changedBy(requestUserId)
-                .build();
+        CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.IN_REVIEW, requestUserId);
 
         this.status = CourseStatus.IN_REVIEW;
+
+        return history;
+    }
+
+    public CourseStatusHistory cancelReview(Long requestUserId) {
+        if (this.status != CourseStatus.IN_REVIEW) {
+            throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
+        }
+
+        CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.DRAFT, requestUserId);
+
+        this.status = CourseStatus.DRAFT;
 
         return history;
     }
