@@ -5,6 +5,7 @@ import com.team08.backend.domain.course.dto.ChapterInfoResponse;
 import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.dto.LectureInfoResponse;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -28,9 +29,11 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doNothing;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -130,5 +133,37 @@ class CourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1L))
                 .andExpect(jsonPath("$.content[0].price").value(30000));
+    }
+
+    @Test
+    @WithMockUser
+    void 인증된_판매자가_유효한_데이터로_강좌_일반_정보_수정_요청_시_204_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
+        CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate));
+        CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
+
+        doNothing().when(courseService).updateCourseGeneralInfo(eq(courseId), any(Long.class), any(CourseUpdateRequest.class));
+
+        mockMvc.perform(put("/api/courses/{courseId}", courseId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser
+    void 강좌_일반_정보_수정_요청_시_필수_데이터가_누락되면_400_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        CourseUpdateRequest request = new CourseUpdateRequest("", "설명", 5L, 50000, "new.png", List.of());
+
+        mockMvc.perform(put("/api/courses/{courseId}", courseId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 }

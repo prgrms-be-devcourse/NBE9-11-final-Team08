@@ -5,6 +5,7 @@ import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -22,12 +23,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
 
@@ -175,5 +173,102 @@ class CourseServiceTest {
         assertThat(primaryOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
         assertThat(secondaryOrder).isNotNull();
         assertThat(secondaryOrder.getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    void 존재하지_않는_강좌_ID로_수정_요청_시_예외가_발생한다() {
+        Long invalidCourseId = 999L;
+        Long instructorId = 1L;
+        CourseUpdateRequest request = new CourseUpdateRequest("제목", "설명", 2L, 20000, "thumb.png", List.of());
+
+        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 소유자가_아닌_사용자가_강좌_수정_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long hackerId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .categoryId(2L)
+                .title("원래 제목")
+                .description("원래 설명")
+                .thumbnail("old.png")
+                .price(10000)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        CourseUpdateRequest request = new CourseUpdateRequest("변경 제목", "변경 설명", 3L, 20000, "new.png", List.of());
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage())
+                .extracting(ex -> ((CustomException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+    }
+
+    @Test
+    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정된다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .categoryId(2L)
+                .title("원래 제목")
+                .description("원래 설명")
+                .thumbnail("old.png")
+                .price(10000)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        Chapter chapter = Chapter.builder().title("원래 챕터").orderNo(1).course(course).build();
+        Field chapterIdField = org.springframework.util.ReflectionUtils.findField(Chapter.class, "id");
+        org.springframework.util.ReflectionUtils.makeAccessible(chapterIdField);
+        org.springframework.util.ReflectionUtils.setField(chapterIdField, chapter, 10L);
+
+        Lecture lecture = Lecture.builder().title("원래 강의").m3u8Path("vid.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
+        Field lectureIdField = org.springframework.util.ReflectionUtils.findField(Lecture.class, "id");
+        org.springframework.util.ReflectionUtils.makeAccessible(lectureIdField);
+        org.springframework.util.ReflectionUtils.setField(lectureIdField, lecture, 20L);
+
+        chapter.addLecture(lecture);
+        course.addChapter(chapter);
+
+        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
+        CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", 500, 2, false);
+        CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate, lectureNew));
+        CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        courseService.updateCourseGeneralInfo(courseId, instructorId, request);
+
+        assertThat(course.getTitle()).isEqualTo("수정 제목");
+        assertThat(course.getDescription()).isEqualTo("수정 설명");
+        assertThat(course.getCategoryId()).isEqualTo(5L);
+        assertThat(course.getPrice()).isEqualTo(50000);
+        assertThat(course.getThumbnail()).isEqualTo("new.png");
+
+        assertThat(course.getChapters()).hasSize(1);
+        Chapter updatedChapter = course.getChapters().get(0);
+        assertThat(updatedChapter.getTitle()).isEqualTo("수정 챕터");
+
+        assertThat(updatedChapter.getLectures()).hasSize(2);
+        Lecture updatedLecture = updatedChapter.getLectures().get(0);
+        assertThat(updatedLecture.getTitle()).isEqualTo("수정 강의");
+        assertThat(updatedLecture.getDurationSeconds()).isEqualTo(400);
+        assertThat(updatedLecture.isFreePreview()).isTrue();
+
+        Lecture newlyAddedLecture = updatedChapter.getLectures().get(1);
+        assertThat(newlyAddedLecture.getTitle()).isEqualTo("신규 강의");
+        assertThat(newlyAddedLecture.getDurationSeconds()).isEqualTo(500);
+        assertThat(newlyAddedLecture.isFreePreview()).isFalse();
     }
 }

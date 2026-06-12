@@ -3,6 +3,7 @@ package com.team08.backend.domain.course.service;
 import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -53,6 +54,16 @@ public class CourseService {
         Pageable pagedWithSort = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.getSort());
         return courseRepository.findAllByStatus(CourseStatus.ON_SALE, pagedWithSort)
                 .map(CourseCardResponse::from);
+    }
+
+    @Transactional
+    public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        course.validateOwner(instructorId);
+
+        course.updateGeneralInfo(request);
     }
 
     @Component

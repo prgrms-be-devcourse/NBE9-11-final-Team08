@@ -3,6 +3,7 @@ package com.team08.backend.domain.course.controller;
 import com.team08.backend.domain.course.dto.CourseCardResponse;
 import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
+import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -42,5 +43,14 @@ public class CourseController {
             @RequestParam(name = "sort", defaultValue = "VIEW_DESC") CourseSortType sortType,
             @PageableDefault(size = 10) Pageable pageable) {
         return courseService.getCourses(sortType, pageable);
+    }
+
+    @PutMapping("/{courseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateCourseGeneralInfo(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            @Valid @RequestBody CourseUpdateRequest request) {
+        courseService.updateCourseGeneralInfo(courseId, loginUserPrincipal.user().id(), request);
     }
 }
