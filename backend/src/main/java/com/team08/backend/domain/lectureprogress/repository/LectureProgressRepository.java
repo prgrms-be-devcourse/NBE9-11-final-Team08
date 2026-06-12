@@ -3,5 +3,13 @@ package com.team08.backend.domain.lectureprogress.repository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
+import java.util.Optional;
+
 public interface LectureProgressRepository extends JpaRepository<LectureProgress, Long> {
+
+    Optional<LectureProgress> findByUserIdAndLectureId(Long userId, Long lectureId);
+
+    // 챕터 내 강의들 중 사용자가 가장 최근 학습한 진행 정보
+    Optional<LectureProgress> findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(Long userId, List<Long> lectureIds);
 }
