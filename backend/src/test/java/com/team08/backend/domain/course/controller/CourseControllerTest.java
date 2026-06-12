@@ -55,7 +55,7 @@ class CourseControllerTest {
     @WithMockUser
     void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest(
-                "스프剩 부트 완벽 가이드",
+                "스프링 부트 완벽 가이드",
                 "백엔드 개발자를 위한 강의",
                 5L,
                 30000,
@@ -173,7 +173,7 @@ class CourseControllerTest {
     void 인증된_판매자가_강좌_심사_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
 
-        doNothing().when(courseService).submitCourseReview(eq(courseId), any(Long.class));
+        doNothing().when(courseService).requestCourseReview(eq(courseId), any(Long.class));
 
         mockMvc.perform(post("/api/courses/{courseId}/reviews", courseId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")

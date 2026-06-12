@@ -285,7 +285,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(invalidCourseId, instructorId))
+        assertThatThrownBy(() -> courseService.requestCourseReview(invalidCourseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
     }
@@ -301,7 +301,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, hackerId))
+        assertThatThrownBy(() -> courseService.requestCourseReview(courseId, hackerId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
     }
@@ -317,7 +317,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId))
+        assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
     }
@@ -333,7 +333,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.submitCourseReview(courseId, instructorId))
+        assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_CURRICULUM_EMPTY.getMessage());
     }
@@ -354,7 +354,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
 
-        courseService.submitCourseReview(courseId, instructorId);
+        courseService.requestCourseReview(courseId, instructorId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.IN_REVIEW);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
