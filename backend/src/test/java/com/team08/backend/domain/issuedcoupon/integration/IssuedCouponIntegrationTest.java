@@ -1,7 +1,11 @@
 package com.team08.backend.domain.issuedcoupon.integration;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
-import com.team08.backend.domain.couponpolicy.entity.*;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
+import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.dto.LoginUserDto;
@@ -14,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -93,8 +96,8 @@ class IssuedCouponIntegrationTest {
 
     private void setUpSecurityContext(User user) {
         LoginUserDto loginUserDto = new LoginUserDto(user.getId(), user.getEmail(), user.getNickname(), user.getRole().name());
-        LoginUserPrincipal principal = new LoginUserPrincipal(loginUserDto);
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, null);
+        LoginUserPrincipal principal = LoginUserPrincipal.from(loginUserDto);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 

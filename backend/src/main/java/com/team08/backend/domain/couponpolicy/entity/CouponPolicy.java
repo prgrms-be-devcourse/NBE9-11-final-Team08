@@ -1,7 +1,7 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
-import com.team08.backend.global.common.BaseTimeEntity; // 💡 BaseTimeEntity 임포트
+import com.team08.backend.global.common.BaseTimeEntity;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.Column;
@@ -121,11 +121,12 @@ public class CouponPolicy extends BaseTimeEntity {
 
     // 선착순 쿠폰 수량 차감
     public void decreaseQuantity() {
-        if (this.totalQuantity != null && this.totalQuantity <= 0) {
+        if (this.totalQuantity == null) {
+            return;
+        }
+        if (this.totalQuantity <= 0) {
             throw new CustomException(ErrorCode.COUPON_EXHAUSTED);
         }
-        if (this.totalQuantity != null) {
-            this.totalQuantity--;
-        }
+        this.totalQuantity--;
     }
 }

@@ -10,7 +10,6 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,23 +38,23 @@ public class IssuedCouponService {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
 
+        // 중복 발급 체크
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
         // 쿠폰 발급 기간 검증
         policy.validateIssuePeriod();
 
-        // 쿠폰 발급 기록 생성
+        // 쿠폰 발급 기록 생성 및 저장
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        // 중복 발급 검증 및 저장
-        try {
-            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
-            return IssuedCouponResponse.from(savedCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
+        return IssuedCouponResponse.from(savedCoupon);
     }
 
     // [사용자] 선착순 쿠폰 다운로드
@@ -75,25 +74,25 @@ public class IssuedCouponService {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
 
+        // 중복 발급 체크
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
         // 쿠폰 발급 기간 검증
         policy.validateIssuePeriod();
 
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
 
-        // 쿠폰 발급 기록 생성
+        // 쿠폰 발급 기록 생성 및 저장
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        // 중복 발급 검증 및 저장
-        try {
-            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
-            return IssuedCouponResponse.from(savedCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
+        return IssuedCouponResponse.from(savedCoupon);
     }
 }

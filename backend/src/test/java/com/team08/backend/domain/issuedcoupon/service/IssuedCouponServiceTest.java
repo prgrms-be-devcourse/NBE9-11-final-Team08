@@ -53,8 +53,11 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
         when(policy.getId()).thenReturn(policyId);
-        
-        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // 중복 체크 통과
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
+
+        when(issuedCouponRepository.save(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
@@ -62,11 +65,11 @@ class IssuedCouponServiceTest {
         // then
         assertThat(response).isNotNull();
         assertThat(response.policyId()).isEqualTo(policyId);
-        verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
+        verify(issuedCouponRepository, times(1)).save(any(IssuedCoupon.class));
     }
 
     @Test
-    @DisplayName("실패: 이미 발급받은 쿠폰인 경우 예외가 발생한다")
+    @DisplayName("실패: 일반 쿠폰 이미 발급받은 경우 예외 발생")
     void downloadCoupon_fail_alreadyIssued() {
         // given
         Long userId = 1L;
@@ -77,7 +80,8 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
 
-        doThrow(DataIntegrityViolationException.class).when(issuedCouponRepository).saveAndFlush(any(IssuedCoupon.class));
+        // 중복 체크 걸림
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(true);
 
         // when & then
         CustomException exception = assertThrows(CustomException.class, () -> {
@@ -97,6 +101,7 @@ class IssuedCouponServiceTest {
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
 
         // 기간 검증 예외 발생 모사
         doThrow(new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED)).when(policy).validateIssuePeriod();
@@ -119,15 +124,16 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.FCFS);
         when(policy.getId()).thenReturn(policyId);
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
 
-        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(issuedCouponRepository.save(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         issuedCouponService.downloadFcfsCoupon(userId, policyId);
 
         // then
         verify(policy, times(1)).decreaseQuantity();
-        verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
+        verify(issuedCouponRepository, times(1)).save(any(IssuedCoupon.class));
     }
 
     @Test
@@ -141,6 +147,7 @@ class IssuedCouponServiceTest {
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.FCFS);
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
 
         // decreaseQuantity에서 예외 발생 모사
         doThrow(new CustomException(ErrorCode.COUPON_EXHAUSTED)).when(policy).decreaseQuantity();
@@ -164,7 +171,8 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(policy.getCouponType()).thenReturn(CouponType.FCFS);
 
-        doThrow(DataIntegrityViolationException.class).when(issuedCouponRepository).saveAndFlush(any(IssuedCoupon.class));
+        // 중복 체크 걸림
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(true);
 
         // when & then
         assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
