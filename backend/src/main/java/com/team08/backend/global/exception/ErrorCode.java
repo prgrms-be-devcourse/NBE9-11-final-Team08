@@ -44,6 +44,8 @@ public enum ErrorCode {
     INVALID_MEMBER_STATUS(HttpStatus.BAD_REQUEST,     "STUDY_019", "처리할 수 없는 멤버 상태입니다."),
     DUPLICATE_STUDY(HttpStatus.CONFLICT, "STUDY_020", "코스의 스터디가 이미 존재합니다."),
     STUDY_NOT_ACTIVE(HttpStatus.CONFLICT, "STUDY_021", "활성화된 스터디가 아닙니다."),
+    STUDY_ACTIVITY_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_022", "스터디 활동을 찾을 수 없습니다."),
+    STUDY_ACTIVITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "STUDY_023", "스터디 활동을 수정할 권한이 없습니다."),
 
     // ── Course ───────────────────────────────────────────────────────────
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
