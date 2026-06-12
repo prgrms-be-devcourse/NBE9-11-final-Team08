@@ -62,6 +62,14 @@ public class Study extends BaseTimeEntity {
         this.status = StudyStatus.READONLY;
     }
 
+    public void changeToInactive() {
+        if (this.status != StudyStatus.DRAFT) {
+            throw new InvalidStudyStatusTransitionException();
+        }
+
+        this.status = StudyStatus.INACTIVE;
+    }
+
     public String getOwnerNickname() {
         return owner.getNickname();
     }
