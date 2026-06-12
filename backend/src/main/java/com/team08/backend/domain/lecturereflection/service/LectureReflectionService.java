@@ -46,7 +46,7 @@ public class LectureReflectionService {
         }
 
         reflection.update(content);
-        return LectureReflectionResponse.from(reflectionRepository.save(reflection));
+        return LectureReflectionResponse.from(reflection);
     }
 
     // 회고 조회 — (사용자, 강의) 기준 단건 조회
