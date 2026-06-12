@@ -3,6 +3,7 @@ package com.team08.backend.domain.issuedcoupon.service;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
@@ -15,8 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,7 +25,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponServiceTest {
@@ -178,5 +184,33 @@ class IssuedCouponServiceTest {
         assertThatThrownBy(() -> issuedCouponService.downloadFcfsCoupon(userId, policyId))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_ISSUED);
+    }
+
+    @Test
+    @DisplayName("성공: 내 쿠폰 목록을 조회하면 정책 정보와 함께 반환된다")
+    void getMyCoupons_success() {
+        // given
+        Long userId = 1L;
+        Long policyId = 10L;
+
+        IssuedCoupon coupon = mock(IssuedCoupon.class);
+        when(coupon.getPolicyId()).thenReturn(policyId);
+        when(coupon.getId()).thenReturn(100L);
+
+        CouponPolicy policy = mock(CouponPolicy.class);
+        when(policy.getId()).thenReturn(policyId);
+        when(policy.getName()).thenReturn("테스트 쿠폰");
+
+        when(issuedCouponRepository.findByUserIdOrderByExpiredAtAsc(userId)).thenReturn(List.of(coupon));
+        when(couponPolicyRepository.findAllById(anyList())).thenReturn(List.of(policy));
+
+        // when
+        List<CouponListResponse> responses = issuedCouponService.getMyCoupons(userId);
+
+        // then
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).couponName()).isEqualTo("테스트 쿠폰");
+        verify(issuedCouponRepository).findByUserIdOrderByExpiredAtAsc(userId);
+        verify(couponPolicyRepository).findAllById(anyList());
     }
 }
