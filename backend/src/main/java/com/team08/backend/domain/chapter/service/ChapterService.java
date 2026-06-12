@@ -54,6 +54,27 @@ public class ChapterService {
     }
 
     /**
+     * 강좌 내 가장 최근 수강 강의 조회
+     * 수강 이력이 없으면 null 반환
+     */
+    @Transactional(readOnly = true)
+    public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
+        List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
+        if (lectureIds.isEmpty()) {
+            return null;
+        }
+
+        return lectureProgressRepository
+                .findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, lectureIds)
+                .map(progress -> {
+                    Lecture lecture = lectureRepository.findById(progress.getLectureId())
+                            .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER));
+                    return LectureEnterResponse.of(lecture, progress);
+                })
+                .orElse(null);
+    }
+
+    /**
      * 챕터 첫 강의 입장 — 해당 챕터의 orderNo 가장 낮은 강의 반환
      * 사용자의 학습 진행 정보도 함께 제공 (없으면 null)
      */
@@ -72,31 +93,4 @@ public class ChapterService {
         return LectureEnterResponse.of(lecture, progress);
     }
 
-    /**
-     * 최근 수강 강의 입장 — 챕터 내에서 사용자가 가장 최근 학습한 강의 반환
-     */
-    @Transactional(readOnly = true)
-    public LectureEnterResponse enterRecentLecture(Long chapterId, Long userId) {
-        chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
-
-        List<Long> lectureIds = lectureRepository
-                .findByChapterIdOrderByOrderNoAsc(chapterId)
-                .stream()
-                .map(Lecture::getId)
-                .toList();
-
-        if (lectureIds.isEmpty()) {
-            throw new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER);
-        }
-
-        LectureProgress recentProgress = lectureProgressRepository
-                .findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, lectureIds)
-                .orElseThrow(() -> new CustomException(ErrorCode.RECENT_LECTURE_NOT_FOUND));
-
-        Lecture lecture = lectureRepository.findById(recentProgress.getLectureId())
-                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
-
-        return LectureEnterResponse.of(lecture, recentProgress);
-    }
 }

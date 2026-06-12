@@ -121,6 +121,59 @@ class ChapterServiceTest {
         assertThat(result).isEmpty();
     }
 
+    // ── 강좌 내 최근 수강 강의 조회 ─────────────────────────────────────────
+
+    @Test
+    @DisplayName("최근 수강 강의 조회 성공")
+    void getLastWatchedLecture_success() {
+        Long courseId = 1L;
+        Long userId = 1L;
+        Long lectureId = 100L;
+
+        given(lectureRepository.findIdsByCourseId(courseId)).willReturn(List.of(lectureId));
+
+        LectureProgress progress = mockProgress(userId, lectureId, 300, false);
+        given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, List.of(lectureId)))
+                .willReturn(Optional.of(progress));
+
+        Lecture lecture = mockLecture(lectureId, 10L, "강의1", 1);
+        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+
+        LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.lectureId()).isEqualTo(lectureId);
+        assertThat(response.progress().lastPositionSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    @DisplayName("최근 수강 강의 조회 - 수강 이력 없음 (null 반환)")
+    void getLastWatchedLecture_noHistory() {
+        Long courseId = 1L;
+        Long userId = 1L;
+
+        given(lectureRepository.findIdsByCourseId(courseId)).willReturn(List.of(100L));
+        given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(eq(userId), any()))
+                .willReturn(Optional.empty());
+
+        LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
+
+        assertThat(response).isNull();
+    }
+
+    @Test
+    @DisplayName("최근 수강 강의 조회 - 강좌에 강의 없음 (null 반환)")
+    void getLastWatchedLecture_noLecturesInCourse() {
+        Long courseId = 1L;
+        Long userId = 1L;
+
+        given(lectureRepository.findIdsByCourseId(courseId)).willReturn(List.of());
+
+        LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
+
+        assertThat(response).isNull();
+    }
+
     // ── 챕터 첫 강의 입장 ──────────────────────────────────────────────────
 
     @Test
@@ -195,65 +248,6 @@ class ChapterServiceTest {
                 .isEqualTo(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER);
     }
 
-    // ── 최근 수강 강의 입장 ────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("최근 수강 강의 입장 성공")
-    void enterRecentLecture_success() {
-        Long chapterId = 10L;
-        Long userId = 1L;
-        Long lectureId = 100L;
-
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(mock(Chapter.class)));
-
-        Lecture lecture = mockLecture(lectureId, chapterId, "강의2", 2);
-        given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId))
-                .willReturn(List.of(lecture));
-
-        LectureProgress progress = mockProgress(userId, lectureId, 300, true);
-        given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(eq(userId), any()))
-                .willReturn(Optional.of(progress));
-
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
-
-        LectureEnterResponse response = chapterService.enterRecentLecture(chapterId, userId);
-
-        assertThat(response.lectureId()).isEqualTo(lectureId);
-        assertThat(response.progress()).isNotNull();
-        assertThat(response.progress().completed()).isTrue();
-    }
-
-    @Test
-    @DisplayName("최근 수강 강의 입장 실패 - 학습 이력 없음")
-    void enterRecentLecture_noHistory() {
-        Long chapterId = 10L;
-
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(mock(Chapter.class)));
-
-        Lecture lecture = mockLecture(100L, chapterId, "강의1", 1);
-        given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId))
-                .willReturn(List.of(lecture));
-
-        given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(any(), any()))
-                .willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> chapterService.enterRecentLecture(chapterId, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.RECENT_LECTURE_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("최근 수강 강의 입장 실패 - 챕터에 강의 없음")
-    void enterRecentLecture_noLectures() {
-        given(chapterRepository.findById(any())).willReturn(Optional.of(mock(Chapter.class)));
-        given(lectureRepository.findByChapterIdOrderByOrderNoAsc(any())).willReturn(List.of());
-
-        assertThatThrownBy(() -> chapterService.enterRecentLecture(10L, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER);
-    }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 

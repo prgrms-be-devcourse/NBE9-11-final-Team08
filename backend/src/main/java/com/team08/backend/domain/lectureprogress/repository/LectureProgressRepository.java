@@ -10,6 +10,6 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
 
     Optional<LectureProgress> findByUserIdAndLectureId(Long userId, Long lectureId);
 
-    // 챕터 내 강의들 중 사용자가 가장 최근 학습한 진행 정보
+    // 강좌 내 강의들 중 사용자가 가장 최근 학습한 진행 정보
     Optional<LectureProgress> findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(Long userId, List<Long> lectureIds);
 }
