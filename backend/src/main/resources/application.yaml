@@ -17,5 +17,7 @@ app:
     secret: ${JWT_SECRET}
     expiration-millis: ${JWT_EXPIRATION_MILLIS:3600000}
     refresh-expiration-millis: ${JWT_REFRESH_EXPIRATION_MILLIS:1209600000}
-  cookie:
+  refresh-cookie:
+    name: refreshToken
     secure: ${IS_COOKIE_SECURE:true}
+    same-site: ${SAME_SITE:Lax}
