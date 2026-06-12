@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -351,5 +352,28 @@ public class AuthServiceTest {
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
         verify(jwtProvider, never()).generateTokenPair(any());
+    }
+
+    @Test
+    void 한번_사용한_refreshToken은_다시_재발급할_수_없다() {
+        User user = UserFixture.builder().build();
+        RefreshToken storedToken = RefreshToken.create(
+                user,
+                TokenHasher.hash("refresh-token"),
+                LocalDateTime.of(2026, 6, 13, 9, 0)
+        );
+        TokenPair newTokenPair = new TokenPair("new-access-token", "new-refresh-token");
+
+        given(jwtProvider.validateRefreshToken("refresh-token")).willReturn(true);
+        given(refreshTokenRepository.findByTokenHashForUpdate(TokenHasher.hash("refresh-token")))
+                .willReturn(Optional.of(storedToken));
+        given(jwtProvider.extractUserId("refresh-token")).willReturn(user.getId());
+        given(jwtProvider.generateTokenPair(any(LoginUserDto.class))).willReturn(newTokenPair);
+
+        authService.refresh("refresh-token");
+
+        assertThatThrownBy(() -> authService.refresh("refresh-token"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        verify(jwtProvider, times(1)).generateTokenPair(any(LoginUserDto.class));
     }
 }

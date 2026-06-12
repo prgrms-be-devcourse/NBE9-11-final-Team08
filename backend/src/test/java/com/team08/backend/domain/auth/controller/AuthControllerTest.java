@@ -154,4 +154,21 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("AUTH_005"))
                 .andExpect(cookie().maxAge("refreshToken", 0));
     }
+
+    @Test
+    void refreshToken_쿠키가_없으면_401과_삭제_쿠키를_반환한다() throws Exception {
+        given(refreshTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("refreshToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
+
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_005"))
+                .andExpect(cookie().maxAge("refreshToken", 0));
+
+        then(authService).shouldHaveNoInteractions();
+    }
 }
