@@ -1,0 +1,59 @@
+package com.team08.backend.domain.studyactivity.service;
+
+import com.team08.backend.domain.study.entity.Study;
+import com.team08.backend.domain.study.entity.StudyStatus;
+import com.team08.backend.domain.study.repository.StudyRepository;
+import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
+import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
+import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
+import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@RequiredArgsConstructor
+public class StudyActivityService {
+
+    private final StudyActivityRepository studyActivityRepository;
+    private final StudyRepository studyRepository;
+    private final StudyMemberRepository studyMemberRepository;
+
+    @Transactional
+    public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
+        Study study = findStudy(studyId);
+        validateActiveStudy(study);
+        validateActiveMember(studyId, userId);
+
+        StudyActivity activity = StudyActivity.create(studyId, userId, content);
+        StudyActivity savedActivity = studyActivityRepository.save(activity);
+
+        return StudyActivityResponse.from(savedActivity);
+    }
+
+    private Study findStudy(Long studyId) {
+        return studyRepository.findById(studyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
+    }
+
+    private void validateActiveStudy(Study study) {
+        if (study.getStatus() != StudyStatus.ACTIVE) {
+            throw new CustomException(ErrorCode.STUDY_NOT_ACTIVE);
+        }
+    }
+
+    private void validateActiveMember(Long studyId, Long userId) {
+        boolean isActiveMember = studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId,
+                userId,
+                StudyMemberStatus.ACTIVE
+        );
+
+        if (!isActiveMember) {
+            throw new CustomException(ErrorCode.STUDY_ACCESS_DENIED);
+        }
+    }
+}
