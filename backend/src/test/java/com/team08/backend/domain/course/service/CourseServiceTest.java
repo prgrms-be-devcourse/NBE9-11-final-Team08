@@ -16,6 +16,8 @@ import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
+import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
+import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
@@ -51,6 +53,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseViewCountManager courseViewCountManager;
+
+    @Mock
+    private CourseStudyManager courseStudyManager;
 
     @InjectMocks
     private CourseService courseService;
@@ -418,6 +423,94 @@ class CourseServiceTest {
         courseService.cancelCourseReview(courseId, instructorId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DRAFT);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+    }
+
+    @Test
+    void 심사_중이_아닌_강좌를_승인_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long adminId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.approveCourseReview(courseId, adminId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_심사_승인_상태로_전이되고_이력이_남는다() {
+        Long courseId = 100L;
+        Long adminId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .title("테스트 제목")
+                .description("테스트 설명")
+                .status(CourseStatus.IN_REVIEW)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseStudyManager.createForCourse(any(CourseStudyCreateCommand.class))).willReturn(1L);
+
+        courseService.approveCourseReview(courseId, adminId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.ON_SALE);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(courseStudyManager).createForCourse(any(CourseStudyCreateCommand.class));
+    }
+
+    @Test
+    void 심사_중이_아닌_강좌를_반려_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long adminId = 999L;
+        String reason = "콘텐츠 부적절";
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.rejectCourseReview(courseId, adminId, reason))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_COURSE_STATUS_TRANSITION.getMessage());
+    }
+
+    @Test
+    void 강좌_심사_반려_시_사유가_누락되면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long adminId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.IN_REVIEW)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.rejectCourseReview(courseId, adminId, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.REJECT_REASON_REQUIRED.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_심사_반려_상태로_전이되고_이력이_남는다() {
+        Long courseId = 100L;
+        Long adminId = 999L;
+        String reason = "콘텐츠 부적절";
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.IN_REVIEW)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        courseService.rejectCourseReview(courseId, adminId, reason);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
     }
 }
