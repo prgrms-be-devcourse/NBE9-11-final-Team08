@@ -47,4 +47,14 @@ public class CourseStatusHistory extends BaseTimeEntity {
                 .changedBy(changedBy)
                 .build();
     }
+
+    public static CourseStatusHistory of(Long courseId, CourseStatus fromStatus, CourseStatus toStatus, Long changedBy, String reason) {
+        return CourseStatusHistory.builder()
+                .courseId(courseId)
+                .fromStatus(fromStatus)
+                .toStatus(toStatus)
+                .changedBy(changedBy)
+                .reason(reason)
+                .build();
+    }
 }

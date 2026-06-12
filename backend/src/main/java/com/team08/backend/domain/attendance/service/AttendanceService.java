@@ -3,6 +3,7 @@ package com.team08.backend.domain.attendance.service;
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -21,6 +22,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
+    private final IssuedCouponService issuedCouponService;
 
     // [사용자] 출석체크
     @Transactional
@@ -50,6 +52,12 @@ public class AttendanceService {
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
             Attendance savedLog = attendanceRepository.saveAndFlush(todayLog);
+
+            // 7일 연속 출석 시 보상 쿠폰 자동 발급
+            if (savedLog.getConsecutiveDays() == 7) {
+                issuedCouponService.issueAttendanceCoupon(userId);
+            }
+
             return AttendanceResponse.from(savedLog);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.ATTENDANCE_ALREADY_EXISTS);

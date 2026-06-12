@@ -36,4 +36,12 @@ public class StudyActivity extends BaseTimeEntity {
     public static StudyActivity create(Long studyId, Long authorId, String content) {
         return new StudyActivity(studyId, authorId, content);
     }
+
+    public void update(String content) {
+        this.content = content;
+    }
+
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+    }
 }

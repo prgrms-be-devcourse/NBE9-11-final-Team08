@@ -44,6 +44,12 @@ public enum ErrorCode {
     INVALID_MEMBER_STATUS(HttpStatus.BAD_REQUEST,     "STUDY_019", "처리할 수 없는 멤버 상태입니다."),
     DUPLICATE_STUDY(HttpStatus.CONFLICT, "STUDY_020", "코스의 스터디가 이미 존재합니다."),
     STUDY_NOT_ACTIVE(HttpStatus.CONFLICT, "STUDY_021", "활성화된 스터디가 아닙니다."),
+    STUDY_ACTIVITY_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_022", "스터디 활동을 찾을 수 없습니다."),
+    STUDY_ACTIVITY_ACCESS_DENIED(HttpStatus.FORBIDDEN, "STUDY_023", "스터디 활동을 수정할 권한이 없습니다."),
+    AI_FEEDBACK_NOT_FOUND(HttpStatus.NOT_FOUND, "STUDY_024", "AI 피드백을 찾을 수 없습니다."),
+    AI_FEEDBACK_REQUEST_DENIED(HttpStatus.FORBIDDEN, "STUDY_025", "AI 피드백을 요청할 권한이 없습니다."),
+    AI_FEEDBACK_GENERATION_IN_PROGRESS(HttpStatus.CONFLICT, "STUDY_026", "AI 피드백을 생성 중입니다."),
+    AI_FEEDBACK_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "STUDY_027", "AI 피드백 생성에 실패했습니다."),
 
     // ── Course ───────────────────────────────────────────────────────────
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND,      "COURSE_001", "강좌를 찾을 수 없습니다."),
@@ -51,6 +57,8 @@ public enum ErrorCode {
     UNAUTHORIZED_COURSE_OWNER(HttpStatus.FORBIDDEN, "COURSE_003", "해당 강좌의 소유자가 아닙니다."),
     INVALID_COURSE_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "COURSE_004", "변경할 수 없는 강좌 상태입니다."),
     COURSE_CURRICULUM_EMPTY(HttpStatus.BAD_REQUEST, "COURSE_005", "강좌에 최소 1개 이상의 챕터와 강의가 존재해야 심사를 요청할 수 있습니다."),
+    REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "COURSE_006", "강좌 심사 반려 시 사유는 필수입니다."),
+    COURSE_HAS_ACTIVE_ENROLLMENTS(HttpStatus.BAD_REQUEST, "COURSE_007", "수강 중인 활성 수강생이 존재하여 강좌를 삭제할 수 없습니다."),
 
     // ── Lecture ──────────────────────────────────────────────────────────
     LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_001", "강의를 찾을 수 없습니다."),
@@ -103,7 +111,13 @@ public enum ErrorCode {
     // ── Coupon ───────────────────────────────────────────────────────────
     COUPON_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_001", "쿠폰 정책을 찾을 수 없습니다."),
     COUPON_ALREADY_ISSUED(HttpStatus.CONFLICT, "COUPON_002", "이미 발급받은 쿠폰입니다."),
-    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다.");
+    INVALID_COUPON_TYPE(HttpStatus.BAD_REQUEST, "COUPON_003", "해당 발급 방식에 적합한 쿠폰이 아닙니다."),
+    COUPON_EXHAUSTED(HttpStatus.CONFLICT, "COUPON_004", "선착순 쿠폰이 모두 소진되었습니다."),
+    COUPON_ISSUE_PERIOD_NOT_STARTED(HttpStatus.BAD_REQUEST, "COUPON_005", "아직 쿠폰 발급 기간이 시작되지 않았습니다."),
+    COUPON_ISSUE_PERIOD_ENDED(HttpStatus.BAD_REQUEST, "COUPON_006", "쿠폰 발급 기간이 종료되었습니다."),
+    COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_007", "존재하지 않는 쿠폰입니다."),
+    COUPON_NOT_OWNED(HttpStatus.FORBIDDEN, "COUPON_008", "본인의 쿠폰만 사용할 수 있습니다."),
+    COUPON_ALREADY_USED_OR_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_009", "사용할 수 없는 쿠폰 상태입니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
