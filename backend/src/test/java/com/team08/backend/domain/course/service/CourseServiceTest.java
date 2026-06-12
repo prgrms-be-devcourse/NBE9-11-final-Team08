@@ -513,4 +513,50 @@ class CourseServiceTest {
         assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
     }
+
+    @Test
+    void 존재하지_않는_강좌_ID로_판매_중지_요청_시_예외가_발생한다() {
+        Long invalidCourseId = 999L;
+        Long instructorId = 1L;
+
+        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.closeCourse(invalidCourseId, instructorId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 소유자가_아닌_사용자가_강좌_판매_중지_요청_시_예외가_발생한다() {
+        Long courseId = 100L;
+        Long hackerId = 999L;
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.closeCourse(courseId, hackerId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_강좌가_판매_중지_상태로_전이되고_연관된_스터디도_폐쇄_요청된다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        courseService.closeCourse(courseId, instructorId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(courseStudyManager).closeForCourse(courseId);
+    }
 }

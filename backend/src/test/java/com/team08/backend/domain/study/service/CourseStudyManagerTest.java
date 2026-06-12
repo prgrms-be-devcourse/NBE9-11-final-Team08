@@ -13,6 +13,8 @@ import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,5 +116,36 @@ public class CourseStudyManagerTest {
         assertThatThrownBy(() ->
                 courseStudyManager.createForCourse(command)
         ).isInstanceOf(DuplicateStudyException.class);
+    }
+
+    @Test
+    void 연관된_스터디가_존재하지_않으면_예외가_발생한다() {
+        // given
+        Long courseId = 10L;
+
+        given(studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.DRAFT))
+                .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() ->
+                courseStudyManager.closeForCourse(courseId)
+        ).isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.STUDY_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 정상_조건에서_강좌_판매_중지_요청_시_연관된_스터디가_읽기_전용_상태로_전이된다() {
+        // given
+        Long courseId = 10L;
+        Study study = TestEntityFactory.study(100L, StudyStatus.ACTIVE);
+
+        given(studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+
+        // when
+        courseStudyManager.closeForCourse(courseId);
+
+        // then
+        assertThat(study.getStatus()).isEqualTo(StudyStatus.READONLY);
     }
 }
