@@ -1,13 +1,12 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.course.dto.CourseCardResponse;
-import com.team08.backend.domain.course.dto.CourseCreateRequest;
-import com.team08.backend.domain.course.dto.CourseDetailResponse;
-import com.team08.backend.domain.course.dto.CourseUpdateRequest;
+import com.team08.backend.domain.course.dto.*;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
+import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CourseService {
 
     private final CourseRepository courseRepository;
+    private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final CourseViewCountManager courseViewCountManager;
 
     @Transactional
@@ -64,6 +64,18 @@ public class CourseService {
         course.validateOwner(instructorId);
 
         course.updateGeneralInfo(request);
+    }
+
+    @Transactional
+    public void requestCourseReview(Long courseId, Long instructorId) {
+        Course course = courseRepository.findWithChaptersAndLecturesAsc(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        course.validateOwner(instructorId);
+
+        CourseStatusHistory history = course.requestReview(instructorId);
+
+        courseStatusHistoryRepository.save(history);
     }
 
     @Component
