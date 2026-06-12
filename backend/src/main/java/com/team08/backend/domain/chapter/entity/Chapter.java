@@ -14,7 +14,6 @@ import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Entity
@@ -79,7 +78,7 @@ public class Chapter extends BaseTimeEntity {
         this.lectures.removeIf(lecture -> !requestIds.contains(lecture.getId()));
 
         Map<Long, Lecture> existingLectureMap = this.lectures.stream()
-                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
+                .collect(Collectors.toMap(Lecture::getId, lecture -> lecture));
 
         for (CourseUpdateRequest.LectureUpdateRequest lectureReq : lectureRequests) {
             if (lectureReq.id() != null && existingLectureMap.containsKey(lectureReq.id())) {
