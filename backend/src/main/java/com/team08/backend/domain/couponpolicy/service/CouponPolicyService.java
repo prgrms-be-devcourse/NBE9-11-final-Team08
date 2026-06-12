@@ -1,6 +1,7 @@
 package com.team08.backend.domain.couponpolicy.service;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,9 +15,10 @@ public class CouponPolicyService {
     private final CouponPolicyRepository couponPolicyRepository;
 
     @Transactional
-    public void createCouponPolicy(CouponPolicyCreateRequest request) {
+    public CouponPolicyResponse createCouponPolicy(CouponPolicyCreateRequest request) {
         CouponPolicy newPolicy = CouponPolicy.create(request);
+        CouponPolicy savedPolicy = couponPolicyRepository.save(newPolicy);
 
-        couponPolicyRepository.save(newPolicy);
+        return CouponPolicyResponse.from(savedPolicy);
     }
 }

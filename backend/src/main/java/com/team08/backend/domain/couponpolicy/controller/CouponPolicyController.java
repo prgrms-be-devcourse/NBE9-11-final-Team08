@@ -1,30 +1,27 @@
 package com.team08.backend.domain.couponpolicy.controller;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.service.CouponPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/coupons")
 @RequiredArgsConstructor
-@Tag(name = "관리자 쿠폰 정책 API", description = "관리자용 쿠폰 생성")
+@Tag(name = "관리자 쿠폰 정책 API", description = "관리자용 쿠폰 정책 관리 API")
 public class CouponPolicyController {
 
     private final CouponPolicyService couponPolicyService;
 
     // [관리자] 쿠폰 정책 생성 /api/admin/coupons
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "쿠폰 정책 생성", description = "새로운 쿠폰 정책(할인액, 유효기간, 발급방식 등)을 생성합니다.")
-    public ResponseEntity<String> createCoupon(@RequestBody CouponPolicyCreateRequest request) {
-        // TODO 관리자 인증 추가
-        couponPolicyService.createCouponPolicy(request);
-        return ResponseEntity.ok("쿠폰 정책이 성공적으로 생성되었습니다.");
+    public CouponPolicyResponse createCoupon(@RequestBody CouponPolicyCreateRequest request) {
+        return couponPolicyService.createCouponPolicy(request);
     }
 }
