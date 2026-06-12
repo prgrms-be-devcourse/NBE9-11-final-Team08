@@ -153,4 +153,34 @@ class StudyActivityControllerTest {
                 )
         );
     }
+
+    @Test
+    @WithMockLoginUser
+    void 스터디_활동_상세를_조회한다() throws Exception {
+        Long studyId = 10L;
+        Long activityId = 100L;
+        Long userId = 1L;
+        StudyActivityResponse response = new StudyActivityResponse(
+                activityId,
+                studyId,
+                userId,
+                "오늘 학습한 내용을 스터디원들과 공유합니다.",
+                LocalDateTime.of(2026, 6, 12, 20, 0)
+        );
+
+        given(studyActivityService.getActivity(studyId, activityId, userId))
+                .willReturn(response);
+
+        mockMvc.perform(get(
+                        "/api/studies/{studyId}/activities/{activityId}",
+                        studyId,
+                        activityId
+                )
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+
+        then(studyActivityService).should()
+                .getActivity(studyId, activityId, userId);
+    }
 }

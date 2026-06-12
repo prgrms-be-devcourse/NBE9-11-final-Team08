@@ -276,6 +276,128 @@ class StudyActivityServiceTest {
                 .findAllByStudyIdAndDeletedAtIsNull(any(), any());
     }
 
+    @Test
+    void ACTIVE_스터디의_ACTIVE_멤버가_활동_상세를_조회한다() {
+        Long studyId = 1L;
+        Long activityId = 100L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+        StudyActivity activity = activity(activityId, studyId, userId);
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activityId, studyId
+        )).willReturn(Optional.of(activity));
+
+        StudyActivityResponse result =
+                studyActivityService.getActivity(studyId, activityId, userId);
+
+        assertThat(result.activityId()).isEqualTo(activityId);
+        assertThat(result.studyId()).isEqualTo(studyId);
+        assertThat(result.authorId()).isEqualTo(userId);
+    }
+
+    @Test
+    void READONLY_스터디의_ACTIVE_멤버도_활동_상세를_조회할_수_있다() {
+        Long studyId = 1L;
+        Long activityId = 100L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
+        StudyActivity activity = activity(activityId, studyId, userId);
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activityId, studyId
+        )).willReturn(Optional.of(activity));
+
+        StudyActivityResponse result =
+                studyActivityService.getActivity(studyId, activityId, userId);
+
+        assertThat(result.activityId()).isEqualTo(activityId);
+    }
+
+    @Test
+    void 존재하지_않는_스터디의_활동_상세는_조회할_수_없다() {
+        Long studyId = 999L;
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivity(studyId, 100L, 1L))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+
+        verify(studyMemberRepository, never())
+                .existsByStudyIdAndUserIdAndStatus(any(), any(), any());
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void DRAFT_스터디의_활동_상세는_조회할_수_없다() {
+        Long studyId = 1L;
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivity(studyId, 100L, 1L))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void ACTIVE_멤버가_아니면_활동_상세를_조회할_수_없다() {
+        Long studyId = 1L;
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(false);
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivity(studyId, 100L, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+
+        verify(studyActivityRepository, never())
+                .findByIdAndStudyIdAndDeletedAtIsNull(any(), any());
+    }
+
+    @Test
+    void 존재하지_않는_활동_상세는_조회할_수_없다() {
+        assertActivityNotFound(1L, 100L);
+    }
+
+    @Test
+    void 삭제된_활동_상세는_조회할_수_없다() {
+        assertActivityNotFound(1L, 101L);
+    }
+
+    @Test
+    void 다른_스터디의_활동_상세는_조회할_수_없다() {
+        assertActivityNotFound(1L, 102L);
+    }
+
     private void assertInactiveStudyCannotCreate(Study study) {
         Long studyId = study.getId();
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
@@ -324,5 +446,25 @@ class StudyActivityServiceTest {
                 activity, "createdAt", LocalDateTime.of(2026, 6, 12, 20, 0)
         );
         return activity;
+    }
+
+    private void assertActivityNotFound(Long studyId, Long activityId) {
+        Long userId = 2L;
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activityId, studyId
+        )).willReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                studyActivityService.getActivity(studyId, activityId, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACTIVITY_NOT_FOUND);
     }
 }

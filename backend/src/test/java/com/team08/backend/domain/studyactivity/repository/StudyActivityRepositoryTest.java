@@ -64,6 +64,30 @@ class StudyActivityRepositoryTest {
                 .containsExactly(higherId.getId(), lowerId.getId(), oldest.getId());
     }
 
+    @Test
+    void ID와_스터디가_일치하는_미삭제_활동을_조회한다() {
+        StudyActivity activity = saveActivity(1L, 1L, "가".repeat(20));
+
+        assertThat(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                activity.getId(), 1L
+        )).contains(activity);
+    }
+
+    @Test
+    void 삭제되었거나_다른_스터디의_활동은_조회하지_않는다() {
+        StudyActivity deleted = saveActivity(1L, 1L, "가".repeat(20));
+        StudyActivity otherStudy = saveActivity(2L, 2L, "나".repeat(20));
+        markDeleted(deleted.getId());
+        entityManager.clear();
+
+        assertThat(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                deleted.getId(), 1L
+        )).isEmpty();
+        assertThat(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
+                otherStudy.getId(), 1L
+        )).isEmpty();
+    }
+
     private StudyActivity saveActivity(Long studyId, Long authorId, String content) {
         return studyActivityRepository.saveAndFlush(
                 StudyActivity.create(studyId, authorId, content)
