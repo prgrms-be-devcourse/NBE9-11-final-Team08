@@ -564,4 +564,52 @@ class CourseServiceTest {
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseClosedEvent.class));
     }
+
+    @Test
+    void 존재하지_않는_강좌_ID로_관리자가_강제_판매_중지_요청_시_예외가_발생한다() {
+        Long invalidCourseId = 999L;
+        Long adminId = 1L;
+        String reason = "운영 정책 위반";
+
+        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.suspendCourseByAdmin(invalidCourseId, adminId, reason))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    void 관리자가_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
+        Long courseId = 100L;
+        Long adminId = 1L;
+        Course course = Course.builder()
+                .instructorId(10L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.suspendCourseByAdmin(courseId, adminId, null))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.REJECT_REASON_REQUIRED.getMessage());
+    }
+
+    @Test
+    void 정상_조건을_충족하면_관리자에_의해_강좌가_강제_판매_중지_상태로_전이되고_공통_폐쇄_이벤트가_발행된다() {
+        Long courseId = 100L;
+        Long adminId = 1L;
+        String reason = "운영 정책 위반";
+        Course course = Course.builder()
+                .instructorId(10L)
+                .status(CourseStatus.ON_SALE)
+                .build();
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        courseService.suspendCourseByAdmin(courseId, adminId, reason);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(CourseClosedEvent.class));
+    }
 }

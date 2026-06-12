@@ -102,4 +102,44 @@ class AdminCourseControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_ADMIN")
+    void 인증된_관리자가_유효한_사유로_강좌_강제_판매_중지_요청_시_204_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        CourseRejectRequest request = new CourseRejectRequest("운영 정책 위반 및 불법 요소 발견");
+
+        doNothing().when(courseService).suspendCourseByAdmin(courseId, 1L, request.reason());
+
+        mockMvc.perform(post("/api/admin/courses/{courseId}/suspension", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_ADMIN")
+    void 강좌_강제_판매_중지_요청_시_중지_사유가_공백이면_400_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        CourseRejectRequest request = new CourseRejectRequest("");
+
+        mockMvc.perform(post("/api/admin/courses/{courseId}/suspension", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void 비인증_사용자가_강좌_강제_판매_중지_요청_시_401_상태코드를_반환한다() throws Exception {
+        Long courseId = 100L;
+        CourseRejectRequest request = new CourseRejectRequest("운영 정책 위반");
+
+        mockMvc.perform(post("/api/admin/courses/{courseId}/suspension", courseId)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+    }
 }
