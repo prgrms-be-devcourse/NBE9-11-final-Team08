@@ -11,6 +11,9 @@ public enum ErrorCode {
     // ── 공통 ──────────────────────────────────────────────────────────────
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
 
+    // ── Auth ─────────────────────────────────────────────────────────────
+    LOGIN_FAILED(HttpStatus.BAD_REQUEST, "AUTH_001", "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요."),
+
     // ── User ─────────────────────────────────────────────────────────────
     USER_NOT_FOUND(HttpStatus.NOT_FOUND,   "USER_001", "사용자를 찾을 수 없습니다."),
 
