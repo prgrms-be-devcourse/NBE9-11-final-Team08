@@ -54,9 +54,9 @@ public class OrderService {
             throw new CustomException(ErrorCode.EMPTY_CART);
         }
 
-        List<Course> courses = findCourses(cartItems);
+        Map<Long, Course> courseMap = findCourseMap(cartItems);
         List<Course> orderCourses = cartItems.stream()
-                .map(cartItem -> getCourse(courses, cartItem.getCourseId()))
+                .map(cartItem -> getCourse(courseMap, cartItem.getCourseId()))
                 .toList();
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
@@ -128,7 +128,7 @@ public class OrderService {
         return toDetailResponse(order, savedItems);
     }
 
-    private List<Course> findCourses(List<CartItem> cartItems) {
+    private Map<Long, Course> findCourseMap(List<CartItem> cartItems) {
         List<Long> courseIds = cartItems.stream()
                 .map(CartItem::getCourseId)
                 .distinct()
@@ -136,13 +136,11 @@ public class OrderService {
 
         List<Course> courses = new ArrayList<>();
         courseRepository.findAllById(courseIds).forEach(courses::add);
-        return courses;
+        return courses.stream()
+                .collect(Collectors.toMap(Course::getId, Function.identity()));
     }
 
-    private Course getCourse(List<Course> courses, Long courseId) {
-        Map<Long, Course> courseMap = courses.stream()
-                .collect(Collectors.toMap(Course::getId, Function.identity()));
-
+    private Course getCourse(Map<Long, Course> courseMap, Long courseId) {
         Course course = courseMap.get(courseId);
         if (course == null) {
             throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
