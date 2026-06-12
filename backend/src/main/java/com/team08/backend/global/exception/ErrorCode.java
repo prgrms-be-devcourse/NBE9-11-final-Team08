@@ -69,6 +69,14 @@ public enum ErrorCode {
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND,        "CART_001", "장바구니 항목을 찾을 수 없습니다."),
     LECTURE_ALREADY_IN_CART(HttpStatus.CONFLICT,         "CART_002", "이미 장바구니에 담긴 강의입니다."),
 
+    // ── QnA ──────────────────────────────────────────────────────────────
+    QNA_QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND,   "QNA_001", "QnA 질문을 찾을 수 없습니다."),
+    QNA_ANSWER_NOT_FOUND(HttpStatus.NOT_FOUND,     "QNA_002", "QnA 답변을 찾을 수 없습니다."),
+    QNA_ACCESS_DENIED(HttpStatus.FORBIDDEN,        "QNA_003", "QnA에 접근할 권한이 없습니다."),
+    QNA_ANSWER_ALREADY_EXISTS(HttpStatus.CONFLICT, "QNA_004", "이미 답변이 존재합니다."),
+    QNA_ALREADY_ANSWERED(HttpStatus.CONFLICT,      "QNA_004", "이미 답변된 질문은 수정/삭제할 수 없습니다."),
+    INSTRUCTOR_ONLY(HttpStatus.FORBIDDEN,          "QNA_005", "강사만 접근 가능합니다."),
+
     // ── Report ───────────────────────────────────────────────────────────
     NOT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_001", "스터디 구성원이 아닙니다."),
     NOT_CURRENT_STUDY_MEMBER(HttpStatus.FORBIDDEN,      "REPORT_002", "현재 소속된 스터디 구성원이 아닙니다."),
