@@ -1,46 +1,123 @@
 package com.team08.backend.global.auth.config;
 
+import com.team08.backend.domain.auth.token.JwtProvider;
+import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SecurityConfigTest.TestController.class)
 @Import({
         SecurityConfig.class,
+        JwtProvider.class,
         SecurityConfigTest.TestController.class
 })
 class SecurityConfigTest {
 
+    private static final LoginUserDto LOGIN_USER = new LoginUserDto(
+            1L,
+            "test@example.com",
+            "테스트유저",
+            "ROLE_USER"
+    );
+
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JwtProvider jwtProvider;
 
     @Test
     void accessToken이_없으면_인증에_실패한다() throws Exception {
         mockMvc.perform(get("/test"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_004"))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
-    void bearerAccessToken이_있으면_요청할_수_있다() throws Exception {
+    void 유효한_accessToken이면_사용자_정보와_권한으로_인증한다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
         mockMvc.perform(get("/test")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
-                .andExpect(status().isOk());
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(LOGIN_USER.id()))
+                .andExpect(jsonPath("$.email").value(LOGIN_USER.email()))
+                .andExpect(jsonPath("$.name").value(LOGIN_USER.name()))
+                .andExpect(jsonPath("$.role").value(LOGIN_USER.role()))
+                .andExpect(jsonPath("$.authority").value(LOGIN_USER.role()));
+    }
+
+    @Test
+    void refreshToken으로는_인증할_수_없다() throws Exception {
+        String refreshToken = jwtProvider.generateRefreshToken(LOGIN_USER.id());
+
+        mockMvc.perform(get("/test")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_004"));
+    }
+
+    @Test
+    void 위조된_토큰으로는_인증할_수_없다() throws Exception {
+        mockMvc.perform(get("/test")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid.token.value"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_004"));
+    }
+
+    @Test
+    void 만료된_accessToken으로는_인증할_수_없다() throws Exception {
+        JwtProvider expiredTokenProvider = new JwtProvider(new TokenProperties(
+                "test-secret-key-test-secret-key-test-secret-key",
+                -1000L,
+                1209600000L
+        ));
+        String expiredToken = expiredTokenProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(get("/test")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_004"));
     }
 
     @RestController
     static class TestController {
 
         @GetMapping("/test")
-        String test() {
-            return "ok";
+        TestAuthenticationResponse test(
+                @AuthenticationPrincipal LoginUserPrincipal principal
+        ) {
+            LoginUserDto user = principal.user();
+            return new TestAuthenticationResponse(
+                    user.id(),
+                    user.email(),
+                    user.name(),
+                    user.role(),
+                    principal.authorities().iterator().next().getAuthority()
+            );
         }
+    }
+
+    record TestAuthenticationResponse(
+            Long id,
+            String email,
+            String name,
+            String role,
+            String authority
+    ) {
     }
 }
