@@ -33,3 +33,6 @@ app:
     secret: test-secret-key-test-secret-key-test-secret-key
     expiration-millis: 3600000
     refresh-expiration-millis: 1209600000
+
+file:
+  upload-dir: src/test/resources/test-uploads

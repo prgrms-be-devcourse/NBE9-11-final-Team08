@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -261,6 +262,36 @@ class CourseControllerTest {
         mockMvc.perform(delete("/api/courses/{courseId}", courseId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
+    void 인증된_판매자가_비디오_파일_업로드_및_인코딩_요청_시_202_상태코드를_반환한다() throws Exception {
+        Long lectureId = 10L;
+        MockMultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "mock video content".getBytes()
+        );
+
+        doNothing().when(courseService).uploadAndEncodeLectureVideo(eq(1L), eq(lectureId), any());
+
+        mockMvc.perform(multipart("/api/courses/lectures/{lectureId}/videos", lectureId)
+                        .file(mockFile)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .with(csrf()))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void 비인증_사용자가_비디오_파일_업로드_요청_시_401_상태코드를_반환한다() throws Exception {
+        Long lectureId = 10L;
+        MockMultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "mock video content".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/courses/lectures/{lectureId}/videos", lectureId)
+                        .file(mockFile)
+                        .with(csrf()))
                 .andExpect(status().isUnauthorized());
     }
 }
