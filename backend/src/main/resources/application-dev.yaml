@@ -34,3 +34,6 @@ app:
     refresh-cookie:
       secure: false
       same-site: None
+
+file:
+  upload-dir: ${LOCAL_UPLOAD_DIR:./videos-local}

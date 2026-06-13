@@ -15,6 +15,7 @@ import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
@@ -29,6 +30,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import static java.util.UUID.randomUUID;
 
 @Slf4j
 @Service
@@ -42,6 +52,8 @@ public class CourseService {
     private final CourseStudyManager courseStudyManager;
     private final EnrollmentRepository enrollmentRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final MediaEncodingService mediaEncodingService;
+    private final LectureRepository lectureRepository;
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request) {
@@ -190,6 +202,30 @@ public class CourseService {
         if (enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)) {
             throw new CustomException(ErrorCode.COURSE_HAS_ACTIVE_ENROLLMENTS);
         }
+    }
+
+    @Transactional
+    public void uploadAndEncodeLectureVideo(Long instructorId, Long lectureId, MultipartFile file) {
+        if (file.isEmpty() || file.getContentType() == null || !file.getContentType().startsWith("video/")) {
+            throw new CustomException(ErrorCode.INVALID_VIDEO_FORMAT);
+        }
+
+        Course course = courseRepository.findByLectureId(lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        course.validateOwner(instructorId);
+
+        String targetDirName = randomUUID().toString();
+        File tempSourceFile;
+
+        try {
+            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), targetDirName, ".mp4");
+            tempSourceFile = tempFilePath.toFile();
+            file.transferTo(tempSourceFile);
+        } catch (IOException e) {
+            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+        }
+
+        mediaEncodingService.encodeToHls(tempSourceFile, targetDirName, lectureId);
     }
 
     @Component

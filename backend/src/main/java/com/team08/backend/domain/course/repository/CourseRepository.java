@@ -29,4 +29,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     void increaseViewCountAtomic(@Param("courseId") Long courseId);
 
     Page<Course> findAllByStatus(CourseStatus status, Pageable pageable);
+
+    @Query("SELECT c FROM Course c JOIN Chapter ch ON ch.course = c JOIN Lecture l ON l.chapter = ch WHERE l.id = :lectureId")
+    Optional<Course> findByLectureId(@Param("lectureId") Long lectureId);
 }
