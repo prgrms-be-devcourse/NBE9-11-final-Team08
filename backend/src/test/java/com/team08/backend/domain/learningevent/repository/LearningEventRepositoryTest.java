@@ -1,5 +1,6 @@
 package com.team08.backend.domain.learningevent.repository;
 
+import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.global.config.JpaConfig;
@@ -70,45 +71,35 @@ class LearningEventRepositoryTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // 강의별 통계 - countByCourseIdAndEventType, sumWatchTimeSeconds
+    // 강의별 통계 - getStatsByCourseId
     // ─────────────────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("강좌별 이벤트 타입 카운트를 정확히 집계한다")
-    void countByCourseIdAndEventType_correctCount() {
+    @DisplayName("단일 쿼리로 강좌별 입장 수, 시청 시간, 완료 수를 한 번에 집계한다")
+    void getStatsByCourseId_aggregatesAllInOneQuery() {
         Long courseId = 10L;
         save(1L, courseId, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e1");
         save(2L, courseId, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e2");
-        save(3L, courseId, 2L, 3L, LearningEventType.LECTURE_COMPLETE, null, "e3");
-        save(4L, 99L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e4"); // 다른 강좌
+        save(3L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 300, "e3");
+        save(4L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 500, "e4");
+        save(5L, courseId, 2L, 3L, LearningEventType.LECTURE_COMPLETE, null, "e5");
+        save(6L, 99L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e6"); // 다른 강좌 제외
 
-        assertThat(learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_ENTER))
-                .isEqualTo(2);
-        assertThat(learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_COMPLETE))
-                .isEqualTo(1);
+        CourseStatsProjection result = learningEventRepository.getStatsByCourseId(courseId);
+
+        assertThat(result.enterCount()).isEqualTo(2L);
+        assertThat(result.watchTimeSeconds()).isEqualTo(800L);
+        assertThat(result.completionCount()).isEqualTo(1L);
     }
 
     @Test
-    @DisplayName("VIDEO_END 이벤트의 positionSeconds 합계를 집계한다")
-    void sumWatchTimeSecondsByCourseId_correctSum() {
-        Long courseId = 10L;
-        save(1L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 300, "v1");
-        save(2L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 500, "v2");
-        save(3L, courseId, 2L, 3L, LearningEventType.VIDEO_START, 0, "v3"); // VIDEO_START는 제외
-        save(4L, 99L, 2L, 3L, LearningEventType.VIDEO_END, 1000, "v4"); // 다른 강좌 제외
+    @DisplayName("이벤트가 없는 강좌는 모든 통계가 0이다")
+    void getStatsByCourseId_noEvents_returnsAllZero() {
+        CourseStatsProjection result = learningEventRepository.getStatsByCourseId(999L);
 
-        long total = learningEventRepository.sumWatchTimeSecondsByCourseId(courseId);
-
-        assertThat(total).isEqualTo(800L);
-    }
-
-    @Test
-    @DisplayName("VIDEO_END 이벤트가 없으면 시청 시간은 0이다")
-    void sumWatchTimeSecondsByCourseId_noVideoEnd_returnsZero() {
-        Long courseId = 10L;
-        save(1L, courseId, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "x1");
-
-        assertThat(learningEventRepository.sumWatchTimeSecondsByCourseId(courseId)).isEqualTo(0L);
+        assertThat(result.enterCount()).isEqualTo(0L);
+        assertThat(result.watchTimeSeconds()).isEqualTo(0L);
+        assertThat(result.completionCount()).isEqualTo(0L);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

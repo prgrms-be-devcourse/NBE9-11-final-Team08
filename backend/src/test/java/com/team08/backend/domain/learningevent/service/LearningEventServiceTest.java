@@ -4,6 +4,7 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
+import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
@@ -171,9 +172,8 @@ class LearningEventServiceTest {
     void getCourseStats_admin_success() {
         Long courseId = 10L;
 
-        given(learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_ENTER)).willReturn(50L);
-        given(learningEventRepository.sumWatchTimeSecondsByCourseId(courseId)).willReturn(36000L);
-        given(learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_COMPLETE)).willReturn(30L);
+        given(learningEventRepository.getStatsByCourseId(courseId))
+                .willReturn(new CourseStatsProjection(50L, 36000L, 30L));
 
         CourseStatsResponse stats =
                 learningEventService.getCourseStats(99L, courseId, "ROLE_ADMIN");
@@ -182,6 +182,8 @@ class LearningEventServiceTest {
         assertThat(stats.enterCount()).isEqualTo(50L);
         assertThat(stats.watchTimeSeconds()).isEqualTo(36000L);
         assertThat(stats.completionCount()).isEqualTo(30L);
+        // 단일 쿼리로 집계됐는지 확인
+        verify(learningEventRepository).getStatsByCourseId(courseId);
     }
 
     @Test
@@ -192,8 +194,8 @@ class LearningEventServiceTest {
         Course course = mockCourse(courseId, sellerId);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(learningEventRepository.countByCourseIdAndEventType(eq(courseId), any())).willReturn(5L);
-        given(learningEventRepository.sumWatchTimeSecondsByCourseId(courseId)).willReturn(1000L);
+        given(learningEventRepository.getStatsByCourseId(courseId))
+                .willReturn(new CourseStatsProjection(5L, 1000L, 3L));
 
         CourseStatsResponse stats =
                 learningEventService.getCourseStats(sellerId, courseId, "ROLE_SELLER");

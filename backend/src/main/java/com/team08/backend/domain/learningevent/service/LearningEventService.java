@@ -5,6 +5,7 @@ import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
 import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
+import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
@@ -67,11 +68,12 @@ public class LearningEventService {
     public CourseStatsResponse getCourseStats(Long requesterId, Long courseId, String requesterRole) {
         validateAdminOrCourseOwner(requesterId, courseId, requesterRole);
 
+        CourseStatsProjection projection = learningEventRepository.getStatsByCourseId(courseId);
         return new CourseStatsResponse(
                 courseId,
-                learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_ENTER),     // 강좌 단위의 입장 수
-                learningEventRepository.sumWatchTimeSecondsByCourseId(courseId),    //총 시청 시간
-                learningEventRepository.countByCourseIdAndEventType(courseId, LearningEventType.LECTURE_COMPLETE)  // 수강 완료 수
+                projection.enterCount(),
+                projection.watchTimeSeconds(),
+                projection.completionCount()
         );
     }
 
