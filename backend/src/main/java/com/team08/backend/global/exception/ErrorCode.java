@@ -121,7 +121,13 @@ public enum ErrorCode {
 
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),
-    LEARNING_EVENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "LEARNING_002", "학습 이벤트에 접근할 권한이 없습니다.");
+    LEARNING_EVENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "LEARNING_002", "학습 이벤트에 접근할 권한이 없습니다."),
+
+    // ── Media ────────────────────────────────────────────────────────────
+    INVALID_VIDEO_FORMAT(HttpStatus.BAD_REQUEST, "MEDIA_001", "올바르지 않은 비디오 파일 형식입니다."),
+    VIDEO_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_002", "로컬 디스크에 원본 비디오 파일 업로드를 실패했습니다."),
+    VIDEO_ENCODING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_003", "HLS 비디오 스트리밍 인코딩 처리에 실패했습니다."),
+    MEDIA_TEMP_DIR_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_004", "임시 디렉터리 생성에 실패했습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
