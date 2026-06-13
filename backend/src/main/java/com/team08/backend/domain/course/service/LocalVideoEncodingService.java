@@ -17,6 +17,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -33,6 +34,7 @@ public class LocalVideoEncodingService implements MediaEncodingService {
     @Transactional
     public void encodeToHls(File sourceFile, String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
+        Process process = null;
 
         try {
             Files.createDirectories(targetPath);
@@ -50,14 +52,22 @@ public class LocalVideoEncodingService implements MediaEncodingService {
             );
 
             pb.redirectErrorStream(true);
-            Process process = pb.start();
+            process = pb.start();
 
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 while (reader.readLine() != null) {}
             }
 
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+            if (!finished) {
+                process.destroyForcibly();
+                log.error("HLS encoding timeout exceeded for lectureId: {}", lectureId);
+                throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+            }
+
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
+                log.error("HLS encoding failed. exitCode: {}, lectureId: {}", exitCode, lectureId);
                 throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
             }
 
@@ -67,6 +77,9 @@ public class LocalVideoEncodingService implements MediaEncodingService {
             lecture.updateM3u8Path(dbSavePath);
 
         } catch (Exception e) {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
             log.error("HLS encoding failed for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {

@@ -33,6 +33,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static java.util.UUID.randomUUID;
 
@@ -211,11 +215,13 @@ public class CourseService {
         course.validateOwner(instructorId);
 
         String targetDirName = randomUUID().toString();
-        File tempSourceFile = new File(System.getProperty("java.io.tmpdir"), targetDirName + ".mp4");
+        File tempSourceFile;
 
         try {
+            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), targetDirName, ".mp4");
+            tempSourceFile = tempFilePath.toFile();
             file.transferTo(tempSourceFile);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
         }
 
