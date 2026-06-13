@@ -24,4 +24,20 @@ public class LearningEvent {
     private LocalDateTime eventTime;
     @Column(unique = true)
     private String uniqueEventKey;
+
+    public static LearningEvent create(
+            Long userId,
+            Long courseId,
+            Long chapterId,
+            Long lectureId,
+            LearningEventType eventType,
+            Integer positionSeconds,
+            LocalDateTime eventTime,
+            String uniqueEventKey
+    ) {
+        return new LearningEvent(
+                null, userId, courseId, chapterId, lectureId,
+                eventType, positionSeconds, eventTime, uniqueEventKey
+        );
+    }
 }
