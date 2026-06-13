@@ -5,7 +5,5 @@ public enum LearningEventType {
     VIDEO_START,
     VIDEO_END,
     POSITION_SAVE,
-    LECTURE_COMPLETE,
-    REFLECTION_CREATE,
-    QNA_CREATE
+    LECTURE_COMPLETE
 }

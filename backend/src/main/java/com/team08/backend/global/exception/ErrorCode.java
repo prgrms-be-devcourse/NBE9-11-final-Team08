@@ -117,7 +117,11 @@ public enum ErrorCode {
     COUPON_ISSUE_PERIOD_ENDED(HttpStatus.BAD_REQUEST, "COUPON_006", "쿠폰 발급 기간이 종료되었습니다."),
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_007", "존재하지 않는 쿠폰입니다."),
     COUPON_NOT_OWNED(HttpStatus.FORBIDDEN, "COUPON_008", "본인의 쿠폰만 사용할 수 있습니다."),
-    COUPON_ALREADY_USED_OR_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_009", "사용할 수 없는 쿠폰 상태입니다.");
+    COUPON_ALREADY_USED_OR_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_009", "사용할 수 없는 쿠폰 상태입니다."),
+
+    // ── LearningEvent ─────────────────────────────────────────────────────
+    DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),
+    LEARNING_EVENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "LEARNING_002", "학습 이벤트에 접근할 권한이 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
