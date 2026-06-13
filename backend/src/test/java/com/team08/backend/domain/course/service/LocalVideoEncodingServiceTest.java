@@ -110,9 +110,7 @@ class LocalVideoEncodingServiceTest {
             @Override
             public void encodeToHls(File sourceFile, String targetDirName, Long lectureId) {
                 try {
-                    throw new CustomException(
-                            ErrorCode.VIDEO_ENCODING_FAILED
-                    );
+                    throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
                 } finally {
                     if (sourceFile.exists()) {
                         sourceFile.delete();
@@ -122,8 +120,7 @@ class LocalVideoEncodingServiceTest {
         };
         ReflectionTestUtils.setField(stubService, "uploadDir", tempUploadDir.toString());
 
-        assertThatThrownBy(() ->
-                        stubService.encodeToHls(tempSourceFile, targetDirName, lectureId))
+        assertThatThrownBy(() -> stubService.encodeToHls(tempSourceFile, targetDirName, lectureId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.VIDEO_ENCODING_FAILED.getMessage());
 
