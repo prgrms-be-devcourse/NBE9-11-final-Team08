@@ -21,6 +21,7 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
@@ -34,7 +35,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Optional;
@@ -68,6 +72,12 @@ class CourseServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private MediaEncodingService mediaEncodingService;
+
+    @Mock
+    private LectureRepository lectureRepository;
 
     @InjectMocks
     private CourseService courseService;
@@ -642,7 +652,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 관리자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+    void admin이_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
         Long courseId = 100L;
         Long adminId = 1L;
         Course course = Course.builder()
@@ -715,5 +725,117 @@ class CourseServiceTest {
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 올바르지_않은_비디오_포맷_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "test.txt", "text/plain", "invalid content".getBytes()
+        );
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
+
+        verify(courseRepository, never()).findByLectureId(any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(File.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 존재하지_않는_강의_ID로_비디오_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long invalidLectureId = 999L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        given(courseRepository.findByLectureId(invalidLectureId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, invalidLectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(File.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 강좌_소유자가_아닌_사용자가_비디오_업로드_요청_시_예외가_발생한다() {
+        Long hackerId = 999L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        Course course = Course.builder()
+                .instructorId(1L)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(hackerId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(File.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 소유권_검증을_통과하면_HLS_인코딩_서비스를_성공적으로_트리거한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
+
+        courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
+
+        verify(courseRepository).findByLectureId(lectureId);
+        verify(mediaEncodingService).encodeToHls(any(File.class), any(String.class), eq(lectureId));
+    }
+
+    @Test
+    void 유효하지_않은_비디오_확장자_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "hacker.txt", "text/plain", "invalid_content".getBytes()
+        );
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(File.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 비디오_업로드_조건을_충족하면_임시_파일을_생성하고_인코딩_서비스를_정상적으로_호출한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "sample.mp4", "video/mp4", "video_stream_bytes".getBytes()
+        );
+
+        Course course = Course.builder()
+                .instructorId(instructorId)
+                .status(CourseStatus.DRAFT)
+                .build();
+
+        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
+
+        courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
+
+        verify(courseRepository).findByLectureId(lectureId);
+        verify(mediaEncodingService).encodeToHls(any(File.class), any(String.class), eq(lectureId));
     }
 }
