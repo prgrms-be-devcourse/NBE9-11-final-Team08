@@ -82,8 +82,6 @@ Enum learning_event_type {
   VIDEO_END
   POSITION_SAVE
   LECTURE_COMPLETE
-  REFLECTION_CREATE
-  QNA_CREATE
 }
 Enum enrollment_status {
   ACTIVE
@@ -169,7 +167,7 @@ Table lecture_modification_requests {
   
   status varchar [not null]         // 신청 상태 (PENDING, APPROVED, REJECTED)
   rejected_reason text              // 관리자가 반려할 경우 적는 반려 사유
-  
+
   managed_by bigint                 // 검토한 관리자 식별자
   created_at timestamp [not null]   // 신청 일시
   updated_at timestamp [not null]   // 처리 일시
