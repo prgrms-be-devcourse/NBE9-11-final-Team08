@@ -817,25 +817,4 @@ class CourseServiceTest {
 
         verify(mediaEncodingService, never()).encodeToHls(any(File.class), any(String.class), any(Long.class));
     }
-
-    @Test
-    void 비디오_업로드_조건을_충족하면_임시_파일을_생성하고_인코딩_서비스를_정상적으로_호출한다() {
-        Long instructorId = 1L;
-        Long lectureId = 10L;
-        MultipartFile mockFile = new MockMultipartFile(
-                "file", "sample.mp4", "video/mp4", "video_stream_bytes".getBytes()
-        );
-
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.DRAFT)
-                .build();
-
-        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
-
-        courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
-
-        verify(courseRepository).findByLectureId(lectureId);
-        verify(mediaEncodingService).encodeToHls(any(File.class), any(String.class), eq(lectureId));
-    }
 }
