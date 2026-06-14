@@ -2,8 +2,7 @@ package com.team08.backend.domain.issuedcoupon.repository;
 
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -32,8 +31,7 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
         try {
             return saveAndFlush(coupon);
         } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+            throw new CouponAlreadyIssuedException();
         }
     }
-
 }

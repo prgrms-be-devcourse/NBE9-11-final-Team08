@@ -1,8 +1,7 @@
 package com.team08.backend.domain.issuedcoupon.strategy;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.domain.issuedcoupon.exception.InvalidCouponTypeException;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -24,7 +23,7 @@ public class IssuedCouponStrategyFactory {
     public IssuedCouponStrategy getStrategy(CouponType type) {
         IssuedCouponStrategy strategy = strategyMap.get(type);
         if (strategy == null) {
-            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
+            throw new InvalidCouponTypeException();
         }
         return strategy;
     }
