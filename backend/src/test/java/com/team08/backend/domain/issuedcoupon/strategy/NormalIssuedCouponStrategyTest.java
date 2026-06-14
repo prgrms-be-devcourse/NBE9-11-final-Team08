@@ -47,7 +47,7 @@ class NormalIssuedCouponStrategyTest {
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
         when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
-        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(issuedCouponRepository.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         IssuedCoupon result = normalIssuedCouponStrategy.issue(userId, policyId);
@@ -56,7 +56,7 @@ class NormalIssuedCouponStrategyTest {
         assertThat(result).isNotNull();
         assertThat(result.getPolicyId()).isEqualTo(policyId);
         verify(policy).validateIssuePeriod();
-        verify(issuedCouponRepository).saveAndFlush(any());
+        verify(issuedCouponRepository).saveWithConcurrencyProtection(any());
     }
 
     @Test
