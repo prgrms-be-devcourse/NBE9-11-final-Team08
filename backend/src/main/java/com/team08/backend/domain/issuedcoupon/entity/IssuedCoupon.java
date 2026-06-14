@@ -1,5 +1,9 @@
 package com.team08.backend.domain.issuedcoupon.entity;
 
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyUsedOrExpiredException;
+import com.team08.backend.domain.issuedcoupon.exception.CouponNotOwnedException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,8 +56,13 @@ public class IssuedCoupon {
         this.expiredAt = expiredAt;
     }
 
-    public static IssuedCoupon issue(Long policyId, Long userId, LocalDateTime expiredAt) {
-        return new IssuedCoupon(policyId, userId, expiredAt);
+    // 쿠폰 발급 기록 생성
+    public static IssuedCoupon create(CouponPolicy policy, Long userId) {
+        return new IssuedCoupon(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
     }
 
     // 쿠폰 사용 처리 (단회성)
@@ -65,5 +74,30 @@ public class IssuedCoupon {
     // 쿠폰 사용 기록 (다회성)
     public void recordUsage() {
         this.usedAt = LocalDateTime.now();
+    }
+
+    // 쿠폰 사용 처리 (쿠폰 사용 타입에 따라 결정)
+    public void applyUsage(CouponUsageType usageType) {
+        if (usageType == CouponUsageType.SINGLE_USE) {
+            this.use();
+        } else {
+            this.recordUsage();
+        }
+    }
+
+    // 쿠폰 사용 가능 여부 검증
+    public void validateUsable(Long userId) {
+        if (!this.userId.equals(userId)) {
+            throw new CouponNotOwnedException();
+        }
+
+        // 지연 평가
+        if (this.status == CouponStatus.ISSUED && this.expiredAt.isBefore(LocalDateTime.now())) {
+            this.status = CouponStatus.EXPIRED;
+        }
+
+        if (this.status != CouponStatus.ISSUED) {
+            throw new CouponAlreadyUsedOrExpiredException();
+        }
     }
 }
