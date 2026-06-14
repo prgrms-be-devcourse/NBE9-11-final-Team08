@@ -14,6 +14,7 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,14 +43,19 @@ public class IssuedCouponService {
         CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
 
-        // 쿠폰 발급 기록 생성 및 저장
+        // 쿠폰 발급 기록
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        issuedCouponRepository.save(newCoupon);
+        // 쿠폰 발급 저장 및 동시성 방어
+        try {
+            issuedCouponRepository.saveAndFlush(newCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
     }
 
     // [시스템] 출석 보상 쿠폰 자동 발급
@@ -64,14 +70,19 @@ public class IssuedCouponService {
         CouponPolicy policy = couponPolicyRepository.findByName("연속 출석 보상 쿠폰")
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
 
-        // 쿠폰 발급 기록 생성 및 저장
+        // 쿠폰 발급 기록 생성
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        issuedCouponRepository.save(newCoupon);
+        // 쿠폰 발급 저장 및 동시성 방어
+        try {
+            issuedCouponRepository.saveAndFlush(newCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
     }
 
     // [사용자] 일반 쿠폰 다운로드
@@ -99,15 +110,19 @@ public class IssuedCouponService {
         // 쿠폰 발급 기간 검증
         policy.validateIssuePeriod();
 
-        // 쿠폰 발급 기록 생성 및 저장
+        // 쿠폰 발급 기록 생성
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
-
-        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
-        return IssuedCouponResponse.from(savedCoupon);
+        // 쿠폰 발급 저장 및 동시성 방어
+        try {
+            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
+            return IssuedCouponResponse.from(savedCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
     }
 
     // [사용자] 선착순 쿠폰 다운로드
@@ -138,15 +153,20 @@ public class IssuedCouponService {
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
 
-        // 쿠폰 발급 기록 생성 및 저장
+        // 쿠폰 발급 기록 생성
         IssuedCoupon newCoupon = IssuedCoupon.issue(
                 policy.getId(),
                 userId,
                 policy.calculateExpirationDate()
         );
 
-        IssuedCoupon savedCoupon = issuedCouponRepository.save(newCoupon);
-        return IssuedCouponResponse.from(savedCoupon);
+        // 쿠폰 발급 저장 및 동시성 방어
+        try {
+            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
+            return IssuedCouponResponse.from(savedCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
     }
 
     // [사용자] 내 쿠폰 목록 조회
