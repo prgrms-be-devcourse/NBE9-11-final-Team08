@@ -22,24 +22,14 @@ public class CouponController {
 
     private final IssuedCouponService issuedCouponService;
 
-    // [사용자] 일반 쿠폰 다운로드 /api/coupons/{policyId}/download
+    // [사용자] 쿠폰 다운로드 /api/coupons/{policyId}/download
     @PostMapping("/{policyId}/download")
-    @Operation(summary = "일반 쿠폰 다운로드", description = "지정한 쿠폰 정책 ID로 쿠폰을 다운로드합니다.")
+    @Operation(summary = "쿠폰 다운로드", description = "지정한 쿠폰 정책 ID로 쿠폰을 다운로드합니다. (일반/선착순 등 타입에 따라 자동 처리)")
     public IssuedCouponResponse downloadCoupon(
             @Parameter(description = "다운로드할 쿠폰 정책 ID")
             @PathVariable Long policyId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         return issuedCouponService.downloadCoupon(loginUserPrincipal.user().id(), policyId);
-    }
-
-    // [사용자] 선착순 쿠폰 다운로드 /api/coupons/{policyId}/download-fcfs
-    @PostMapping("/{policyId}/download-fcfs")
-    @Operation(summary = "선착순 쿠폰 다운로드", description = "재고가 제한된 선착순 쿠폰을 다운로드합니다.")
-    public IssuedCouponResponse downloadFcfsCoupon(
-            @Parameter(description = "다운로드할 쿠폰 정책 ID")
-            @PathVariable Long policyId,
-            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        return issuedCouponService.downloadFcfsCoupon(loginUserPrincipal.user().id(), policyId);
     }
 
     // [사용자] 내 쿠폰 목록 조회 /api/coupons/me
