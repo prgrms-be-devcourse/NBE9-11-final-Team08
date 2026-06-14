@@ -136,8 +136,9 @@ public class CouponPolicy extends BaseTimeEntity {
             // 정액 할인: (할인 금액과 원래 가격 중 작은 값 반환 - 상품가보다 더 할인되는 것 방지)
             return Math.min(this.discountValue, originalPrice);
         } else {
-            // 정률 할인: (원래 가격 * 할인율)
-            int discount = (int) (originalPrice * (this.discountValue / 100.0));
+            // 정률 할인 (원 단위 내림): (원래 가격 * 할인율) / 100
+            int discount = (int) ((long) originalPrice * this.discountValue / 100);
+
             // 최대 할인 금액 제한이 있는 경우
             if (this.maxDiscountAmount != null && discount > this.maxDiscountAmount) {
                 return this.maxDiscountAmount;
