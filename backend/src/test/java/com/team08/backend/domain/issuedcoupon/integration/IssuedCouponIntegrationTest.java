@@ -80,7 +80,7 @@ class IssuedCouponIntegrationTest {
         CouponPolicy policy = savePolicy("선착순 100명 쿠폰", CouponType.FCFS);
 
         // when
-        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download-fcfs"))
+        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
                 .andExpect(jsonPath("$.status").value("ISSUED"));
