@@ -8,7 +8,6 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,17 +38,10 @@ public class NormalIssuedCouponStrategy implements IssuedCouponStrategy {
         // 쿠폰 발급 기간 검증
         policy.validateIssuePeriod();
 
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
+        // 쿠폰 발급 기록 생성
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
 
         // 동시성 방어
-        try {
-            return issuedCouponRepository.saveAndFlush(newCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        return issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
     }
 }

@@ -16,7 +16,6 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,19 +45,11 @@ public class IssuedCouponService {
         CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
 
-        // 쿠폰 발급 기록
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
+        // 쿠폰 발급 기록 생성
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
 
         // 쿠폰 발급 저장 및 동시성 방어
-        try {
-            issuedCouponRepository.saveAndFlush(newCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
     }
 
     // [시스템] 출석 보상 쿠폰 자동 발급
@@ -74,18 +65,10 @@ public class IssuedCouponService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
 
         // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
 
         // 쿠폰 발급 저장 및 동시성 방어
-        try {
-            issuedCouponRepository.saveAndFlush(newCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
     }
 
     // [사용자] 쿠폰 다운로드

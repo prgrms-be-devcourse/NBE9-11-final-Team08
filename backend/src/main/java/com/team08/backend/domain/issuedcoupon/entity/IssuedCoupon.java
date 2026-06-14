@@ -1,5 +1,6 @@
 package com.team08.backend.domain.issuedcoupon.entity;
 
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,8 +53,13 @@ public class IssuedCoupon {
         this.expiredAt = expiredAt;
     }
 
-    public static IssuedCoupon issue(Long policyId, Long userId, LocalDateTime expiredAt) {
-        return new IssuedCoupon(policyId, userId, expiredAt);
+    // 쿠폰 발급 기록 생성
+    public static IssuedCoupon create(CouponPolicy policy, Long userId) {
+        return new IssuedCoupon(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
     }
 
     // 쿠폰 사용 처리 (단회성)

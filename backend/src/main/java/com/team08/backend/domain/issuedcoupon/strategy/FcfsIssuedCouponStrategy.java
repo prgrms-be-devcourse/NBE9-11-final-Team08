@@ -43,17 +43,10 @@ public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
 
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
+        // 쿠폰 발급 기록 생성
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
 
         // 동시성 방어
-        try {
-            return issuedCouponRepository.saveAndFlush(newCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        return issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
     }
 }

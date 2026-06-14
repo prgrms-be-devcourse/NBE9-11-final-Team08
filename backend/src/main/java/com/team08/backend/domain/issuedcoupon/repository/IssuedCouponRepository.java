@@ -2,6 +2,9 @@ package com.team08.backend.domain.issuedcoupon.repository;
 
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -23,5 +26,14 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
             @Param("issuedStatus") CouponStatus issuedStatus,
             @Param("expiredStatus") CouponStatus expiredStatus
     );
+
+    // 쿠폰 발급 저장 및 동시성 방어
+    default IssuedCoupon saveWithConcurrencyProtection(IssuedCoupon coupon) {
+        try {
+            return saveAndFlush(coupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+    }
 
 }
