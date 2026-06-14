@@ -2,8 +2,8 @@ package com.team08.backend.domain.issuedcoupon.entity;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyUsedOrExpiredException;
+import com.team08.backend.domain.issuedcoupon.exception.CouponNotOwnedException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -88,10 +88,16 @@ public class IssuedCoupon {
     // 쿠폰 사용 가능 여부 검증
     public void validateUsable(Long userId) {
         if (!this.userId.equals(userId)) {
-            throw new CustomException(ErrorCode.COUPON_NOT_OWNED);
+            throw new CouponNotOwnedException();
         }
+
+        // 지연 평가
+        if (this.status == CouponStatus.ISSUED && this.expiredAt.isBefore(LocalDateTime.now())) {
+            this.status = CouponStatus.EXPIRED;
+        }
+
         if (this.status != CouponStatus.ISSUED) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_USED_OR_EXPIRED);
+            throw new CouponAlreadyUsedOrExpiredException();
         }
     }
 }
