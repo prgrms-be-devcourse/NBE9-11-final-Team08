@@ -1,0 +1,59 @@
+package com.team08.backend.domain.issuedcoupon.strategy;
+
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+@RequiredArgsConstructor
+public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
+
+    private final CouponPolicyRepository couponPolicyRepository;
+    private final IssuedCouponRepository issuedCouponRepository;
+
+    @Override
+    public CouponType getSupportedType() {
+        return CouponType.FCFS;
+    }
+
+    // [사용자] 선착순 쿠폰 발급 로직
+    @Override
+    @Transactional
+    public IssuedCoupon issue(Long userId, Long policyId) {
+        // 비관적 락을 적용한 쿠폰 정책 조회
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+
+        // 중복 발급 체크
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+
+        // 쿠폰 발급 기간 검증
+        policy.validateIssuePeriod();
+
+        // 쿠폰 수량 차감 및 재고 소진 체크
+        policy.decreaseQuantity();
+
+        IssuedCoupon newCoupon = IssuedCoupon.issue(
+                policy.getId(),
+                userId,
+                policy.calculateExpirationDate()
+        );
+
+        // 동시성 방어
+        try {
+            return issuedCouponRepository.saveAndFlush(newCoupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+    }
+}

@@ -10,6 +10,8 @@ import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
+import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -29,6 +31,7 @@ public class IssuedCouponService {
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
+    private final IssuedCouponStrategyFactory strategyFactory;
 
     // TODO 나중에 회원가입에 추가
     // [시스템] 가입 기념 쿠폰 자동 발급
@@ -85,7 +88,7 @@ public class IssuedCouponService {
         }
     }
 
-    // [사용자] 일반 쿠폰 다운로드
+    // [사용자] 쿠폰 다운로드
     @Transactional
     public IssuedCouponResponse downloadCoupon(Long userId, Long policyId) {
         // 사용자 존재 확인
@@ -97,76 +100,12 @@ public class IssuedCouponService {
         CouponPolicy policy = couponPolicyRepository.findById(policyId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
 
-        // 일반 다운로드 쿠폰 여부 검증
-        if (policy.getCouponType() != CouponType.NORMAL) {
-            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
-        }
+        // 타입에 맞는 전략 선택
+        IssuedCouponStrategy strategy = strategyFactory.getStrategy(policy.getCouponType());
 
-        // 중복 발급 체크
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
-
-        // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
-
-        // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
-        // 쿠폰 발급 저장 및 동시성 방어
-        try {
-            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
-            return IssuedCouponResponse.from(savedCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
-    }
-
-    // [사용자] 선착순 쿠폰 다운로드
-    @Transactional
-    public IssuedCouponResponse downloadFcfsCoupon(Long userId, Long policyId) {
-        // 사용자 존재 확인
-        if (!userRepository.existsById(userId)) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
-        }
-
-        // 비관적 락을 적용한 쿠폰 정책 조회
-        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
-
-        // 선착순 쿠폰 여부 검증
-        if (policy.getCouponType() != CouponType.FCFS) {
-            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
-        }
-
-        // 중복 발급 체크
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
-
-        // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
-
-        // 쿠폰 수량 차감 및 재고 소진 체크
-        policy.decreaseQuantity();
-
-        // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.issue(
-                policy.getId(),
-                userId,
-                policy.calculateExpirationDate()
-        );
-
-        // 쿠폰 발급 저장 및 동시성 방어
-        try {
-            IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(newCoupon);
-            return IssuedCouponResponse.from(savedCoupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
-        }
+        // 쿠폰 발급 로직 실행 및 저장
+        IssuedCoupon savedCoupon = strategy.issue(userId, policyId);
+        return IssuedCouponResponse.from(savedCoupon);
     }
 
     // [사용자] 내 쿠폰 목록 조회
