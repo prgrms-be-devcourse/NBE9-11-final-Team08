@@ -7,6 +7,8 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
+import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
@@ -36,7 +38,7 @@ public class IssuedCouponService {
     public void issueSignUpCoupon(Long userId) {
         // 쿠폰 타입으로 정책 조회 및 발급
         CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         issueSystemCoupon(userId, policy);
     }
@@ -46,7 +48,7 @@ public class IssuedCouponService {
     public void issueAttendanceCoupon(Long userId) {
         // 쿠폰 이름으로 정책 조회 및 발급
         CouponPolicy policy = couponPolicyRepository.findByName("연속 출석 보상 쿠폰")
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         issueSystemCoupon(userId, policy);
     }
@@ -75,7 +77,7 @@ public class IssuedCouponService {
 
         // 쿠폰 정책 조회
         CouponPolicy policy = couponPolicyRepository.findById(policyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 타입에 맞는 전략 선택
         IssuedCouponStrategy strategy = strategyFactory.getStrategy(policy.getCouponType());
@@ -104,7 +106,7 @@ public class IssuedCouponService {
                 .map(coupon -> {
                     CouponPolicy policy = policyMap.get(coupon.getPolicyId());
                     if (policy == null) {
-                        throw new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND);
+                        throw new CouponPolicyNotFoundException();
                     }
                     return CouponListResponse.of(coupon, policy);
                 })
@@ -115,13 +117,13 @@ public class IssuedCouponService {
     @Transactional(readOnly = true)
     public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
         IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_NOT_FOUND));
+                .orElseThrow(CouponNotFoundException::new);
 
         // 쿠폰 사용 가능 여부 검증
         issuedCoupon.validateUsable(userId);
 
         CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 할인 예상 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
@@ -143,13 +145,13 @@ public class IssuedCouponService {
     @Transactional
     public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
         IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_NOT_FOUND));
+                .orElseThrow(CouponNotFoundException::new);
 
         // 쿠폰 사용 가능 여부 검증
         issuedCoupon.validateUsable(userId);
 
         CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 할인 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);

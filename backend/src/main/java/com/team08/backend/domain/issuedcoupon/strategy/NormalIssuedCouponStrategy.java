@@ -4,9 +4,9 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
+import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +28,11 @@ public class NormalIssuedCouponStrategy implements IssuedCouponStrategy {
     @Transactional
     public IssuedCoupon issue(Long userId, Long policyId) {
         CouponPolicy policy = couponPolicyRepository.findById(policyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COUPON_POLICY_NOT_FOUND));
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 중복 발급 체크
         if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+            throw new CouponAlreadyIssuedException();
         }
 
         // 쿠폰 발급 기간 검증
