@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "attendances", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "attendance_date"}))
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Attendance {
     @Id
@@ -40,19 +39,19 @@ public class Attendance {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    private Attendance(Long userId, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays) {
+    private Attendance(Long userId, LocalDate attendanceDate, Integer consecutiveDays, Integer monthlyTotalDays, LocalDateTime createdAt) {
         this.userId = userId;
         this.attendanceDate = attendanceDate;
         this.consecutiveDays = consecutiveDays;
         this.monthlyTotalDays = monthlyTotalDays;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = createdAt;
     }
 
     // 오늘 자 출석 기록 생성
-    public static Attendance record(Long userId, LocalDate today, int lastConsecutiveDays, int currentMonthCount) {
+    public static Attendance record(Long userId, LocalDate today, int lastConsecutiveDays, int currentMonthCount, LocalDateTime now) {
         int consecutive = lastConsecutiveDays + 1;
         int monthly = currentMonthCount + 1;
 
-        return new Attendance(userId, today, consecutive, monthly);
+        return new Attendance(userId, today, consecutive, monthly, now);
     }
 }

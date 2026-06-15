@@ -13,7 +13,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Optional;
 
@@ -24,10 +26,13 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
     private final IssuedCouponService issuedCouponService;
+    private final Clock clock;
 
     // [사용자] 출석체크
     @Transactional
-    public AttendanceResponse checkIn(Long userId, LocalDate today) {
+    public AttendanceResponse checkIn(Long userId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate today = now.toLocalDate();
 
         // 사용자 검증
         if (!userRepository.existsById(userId)) {
@@ -48,7 +53,7 @@ public class AttendanceService {
                 .orElse(0);
 
         // 오늘 자 출석 기록 생성
-        Attendance todayLog = Attendance.record(userId, today, lastConsecutive, (int) currentMonthCount);
+        Attendance todayLog = Attendance.record(userId, today, lastConsecutive, (int) currentMonthCount, now);
 
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
