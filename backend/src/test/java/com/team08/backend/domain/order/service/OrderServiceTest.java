@@ -1,0 +1,316 @@
+package com.team08.backend.domain.order.service;
+
+import com.team08.backend.domain.cart.entity.Cart;
+import com.team08.backend.domain.cart.repository.CartRepository;
+import com.team08.backend.domain.cartitem.entity.CartItem;
+import com.team08.backend.domain.cartitem.repository.CartItemRepository;
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.entity.CourseStatus;
+import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
+import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.order.dto.OrderDetailResponse;
+import com.team08.backend.domain.order.entity.Order;
+import com.team08.backend.domain.order.entity.OrderStatus;
+import com.team08.backend.domain.order.repository.OrderRepository;
+import com.team08.backend.domain.orderitem.entity.OrderItem;
+import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+
+@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    private static final Long USER_ID = 1L;
+    private static final Long OTHER_USER_ID = 2L;
+    private static final Long CART_ID = 10L;
+    private static final Long ORDER_ID = 100L;
+    private static final Long COURSE_ID = 1000L;
+
+    @Mock
+    private OrderRepository orderRepository;
+
+    @Mock
+    private OrderItemRepository orderItemRepository;
+
+    @Mock
+    private CartRepository cartRepository;
+
+    @Mock
+    private CartItemRepository cartItemRepository;
+
+    @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
+
+    @InjectMocks
+    private OrderService orderService;
+
+    @Test
+    void cartOrderCanBeCreated() {
+        Cart cart = new Cart(CART_ID, USER_ID);
+        CartItem firstCartItem = new CartItem(1L, CART_ID, COURSE_ID);
+        CartItem secondCartItem = new CartItem(2L, CART_ID, COURSE_ID + 1);
+        Course firstCourse = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Course secondCourse = course(COURSE_ID + 1, "JPA", 20_000, CourseStatus.ON_SALE);
+
+        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
+        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(firstCartItem, secondCartItem));
+        given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID + 1, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        stubOrderSave();
+        stubOrderItemSaveAll();
+
+        OrderDetailResponse response = orderService.createOrderFromCart(USER_ID);
+
+        assertThat(response.orderId()).isEqualTo(ORDER_ID);
+        assertThat(response.totalPrice()).isEqualTo(50_000);
+        assertThat(response.discountPrice()).isZero();
+        assertThat(response.finalPrice()).isEqualTo(50_000);
+        assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.items()).hasSize(2);
+        assertThat(response.items()).extracting("courseTitle").containsExactly("Spring", "JPA");
+        assertThat(response.items()).extracting("price").containsExactly(30_000, 20_000);
+        verify(cartItemRepository).deleteAllByCartId(CART_ID);
+    }
+
+    @Test
+    void emptyCartCannotCreateOrder() {
+        Cart cart = new Cart(CART_ID, USER_ID);
+        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
+        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of());
+
+        assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.EMPTY_CART));
+
+        verifyNoInteractions(orderRepository, orderItemRepository, courseRepository, enrollmentRepository);
+    }
+
+    @Test
+    void nonOnSaleCourseCannotCreateOrder() {
+        Cart cart = new Cart(CART_ID, USER_ID);
+        CartItem cartItem = new CartItem(1L, CART_ID, COURSE_ID);
+        Course course = course(COURSE_ID, "Draft", 30_000, CourseStatus.DRAFT);
+
+        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
+        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(cartItem));
+        given(courseRepository.findAllById(any())).willReturn(List.of(course));
+
+        assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COURSE_NOT_ON_SALE));
+
+        verifyNoInteractions(orderRepository, orderItemRepository, enrollmentRepository);
+        verifyNoMoreInteractions(cartItemRepository);
+    }
+
+    @Test
+    void activeEnrollmentCannotCreateOrder() {
+        Cart cart = new Cart(CART_ID, USER_ID);
+        CartItem cartItem = new CartItem(1L, CART_ID, COURSE_ID);
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+
+        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
+        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(cartItem));
+        given(courseRepository.findAllById(any())).willReturn(List.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LECTURE_ALREADY_ENROLLED));
+
+        verifyNoInteractions(orderRepository, orderItemRepository);
+        verifyNoMoreInteractions(cartItemRepository);
+    }
+
+    @Test
+    void directOrderCanBeCreated() {
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+
+        given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        stubOrderSave();
+        stubOrderItemSaveAll();
+
+        OrderDetailResponse response = orderService.createDirectOrder(USER_ID, COURSE_ID);
+
+        assertThat(response.orderId()).isEqualTo(ORDER_ID);
+        assertThat(response.totalPrice()).isEqualTo(30_000);
+        assertThat(response.finalPrice()).isEqualTo(30_000);
+        assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> {
+                    assertThat(item.courseId()).isEqualTo(COURSE_ID);
+                    assertThat(item.courseTitle()).isEqualTo("Spring");
+                    assertThat(item.price()).isEqualTo(30_000);
+                });
+    }
+
+    @Test
+    void myOrderDetailCanBeFound() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+
+        OrderDetailResponse response = orderService.getMyOrder(USER_ID, ORDER_ID);
+
+        assertThat(response.orderId()).isEqualTo(ORDER_ID);
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> assertThat(item.courseTitle()).isEqualTo("Spring"));
+    }
+
+    @Test
+    void otherUsersOrderDetailCannotBeFound() {
+        given(orderRepository.findByIdAndUserId(ORDER_ID, OTHER_USER_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderService.getMyOrder(OTHER_USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_NOT_FOUND));
+
+        verifyNoInteractions(orderItemRepository);
+    }
+
+    @Test
+    void pendingPaymentOrderCanBeCanceled() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+
+        OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(response.canceledAt()).isNotNull();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+    }
+
+    @Test
+    void nonPendingPaymentOrderCannotBeCanceled() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PAID);
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelMyOrder(USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
+
+        verifyNoInteractions(orderItemRepository);
+    }
+
+    private void stubOrderSave() {
+        given(orderRepository.save(any(Order.class))).willAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            return new Order(
+                    ORDER_ID,
+                    order.getUserId(),
+                    order.getOrderNumber(),
+                    order.getTotalPrice(),
+                    order.getDiscountPrice(),
+                    order.getFinalPrice(),
+                    order.getStatus(),
+                    order.getOrderedAt(),
+                    order.getPaidAt(),
+                    order.getCanceledAt(),
+                    order.getRefundedAt(),
+                    order.getExpiredAt(),
+                    order.getCreatedAt(),
+                    order.getUpdatedAt()
+            );
+        });
+    }
+
+    private void stubOrderItemSaveAll() {
+        given(orderItemRepository.saveAll(any())).willAnswer(invocation -> {
+            Iterable<OrderItem> items = invocation.getArgument(0);
+            List<OrderItem> savedItems = new ArrayList<>();
+            long id = 1L;
+            for (OrderItem item : items) {
+                savedItems.add(orderItem(
+                        id++,
+                        item.getOrderId(),
+                        item.getCourseId(),
+                        item.getCourseTitle(),
+                        item.getPrice()
+                ));
+            }
+            return savedItems;
+        });
+    }
+
+    private Order order(Long orderId, Long userId, OrderStatus status) {
+        LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
+        return new Order(
+                orderId,
+                userId,
+                "ORD-20260612100000-ABC12345",
+                30_000,
+                0,
+                30_000,
+                status,
+                now,
+                null,
+                null,
+                null,
+                null,
+                now,
+                null
+        );
+    }
+
+    private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
+        LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
+        return new OrderItem(orderItemId, orderId, courseId, courseTitle, price, 0, price, now, null);
+    }
+
+    private Course course(Long courseId, String title, int price, CourseStatus status) {
+        Course course = newInstance(Course.class);
+        ReflectionTestUtils.setField(course, "id", courseId);
+        ReflectionTestUtils.setField(course, "instructorId", 1L);
+        ReflectionTestUtils.setField(course, "categoryId", 1L);
+        ReflectionTestUtils.setField(course, "title", title);
+        ReflectionTestUtils.setField(course, "description", title + " description");
+        ReflectionTestUtils.setField(course, "thumbnail", title + ".png");
+        ReflectionTestUtils.setField(course, "price", price);
+        ReflectionTestUtils.setField(course, "status", status);
+        return course;
+    }
+
+    private <T> T newInstance(Class<T> type) {
+        try {
+            var constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to create test entity: " + type.getSimpleName(), e);
+        }
+    }
+}

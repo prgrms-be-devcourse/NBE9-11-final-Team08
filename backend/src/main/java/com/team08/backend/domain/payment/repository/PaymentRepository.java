@@ -1,0 +1,8 @@
+package com.team08.backend.domain.payment.repository;
+
+import com.team08.backend.domain.payment.entity.Payment;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface PaymentRepository extends JpaRepository<Payment, Long> {
+    boolean existsByOrderId(Long orderId);
+}
