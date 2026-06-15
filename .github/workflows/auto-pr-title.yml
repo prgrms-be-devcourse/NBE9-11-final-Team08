@@ -1,0 +1,38 @@
+name: Auto PR Title
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  update-pr-title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.payload.pull_request.head.ref;
+
+            const match = branch.match(
+              /^(feature|fix|refactor|perf)\/(\d+)-(.+)$/
+            );
+
+            if (!match) {
+              console.log("브랜치 규칙 불일치");
+              return;
+            }
+
+            const [, type, issueNumber, keyword] = match;
+
+            const title = `${type}: ${keyword} (#${issueNumber})`;
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              title
+            });

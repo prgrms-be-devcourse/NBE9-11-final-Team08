@@ -1,0 +1,50 @@
+name: Create Branch From Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  create-branch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Branch
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+
+          TYPE=$(echo "$ISSUE_TITLE" \
+            | grep -oP '(?<=\[).*(?=\])')
+
+          BRANCH_KEY=$(echo "$ISSUE_BODY" \
+            | awk '/## Branch/{getline; print}' \
+            | xargs)
+
+          if [ -z "$TYPE" ]; then
+            echo "Issue title must contain [type]"
+            exit 1
+          fi
+
+          if [ -z "$BRANCH_KEY" ]; then
+            echo "Issue body must contain branch name"
+            exit 1
+          fi
+
+          BRANCH_NAME="${TYPE}/${ISSUE_NUMBER}-${BRANCH_KEY}"
+
+          echo "Creating $BRANCH_NAME"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
