@@ -1,7 +1,9 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
-import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -57,8 +59,42 @@ class CouponPolicyTest {
 
         // when & then
         assertThatThrownBy(() -> policy.validateIssuePeriod(now))
-                .isInstanceOf(CustomException.class)
+                .isInstanceOf(CouponIssuePeriodNotStartedException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
+    }
+
+    @Test
+    @DisplayName("실패: 현재 시간이 발급 종료일 이후이면 예외가 발생한다")
+    void validateIssuePeriod_fail_ended() {
+        // given
+        LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
+        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+                "테스트", DiscountType.AMOUNT, 1000, 30, 100, null,
+                CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
+                false, now.minusDays(2), now.minusDays(1)
+        );
+        CouponPolicy policy = CouponPolicy.create(request);
+
+        // when & then
+        assertThatThrownBy(() -> policy.validateIssuePeriod(now))
+                .isInstanceOf(CouponIssuePeriodEndedException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ISSUE_PERIOD_ENDED);
+    }
+
+    @Test
+    @DisplayName("실패: 쿠폰 수량이 0 이하일 때 차감을 시도하면 예외가 발생한다")
+    void decreaseQuantity_fail_exhausted() {
+        // given
+        CouponPolicy policy = CouponPolicy.create(new CouponPolicyCreateRequest(
+                "테스트", DiscountType.AMOUNT, 1000, 30, 0, null,
+                CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
+                false, null, null
+        ));
+
+        // when & then
+        assertThatThrownBy(policy::decreaseQuantity)
+                .isInstanceOf(CouponExhaustedException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_EXHAUSTED);
     }
 
     @Test

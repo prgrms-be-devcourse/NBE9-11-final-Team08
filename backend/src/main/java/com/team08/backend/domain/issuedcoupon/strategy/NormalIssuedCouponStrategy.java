@@ -5,7 +5,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
-import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
+import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

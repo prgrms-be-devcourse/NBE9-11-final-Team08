@@ -1,8 +1,10 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
 import com.team08.backend.global.common.BaseTimeEntity;
-import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -111,10 +113,10 @@ public class CouponPolicy extends BaseTimeEntity {
     // 쿠폰 발급 기간 검증
     public void validateIssuePeriod(LocalDateTime now) {
         if (issueStartDate != null && now.isBefore(issueStartDate)) {
-            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
+            throw new CouponIssuePeriodNotStartedException();
         }
         if (issueEndDate != null && now.isAfter(issueEndDate)) {
-            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_ENDED);
+            throw new CouponIssuePeriodEndedException();
         }
     }
 
@@ -124,7 +126,7 @@ public class CouponPolicy extends BaseTimeEntity {
             return;
         }
         if (this.totalQuantity <= 0) {
-            throw new CustomException(ErrorCode.COUPON_EXHAUSTED);
+            throw new CouponExhaustedException();
         }
         this.totalQuantity--;
     }
