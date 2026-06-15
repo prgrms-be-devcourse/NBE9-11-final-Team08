@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -24,7 +25,7 @@ class IssuedCouponTest {
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now();
 
-        when(policy.calculateExpirationDate()).thenReturn(LocalDateTime.now().plusDays(30));
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
         IssuedCoupon coupon = IssuedCoupon.create(policy, userId, now);
 
         ReflectionTestUtils.setField(coupon, "expiredAt", now.minusSeconds(1));
@@ -43,7 +44,7 @@ class IssuedCouponTest {
         Long otherUserId = 2L;
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now();
-        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
         
         IssuedCoupon coupon = IssuedCoupon.create(policy, ownerId, now);
 

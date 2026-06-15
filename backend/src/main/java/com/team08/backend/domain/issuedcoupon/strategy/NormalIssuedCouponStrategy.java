@@ -42,7 +42,7 @@ public class NormalIssuedCouponStrategy implements IssuedCouponStrategy {
         }
 
         // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
+        policy.validateIssuePeriod(now);
 
         // 쿠폰 발급 기록 생성
         return IssuedCoupon.create(policy, userId, now);

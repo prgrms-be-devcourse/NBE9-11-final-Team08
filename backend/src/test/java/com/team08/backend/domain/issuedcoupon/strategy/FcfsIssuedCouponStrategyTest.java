@@ -57,7 +57,7 @@ class FcfsIssuedCouponStrategyTest {
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
-        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
         // when
         IssuedCoupon result = fcfsIssuedCouponStrategy.issue(userId, policyId);

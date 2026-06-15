@@ -102,15 +102,14 @@ public class CouponPolicy extends BaseTimeEntity {
                 .build();
     }
 
-    public LocalDateTime calculateExpirationDate() {
-        return java.time.LocalDate.now()
+    public LocalDateTime calculateExpirationDate(LocalDateTime now) {
+        return now.toLocalDate()
                 .plusDays(this.validDays)
                 .atTime(java.time.LocalTime.MAX);
     }
 
     // 쿠폰 발급 기간 검증
-    public void validateIssuePeriod() {
-        LocalDateTime now = LocalDateTime.now();
+    public void validateIssuePeriod(LocalDateTime now) {
         if (issueStartDate != null && now.isBefore(issueStartDate)) {
             throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
         }

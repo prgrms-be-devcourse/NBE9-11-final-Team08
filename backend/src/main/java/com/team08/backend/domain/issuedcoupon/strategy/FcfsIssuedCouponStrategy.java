@@ -43,7 +43,7 @@ public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
         }
 
         // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
+        policy.validateIssuePeriod(now);
 
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
