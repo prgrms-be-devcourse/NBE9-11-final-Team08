@@ -2,6 +2,7 @@ package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
+import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -60,7 +61,7 @@ public class AttendanceService {
 
             return AttendanceResponse.from(savedLog);
         } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.ATTENDANCE_ALREADY_EXISTS);
+            throw new AttendanceAlreadyExistsException();
         }
     }
 }
