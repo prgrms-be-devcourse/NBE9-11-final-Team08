@@ -204,11 +204,14 @@ public class DataInitializer implements ApplicationRunner {
                 {"React 기초",        "JSX & 컴포넌트", "Props & State", "이벤트 처리"},
                 {"Hooks 심화",        "useState & useEffect", "useContext", "커스텀 훅"},
                 {"상태 관리",         "Context API", "Zustand 입문", "서버 상태 관리"},
+                {"상태 관리",         "Context API", "Zustand 입문", "서버 상태 관리"},
                 {"라우팅 & 성능",     "React Router v6", "코드 스플리팅", "메모이제이션"}
         });
 
         addCurriculum(javaBasicCourse, new String[][]{
                 {"Java 기초 문법",  "변수와 타입", "제어문", "배열"},
+                {"객체지향 프로그래밍", "클래스와 객체", "상속과 다형성", "인터페이스"},
+                {"객체지향 프로그래밍", "클래스와 객체", "상속과 다형성", "인터페이스"},
                 {"객체지향 프로그래밍", "클래스와 객체", "상속과 다형성", "인터페이스"},
                 {"컬렉션 & 스트림",  "List & Map", "Stream API", "람다 표현식"}
         });
