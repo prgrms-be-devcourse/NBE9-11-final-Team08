@@ -7,17 +7,16 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponWriter;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +34,7 @@ public class IssuedCouponService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
+    private final IssuedCouponWriter issuedCouponWriter;
     private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
@@ -58,7 +58,7 @@ public class IssuedCouponService {
         issueSystemCoupon(userId, policy);
     }
 
-    // [시스템] 공통 쿠폰 발급 처리
+    // 시스템 공통 쿠폰 발급 처리
     private void issueSystemCoupon(Long userId, CouponPolicy policy) {
         // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
@@ -69,7 +69,7 @@ public class IssuedCouponService {
         IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, LocalDateTime.now(clock));
 
         // 쿠폰 발급 저장 및 동시성 방어
-        saveWithConcurrencyProtection(newCoupon);
+        issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
     }
 
     // [사용자] 쿠폰 다운로드
@@ -89,20 +89,8 @@ public class IssuedCouponService {
 
         // 쿠폰 발급 로직 실행 및 저장
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
-
-        // 쿠폰 발급 저장 및 동시성 방어
-        IssuedCoupon savedCoupon = saveWithConcurrencyProtection(newCoupon);
-
+        IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
         return IssuedCouponResponse.from(savedCoupon);
-    }
-
-    // [시스템] 쿠폰 발급 저장 및 동시성 방어
-    private IssuedCoupon saveWithConcurrencyProtection(IssuedCoupon coupon) {
-        try {
-            return issuedCouponRepository.saveAndFlush(coupon);
-        } catch (DataIntegrityViolationException e) {
-            throw new CouponAlreadyIssuedException();
-        }
     }
 
     // [사용자] 내 쿠폰 목록 조회

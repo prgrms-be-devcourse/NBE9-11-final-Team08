@@ -9,6 +9,7 @@ import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponWriter;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -49,6 +50,9 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponStrategyFactory strategyFactory;
 
+    @Mock
+    private IssuedCouponWriter issuedCouponWriter;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
@@ -60,6 +64,7 @@ class IssuedCouponServiceTest {
                 couponPolicyRepository,
                 userRepository,
                 strategyFactory,
+                issuedCouponWriter,
                 clock
         );
     }
@@ -79,7 +84,9 @@ class IssuedCouponServiceTest {
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
+
+        // writer 모킹
+        when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
 
         // when
         IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
@@ -88,7 +95,7 @@ class IssuedCouponServiceTest {
         assertThat(response).isNotNull();
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
-        verify(issuedCouponRepository, times(1)).saveAndFlush(any());
+        verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
     }
 
     @Test
