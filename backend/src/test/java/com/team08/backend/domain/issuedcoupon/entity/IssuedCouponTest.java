@@ -17,24 +17,22 @@ import static org.mockito.Mockito.when;
 class IssuedCouponTest {
 
     @Test
-    @DisplayName("실패: 쿠폰 상태가 ISSUED여도 만료 시간이 지났다면 상태를 EXPIRED로 변경하고 예외가 발생한다 (지연 평가 검증)")
+    @DisplayName("실패: 쿠폰 상태가 ISSUED여도 만료 시간이 지났다면 예외가 발생한다 (실시간 만료 체크 검증)")
     void validateUsable_fail_expiredTime() {
         // given
         Long userId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now();
-        
-        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+
+        when(policy.calculateExpirationDate()).thenReturn(LocalDateTime.now().plusDays(30));
         IssuedCoupon coupon = IssuedCoupon.create(policy, userId, now);
-        
+
         ReflectionTestUtils.setField(coupon, "expiredAt", now.minusSeconds(1));
 
         // when & then
         assertThatThrownBy(() -> coupon.validateUsable(userId, now))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_USED_OR_EXPIRED);
-        
-        assertThat(coupon.getStatus()).isEqualTo(CouponStatus.EXPIRED);
     }
 
     @Test

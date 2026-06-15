@@ -105,13 +105,14 @@ public class IssuedCouponService {
         Map<Long, CouponPolicy> policyMap = couponPolicyRepository.findAllById(policyIds).stream()
                 .collect(Collectors.toMap(CouponPolicy::getId, policy -> policy));
 
+        LocalDateTime now = LocalDateTime.now(clock);
         return issuedCoupons.stream()
                 .map(coupon -> {
                     CouponPolicy policy = policyMap.get(coupon.getPolicyId());
                     if (policy == null) {
                         throw new CouponPolicyNotFoundException();
                     }
-                    return CouponListResponse.of(coupon, policy);
+                    return CouponListResponse.of(coupon, policy, now);
                 })
                 .toList();
     }

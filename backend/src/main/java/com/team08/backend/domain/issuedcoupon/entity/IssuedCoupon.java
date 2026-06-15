@@ -86,18 +86,19 @@ public class IssuedCoupon {
         }
     }
 
+    // 쿠폰 만료 처리
+    public void expire() {
+        this.status = CouponStatus.EXPIRED;
+    }
+
     // 쿠폰 사용 가능 여부 검증
     public void validateUsable(Long userId, LocalDateTime now) {
         if (!this.userId.equals(userId)) {
             throw new CouponNotOwnedException();
         }
 
-        // 지연 평가
-        if (this.status == CouponStatus.ISSUED && this.expiredAt.isBefore(now)) {
-            this.status = CouponStatus.EXPIRED;
-        }
-
-        if (this.status != CouponStatus.ISSUED) {
+        // 상태 체크, 만료 시각 체크
+        if (this.status != CouponStatus.ISSUED || this.expiredAt.isBefore(now)) {
             throw new CouponAlreadyUsedOrExpiredException();
         }
     }
