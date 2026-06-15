@@ -1,0 +1,100 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────
+# 8th Layer LMS - Docker Compose
+# t2.small (1 vCPU, 2 GB RAM) 기준
+#
+# 기본 실행:
+#   docker compose up -d
+#
+# 성능 테스트 실행:
+#   docker compose --profile perf up k6
+#
+# 특정 시나리오만:
+#   docker compose run --rm k6 run /scripts/learning-event-spike.js
+# ─────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MySQL 8 ─────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: 8thlayer-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE}
+      MYSQL_USER:          ${MYSQL_USER}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=100
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Spring Boot App ──────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: 8thlayer-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL:               jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME:          ${MYSQL_USER}
+      SPRING_DATASOURCE_PASSWORD:          ${MYSQL_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_JPA_DATABASE_PLATFORM:        org.hibernate.dialect.MySQLDialect
+      SPRING_JPA_HIBERNATE_DDL_AUTO:       update
+      JWT_SECRET:                          ${JWT_SECRET}
+      JWT_EXPIRATION_MILLIS:               ${JWT_EXPIRATION_MILLIS:-3600000}
+      JWT_REFRESH_EXPIRATION_MILLIS:       ${JWT_REFRESH_EXPIRATION_MILLIS:-1209600000}
+      IS_COOKIE_SECURE:                    ${IS_COOKIE_SECURE:-false}
+      SAME_SITE:                           ${SAME_SITE:-Lax}
+      OPENAI_API_KEY:                      ${OPENAI_API_KEY:-local-dummy-key}
+      OPENAI_MODEL:                        ${OPENAI_MODEL:-gpt-4.1-mini}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── k6 성능 테스트 ───────────────────────────────────────────────
+  # profile: perf 로 격리 → 평소엔 자동 실행 안 됨
+  k6:
+    image: grafana/k6:latest
+    container_name: 8thlayer-k6
+    profiles: ["perf"]
+    depends_on:
+      app:
+        condition: service_healthy  # 앱이 완전히 뜬 뒤 실행
+    volumes:
+      - ./src/test/k6:/scripts:ro   # k6 스크립트 마운트 (읽기 전용)
+    environment:
+      BASE_URL:     http://app:8080   # 컨테이너 내부 네트워크 사용
+      USER_TOKEN:   ${K6_USER_TOKEN}
+      ADMIN_TOKEN:  ${K6_ADMIN_TOKEN}
+      SELLER_TOKEN: ${K6_SELLER_TOKEN}
+    command: run /scripts/learning-event-perf.js
+
+volumes:
+  mysql_data:
+    driver: local

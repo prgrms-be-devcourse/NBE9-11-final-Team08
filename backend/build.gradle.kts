@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.implementation
+
 plugins {
     java
     id("org.springframework.boot") version "3.5.14"
@@ -20,6 +22,7 @@ repositories {
 
 dependencies {
     implementation(platform("org.springframework.ai:spring-ai-bom:1.1.8"))
+    implementation ("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -31,6 +34,8 @@ dependencies {
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     runtimeOnly("com.h2database:h2")
+    runtimeOnly ("com.mysql:mysql-connector-j")
+
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     annotationProcessor("org.projectlombok:lombok")

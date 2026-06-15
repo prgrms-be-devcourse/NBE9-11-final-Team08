@@ -6,6 +6,7 @@ import com.team08.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.team08.backend.global.auth.handler.JwtAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -26,6 +27,8 @@ public class SecurityConfig {
     ) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -33,6 +36,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // 인증 관련 및 문서
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -42,6 +46,14 @@ public class SecurityConfig {
                                 "/api/auth/refresh",
                                 "/api/auth/logout"
                         ).permitAll()
+                                // 비로그인 사용자도 조회 가능한 공개 API
+                                .requestMatchers(HttpMethod.GET,
+                                        "/api/courses",
+                                        "/api/courses/{courseId}",
+                                        "/api/courses/{courseId}/chapters",
+                                        "/api/chapters/{chapterId}/lectures/first",
+                                        "/actuator/**"
+                                ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
