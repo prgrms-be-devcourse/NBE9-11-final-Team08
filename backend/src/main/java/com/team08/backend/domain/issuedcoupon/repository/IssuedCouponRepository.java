@@ -23,5 +23,4 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
             @Param("issuedStatus") CouponStatus issuedStatus,
             @Param("expiredStatus") CouponStatus expiredStatus
     );
-
 }

@@ -44,12 +44,12 @@ class CouponSchedulerTest {
         CouponPolicy policy2 = savePolicy("테스트정책2");
 
         // 만료일이 지난 쿠폰 생성
-        IssuedCoupon expiredCoupon = IssuedCoupon.issue(policy1.getId(), user.getId(), LocalDateTime.now().minusDays(1));
+        IssuedCoupon expiredCoupon = IssuedCoupon.create(policy1, user.getId(), LocalDateTime.now());
         ReflectionTestUtils.setField(expiredCoupon, "expiredAt", LocalDateTime.now().minusMinutes(1));
         issuedCouponRepository.save(expiredCoupon);
 
         // 유효기간이 남은 쿠폰 생성
-        IssuedCoupon validCoupon = IssuedCoupon.issue(policy2.getId(), user.getId(), LocalDateTime.now().plusDays(1));
+        IssuedCoupon validCoupon = IssuedCoupon.create(policy2, user.getId(), LocalDateTime.now());
         ReflectionTestUtils.setField(validCoupon, "expiredAt", LocalDateTime.now().plusDays(1));
         issuedCouponRepository.save(validCoupon);
 

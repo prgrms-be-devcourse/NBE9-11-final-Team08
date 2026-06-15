@@ -7,13 +7,16 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponWriter;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -52,6 +58,17 @@ class IssuedCouponIntegrationTest {
 
     @Autowired
     private IssuedCouponService issuedCouponService;
+
+    // 변경점 1: @MockBean -> @MockitoBean 교체 (Spring Boot 3.4.0+ 대응)
+    @MockitoBean
+    private IssuedCouponWriter issuedCouponWriter;
+
+    @BeforeEach
+    void setUp() {
+        // IssuedCouponWriter가 받은 객체를 그대로 Repository에 저장하고 반환하도록 설정 (테스트 트랜잭션 유지를 위해)
+        when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class)))
+                .thenAnswer(invocation -> issuedCouponRepository.save(invocation.getArgument(0)));
+    }
 
     @Test
     @DisplayName("사용자가 일반 쿠폰을 다운로드하는 통합 테스트")
@@ -80,7 +97,7 @@ class IssuedCouponIntegrationTest {
         CouponPolicy policy = savePolicy("선착순 100명 쿠폰", CouponType.FCFS);
 
         // when
-        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download-fcfs"))
+        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
                 .andExpect(jsonPath("$.status").value("ISSUED"));
@@ -109,7 +126,7 @@ class IssuedCouponIntegrationTest {
     }
 
     private User saveUser(String email) {
-        User user = newInstance(User.class);
+        User user = createUserInstance();
         ReflectionTestUtils.setField(user, "email", email);
         ReflectionTestUtils.setField(user, "password", "password");
         ReflectionTestUtils.setField(user, "nickname", "테스트유저");
@@ -144,13 +161,13 @@ class IssuedCouponIntegrationTest {
         return couponPolicyRepository.save(policy);
     }
 
-    private <T> T newInstance(Class<T> type) {
+    private User createUserInstance() {
         try {
-            var constructor = type.getDeclaredConstructor();
+            var constructor = User.class.getDeclaredConstructor();
             constructor.setAccessible(true);
             return constructor.newInstance();
         } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Failed to create test entity.", e);
+            throw new IllegalStateException("Failed to create test User entity.", e);
         }
     }
 }
