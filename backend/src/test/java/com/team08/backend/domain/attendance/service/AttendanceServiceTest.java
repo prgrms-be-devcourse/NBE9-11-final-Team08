@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -70,13 +71,16 @@ class AttendanceServiceTest {
         Attendance yesterdayLog = Attendance.record(
                 userId,
                 yesterday,
-                0,
+                Optional.empty(), // simplify for creation
                 0,
                 now.minusDays(1));
+        
+        // manually set consecutive days to 1 for the test
+        ReflectionTestUtils.setField(yesterdayLog, "consecutiveDays", 1);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
-        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(1L);
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday)).thenReturn(1L);
 
         // saveAndFlush()가 호출되면 저장된 객체(인자)를 그대로 반환하도록 설정
         when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
@@ -100,7 +104,7 @@ class AttendanceServiceTest {
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
-        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(0L);
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday)).thenReturn(0L);
 
         when(attendanceRepository.saveAndFlush(any(Attendance.class)))
                 .thenThrow(new DataIntegrityViolationException("DB Unique Constraint Violation"));
@@ -122,7 +126,7 @@ class AttendanceServiceTest {
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.empty());
-        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(3L);
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday)).thenReturn(3L);
 
         when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
@@ -144,11 +148,12 @@ class AttendanceServiceTest {
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
 
         // 어제 자 기록의 연속 출석일수가 6일이어야 오늘이 7일째가 됨
-        Attendance yesterdayLog = Attendance.record(userId, yesterday, 5, 10, now.minusDays(1));
+        Attendance yesterdayLog = Attendance.record(userId, yesterday, Optional.empty(), 0, now.minusDays(1));
+        ReflectionTestUtils.setField(yesterdayLog, "consecutiveDays", 6);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday)).thenReturn(Optional.of(yesterdayLog));
-        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today)).thenReturn(10L);
+        when(attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday)).thenReturn(10L);
         when(attendanceRepository.saveAndFlush(any(Attendance.class))).thenAnswer(i -> i.getArguments()[0]);
 
         // when

@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Entity
 @Table(name = "attendances", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "attendance_date"}))
@@ -48,9 +49,12 @@ public class Attendance {
     }
 
     // 오늘 자 출석 기록 생성
-    public static Attendance record(Long userId, LocalDate today, int lastConsecutiveDays, int currentMonthCount, LocalDateTime now) {
-        int consecutive = lastConsecutiveDays + 1;
-        int monthly = currentMonthCount + 1;
+    public static Attendance record(Long userId, LocalDate today, Optional<Attendance> yesterdayAttendance, int monthCountBeforeToday, LocalDateTime now) {
+        int consecutive = yesterdayAttendance
+                .map(Attendance::getConsecutiveDays)
+                .orElse(0) + 1;
+
+        int monthly = monthCountBeforeToday + 1;
 
         return new Attendance(userId, today, consecutive, monthly, now);
     }

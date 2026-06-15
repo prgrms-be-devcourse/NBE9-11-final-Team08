@@ -33,6 +33,7 @@ public class AttendanceService {
     public AttendanceResponse checkIn(Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDate today = now.toLocalDate();
+        LocalDate yesterday = today.minusDays(1);
 
         // 사용자 검증
         if (!userRepository.existsById(userId)) {
@@ -40,20 +41,19 @@ public class AttendanceService {
         }
 
         // 어제 출석 기록 조회
-        LocalDate yesterday = today.minusDays(1);
         Optional<Attendance> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
 
-        // 이번 달 누적 출석일 조회
+        // 이번 달 누적 출석일 조회 (오늘 기록 제외)
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
-        long currentMonthCount = attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, today);
-
-        // 연속 출석일 계산
-        int lastConsecutive = yesterdayAttendance
-                .map(Attendance::getConsecutiveDays)
-                .orElse(0);
+        long monthCountBeforeToday = attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday);
 
         // 오늘 자 출석 기록 생성
-        Attendance todayLog = Attendance.record(userId, today, lastConsecutive, (int) currentMonthCount, now);
+        Attendance todayLog = Attendance.record(
+                userId,
+                today,
+                yesterdayAttendance,
+                (int) monthCountBeforeToday,
+                now);
 
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
