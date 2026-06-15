@@ -62,7 +62,7 @@ class IssuedCouponServiceTest {
         // 중복 체크 통과
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
 
-        when(issuedCouponRepository.save(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
@@ -70,7 +70,30 @@ class IssuedCouponServiceTest {
         // then
         assertThat(response).isNotNull();
         assertThat(response.policyId()).isEqualTo(policyId);
-        verify(issuedCouponRepository, times(1)).save(any(IssuedCoupon.class));
+        verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
+    }
+
+    @Test
+    @DisplayName("실패: 일반 쿠폰 다운로드 시 DB 유니크 제약 위반(동시성) 발생 시 예외 발생")
+    void downloadCoupon_fail_dataIntegrityViolation() {
+        // given
+        Long userId = 1L;
+        Long policyId = 1L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
+        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
+
+        // saveAndFlush 시점에 예외 발생 (동시성 상황 모사)
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class)))
+                .thenThrow(new DataIntegrityViolationException("Duplicate entry"));
+
+        // when & then
+        assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_ISSUED);
     }
 
     @Test
@@ -131,14 +154,14 @@ class IssuedCouponServiceTest {
         when(policy.getId()).thenReturn(policyId);
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
 
-        when(issuedCouponRepository.save(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         issuedCouponService.downloadFcfsCoupon(userId, policyId);
 
         // then
         verify(policy, times(1)).decreaseQuantity();
-        verify(issuedCouponRepository, times(1)).save(any(IssuedCoupon.class));
+        verify(issuedCouponRepository, times(1)).saveAndFlush(any(IssuedCoupon.class));
     }
 
     @Test
