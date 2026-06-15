@@ -56,7 +56,7 @@ public class IssuedCouponService {
         issueSystemCoupon(userId, policy);
     }
 
-    // 시스템 공통 쿠폰 발급 처리
+    // [시스템] 공통 쿠폰 발급 처리
     private void issueSystemCoupon(Long userId, CouponPolicy policy) {
         // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
