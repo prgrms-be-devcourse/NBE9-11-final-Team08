@@ -31,3 +31,15 @@ bin/
 *.db
 
 .DS_Store
+
+# Local environment and deployment secrets
+.env
+*.pem
+
+# Terraform local state
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
