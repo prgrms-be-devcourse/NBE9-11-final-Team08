@@ -21,7 +21,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +46,7 @@ class NormalIssuedCouponStrategyTest {
     }
 
     @Test
-    @DisplayName("성공: 일반 쿠폰 전략이 정상적으로 쿠폰을 발급한다")
+    @DisplayName("성공: 일반 쿠폰 전략이 정상적으로 쿠폰을 생성하여 반환한다")
     void issue_success() {
         // given
         Long userId = 1L;
@@ -59,7 +58,6 @@ class NormalIssuedCouponStrategyTest {
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
         when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
-        when(issuedCouponRepository.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         IssuedCoupon result = normalIssuedCouponStrategy.issue(userId, policyId);
@@ -68,7 +66,6 @@ class NormalIssuedCouponStrategyTest {
         assertThat(result).isNotNull();
         assertThat(result.getPolicyId()).isEqualTo(policyId);
         verify(policy).validateIssuePeriod();
-        verify(issuedCouponRepository).saveWithConcurrencyProtection(any());
     }
 
     @Test

@@ -27,7 +27,12 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponServiceTest {
@@ -74,6 +79,7 @@ class IssuedCouponServiceTest {
         when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
+        when(issuedCouponRepository.saveAndFlush(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
 
         // when
         IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
@@ -82,6 +88,7 @@ class IssuedCouponServiceTest {
         assertThat(response).isNotNull();
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
+        verify(issuedCouponRepository, times(1)).saveAndFlush(any());
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
@@ -16,6 +17,7 @@ import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,7 +69,7 @@ public class IssuedCouponService {
         IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, LocalDateTime.now(clock));
 
         // 쿠폰 발급 저장 및 동시성 방어
-        issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
+        saveWithConcurrencyProtection(newCoupon);
     }
 
     // [사용자] 쿠폰 다운로드
@@ -86,8 +88,21 @@ public class IssuedCouponService {
         IssuedCouponStrategy strategy = strategyFactory.getStrategy(policy.getCouponType());
 
         // 쿠폰 발급 로직 실행 및 저장
-        IssuedCoupon savedCoupon = strategy.issue(userId, policyId);
+        IssuedCoupon newCoupon = strategy.issue(userId, policyId);
+
+        // 쿠폰 발급 저장 및 동시성 방어
+        IssuedCoupon savedCoupon = saveWithConcurrencyProtection(newCoupon);
+
         return IssuedCouponResponse.from(savedCoupon);
+    }
+
+    // [시스템] 쿠폰 발급 저장 및 동시성 방어
+    private IssuedCoupon saveWithConcurrencyProtection(IssuedCoupon coupon) {
+        try {
+            return issuedCouponRepository.saveAndFlush(coupon);
+        } catch (DataIntegrityViolationException e) {
+            throw new CouponAlreadyIssuedException();
+        }
     }
 
     // [사용자] 내 쿠폰 목록 조회

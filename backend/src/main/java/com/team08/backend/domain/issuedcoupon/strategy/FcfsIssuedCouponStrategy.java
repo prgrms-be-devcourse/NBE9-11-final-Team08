@@ -43,15 +43,12 @@ public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
         }
 
         // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod(); // TODO: Policy 쪽도 Clock 적용 시 파라미터로 now 전달 필요
+        policy.validateIssuePeriod();
 
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
 
         // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, now);
-
-        // 동시성 방어
-        return issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
+        return IssuedCoupon.create(policy, userId, now);
     }
 }
