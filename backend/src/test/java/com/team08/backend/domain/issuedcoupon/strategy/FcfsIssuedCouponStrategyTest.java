@@ -6,14 +6,17 @@ import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,8 +33,18 @@ class FcfsIssuedCouponStrategyTest {
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
 
-    @InjectMocks
+    private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
+
     private FcfsIssuedCouponStrategy fcfsIssuedCouponStrategy;
+
+    @BeforeEach
+    void setUp() {
+        fcfsIssuedCouponStrategy = new FcfsIssuedCouponStrategy(
+                couponPolicyRepository,
+                issuedCouponRepository,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("성공: 선착순 쿠폰 전략이 정상적으로 재고를 차감하고 발급한다")
@@ -40,7 +53,7 @@ class FcfsIssuedCouponStrategyTest {
         Long userId = 1L;
         Long policyId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);

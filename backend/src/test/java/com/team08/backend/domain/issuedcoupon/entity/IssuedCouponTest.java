@@ -22,14 +22,15 @@ class IssuedCouponTest {
         // given
         Long userId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
+        LocalDateTime now = LocalDateTime.now();
         
-        when(policy.calculateExpirationDate()).thenReturn(LocalDateTime.now().plusDays(30));
-        IssuedCoupon coupon = IssuedCoupon.create(policy, userId);
+        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+        IssuedCoupon coupon = IssuedCoupon.create(policy, userId, now);
         
-        ReflectionTestUtils.setField(coupon, "expiredAt", LocalDateTime.now().minusSeconds(1));
+        ReflectionTestUtils.setField(coupon, "expiredAt", now.minusSeconds(1));
 
         // when & then
-        assertThatThrownBy(() -> coupon.validateUsable(userId))
+        assertThatThrownBy(() -> coupon.validateUsable(userId, now))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_USED_OR_EXPIRED);
         
@@ -43,12 +44,13 @@ class IssuedCouponTest {
         Long ownerId = 1L;
         Long otherUserId = 2L;
         CouponPolicy policy = mock(CouponPolicy.class);
-        when(policy.calculateExpirationDate()).thenReturn(LocalDateTime.now().plusDays(30));
+        LocalDateTime now = LocalDateTime.now();
+        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
         
-        IssuedCoupon coupon = IssuedCoupon.create(policy, ownerId);
+        IssuedCoupon coupon = IssuedCoupon.create(policy, ownerId, now);
 
         // when & then
-        assertThatThrownBy(() -> coupon.validateUsable(otherUserId))
+        assertThatThrownBy(() -> coupon.validateUsable(otherUserId, now))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_NOT_OWNED);
     }

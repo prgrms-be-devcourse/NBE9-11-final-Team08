@@ -48,51 +48,52 @@ public class IssuedCoupon {
 
     private LocalDateTime usedAt;
 
-    private IssuedCoupon(Long policyId, Long userId, LocalDateTime expiredAt) {
+    private IssuedCoupon(Long policyId, Long userId, LocalDateTime expiredAt, LocalDateTime now) {
         this.policyId = policyId;
         this.userId = userId;
         this.status = CouponStatus.ISSUED;
-        this.issuedAt = LocalDateTime.now();
+        this.issuedAt = now;
         this.expiredAt = expiredAt;
     }
 
     // 쿠폰 발급 기록 생성
-    public static IssuedCoupon create(CouponPolicy policy, Long userId) {
+    public static IssuedCoupon create(CouponPolicy policy, Long userId, LocalDateTime now) {
         return new IssuedCoupon(
                 policy.getId(),
                 userId,
-                policy.calculateExpirationDate()
+                policy.calculateExpirationDate(), // TODO: 나중에 Policy 쪽도 Clock 적용 시 파라미터로 now 전달 필요
+                now
         );
     }
 
     // 쿠폰 사용 처리 (단회성)
-    public void use() {
+    public void use(LocalDateTime now) {
         this.status = CouponStatus.USED;
-        this.usedAt = LocalDateTime.now();
+        this.usedAt = now;
     }
 
     // 쿠폰 사용 기록 (다회성)
-    public void recordUsage() {
-        this.usedAt = LocalDateTime.now();
+    public void recordUsage(LocalDateTime now) {
+        this.usedAt = now;
     }
 
     // 쿠폰 사용 처리 (쿠폰 사용 타입에 따라 결정)
-    public void applyUsage(CouponUsageType usageType) {
+    public void applyUsage(CouponUsageType usageType, LocalDateTime now) {
         if (usageType == CouponUsageType.SINGLE_USE) {
-            this.use();
+            this.use(now);
         } else {
-            this.recordUsage();
+            this.recordUsage(now);
         }
     }
 
     // 쿠폰 사용 가능 여부 검증
-    public void validateUsable(Long userId) {
+    public void validateUsable(Long userId, LocalDateTime now) {
         if (!this.userId.equals(userId)) {
             throw new CouponNotOwnedException();
         }
 
         // 지연 평가
-        if (this.status == CouponStatus.ISSUED && this.expiredAt.isBefore(LocalDateTime.now())) {
+        if (this.status == CouponStatus.ISSUED && this.expiredAt.isBefore(now)) {
             this.status = CouponStatus.EXPIRED;
         }
 

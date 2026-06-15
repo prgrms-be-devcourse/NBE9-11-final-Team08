@@ -12,22 +12,22 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponServiceTest {
@@ -44,8 +44,20 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponStrategyFactory strategyFactory;
 
-    @InjectMocks
+    private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
+
     private IssuedCouponService issuedCouponService;
+
+    @BeforeEach
+    void setUp() {
+        issuedCouponService = new IssuedCouponService(
+                issuedCouponRepository,
+                couponPolicyRepository,
+                userRepository,
+                strategyFactory,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("성공: 쿠폰 다운로드 요청 시 팩토리를 통해 전략을 가져와 실행한다")
@@ -104,6 +116,7 @@ class IssuedCouponServiceTest {
         Long userId = 1L;
         Long issuedCouponId = 100L;
         int originalPrice = 10000;
+        LocalDateTime now = LocalDateTime.now(clock);
 
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
         when(issuedCoupon.getPolicyId()).thenReturn(1L);
@@ -121,7 +134,7 @@ class IssuedCouponServiceTest {
         // then
         assertThat(response.discountAmount()).isEqualTo(1000);
         assertThat(response.finalPrice()).isEqualTo(9000);
-        verify(issuedCoupon).validateUsable(userId);
+        verify(issuedCoupon).validateUsable(userId, now);
     }
 
     @Test
@@ -131,6 +144,7 @@ class IssuedCouponServiceTest {
         Long userId = 1L;
         Long issuedCouponId = 100L;
         int originalPrice = 10000;
+        LocalDateTime now = LocalDateTime.now(clock);
 
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
         when(issuedCoupon.getPolicyId()).thenReturn(1L);
@@ -147,7 +161,7 @@ class IssuedCouponServiceTest {
 
         // then
         assertThat(discountAmount).isEqualTo(1000);
-        verify(issuedCoupon).validateUsable(userId);
-        verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE);
+        verify(issuedCoupon).validateUsable(userId, now);
+        verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE, now);
     }
 }

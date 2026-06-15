@@ -11,12 +11,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 @Component
 @RequiredArgsConstructor
 public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
 
     private final CouponPolicyRepository couponPolicyRepository;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final Clock clock;
 
     @Override
     public CouponType getSupportedType() {
@@ -31,19 +35,21 @@ public class FcfsIssuedCouponStrategy implements IssuedCouponStrategy {
         CouponPolicy policy = couponPolicyRepository.findByIdWithLock(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
+        LocalDateTime now = LocalDateTime.now(clock);
+
         // 중복 발급 체크
         if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
             throw new CouponAlreadyIssuedException();
         }
 
         // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
+        policy.validateIssuePeriod(); // TODO: Policy 쪽도 Clock 적용 시 파라미터로 now 전달 필요
 
         // 쿠폰 수량 차감 및 재고 소진 체크
         policy.decreaseQuantity();
 
         // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, now);
 
         // 동시성 방어
         return issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);

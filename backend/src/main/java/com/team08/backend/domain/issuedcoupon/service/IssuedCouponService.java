@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,6 +33,7 @@ public class IssuedCouponService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
+    private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
     // [시스템] 가입 기념 쿠폰 자동 발급
@@ -61,7 +64,7 @@ public class IssuedCouponService {
         }
 
         // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId);
+        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, LocalDateTime.now(clock));
 
         // 쿠폰 발급 저장 및 동시성 방어
         issuedCouponRepository.saveWithConcurrencyProtection(newCoupon);
@@ -119,8 +122,8 @@ public class IssuedCouponService {
         IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
                 .orElseThrow(CouponNotFoundException::new);
 
-        // 쿠폰 사용 가능 여부 검증
-        issuedCoupon.validateUsable(userId);
+        // 사용 가능 여부 검증
+        issuedCoupon.validateUsable(userId, LocalDateTime.now(clock));
 
         CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
                 .orElseThrow(CouponPolicyNotFoundException::new);
@@ -147,8 +150,8 @@ public class IssuedCouponService {
         IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
                 .orElseThrow(CouponNotFoundException::new);
 
-        // 쿠폰 사용 가능 여부 검증
-        issuedCoupon.validateUsable(userId);
+        // 사용 가능 여부 검증
+        issuedCoupon.validateUsable(userId, LocalDateTime.now(clock));
 
         CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
                 .orElseThrow(CouponPolicyNotFoundException::new);
@@ -157,7 +160,7 @@ public class IssuedCouponService {
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
 
         // 쿠폰 사용 처리
-        issuedCoupon.applyUsage(policy.getUsageType());
+        issuedCoupon.applyUsage(policy.getUsageType(), LocalDateTime.now(clock));
 
         // 최종 할인된 금액 반환
         return discountAmount;
