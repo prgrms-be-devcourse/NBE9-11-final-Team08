@@ -1,0 +1,10 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE}:${IMAGE_TAG:-latest}
+    pull_policy: always
+
+  nginx:
+    volumes:
+      - ../nginx/templates/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certbot_www:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt

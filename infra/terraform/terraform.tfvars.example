@@ -1,0 +1,2 @@
+admin_cidr     = "admin.public.ip/32"
+public_key_path = "ssh/path"
