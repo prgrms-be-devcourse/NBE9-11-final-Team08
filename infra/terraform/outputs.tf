@@ -1,3 +1,13 @@
+output "vpc_id" {
+  description = "ID of the project VPC."
+  value       = aws_vpc.app.id
+}
+
+output "public_subnet_id" {
+  description = "ID of the public subnet hosting the EC2 instance."
+  value       = aws_subnet.public.id
+}
+
 output "elastic_ip" {
   description = "Elastic IP to use for the external DNS A record."
   value       = aws_eip.app.public_ip

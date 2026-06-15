@@ -10,6 +10,28 @@ variable "project_name" {
   default     = "team08-backend"
 }
 
+variable "vpc_cidr" {
+  description = "IPv4 CIDR block for the project VPC."
+  type        = string
+  default     = "10.0.0.0/16"
+
+  validation {
+    condition     = can(cidrhost(var.vpc_cidr, 0))
+    error_message = "vpc_cidr must be a valid IPv4 CIDR."
+  }
+}
+
+variable "public_subnet_cidr" {
+  description = "IPv4 CIDR block for the public subnet."
+  type        = string
+  default     = "10.0.1.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.public_subnet_cidr, 0))
+    error_message = "public_subnet_cidr must be a valid IPv4 CIDR."
+  }
+}
+
 variable "instance_type" {
   description = "EC2 instance type for the Docker Compose host."
   type        = string

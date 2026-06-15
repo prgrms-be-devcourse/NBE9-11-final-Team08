@@ -1,12 +1,5 @@
-data "aws_vpc" "default" {
-  default = true
-}
-
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
 data "aws_ami" "ubuntu" {
@@ -29,6 +22,53 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+resource "aws_vpc" "app" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "${var.project_name}-vpc"
+  }
+}
+
+resource "aws_internet_gateway" "app" {
+  vpc_id = aws_vpc.app.id
+
+  tags = {
+    Name = "${var.project_name}-igw"
+  }
+}
+
+resource "aws_subnet" "public" {
+  vpc_id                  = aws_vpc.app.id
+  cidr_block              = var.public_subnet_cidr
+  availability_zone       = sort(data.aws_availability_zones.available.names)[0]
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "${var.project_name}-public-subnet"
+  }
+}
+
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.app.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.app.id
+  }
+
+  tags = {
+    Name = "${var.project_name}-public-rt"
+  }
+}
+
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.public.id
+}
+
 resource "aws_key_pair" "deploy" {
   key_name   = "${var.project_name}-key"
   public_key = file(pathexpand(var.public_key_path))
@@ -41,7 +81,7 @@ resource "aws_key_pair" "deploy" {
 resource "aws_security_group" "app" {
   name        = "${var.project_name}-sg"
   description = "HTTP, HTTPS, and restricted SSH access for the backend host"
-  vpc_id      = data.aws_vpc.default.id
+  vpc_id      = aws_vpc.app.id
 
   ingress {
     description = "SSH from administrator"
@@ -83,11 +123,13 @@ resource "aws_security_group" "app" {
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
-  subnet_id                   = sort(data.aws_subnets.default.ids)[0]
+  subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.app.id]
   key_name                    = aws_key_pair.deploy.key_name
   associate_public_ip_address = true
   user_data                   = file("${path.module}/user-data.sh")
+
+  depends_on = [aws_route_table_association.public]
 
   root_block_device {
     volume_type           = "gp3"
@@ -103,6 +145,11 @@ resource "aws_instance" "app" {
 
   tags = {
     Name = var.project_name
+  }
+
+  volume_tags = {
+    Name = "${var.project_name}-root"
+    Team = "devcos-team08"
   }
 }
 
