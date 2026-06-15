@@ -1,6 +1,6 @@
 package com.team08.backend.domain.issuedcoupon.integration;
 
-import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -59,7 +59,6 @@ class IssuedCouponIntegrationTest {
     @Autowired
     private IssuedCouponService issuedCouponService;
 
-    // 변경점 1: @MockBean -> @MockitoBean 교체 (Spring Boot 3.4.0+ 대응)
     @MockitoBean
     private IssuedCouponWriter issuedCouponWriter;
 
@@ -143,7 +142,7 @@ class IssuedCouponIntegrationTest {
     }
 
     private CouponPolicy savePolicy(String name, CouponType type) {
-        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
                 name,
                 DiscountType.AMOUNT,
                 1000,
@@ -157,7 +156,7 @@ class IssuedCouponIntegrationTest {
                 null,
                 null
         );
-        CouponPolicy policy = CouponPolicy.create(request);
+        CouponPolicy policy = CouponPolicy.create(command);
         return couponPolicyRepository.save(policy);
     }
 

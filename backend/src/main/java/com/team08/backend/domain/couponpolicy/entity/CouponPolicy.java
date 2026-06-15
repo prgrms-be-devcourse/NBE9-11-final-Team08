@@ -1,11 +1,10 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
-import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
 import com.team08.backend.global.common.BaseTimeEntity;
-import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -86,21 +85,21 @@ public class CouponPolicy extends BaseTimeEntity {
         this.issueEndDate = issueEndDate;
     }
 
-    public static CouponPolicy create(CouponPolicyCreateRequest request) {
+    public static CouponPolicy create(CouponPolicyCreateCommand command) {
         return CouponPolicy.builder()
-                .name(request.name())
-                .discountType(request.discountType())
-                .discountValue(request.discountValue())
+                .name(command.name())
+                .discountType(command.discountType())
+                .discountValue(command.discountValue())
                 .maxDiscountAmount(null)
-                .validDays(request.validDays())
-                .totalQuantity(request.totalQuantity())
-                .categoryId(request.categoryId())
-                .couponType(request.couponType())
-                .couponTarget(request.couponTarget())
-                .usageType(request.usageType())
-                .isStackable(request.isStackable())
-                .issueStartDate(request.issueStartDate())
-                .issueEndDate(request.issueEndDate())
+                .validDays(command.validDays())
+                .totalQuantity(command.totalQuantity())
+                .categoryId(command.categoryId())
+                .couponType(command.couponType())
+                .couponTarget(command.couponTarget())
+                .usageType(command.usageType())
+                .isStackable(command.isStackable())
+                .issueStartDate(command.issueStartDate())
+                .issueEndDate(command.issueEndDate())
                 .build();
     }
 

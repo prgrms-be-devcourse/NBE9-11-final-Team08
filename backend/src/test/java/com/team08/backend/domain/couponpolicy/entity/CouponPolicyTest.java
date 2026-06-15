@@ -1,5 +1,6 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
+import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
@@ -19,7 +20,12 @@ class CouponPolicyTest {
     @DisplayName("성공: 정률 할인 계산 시 정수 연산을 사용하여 정확한 금액을 반환한다 (내림 처리)")
     void calculateDiscountAmount_percent_success() {
         // given
-        CouponPolicy policy = CouponPolicy.create(createRequest(DiscountType.PERCENT, 10)); // 10% 할인
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
+                "테스트", DiscountType.PERCENT, 10, 30, 100, null,
+                CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
+                false, null, null
+        );
+        CouponPolicy policy = CouponPolicy.create(command);
         int originalPrice = 10555; // 10% 면 1055.5원 -> 1055원 기대
 
         // when
@@ -34,12 +40,12 @@ class CouponPolicyTest {
     void validateIssuePeriod_success() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
                 "테스트", DiscountType.AMOUNT, 1000, 30, 100, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.minusDays(1), now.plusDays(1)
         );
-        CouponPolicy policy = CouponPolicy.create(request);
+        CouponPolicy policy = CouponPolicy.create(command);
 
         // when & then
         policy.validateIssuePeriod(now);
@@ -50,12 +56,12 @@ class CouponPolicyTest {
     void validateIssuePeriod_fail_notStarted() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
                 "테스트", DiscountType.AMOUNT, 1000, 30, 100, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.plusDays(1), now.plusDays(2)
         );
-        CouponPolicy policy = CouponPolicy.create(request);
+        CouponPolicy policy = CouponPolicy.create(command);
 
         // when & then
         assertThatThrownBy(() -> policy.validateIssuePeriod(now))
@@ -68,12 +74,12 @@ class CouponPolicyTest {
     void validateIssuePeriod_fail_ended() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
                 "테스트", DiscountType.AMOUNT, 1000, 30, 100, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.minusDays(2), now.minusDays(1)
         );
-        CouponPolicy policy = CouponPolicy.create(request);
+        CouponPolicy policy = CouponPolicy.create(command);
 
         // when & then
         assertThatThrownBy(() -> policy.validateIssuePeriod(now))
@@ -85,11 +91,12 @@ class CouponPolicyTest {
     @DisplayName("실패: 쿠폰 수량이 0 이하일 때 차감을 시도하면 예외가 발생한다")
     void decreaseQuantity_fail_exhausted() {
         // given
-        CouponPolicy policy = CouponPolicy.create(new CouponPolicyCreateRequest(
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
                 "테스트", DiscountType.AMOUNT, 1000, 30, 0, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, null, null
-        ));
+        );
+        CouponPolicy policy = CouponPolicy.create(command);
 
         // when & then
         assertThatThrownBy(policy::decreaseQuantity)
@@ -102,20 +109,17 @@ class CouponPolicyTest {
     void calculateExpirationDate_success() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicy policy = CouponPolicy.create(createRequest(DiscountType.AMOUNT, 1000)); // validDays: 30
+        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
+                "테스트", DiscountType.AMOUNT, 1000, 30, 100, null,
+                CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
+                false, null, null
+        );
+        CouponPolicy policy = CouponPolicy.create(command);
 
         // when
         LocalDateTime expiredAt = policy.calculateExpirationDate(now);
 
         // then
         assertThat(expiredAt).isEqualTo(now.toLocalDate().plusDays(30).atTime(java.time.LocalTime.MAX));
-    }
-
-    private CouponPolicyCreateRequest createRequest(DiscountType type, int value) {
-        return new CouponPolicyCreateRequest(
-                "테스트", type, value, 30, 100, null,
-                CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                false, null, null
-        );
     }
 }
