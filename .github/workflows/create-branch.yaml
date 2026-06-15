@@ -1,6 +1,15 @@
 name: Create Branch From Issue
 
 on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        required: true
+      issue_title:
+        required: true
+      issue_body:
+        required: true
+
   issues:
     types: [opened]
 

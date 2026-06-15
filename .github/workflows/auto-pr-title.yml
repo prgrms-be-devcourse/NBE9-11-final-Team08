@@ -1,6 +1,7 @@
 name: Auto PR Title
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened]
 
