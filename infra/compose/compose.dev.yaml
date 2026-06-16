@@ -1,102 +1,43 @@
-name: nbe9-11-final-team08
+# 개발용 override (compose.yaml 위에 얹어서 사용).
+#
+# 개발 환경에서는 MySQL만 Docker로 띄우고,
+# Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행합니다.
+# (핫 리로드 / 디버깅 / 빠른 피드백을 위해 backend 컨테이너는 사용하지 않습니다.)
+#
+# DB만 기동:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d db
+#
+# nginx 라우팅/프록시까지 점검하고 싶을 때만 (선택):
+#   docker compose -f compose.yaml -f compose.dev.yaml --profile edge up -d db nginx-dev
+#   → http://localhost:8080 (nginx) → host.docker.internal:8080 (IntelliJ Spring Boot)
 
 services:
   db:
-    image: mysql:8.4
     ports:
-      - "3306:3306"
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      TZ: Asia/Seoul
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_0900_ai_ci
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent && mysql -h localhost -u$$MYSQL_USER -p$$MYSQL_PASSWORD -e 'SELECT 1' $$MYSQL_DATABASE"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
+      - "3306:3306"   # IntelliJ가 localhost:3306으로 접속
     networks:
-      - internal
-
-  backend:
-    build:
-      context: ../../backend
-    image: ${BACKEND_IMAGE:-team08-backend}:${IMAGE_TAG:-local}
-    restart: unless-stopped
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_NAME: ${DB_NAME}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION_MILLIS: ${JWT_EXPIRATION_MILLIS:-3600000}
-      JWT_REFRESH_EXPIRATION_MILLIS: ${JWT_REFRESH_EXPIRATION_MILLIS:-1209600000}
-      IS_COOKIE_SECURE: ${IS_COOKIE_SECURE:-false}
-      SAME_SITE: ${SAME_SITE:-Lax}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
-      TZ: Asia/Seoul
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
-    networks:
+      # base의 internal 네트워크는 host 격리(internal: true)라 포트 발행이 안 됨.
+      # dev에서는 host에서 붙을 수 있도록 public 네트워크에도 연결.
       - internal
       - public
-    volumes:
-      - ./videos-local:/app/videos-local
-  nginx:
+
+  # 평소엔 뜨지 않음. --profile edge 로만 기동.
+  nginx-dev:
     image: nginx:1.27-alpine
+    profiles: ["edge"]
     restart: unless-stopped
     environment:
-      DOMAIN: ${DOMAIN:-localhost}
-    depends_on:
-      backend:
-        condition: service_healthy
+      DOMAIN: localhost
     ports:
-      - "80:80"
-      - "443:443"
+      - "8080:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux 대응 (Mac/Win은 기본 지원)
     volumes:
-      - ../nginx/templates/local.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - certbot_www:/var/www/certbot:ro
-      - letsencrypt:/etc/letsencrypt
+      - ../nginx/templates/dev.conf.template:/etc/nginx/templates/default.conf.template:ro
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/nginx-health"]
       interval: 15s
       timeout: 5s
       retries: 5
     networks:
-      - internal
       - public
-
-  certbot:
-    image: certbot/certbot:v3.3.0
-    profiles: ["certbot"]
-    volumes:
-      - certbot_www:/var/www/certbot
-      - letsencrypt:/etc/letsencrypt
-
-volumes:
-  mysql_data:
-  certbot_www:
-  letsencrypt:
-
-networks:
-  internal:
-    internal: true
-  public:

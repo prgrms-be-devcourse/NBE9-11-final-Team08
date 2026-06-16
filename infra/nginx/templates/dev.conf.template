@@ -1,0 +1,19 @@
+server {
+    listen 80;
+    server_name ${DOMAIN};
+
+    location = /nginx-health {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    # IntelliJ에서 로컬 실행 중인 Spring Boot로 프록시
+    location / {
+        proxy_pass http://host.docker.internal:8080; # 컨테이너 밖의 호스트 pc
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
