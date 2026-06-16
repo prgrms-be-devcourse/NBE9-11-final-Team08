@@ -25,6 +25,7 @@ public class CouponPolicyService {
                 request.validDays(),
                 request.totalQuantity(),
                 request.categoryId(),
+                request.courseIds(),
                 request.couponType(),
                 request.couponTarget(),
                 request.usageType(),

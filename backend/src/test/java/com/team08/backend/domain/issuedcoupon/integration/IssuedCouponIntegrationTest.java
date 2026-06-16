@@ -150,6 +150,7 @@ class IssuedCouponIntegrationTest {
                 7,
                 100,
                 null,
+                null,
                 type,
                 CouponTarget.ALL,
                 CouponUsageType.SINGLE_USE,

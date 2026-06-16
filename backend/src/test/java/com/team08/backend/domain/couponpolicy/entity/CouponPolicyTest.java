@@ -19,7 +19,7 @@ class CouponPolicyTest {
     void calculateDiscountAmount_percent_success() {
         // given
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.PERCENT, 10, null, 0, 30, 100, null,
+                "테스트", DiscountType.PERCENT, 10, null, 0, 30, 100, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, null, null
         );
@@ -38,7 +38,7 @@ class CouponPolicyTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null,
+                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.minusDays(1), now.plusDays(1)
         );
@@ -53,7 +53,7 @@ class CouponPolicyTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null,
+                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.plusDays(1), now.plusDays(2)
         );
@@ -70,7 +70,7 @@ class CouponPolicyTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null,
+                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, now.minusDays(2), now.minusDays(1)
         );
@@ -86,7 +86,7 @@ class CouponPolicyTest {
     void decreaseQuantity_fail_exhausted() {
         // given
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 0, null,
+                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 0, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, null, null
         );
@@ -103,7 +103,7 @@ class CouponPolicyTest {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.create(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null,
+                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 100, null, null,
                 CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
                 false, null, null
         );

@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record CouponPolicyCreateRequest(
         @NotBlank(message = "쿠폰 이름은 필수입니다.")
@@ -32,6 +33,8 @@ public record CouponPolicyCreateRequest(
         Integer totalQuantity, // null이면 무제한
 
         Long categoryId,
+
+        List<Long> courseIds,
 
         @NotNull(message = "쿠폰 발급 타입은 필수입니다.")
         CouponType couponType,
@@ -69,6 +72,14 @@ public record CouponPolicyCreateRequest(
     public boolean isCategoryValid() {
         if (couponTarget == CouponTarget.CATEGORY) {
             return categoryId != null;
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "코스 할인인 경우 코스 ID 목록은 필수입니다.")
+    public boolean isCourseValid() {
+        if (couponTarget == CouponTarget.COURSE) {
+            return courseIds != null && !courseIds.isEmpty();
         }
         return true;
     }

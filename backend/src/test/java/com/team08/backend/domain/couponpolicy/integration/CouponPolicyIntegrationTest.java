@@ -49,6 +49,7 @@ class CouponPolicyIntegrationTest {
                 7,
                 50,
                 null,
+                null,
                 CouponType.NORMAL,
                 CouponTarget.ALL,
                 CouponUsageType.SINGLE_USE,

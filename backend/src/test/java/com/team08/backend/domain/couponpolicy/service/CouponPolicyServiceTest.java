@@ -43,6 +43,7 @@ class CouponPolicyServiceTest {
                 100,
                 null,
                 null,
+                null,
                 CouponType.NORMAL,
                 CouponTarget.ALL,
                 CouponUsageType.SINGLE_USE,

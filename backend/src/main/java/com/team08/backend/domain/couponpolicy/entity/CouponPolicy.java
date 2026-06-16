@@ -3,20 +3,16 @@ package com.team08.backend.domain.couponpolicy.entity;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
+import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
 import com.team08.backend.global.common.BaseTimeEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "coupon_policies")
@@ -48,6 +44,9 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private Long categoryId;
 
+    @OneToMany(mappedBy = "couponPolicy", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CouponPolicyCourse> targetCourses = new ArrayList<>();
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CouponType couponType;
@@ -67,7 +66,7 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private LocalDateTime issueEndDate;
 
-    private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity, Long categoryId, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+    private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity, Long categoryId, List<Long> courseIds, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
         this.discountType = discountType;
         this.discountValue = discountValue;
@@ -82,6 +81,12 @@ public class CouponPolicy extends BaseTimeEntity {
         this.isStackable = isStackable != null ? isStackable : false;
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
+
+        if (courseIds != null) {
+            for (Long courseId : courseIds) {
+                this.targetCourses.add(new CouponPolicyCourse(this, courseId));
+            }
+        }
     }
     // TODO 멘토링 
     /* 
@@ -111,6 +116,7 @@ public class CouponPolicy extends BaseTimeEntity {
             Integer validDays,
             Integer totalQuantity,
             Long categoryId,
+            List<Long> courseIds,
             CouponType couponType,
             CouponTarget couponTarget,
             CouponUsageType usageType,
@@ -127,6 +133,7 @@ public class CouponPolicy extends BaseTimeEntity {
                 validDays,
                 totalQuantity,
                 categoryId,
+                courseIds,
                 couponType,
                 couponTarget,
                 usageType,
