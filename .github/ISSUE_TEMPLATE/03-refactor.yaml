@@ -10,16 +10,6 @@ body:
       description: "리팩토링이 필요한 코드나 패키지 위치를 적어주세요."
     validations:
       required: true
-
-  - type: input
-    id: branch
-    attributes:
-      label: "🌿 Branch"
-      description: "브랜치 키를 입력하세요 (선택, 소문자/숫자/하이픈만 허용). 비워두면 브랜치를 만들지 않습니다."
-      placeholder: "ex) refactor-user-service"
-    validations:
-      required: false
-
   - type: textarea
     id: refactor_purpose
     attributes:
