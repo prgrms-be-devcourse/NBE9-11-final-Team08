@@ -69,9 +69,9 @@ class OrderServiceTest {
 
     @Test
     void cartOrderCanBeCreated() {
-        Cart cart = new Cart(CART_ID, USER_ID);
-        CartItem firstCartItem = new CartItem(1L, CART_ID, COURSE_ID);
-        CartItem secondCartItem = new CartItem(2L, CART_ID, COURSE_ID + 1);
+        Cart cart = cart(CART_ID, USER_ID);
+        CartItem firstCartItem = cartItem(1L, COURSE_ID);
+        CartItem secondCartItem = cartItem(2L, COURSE_ID + 1);
         Course firstCourse = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
         Course secondCourse = course(COURSE_ID + 1, "JPA", 20_000, CourseStatus.ON_SALE);
 
@@ -100,7 +100,7 @@ class OrderServiceTest {
 
     @Test
     void emptyCartCannotCreateOrder() {
-        Cart cart = new Cart(CART_ID, USER_ID);
+        Cart cart = cart(CART_ID, USER_ID);
         given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
         given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of());
 
@@ -113,8 +113,8 @@ class OrderServiceTest {
 
     @Test
     void nonOnSaleCourseCannotCreateOrder() {
-        Cart cart = new Cart(CART_ID, USER_ID);
-        CartItem cartItem = new CartItem(1L, CART_ID, COURSE_ID);
+        Cart cart = cart(CART_ID, USER_ID);
+        CartItem cartItem = cartItem(1L, COURSE_ID);
         Course course = course(COURSE_ID, "Draft", 30_000, CourseStatus.DRAFT);
 
         given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
@@ -131,8 +131,8 @@ class OrderServiceTest {
 
     @Test
     void activeEnrollmentCannotCreateOrder() {
-        Cart cart = new Cart(CART_ID, USER_ID);
-        CartItem cartItem = new CartItem(1L, CART_ID, COURSE_ID);
+        Cart cart = cart(CART_ID, USER_ID);
+        CartItem cartItem = cartItem(1L, COURSE_ID);
         Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
 
         given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
@@ -289,6 +289,19 @@ class OrderServiceTest {
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
         return new OrderItem(orderItemId, orderId, courseId, courseTitle, price, 0, price, now, null);
+    }
+
+    private Cart cart(Long cartId, Long userId) {
+        Cart cart = Cart.create(userId);
+        ReflectionTestUtils.setField(cart, "id", cartId);
+        return cart;
+    }
+
+    private CartItem cartItem(Long cartItemId, Long courseId) {
+        CartItem cartItem = newInstance(CartItem.class);
+        ReflectionTestUtils.setField(cartItem, "id", cartItemId);
+        ReflectionTestUtils.setField(cartItem, "courseId", courseId);
+        return cartItem;
     }
 
     private Course course(Long courseId, String title, int price, CourseStatus status) {

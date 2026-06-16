@@ -5,7 +5,6 @@ import com.team08.backend.domain.cart.dto.CartResponse;
 import com.team08.backend.domain.cart.entity.Cart;
 import com.team08.backend.domain.cart.repository.CartRepository;
 import com.team08.backend.domain.cartitem.entity.CartItem;
-import com.team08.backend.domain.cartitem.repository.CartItemRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
@@ -14,7 +13,6 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,79 +27,71 @@ import java.util.stream.Collectors;
 public class CartService {
 
     private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
 
     @Transactional
     public CartResponse addItem(Long userId, Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-
-        if (course.getStatus() != CourseStatus.ON_SALE) {
-            throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
-        }
-
-        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE)) {
-            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
-        }
-
-        Cart cart = getOrCreateCart(userId);
-
-        if (cartItemRepository.existsByCartIdAndCourseId(cart.getId(), courseId)) {
-            throw new CustomException(ErrorCode.LECTURE_ALREADY_IN_CART);
-        }
-
-        saveCartItem(cart.getId(), courseId);
-
+        Course course = findCourse(courseId);
+        validateCourseOnSale(course);
+        validateNotEnrolled(userId, courseId);
+        Cart cart = prepareCartForAddItem(userId);
+        cart.addItem(courseId);
+        cartRepository.saveAndFlush(cart);
         return toResponse(cart);
     }
 
     @Transactional(readOnly = true)
     public CartResponse getCart(Long userId) {
-        return cartRepository.findByUserId(userId)
+        return cartRepository.findByUserIdWithItems(userId)
                 .map(this::toResponse)
                 .orElseGet(CartResponse::empty);
     }
 
     @Transactional
     public CartResponse removeItem(Long userId, Long cartItemId) {
-        Cart cart = cartRepository.findByUserId(userId)
+        Cart cart = cartRepository.findByUserIdWithItems(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CART_ITEM_NOT_FOUND));
 
-        CartItem cartItem = cartItemRepository.findByIdAndCartId(cartItemId, cart.getId())
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_ITEM_NOT_FOUND));
-
-        cartItemRepository.delete(cartItem);
+        cart.removeItem(cartItemId);
 
         return toResponse(cart);
     }
 
     @Transactional
     public CartResponse clearCart(Long userId) {
-        return cartRepository.findByUserId(userId)
+        return cartRepository.findByUserIdWithItems(userId)
                 .map(cart -> {
-                    cartItemRepository.deleteAllByCartId(cart.getId());
+                    cart.clearItems();
                     return CartResponse.empty();
                 })
                 .orElseGet(CartResponse::empty);
     }
 
-    private Cart getOrCreateCart(Long userId) {
-        return cartRepository.findByUserId(userId)
-                .orElseGet(() -> cartRepository.save(new Cart(null, userId)));
+    private Course findCourse(Long courseId) {
+        return courseRepository.findById(courseId)
+                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
     }
 
-    private void saveCartItem(Long cartId, Long courseId) {
-        try {
-            cartItemRepository.saveAndFlush(new CartItem(null, cartId, courseId));
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.LECTURE_ALREADY_IN_CART);
+    private void validateCourseOnSale(Course course) {
+        if (course.getStatus() != CourseStatus.ON_SALE) {
+            throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
     }
 
+    private void validateNotEnrolled(Long userId, Long courseId) {
+        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE)) {
+            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
+        }
+    }
+
+    private Cart prepareCartForAddItem(Long userId) {
+        return cartRepository.findByUserIdWithItems(userId)
+                .orElseGet(() -> Cart.create(userId));
+    }
+
     private CartResponse toResponse(Cart cart) {
-        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+        List<CartItem> cartItems = cart.getItems();
         if (cartItems.isEmpty()) {
             return CartResponse.empty();
         }
