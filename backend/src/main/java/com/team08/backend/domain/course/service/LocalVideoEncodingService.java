@@ -1,7 +1,5 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
@@ -10,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -31,7 +28,7 @@ public class LocalVideoEncodingService implements MediaEncodingService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    private final LectureRepository lectureRepository;
+    private final LectureDbService lectureDbService;
 
     @PostConstruct
     public void init() {
@@ -48,7 +45,6 @@ public class LocalVideoEncodingService implements MediaEncodingService {
 
     @Override
     @Async("videoEncodingExecutor")
-    @Transactional
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
         File sourceFile;
@@ -101,9 +97,7 @@ public class LocalVideoEncodingService implements MediaEncodingService {
             }
 
             String dbSavePath = targetDirName + "/output.m3u8";
-            Lecture lecture = lectureRepository.findById(lectureId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
-            lecture.updateM3u8Path(dbSavePath);
+            lectureDbService.updateLectureM3u8(lectureId, dbSavePath);
 
             isSuccessful = true;
 

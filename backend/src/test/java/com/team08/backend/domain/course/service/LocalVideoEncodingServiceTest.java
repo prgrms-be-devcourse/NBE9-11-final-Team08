@@ -1,7 +1,5 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,12 +16,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LocalVideoEncodingServiceTest {
@@ -32,7 +29,7 @@ class LocalVideoEncodingServiceTest {
     private LocalVideoEncodingService localVideoEncodingService;
 
     @Mock
-    private LectureRepository lectureRepository;
+    private LectureDbService lectureDbService;
 
     private Path tempUploadDir;
     private MockMultipartFile realMockMultipartFile;
@@ -66,19 +63,11 @@ class LocalVideoEncodingServiceTest {
     void 비디오_인코딩이_성공하면_HLS_파일_경로가_갱신된다() {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
-
-        Lecture lecture = Lecture.builder()
-                .title("테스트 강의")
-                .m3u8Path("")
-                .durationSeconds(600)
-                .orderNo(1)
-                .build();
-
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        String expectedDbPath = targetDirName + "/output.m3u8";
 
         localVideoEncodingService.encodeToHls(realMockMultipartFile, targetDirName, lectureId);
 
-        assertThat(lecture.getM3u8Path()).isEqualTo(targetDirName + "/output.m3u8");
+        verify(lectureDbService).updateLectureM3u8(lectureId, expectedDbPath);
 
         Path targetWorkspace = tempUploadDir.resolve(targetDirName);
         assertThat(Files.exists(targetWorkspace.resolve("output.m3u8"))).isTrue();

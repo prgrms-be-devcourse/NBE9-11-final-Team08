@@ -1,7 +1,5 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.S3FileStorageService;
@@ -10,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -27,12 +24,11 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class S3VideoEncodingService implements MediaEncodingService {
 
-    private final LectureRepository lectureRepository;
     private final S3FileStorageService s3FileStorageService;
+    private final LectureDbService lectureDbService;
 
     @Override
     @Async("videoEncodingExecutor")
-    @Transactional
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
         String s3SourceKey = "videos/temp/" + targetDirName + ".mp4";
         File tempMultipartFile = null;
@@ -103,9 +99,7 @@ public class S3VideoEncodingService implements MediaEncodingService {
             }
 
             String dbSavePath = "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";
-            Lecture lecture = lectureRepository.findById(lectureId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
-            lecture.updateM3u8Path(dbSavePath);
+            lectureDbService.updateLectureM3u8(lectureId, dbSavePath);
 
         } catch (Exception e) {
             if (process != null && process.isAlive()) {

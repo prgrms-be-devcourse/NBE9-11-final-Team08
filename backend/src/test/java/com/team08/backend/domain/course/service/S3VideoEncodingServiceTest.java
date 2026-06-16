@@ -1,6 +1,5 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.util.S3FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,10 +23,10 @@ import static org.mockito.Mockito.*;
 class S3VideoEncodingServiceTest {
 
     @Mock
-    private LectureRepository lectureRepository;
+    private S3FileStorageService s3FileStorageService;
 
     @Mock
-    private S3FileStorageService s3FileStorageService;
+    private LectureDbService lectureDbService;
 
     @InjectMocks
     private S3VideoEncodingService s3VideoEncodingService;
