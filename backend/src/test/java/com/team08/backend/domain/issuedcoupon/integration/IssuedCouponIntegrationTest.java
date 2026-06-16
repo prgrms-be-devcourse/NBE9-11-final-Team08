@@ -1,6 +1,5 @@
 package com.team08.backend.domain.issuedcoupon.integration;
 
-import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -142,10 +141,12 @@ class IssuedCouponIntegrationTest {
     }
 
     private CouponPolicy savePolicy(String name, CouponType type) {
-        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
+        CouponPolicy policy = CouponPolicy.create(
                 name,
                 DiscountType.AMOUNT,
                 1000,
+                null,
+                0,
                 7,
                 100,
                 null,
@@ -156,7 +157,6 @@ class IssuedCouponIntegrationTest {
                 null,
                 null
         );
-        CouponPolicy policy = CouponPolicy.create(command);
         return couponPolicyRepository.save(policy);
     }
 

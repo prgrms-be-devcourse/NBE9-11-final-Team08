@@ -22,8 +22,10 @@ public record CouponPolicyCreateRequest(
         @Min(value = 1, message = "할인 값은 1 이상이어야 합니다.")
         Integer discountValue,
 
-        @NotNull(message = "유효 기간은 필수입니다.")
-        @Min(value = 1, message = "유효 기간은 1일 이상이어야 합니다.")
+        Integer maxDiscountAmount,
+        
+        Integer minOrderAmount,
+
         Integer validDays,
 
         @Min(value = 1, message = "총 수량은 1개 이상이어야 합니다.")

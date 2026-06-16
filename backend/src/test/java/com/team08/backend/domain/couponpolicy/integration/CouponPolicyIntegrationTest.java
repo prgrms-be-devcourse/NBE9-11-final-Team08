@@ -44,6 +44,8 @@ class CouponPolicyIntegrationTest {
                 "통합 테스트 쿠폰",
                 DiscountType.PERCENT,
                 10,
+                null,
+                50,
                 7,
                 50,
                 null,

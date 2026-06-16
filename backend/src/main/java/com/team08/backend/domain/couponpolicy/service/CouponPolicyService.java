@@ -1,6 +1,5 @@
 package com.team08.backend.domain.couponpolicy.service;
 
-import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
@@ -17,10 +16,12 @@ public class CouponPolicyService {
 
     @Transactional
     public CouponPolicyResponse createCouponPolicy(CouponPolicyCreateRequest request) {
-        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
+        CouponPolicy newPolicy = CouponPolicy.create(
                 request.name(),
                 request.discountType(),
                 request.discountValue(),
+                request.maxDiscountAmount(),
+                request.minOrderAmount(),
                 request.validDays(),
                 request.totalQuantity(),
                 request.categoryId(),
@@ -31,8 +32,6 @@ public class CouponPolicyService {
                 request.issueStartDate(),
                 request.issueEndDate()
         );
-
-        CouponPolicy newPolicy = CouponPolicy.create(command);
         CouponPolicy savedPolicy = couponPolicyRepository.save(newPolicy);
 
         return CouponPolicyResponse.from(savedPolicy);

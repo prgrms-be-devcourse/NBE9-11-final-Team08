@@ -1,6 +1,5 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
-import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
@@ -14,7 +13,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -42,7 +40,8 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private Integer maxDiscountAmount;
 
-    @Column(nullable = false)
+    private Integer minOrderAmount;
+
     private Integer validDays;
 
     private Integer totalQuantity;
@@ -68,12 +67,12 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private LocalDateTime issueEndDate;
 
-    @Builder(access = AccessLevel.PRIVATE)
-    private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer validDays, Integer totalQuantity, Long categoryId, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+    private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity, Long categoryId, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
         this.discountType = discountType;
         this.discountValue = discountValue;
         this.maxDiscountAmount = maxDiscountAmount;
+        this.minOrderAmount = minOrderAmount;
         this.validDays = validDays;
         this.totalQuantity = totalQuantity;
         this.categoryId = categoryId;
@@ -103,25 +102,44 @@ public class CouponPolicy extends BaseTimeEntity {
 
     // 대량 데이터 서버랑 동일하다
 
-    public static CouponPolicy create(CouponPolicyCreateCommand command) {
-        return CouponPolicy.builder()
-                .name(command.name())
-                .discountType(command.discountType())
-                .discountValue(command.discountValue())
-                .maxDiscountAmount(null)
-                .validDays(command.validDays())
-                .totalQuantity(command.totalQuantity())
-                .categoryId(command.categoryId())
-                .couponType(command.couponType())
-                .couponTarget(command.couponTarget())
-                .usageType(command.usageType())
-                .isStackable(command.isStackable())
-                .issueStartDate(command.issueStartDate())
-                .issueEndDate(command.issueEndDate())
-                .build();
+    public static CouponPolicy create(
+            String name,
+            DiscountType discountType,
+            Integer discountValue,
+            Integer maxDiscountAmount,
+            Integer minOrderAmount,
+            Integer validDays,
+            Integer totalQuantity,
+            Long categoryId,
+            CouponType couponType,
+            CouponTarget couponTarget,
+            CouponUsageType usageType,
+            Boolean isStackable,
+            LocalDateTime issueStartDate,
+            LocalDateTime issueEndDate
+    ) {
+        return new CouponPolicy(
+                name,
+                discountType,
+                discountValue,
+                maxDiscountAmount,
+                minOrderAmount,
+                validDays,
+                totalQuantity,
+                categoryId,
+                couponType,
+                couponTarget,
+                usageType,
+                isStackable,
+                issueStartDate,
+                issueEndDate
+        );
     }
 
     public LocalDateTime calculateExpirationDate(LocalDateTime now) {
+        if (this.validDays == null) {
+            return LocalDateTime.of(2099, 1, 1, 23, 59);
+        }
         return now.toLocalDate()
                 .plusDays(this.validDays)
                 .atTime(java.time.LocalTime.MAX);
