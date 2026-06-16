@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class LocalVideoEncodingServiceTest {
@@ -85,5 +86,23 @@ class LocalVideoEncodingServiceTest {
 
         assertThatThrownBy(() -> localVideoEncodingService.encodeToHls(emptyFile, targetDirName, lectureId))
                 .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 인코딩_프로세스는_완료되었으나_결과_파편_파일이_없으면_예외를_던진다() {
+        Long lectureId = 1L;
+        String targetDirName = UUID.randomUUID().toString();
+
+        MockMultipartFile corruptedVideoFile = new MockMultipartFile(
+                "file",
+                "corrupted.mp4",
+                "video/mp4",
+                "invalid video content data format headers".getBytes()
+        );
+
+        assertThatThrownBy(() -> localVideoEncodingService.encodeToHls(corruptedVideoFile, targetDirName, lectureId))
+                .isInstanceOf(CustomException.class);
+
+        verifyNoInteractions(lectureDbService);
     }
 }

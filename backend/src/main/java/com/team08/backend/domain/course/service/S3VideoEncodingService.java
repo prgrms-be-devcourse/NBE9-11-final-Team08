@@ -10,9 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -72,10 +70,6 @@ public class S3VideoEncodingService implements MediaEncodingService {
 
             pb.redirectErrorStream(true);
             process = pb.start();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                while (reader.readLine() != null) {}
-            }
 
             boolean finished = process.waitFor(10, TimeUnit.MINUTES);
             if (!finished) {

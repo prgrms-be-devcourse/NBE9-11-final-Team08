@@ -31,7 +31,7 @@ public class S3FileStorageService {
             return s3Key;
         } catch (Exception e) {
             log.error("Failed to upload file to S3. key: {}", s3Key, e);
-            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+            throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }
 
@@ -41,7 +41,7 @@ public class S3FileStorageService {
             return destinationFile;
         } catch (Exception e) {
             log.error("Failed to download file from S3. key: {}", s3Key, e);
-            throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+            throw new CustomException(ErrorCode.S3_DOWNLOAD_FAILED);
         }
     }
 
@@ -50,6 +50,7 @@ public class S3FileStorageService {
             s3Template.deleteObject(bucket, s3Key);
         } catch (Exception e) {
             log.error("Failed to delete file from S3. key: {}", s3Key, e);
+            throw new CustomException(ErrorCode.S3_DELETE_FAILED);
         }
     }
 
@@ -60,10 +61,12 @@ public class S3FileStorageService {
                     s3Template.deleteObject(bucket, s3Resource.getFilename());
                 } catch (Exception e) {
                     log.error("Failed to delete object during bulk directory clear. key: {}", s3Resource.getFilename(), e);
+                    throw new CustomException(ErrorCode.S3_DELETE_FAILED);
                 }
             });
         } catch (Exception e) {
             log.error("Failed to list and delete directory from S3. prefix: {}", s3Prefix, e);
+            throw new CustomException(ErrorCode.S3_DELETE_FAILED);
         }
     }
 }
