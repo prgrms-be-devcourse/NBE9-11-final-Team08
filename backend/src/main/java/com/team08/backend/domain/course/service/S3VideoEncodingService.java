@@ -120,8 +120,12 @@ public class S3VideoEncodingService implements MediaEncodingService {
             }
             if (localWorkspacePath != null) {
                 try (var stream = Files.walk(localWorkspacePath)) {
-                    stream.map(Path::toFile).forEach(File::delete);
-                } catch (Exception ignored) {}
+                    stream.sorted(java.util.Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                } catch (Exception e) {
+                    log.error("Failed to clean up temporary directory: {}", localWorkspacePath, e);
+                }
             }
         }
     }

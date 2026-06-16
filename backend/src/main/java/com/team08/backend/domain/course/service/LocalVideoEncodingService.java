@@ -21,6 +21,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Comparator.reverseOrder;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -61,6 +63,7 @@ public class LocalVideoEncodingService implements MediaEncodingService {
         }
 
         Process process = null;
+        boolean isSuccessful = false;
 
         try {
             Files.createDirectories(targetPath);
@@ -102,6 +105,8 @@ public class LocalVideoEncodingService implements MediaEncodingService {
                     .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
             lecture.updateM3u8Path(dbSavePath);
 
+            isSuccessful = true;
+
         } catch (Exception e) {
             if (process != null && process.isAlive()) {
                 process.destroyForcibly();
@@ -109,8 +114,17 @@ public class LocalVideoEncodingService implements MediaEncodingService {
             log.error("HLS encoding failed for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
-            if (sourceFile.exists()) {
+            if (sourceFile != null && sourceFile.exists()) {
                 sourceFile.delete();
+            }
+            if (!isSuccessful && targetPath != null && Files.exists(targetPath)) {
+                try (var stream = Files.walk(targetPath)) {
+                    stream.sorted(reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                } catch (Exception e) {
+                    log.error("Failed to clean up incomplete target directory: {}", targetPath, e);
+                }
             }
         }
     }
