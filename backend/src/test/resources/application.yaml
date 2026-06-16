@@ -13,13 +13,13 @@ spring:
         speech: none
         transcription: none
   datasource:
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:mysql://db:3306/team08_test
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: user
+    password: 1234
 
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
