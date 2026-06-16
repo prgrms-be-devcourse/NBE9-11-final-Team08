@@ -10,6 +10,16 @@ body:
       description: "어떤 문서에 어떤 내용을 작성하거나 수정하는지 적어주세요."
     validations:
       required: true
+
+  - type: input
+    id: branch
+    attributes:
+      label: "🌿 Branch"
+      description: "브랜치 키를 입력하세요 (선택, 소문자/숫자/하이픈만 허용). 비워두면 브랜치를 만들지 않습니다."
+      placeholder: "ex) update-readme"
+    validations:
+      required: false
+
   - type: textarea
     id: docs_purpose
     attributes:
@@ -21,12 +31,13 @@ body:
         - [ ] 오타 수정 및 가독성 개선
     validations:
       required: true
+
   - type: textarea
     id: docs_details
     attributes:
       label: "✔️ 세부 항목"
       value: |
-        - [ ] 작업할 문서 명칭: 
+        - [ ] 작업할 문서 명칭:
         - [ ] 포함될 주요 내용:
     validations:
       required: true
