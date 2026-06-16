@@ -9,7 +9,6 @@ import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponWriter;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;

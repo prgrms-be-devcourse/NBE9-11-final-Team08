@@ -61,7 +61,7 @@ public class IssuedCoupon {
         return new IssuedCoupon(
                 policy.getId(),
                 userId,
-                policy.calculateExpirationDate(), // TODO: 나중에 Policy 쪽도 Clock 적용 시 파라미터로 now 전달 필요
+                policy.calculateExpirationDate(now),
                 now
         );
     }

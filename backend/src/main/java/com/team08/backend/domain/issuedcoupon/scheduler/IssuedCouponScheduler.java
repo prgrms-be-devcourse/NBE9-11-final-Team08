@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CouponScheduler {
+public class IssuedCouponScheduler {
 
     private final IssuedCouponRepository issuedCouponRepository;
 
