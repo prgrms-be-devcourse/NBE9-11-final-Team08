@@ -64,7 +64,10 @@ public class ChapterService {
         if (lectureIds.isEmpty()) {
             return null;
         }
-
+        // TODO: (멘토님) 병목 포인트, 벌크 처리 , 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
+        // get이라 무난하지만 중ㅇ요한 메타 데이터가 많이 관리 되는 곳이니 좀더 고민해서 구현
+        // - 생각의 흐름 정리하는 법: 실시간으로 강좌/챕터/강의 별 시청중인 유저 수를 대시보드로 만들어 달라는 요구를 top down 으로 생각해보길 추천해주심
+        // - 강좌수는 인프런같은 애들을 참고
         return lectureProgressRepository
                 .findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, lectureIds)
                 .map(progress -> {

@@ -23,4 +23,5 @@ public class LectureController {
 
         return lectureService.createLecture(courseId, chapterId, request);
     }
+    // TODO: lecture 단일 입장도 고려
 }

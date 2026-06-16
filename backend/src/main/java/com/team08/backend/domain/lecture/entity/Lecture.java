@@ -17,6 +17,9 @@ import java.time.LocalDateTime;
 @Where(clause = "deleted_at IS NULL")
 public class Lecture extends BaseTimeEntity {
 
+    // TODO: 조회가 빈번한 lecture 태이블에 관해서 같은 chapter끼리 정렬될 수 있도록
+    //  chapter fk에 인덱싱 적용하기
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
