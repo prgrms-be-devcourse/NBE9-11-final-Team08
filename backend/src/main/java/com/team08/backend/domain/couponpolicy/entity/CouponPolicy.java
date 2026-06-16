@@ -144,6 +144,7 @@ public class CouponPolicy extends BaseTimeEntity {
         );
     }
 
+
     public LocalDateTime calculateExpirationDate(LocalDateTime now) {
         if (this.validDays == null) {
             return LocalDateTime.of(2099, 1, 1, 23, 59);
@@ -174,7 +175,7 @@ public class CouponPolicy extends BaseTimeEntity {
         this.totalQuantity--;
     }
 
-    // [시스템] 할인 금액 계산
+    // 할인 금액 계산
     public int calculateDiscountAmount(int originalPrice) {
         if (this.discountType == DiscountType.AMOUNT) {
             // 정액 할인: (할인 금액과 원래 가격 중 작은 값 반환 - 상품가보다 더 할인되는 것 방지)
@@ -189,5 +190,16 @@ public class CouponPolicy extends BaseTimeEntity {
             }
             return discount;
         }
+    }
+
+    // TODO 나중에 결제에서 사용 
+    // 할인 적용 가능 여부 확인
+    public boolean isApplicableTo(Long targetCourseId, Long targetCategoryId) {
+        return switch (this.couponTarget) {
+            case ALL -> true;
+            case CATEGORY -> this.categoryId != null && this.categoryId.equals(targetCategoryId);
+            case COURSE -> this.targetCourses.stream()
+                    .anyMatch(tc -> tc.getCourseId().equals(targetCourseId));
+        };
     }
 }

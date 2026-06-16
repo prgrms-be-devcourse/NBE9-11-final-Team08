@@ -7,11 +7,59 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CouponPolicyTest {
+
+    @Test
+    @DisplayName("성공: COURSE 타겟 쿠폰은 지정된 코스 ID들에만 적용 가능하다")
+    void isApplicableTo_course_success() {
+        // given
+        List<Long> targetCourseIds = List.of(100L, 200L);
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                "특정 코스 할인", DiscountType.AMOUNT, 1000, null, 0, 7, null,
+                targetCourseIds, CouponTarget.COURSE, CouponUsageType.SINGLE_USE,
+                false, null, null
+        );
+
+        // when & then
+        assertThat(policy.isApplicableTo(100L, 1L)).isTrue();  // 코스 100 포함됨
+        assertThat(policy.isApplicableTo(200L, 1L)).isTrue();  // 코스 200 포함됨
+        assertThat(policy.isApplicableTo(300L, 1L)).isFalse(); // 코스 300 미포함 (적용 불가)
+    }
+
+    @Test
+    @DisplayName("성공: CATEGORY 타겟 쿠폰은 지정된 카테고리 ID에만 적용 가능하다")
+    void isApplicableTo_category_success() {
+        // given
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                "카테고리 할인", DiscountType.AMOUNT, 1000, null, 0, 7, 50L,
+                null, CouponTarget.CATEGORY, CouponUsageType.SINGLE_USE,
+                false, null, null
+        );
+
+        // when & then
+        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 일치
+        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 불일치
+    }
+
+    @Test
+    @DisplayName("성공: ALL 타겟 쿠폰은 모든 코스와 카테고리에 적용 가능하다")
+    void isApplicableTo_all_success() {
+        // given
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                "전체 할인", DiscountType.AMOUNT, 1000, null, 0, 7, null,
+                null, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
+                false, null, null
+        );
+
+        // when & then
+        assertThat(policy.isApplicableTo(999L, 999L)).isTrue();
+        assertThat(policy.isApplicableTo(1L, 1L)).isTrue();
+    }
 
     @Test
     @DisplayName("성공: 정률 할인 계산 시 정수 연산을 사용하여 정확한 금액을 반환한다 (내림 처리)")
