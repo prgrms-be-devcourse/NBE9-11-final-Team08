@@ -10,9 +10,20 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
-set -a
-source "${env_file}"
-set +a
+read_env_value() {
+  local key="$1"
+  local line
+
+  line="$(grep -m 1 -E "^${key}=" "${env_file}" || true)"
+  if [[ -z "${line}" ]]; then
+    return 1
+  fi
+
+  printf '%s' "${line#*=}"
+}
+
+DOMAIN="$(read_env_value DOMAIN)"
+CERTBOT_EMAIL="$(read_env_value CERTBOT_EMAIL)"
 
 : "${DOMAIN:?DOMAIN is required in .env}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL is required in .env}"

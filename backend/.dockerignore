@@ -3,3 +3,9 @@ build
 .idea
 *.iml
 db_dev*
+.env
+.env.*
+*.jks
+*.key
+*.p12
+*.pem
