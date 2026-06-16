@@ -3,6 +3,7 @@ package com.team08.backend.domain.feed.service;
 import com.team08.backend.domain.feeditem.entity.FeedItem;
 import com.team08.backend.domain.feeditem.entity.FeedItemType;
 import com.team08.backend.domain.feeditem.repository.FeedItemRepository;
+import com.team08.backend.domain.feeditem.service.FeedContentSummarizer;
 import com.team08.backend.domain.feeditem.service.FeedItemEventListener;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.event.StudyActivityCreatedEvent;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -21,6 +23,9 @@ public class FeedItemEventListenerTest {
 
     @Mock
     private FeedItemRepository feedItemRepository;
+
+    @Mock
+    private FeedContentSummarizer feedContentSummarizer;
 
     @InjectMocks
     private FeedItemEventListener feedItemEventListener;
@@ -34,6 +39,9 @@ public class FeedItemEventListenerTest {
         StudyActivity studyActivity = StudyActivity.create(studyId, authorId, content);
         StudyActivityCreatedEvent event = StudyActivityCreatedEvent.from(studyActivity);
 
+        given(feedContentSummarizer.summarize(content))
+                .willReturn(content);
+
         // when
         feedItemEventListener.handle(event);
 
@@ -43,10 +51,10 @@ public class FeedItemEventListenerTest {
 
         FeedItem saved = captor.getValue();
 
-        assertThat(saved.getStudyId()).isEqualTo(1L);
-        assertThat(saved.getAuthorId()).isEqualTo(3L);
+        assertThat(saved.getStudyId()).isEqualTo(studyId);
+        assertThat(saved.getAuthorId()).isEqualTo(authorId);
         assertThat(saved.getType()).isEqualTo(FeedItemType.STUDY_ACTIVITY);
-        assertThat(saved.getSourceId()).isEqualTo(10L);
-        assertThat(saved.getContent()).isEqualTo("오늘 학습한 내용을 공유합니다.");
+        assertThat(saved.getSourceId()).isEqualTo(studyActivity.getId());
+        assertThat(saved.getContent()).isEqualTo(content);
     }
 }
