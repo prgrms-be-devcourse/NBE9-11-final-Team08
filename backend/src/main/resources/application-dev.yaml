@@ -21,6 +21,8 @@ app:
   ai:
     model: stub
     prompt-version: v1
+  data-init:
+    mode: bulk  # none | simple | bulk
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
     refresh-cookie:
