@@ -74,6 +74,9 @@ class LocalVideoEncodingServiceTest {
 
         LocalVideoEncodingService stubService = new LocalVideoEncodingService(lectureRepository) {
             @Override
+            public void init() {}
+
+            @Override
             public void encodeToHls(File sourceFile, String targetDirName, Long lectureId) {
                 try {
                     Path targetPath = Path.of(tempUploadDir.toString(), targetDirName);
@@ -107,6 +110,9 @@ class LocalVideoEncodingServiceTest {
         String targetDirName = UUID.randomUUID().toString();
 
         LocalVideoEncodingService stubService = new LocalVideoEncodingService(lectureRepository) {
+            @Override
+            public void init() {}
+
             @Override
             public void encodeToHls(File sourceFile, String targetDirName, Long lectureId) {
                 try {

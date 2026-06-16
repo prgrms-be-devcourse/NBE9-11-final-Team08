@@ -218,7 +218,7 @@ public class CourseService {
         File tempSourceFile;
 
         try {
-            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), targetDirName, ".mp4");
+            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "lecture-tmp-", ".mp4");
             tempSourceFile = tempFilePath.toFile();
             file.transferTo(tempSourceFile);
         } catch (IOException e) {

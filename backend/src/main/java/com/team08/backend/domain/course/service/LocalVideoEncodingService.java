@@ -4,6 +4,7 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,19 @@ public class LocalVideoEncodingService implements MediaEncodingService {
     private String uploadDir;
 
     private final LectureRepository lectureRepository;
+
+    @PostConstruct
+    public void init() {
+        try {
+            Path path = Paths.get(uploadDir);
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
+        } catch (Exception e) {
+            log.error("Failed to initialize upload directory: {}", uploadDir, e);
+            throw new IllegalStateException("Upload directory initialization failed", e);
+        }
+    }
 
     @Override
     @Async("videoEncodingExecutor")
