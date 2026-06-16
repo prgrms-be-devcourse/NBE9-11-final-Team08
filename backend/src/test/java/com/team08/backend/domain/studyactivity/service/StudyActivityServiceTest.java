@@ -21,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -48,6 +49,9 @@ class StudyActivityServiceTest {
 
     @Mock
     private AiFeedbackInvalidator aiFeedbackInvalidator;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private StudyActivityService studyActivityService;
@@ -669,7 +673,17 @@ class StudyActivityServiceTest {
         studyActivityService.createActivity(studyId, userId, activity.getContent());
 
         // then
-        verify(eventPublisher).publishEvent(any(StudyActivityCreatedEvent.class));
+        ArgumentCaptor<StudyActivityCreatedEvent> captor =
+                ArgumentCaptor.forClass(StudyActivityCreatedEvent.class);
+
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        StudyActivityCreatedEvent event = captor.getValue();
+
+        assertThat(event.studyActivityId()).isEqualTo(activity.getId());
+        assertThat(event.studyId()).isEqualTo(studyId);
+        assertThat(event.authorId()).isEqualTo(userId);
+        assertThat(event.content()).isEqualTo(activity.getContent());
     }
 
     private void assertInactiveStudyCannotCreate(Study study) {
