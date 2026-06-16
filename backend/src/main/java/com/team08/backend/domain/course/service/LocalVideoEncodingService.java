@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -46,8 +47,19 @@ public class LocalVideoEncodingService implements MediaEncodingService {
     @Override
     @Async("videoEncodingExecutor")
     @Transactional
-    public void encodeToHls(File sourceFile, String targetDirName, Long lectureId) {
+    public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
+        File sourceFile;
+
+        try {
+            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "lecture-local-tmp-", ".mp4");
+            sourceFile = tempFilePath.toFile();
+            file.transferTo(sourceFile);
+        } catch (Exception e) {
+            log.error("Failed to create temporary file for local encoding. lectureId: {}", lectureId, e);
+            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+        }
+
         Process process = null;
 
         try {

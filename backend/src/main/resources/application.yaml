@@ -38,3 +38,15 @@ app:
       name: refreshToken
       secure: ${IS_COOKIE_SECURE:true}
       same-site: ${SAME_SITE:Lax}
+
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY_ID}
+      secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region:
+      static: ap-northeast-2
+    s3:
+      bucket: ${AWS_S3_BUCKET_NAME}
+    stack:
+      auto: false

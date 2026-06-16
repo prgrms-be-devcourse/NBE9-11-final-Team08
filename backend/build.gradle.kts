@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+    implementation("io.awspring.cloud:spring-cloud-aws-starter-s3:3.3.0")
     implementation(platform("org.springframework.ai:spring-ai-bom:1.1.8"))
     implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -48,4 +49,8 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+
+    environment("AWS_ACCESS_KEY_ID", "dummy-access-key")
+    environment("AWS_SECRET_ACCESS_KEY", "dummy-secret-key")
+    environment("AWS_S3_BUCKET_NAME", "dummy-bucket-name")
 }

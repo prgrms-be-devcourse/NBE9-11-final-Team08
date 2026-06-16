@@ -1,7 +1,7 @@
 package com.team08.backend.domain.course.service;
 
-import java.io.File;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface MediaEncodingService {
-    void encodeToHls(File sourceFile, String targetDirName, Long lectureId);
+    void encodeToHls(MultipartFile file, String targetDirName, Long lectureId);
 }
