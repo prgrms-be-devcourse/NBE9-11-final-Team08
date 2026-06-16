@@ -83,4 +83,17 @@ class S3VideoEncodingServiceTest {
 
         verify(s3FileStorageService, atLeastOnce()).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
     }
+
+    @Test
+    void 인코딩은_성공했으나_생성된_HLS_파편_파일이_없으면_예외를_던진다() {
+        given(s3FileStorageService.uploadFile(any(File.class), anyString())).willReturn("path");
+        given(s3FileStorageService.downloadFile(anyString(), any(File.class))).willReturn(mock(File.class));
+
+        assertThrows(CustomException.class, () ->
+                s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
+        );
+
+        verify(s3FileStorageService, atLeastOnce()).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
+        verifyNoInteractions(lectureDbService);
+    }
 }

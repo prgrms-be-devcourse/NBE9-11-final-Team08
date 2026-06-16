@@ -91,11 +91,14 @@ public class S3VideoEncodingService implements MediaEncodingService {
             }
 
             File[] generatedFiles = localWorkspacePath.toFile().listFiles();
-            if (generatedFiles != null) {
-                for (File f : generatedFiles) {
-                    String s3TargetKey = "lectures/" + lectureId + "/" + targetDirName + "/" + f.getName();
-                    s3FileStorageService.uploadFile(f, s3TargetKey);
-                }
+            if (generatedFiles == null || generatedFiles.length == 0) {
+                log.error("S3 HLS encoding generated zero files. lectureId: {}", lectureId);
+                throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+            }
+
+            for (File f : generatedFiles) {
+                String s3TargetKey = "lectures/" + lectureId + "/" + targetDirName + "/" + f.getName();
+                s3FileStorageService.uploadFile(f, s3TargetKey);
             }
 
             String dbSavePath = "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";

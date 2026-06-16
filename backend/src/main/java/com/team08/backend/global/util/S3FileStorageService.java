@@ -26,8 +26,8 @@ public class S3FileStorageService {
     private final S3Template s3Template;
 
     public String uploadFile(File file, String s3Key) {
-        try {
-            s3Template.upload(bucket, s3Key, Files.newInputStream(file.toPath()));
+        try (InputStream is = Files.newInputStream(file.toPath())) {
+            s3Template.upload(bucket, s3Key, is);
             return s3Key;
         } catch (Exception e) {
             log.error("Failed to upload file to S3. key: {}", s3Key, e);
