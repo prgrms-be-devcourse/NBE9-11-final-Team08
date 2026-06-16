@@ -4,7 +4,6 @@ import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,12 +23,11 @@ public record CouponPolicyCreateRequest(
         Integer discountValue,
 
         Integer maxDiscountAmount,
-        
+
         Integer minOrderAmount,
 
-        Integer validDays,
+        Integer validDays, // null이면 무기한
 
-        @Min(value = 1, message = "총 수량은 1개 이상이어야 합니다.")
         Integer totalQuantity, // null이면 무제한
 
         Long categoryId,
@@ -52,43 +50,4 @@ public record CouponPolicyCreateRequest(
 
         LocalDateTime issueEndDate
 ) {
-    @AssertTrue(message = "발급 시작일은 종료일보다 이전이어야 합니다.")
-    public boolean isValidIssueDate() {
-        if (issueStartDate == null || issueEndDate == null) {
-            return true;
-        }
-        return issueStartDate.isBefore(issueEndDate);
-    }
-
-    @AssertTrue(message = "퍼센트 할인 값은 100 이하이어야 합니다.")
-    public boolean isDiscountValueValid() {
-        if (discountType == DiscountType.PERCENT) {
-            return discountValue <= 100;
-        }
-        return true;
-    }
-
-    @AssertTrue(message = "카테고리 할인인 경우 카테고리 ID는 필수입니다.")
-    public boolean isCategoryValid() {
-        if (couponTarget == CouponTarget.CATEGORY) {
-            return categoryId != null;
-        }
-        return true;
-    }
-
-    @AssertTrue(message = "코스 할인인 경우 코스 ID 목록은 필수입니다.")
-    public boolean isCourseValid() {
-        if (couponTarget == CouponTarget.COURSE) {
-            return courseIds != null && !courseIds.isEmpty();
-        }
-        return true;
-    }
-
-    @AssertTrue(message = "선착순 쿠폰은 총 수량이 필수입니다.")
-    public boolean isQuantityValid() {
-        if (couponType == CouponType.FCFS) {
-            return totalQuantity != null && totalQuantity > 0;
-        }
-        return true;
-    }
 }

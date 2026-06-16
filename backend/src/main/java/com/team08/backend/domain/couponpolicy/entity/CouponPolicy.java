@@ -5,7 +5,16 @@ import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedEx
 import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
 import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
 import com.team08.backend.global.common.BaseTimeEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -107,39 +116,31 @@ public class CouponPolicy extends BaseTimeEntity {
 
     // 대량 데이터 서버랑 동일하다
 
-    public static CouponPolicy create(
-            String name,
-            DiscountType discountType,
-            Integer discountValue,
-            Integer maxDiscountAmount,
-            Integer minOrderAmount,
-            Integer validDays,
-            Integer totalQuantity,
-            Long categoryId,
-            List<Long> courseIds,
-            CouponType couponType,
-            CouponTarget couponTarget,
-            CouponUsageType usageType,
-            Boolean isStackable,
-            LocalDateTime issueStartDate,
-            LocalDateTime issueEndDate
+    // 선착순 쿠폰 생성
+    public static CouponPolicy createFcfsPolicy(
+            String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
+            Integer minOrderAmount, Integer validDays, int totalQuantity, Long categoryId, List<Long> courseIds,
+            CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable,
+            LocalDateTime issueStartDate, LocalDateTime issueEndDate
     ) {
         return new CouponPolicy(
-                name,
-                discountType,
-                discountValue,
-                maxDiscountAmount,
-                minOrderAmount,
-                validDays,
-                totalQuantity,
-                categoryId,
-                courseIds,
-                couponType,
-                couponTarget,
-                usageType,
-                isStackable,
-                issueStartDate,
-                issueEndDate
+                name, discountType, discountValue, maxDiscountAmount,
+                minOrderAmount, validDays, totalQuantity, categoryId, courseIds,
+                CouponType.FCFS, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
+        );
+    }
+
+    // 일반 쿠폰 생성
+    public static CouponPolicy createNormalPolicy(
+            String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
+            Integer minOrderAmount, Integer validDays, Long categoryId, List<Long> courseIds,
+            CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable,
+            LocalDateTime issueStartDate, LocalDateTime issueEndDate
+    ) {
+        return new CouponPolicy(
+                name, discountType, discountValue, maxDiscountAmount,
+                minOrderAmount, validDays, null, categoryId, courseIds,
+                CouponType.NORMAL, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
         );
     }
 
