@@ -1,7 +1,8 @@
-package com.team08.backend.domain.issuedcoupon.repository;
+package com.team08.backend.domain.issuedcoupon.service;
 
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;

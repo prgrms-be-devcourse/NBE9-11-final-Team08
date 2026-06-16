@@ -5,7 +5,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
-import com.team08.backend.domain.issuedcoupon.exception.CouponPolicyNotFoundException;
+import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -42,7 +42,7 @@ public class NormalIssuedCouponStrategy implements IssuedCouponStrategy {
         }
 
         // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod();
+        policy.validateIssuePeriod(now);
 
         // 쿠폰 발급 기록 생성
         return IssuedCoupon.create(policy, userId, now);

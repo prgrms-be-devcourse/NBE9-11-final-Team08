@@ -3,8 +3,8 @@ package com.team08.backend.domain.issuedcoupon.strategy;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +21,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class NormalIssuedCouponStrategyTest {
@@ -57,7 +60,7 @@ class NormalIssuedCouponStrategyTest {
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
-        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
         // when
         IssuedCoupon result = normalIssuedCouponStrategy.issue(userId, policyId);
@@ -65,7 +68,7 @@ class NormalIssuedCouponStrategyTest {
         // then
         assertThat(result).isNotNull();
         assertThat(result.getPolicyId()).isEqualTo(policyId);
-        verify(policy).validateIssuePeriod();
+        verify(policy).validateIssuePeriod(any(LocalDateTime.class));
     }
 
     @Test
@@ -81,7 +84,7 @@ class NormalIssuedCouponStrategyTest {
 
         // when & then
         assertThatThrownBy(() -> normalIssuedCouponStrategy.issue(userId, policyId))
-                .isInstanceOf(CustomException.class)
+                .isInstanceOf(CouponAlreadyIssuedException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_ISSUED);
     }
 }

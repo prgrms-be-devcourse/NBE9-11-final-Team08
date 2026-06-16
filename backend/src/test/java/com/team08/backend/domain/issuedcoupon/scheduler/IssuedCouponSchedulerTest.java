@@ -1,6 +1,10 @@
 package com.team08.backend.domain.issuedcoupon.scheduler;
 
-import com.team08.backend.domain.couponpolicy.entity.*;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
+import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
@@ -21,10 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-class CouponSchedulerTest {
+class IssuedCouponSchedulerTest {
 
     @Autowired
-    private CouponScheduler couponScheduler;
+    private IssuedCouponScheduler issuedCouponScheduler;
 
     @Autowired
     private IssuedCouponRepository issuedCouponRepository;
@@ -54,7 +58,7 @@ class CouponSchedulerTest {
         issuedCouponRepository.save(validCoupon);
 
         // when
-        couponScheduler.expireCoupons();
+        issuedCouponScheduler.expireCoupons();
 
         // then
         IssuedCoupon updatedExpiredCoupon = issuedCouponRepository.findById(expiredCoupon.getId()).get();

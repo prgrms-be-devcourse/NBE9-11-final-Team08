@@ -29,9 +29,7 @@ public class AttendanceController {
     @Operation(summary = "출석 체크", description = "당일 출석을 수행하고 연속/누적 출석일수를 반환합니다.")
     public AttendanceResponse checkIn(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        LocalDate today = LocalDate.now();
-
         // [사용자] 출석체크
-        return attendanceService.checkIn(loginUserPrincipal.user().id(), today);
+        return attendanceService.checkIn(loginUserPrincipal.user().id());
     }
 }

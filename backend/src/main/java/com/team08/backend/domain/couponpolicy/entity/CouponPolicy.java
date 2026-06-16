@@ -1,9 +1,10 @@
 package com.team08.backend.domain.couponpolicy.entity;
 
-import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodEndedException;
+import com.team08.backend.domain.couponpolicy.exception.CouponIssuePeriodNotStartedException;
 import com.team08.backend.global.common.BaseTimeEntity;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,39 +84,56 @@ public class CouponPolicy extends BaseTimeEntity {
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
     }
+    // TODO 멘토링 
+    /* 
+    빌더 패턴이 하는 부분이 나중에 갔을 땐 필드값 추가마다 추가해야 됨
+    빌더 말고 별도의 객체로 만들어보면 좋다
+    여러가지의 정책들로 100개 여러가지 생성 정책
+    객체를 생성하는 여러가지 방법을 조건 기준마다 생성 규칙 표ㅕ준화 어디 필수 비필수 생성방법 검증
+    생성 방법이 빌더로 하면 너무 단편적이다
+    다양한 객체 생성 패턴을 익혀라
+    빌더 현업에서 잘 안 씀
+    인터페이스 두고 여러 생성방법 정의 내리기
+    쿠폰에 대한 서비스 == 컴퍼넌트 
+    팩토리
+    빌더는 단순 (MVP만) 
+    코틀린 생성자 역할이 클래스가 함
+    객체 생성에 대한 다양한 방식
+     */
 
-    public static CouponPolicy create(CouponPolicyCreateRequest request) {
+    // 대량 데이터 서버랑 동일하다
+
+    public static CouponPolicy create(CouponPolicyCreateCommand command) {
         return CouponPolicy.builder()
-                .name(request.name())
-                .discountType(request.discountType())
-                .discountValue(request.discountValue())
+                .name(command.name())
+                .discountType(command.discountType())
+                .discountValue(command.discountValue())
                 .maxDiscountAmount(null)
-                .validDays(request.validDays())
-                .totalQuantity(request.totalQuantity())
-                .categoryId(request.categoryId())
-                .couponType(request.couponType())
-                .couponTarget(request.couponTarget())
-                .usageType(request.usageType())
-                .isStackable(request.isStackable())
-                .issueStartDate(request.issueStartDate())
-                .issueEndDate(request.issueEndDate())
+                .validDays(command.validDays())
+                .totalQuantity(command.totalQuantity())
+                .categoryId(command.categoryId())
+                .couponType(command.couponType())
+                .couponTarget(command.couponTarget())
+                .usageType(command.usageType())
+                .isStackable(command.isStackable())
+                .issueStartDate(command.issueStartDate())
+                .issueEndDate(command.issueEndDate())
                 .build();
     }
 
-    public LocalDateTime calculateExpirationDate() {
-        return java.time.LocalDate.now()
+    public LocalDateTime calculateExpirationDate(LocalDateTime now) {
+        return now.toLocalDate()
                 .plusDays(this.validDays)
                 .atTime(java.time.LocalTime.MAX);
     }
 
     // 쿠폰 발급 기간 검증
-    public void validateIssuePeriod() {
-        LocalDateTime now = LocalDateTime.now();
+    public void validateIssuePeriod(LocalDateTime now) {
         if (issueStartDate != null && now.isBefore(issueStartDate)) {
-            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_NOT_STARTED);
+            throw new CouponIssuePeriodNotStartedException();
         }
         if (issueEndDate != null && now.isAfter(issueEndDate)) {
-            throw new CustomException(ErrorCode.COUPON_ISSUE_PERIOD_ENDED);
+            throw new CouponIssuePeriodEndedException();
         }
     }
 
@@ -125,7 +143,7 @@ public class CouponPolicy extends BaseTimeEntity {
             return;
         }
         if (this.totalQuantity <= 0) {
-            throw new CustomException(ErrorCode.COUPON_EXHAUSTED);
+            throw new CouponExhaustedException();
         }
         this.totalQuantity--;
     }

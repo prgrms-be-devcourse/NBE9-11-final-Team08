@@ -1,10 +1,10 @@
 package com.team08.backend.domain.issuedcoupon.strategy;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +21,11 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FcfsIssuedCouponStrategyTest {
@@ -57,7 +61,7 @@ class FcfsIssuedCouponStrategyTest {
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
-        when(policy.calculateExpirationDate()).thenReturn(now.plusDays(30));
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
         // when
         IssuedCoupon result = fcfsIssuedCouponStrategy.issue(userId, policyId);
@@ -76,11 +80,11 @@ class FcfsIssuedCouponStrategyTest {
         CouponPolicy policy = mock(CouponPolicy.class);
 
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
-        doThrow(new CustomException(ErrorCode.COUPON_EXHAUSTED)).when(policy).decreaseQuantity();
+        doThrow(new CouponExhaustedException()).when(policy).decreaseQuantity();
 
         // when & then
         assertThatThrownBy(() -> fcfsIssuedCouponStrategy.issue(userId, policyId))
-                .isInstanceOf(CustomException.class)
+                .isInstanceOf(CouponExhaustedException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_EXHAUSTED);
     }
 }
