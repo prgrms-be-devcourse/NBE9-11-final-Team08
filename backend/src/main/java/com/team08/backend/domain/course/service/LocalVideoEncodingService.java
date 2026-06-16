@@ -10,9 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -76,16 +74,11 @@ public class LocalVideoEncodingService implements MediaEncodingService {
                     outputM3u8
             );
 
-            pb.redirectErrorStream(true);
+            pb.inheritIO();
             process = pb.start();
-
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                while (reader.readLine() != null) {}
-            }
 
             boolean finished = process.waitFor(10, TimeUnit.MINUTES);
             if (!finished) {
-                process.destroyForcibly();
                 log.error("HLS encoding timeout exceeded for lectureId: {}", lectureId);
                 throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
             }
@@ -96,18 +89,24 @@ public class LocalVideoEncodingService implements MediaEncodingService {
                 throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
             }
 
+            File[] generatedFiles = targetPath.toFile().listFiles();
+            if (generatedFiles == null || generatedFiles.length == 0) {
+                log.error("HLS encoding generated zero files. lectureId: {}", lectureId);
+                throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+            }
+
             String dbSavePath = targetDirName + "/output.m3u8";
             lectureDbService.updateLectureM3u8(lectureId, dbSavePath);
 
             isSuccessful = true;
 
         } catch (Exception e) {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-            }
             log.error("HLS encoding failed for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
             if (sourceFile != null && sourceFile.exists()) {
                 sourceFile.delete();
             }

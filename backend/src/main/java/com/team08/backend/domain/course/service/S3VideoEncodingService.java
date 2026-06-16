@@ -73,7 +73,6 @@ public class S3VideoEncodingService implements MediaEncodingService {
 
             boolean finished = process.waitFor(10, TimeUnit.MINUTES);
             if (!finished) {
-                process.destroyForcibly();
                 log.error("S3 HLS encoding timeout exceeded for lectureId: {}", lectureId);
                 throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
             }
@@ -99,12 +98,12 @@ public class S3VideoEncodingService implements MediaEncodingService {
             lectureDbService.updateLectureM3u8(lectureId, dbSavePath);
 
         } catch (Exception e) {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-            }
             log.error("S3 HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
             s3FileStorageService.deleteFile(s3SourceKey);
             if (localSourceFile != null && localSourceFile.exists()) {
                 localSourceFile.delete();

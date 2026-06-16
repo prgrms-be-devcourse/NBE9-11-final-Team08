@@ -48,7 +48,7 @@ class S3VideoEncodingServiceTest {
     }
 
     @Test
-    void S3_임시_경로로_원본_비디오_업로드_실패_시_예외를_던진다() {
+    void S3_임시_경로로_원본_비디오_업로드_실패_시_예외를_던지고_로컬_임시_자원을_정리한다() {
         doThrow(new RuntimeException())
                 .when(s3FileStorageService)
                 .uploadFile(any(File.class), anyString());
@@ -56,6 +56,8 @@ class S3VideoEncodingServiceTest {
         assertThrows(CustomException.class, () ->
                 s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
         );
+
+        verify(s3FileStorageService, never()).deleteFile(anyString());
     }
 
     @Test
@@ -69,7 +71,7 @@ class S3VideoEncodingServiceTest {
                 s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
         );
 
-        verify(s3FileStorageService, atLeastOnce()).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
+        verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
     }
 
     @Test
@@ -81,7 +83,7 @@ class S3VideoEncodingServiceTest {
                 s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
         );
 
-        verify(s3FileStorageService, atLeastOnce()).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
+        verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
     }
 
     @Test
@@ -93,7 +95,7 @@ class S3VideoEncodingServiceTest {
                 s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
         );
 
-        verify(s3FileStorageService, atLeastOnce()).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
+        verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
         verifyNoInteractions(lectureDbService);
     }
 }

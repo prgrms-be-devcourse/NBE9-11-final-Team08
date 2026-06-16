@@ -89,7 +89,7 @@ class LocalVideoEncodingServiceTest {
     }
 
     @Test
-    void 인코딩_프로세스는_완료되었으나_결과_파편_파일이_없으면_예외를_던진다() {
+    void 인코딩_프로세스는_완료되었으나_결과_파편_파일이_없으면_예외를_던지고_생성되던_디렉토리를_청소한다() {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
 
@@ -102,6 +102,9 @@ class LocalVideoEncodingServiceTest {
 
         assertThatThrownBy(() -> localVideoEncodingService.encodeToHls(corruptedVideoFile, targetDirName, lectureId))
                 .isInstanceOf(CustomException.class);
+
+        Path targetWorkspace = tempUploadDir.resolve(targetDirName);
+        assertThat(Files.exists(targetWorkspace)).isFalse();
 
         verifyNoInteractions(lectureDbService);
     }
