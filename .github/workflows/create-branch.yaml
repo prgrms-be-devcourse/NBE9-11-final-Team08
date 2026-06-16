@@ -1,5 +1,6 @@
 name: Create Branch From Issue
 
+# 트리거 설정: 수동 실행(workflow_dispatch) 또는 이슈 생성(issues) 시 실행
 on:
   workflow_dispatch:
     inputs:
@@ -11,49 +12,61 @@ on:
         required: true
 
   issues:
-    types: [opened]
+    types: [opened] # 이슈가 새로 열렸을 때만 트리거
 
+# 워크플로우 권한 설정
 permissions:
-  contents: write
-  issues: write
+  contents: write # 브랜치 생성(push)을 위한 저장소 쓰기 권한
+  issues: write   # 이슈 코멘트 등 이슈 관련 쓰기 권한
 
 jobs:
   create-branch:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 # 저장소 체크아웃
 
       - name: Create Branch
         env:
+          # 이슈 이벤트에서 번호, 제목, 본문을 환경변수로 주입
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
 
+          # 이슈 제목에서 [type] 형식의 타입 추출
+          # 예) "[feat] 로그인 기능 추가" → "feat"
           TYPE=$(echo "$ISSUE_TITLE" \
             | grep -oP '(?<=\[).*(?=\])')
 
+          # 이슈 본문에서 "## Branch" 섹션 바로 다음 줄을 브랜치 키로 추출
+          # 예) "## Branch\nlogin-page" → "login-page"
           BRANCH_KEY=$(echo "$ISSUE_BODY" \
             | awk '/## Branch/{getline; print}' \
-            | xargs)
+            | xargs) # 앞뒤 공백 제거
 
+          # 타입이 없으면 에러 처리
           if [ -z "$TYPE" ]; then
             echo "Issue title must contain [type]"
             exit 1
           fi
 
+          # 브랜치 키가 없으면 에러 처리
           if [ -z "$BRANCH_KEY" ]; then
             echo "Issue body must contain branch name"
             exit 1
           fi
 
+          # 최종 브랜치명 조합: {type}/{이슈번호}-{브랜치키}
+          # 예) "feat/42-login-page"
           BRANCH_NAME="${TYPE}/${ISSUE_NUMBER}-${BRANCH_KEY}"
 
           echo "Creating $BRANCH_NAME"
 
+          # git 커밋 작성자를 GitHub Actions 봇으로 설정
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # 브랜치 생성 후 원격 저장소에 푸시
           git checkout -b "$BRANCH_NAME"
           git push origin "$BRANCH_NAME"
