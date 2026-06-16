@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,6 +25,8 @@ public class S3VideoEncodingService implements MediaEncodingService {
 
     private final S3FileStorageService s3FileStorageService;
     private final LectureDbService lectureDbService;
+
+    // TODO: k6 부하 테스트 진행 후 서버 가용량(CPU/메모리/디스크 I/O) 측정치에 기반하여 videoEncodingExecutor 스레드 풀 제한(max-size, queue-capacity) 설정 반영 예정
 
     @Override
     @Async("videoEncodingExecutor")
@@ -68,7 +71,7 @@ public class S3VideoEncodingService implements MediaEncodingService {
                     outputM3u8
             );
 
-            pb.redirectErrorStream(true);
+            pb.inheritIO();
             process = pb.start();
 
             boolean finished = process.waitFor(10, TimeUnit.MINUTES);
@@ -111,8 +114,13 @@ public class S3VideoEncodingService implements MediaEncodingService {
             if (localWorkspacePath != null) {
                 try (var stream = Files.walk(localWorkspacePath)) {
                     stream.sorted(java.util.Comparator.reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
+                            .forEach(path -> {
+                                try {
+                                    Files.delete(path);
+                                } catch (IOException e) {
+                                    log.warn("Cleanup failed for temporary workspace path: {}", path, e);
+                                }
+                            });
                 } catch (Exception e) {
                     log.error("Failed to clean up temporary directory: {}", localWorkspacePath, e);
                 }

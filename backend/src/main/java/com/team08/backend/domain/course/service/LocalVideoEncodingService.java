@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -41,6 +42,7 @@ public class LocalVideoEncodingService implements MediaEncodingService {
         }
     }
 
+    // TODO: k6 부하 테스트 진행 후 서버 가용량(CPU/메모리/디스크 I/O) 측정치에 기반하여 videoEncodingExecutor 스레드 풀 제한(max-size, queue-capacity) 설정 반영 예정
     @Override
     @Async("videoEncodingExecutor")
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
@@ -113,8 +115,13 @@ public class LocalVideoEncodingService implements MediaEncodingService {
             if (!isSuccessful && targetPath != null && Files.exists(targetPath)) {
                 try (var stream = Files.walk(targetPath)) {
                     stream.sorted(reverseOrder())
-                            .map(Path::toFile)
-                            .forEach(File::delete);
+                            .forEach(path -> {
+                                try {
+                                    Files.delete(path);
+                                } catch (IOException e) {
+                                    log.warn("Cleanup failed for incomplete target path: {}", path, e);
+                                }
+                            });
                 } catch (Exception e) {
                     log.error("Failed to clean up incomplete target directory: {}", targetPath, e);
                 }
