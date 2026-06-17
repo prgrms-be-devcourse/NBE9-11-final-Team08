@@ -89,14 +89,14 @@ perf-logs: ## [부하] 앱 로그 실시간 보기
 # prod-logs: ## [배포] 백엔드 로그 실시간 보기
 # 	$(call run,$(PROD) logs -f backend)
 #
-# ## ─────────────── 공통 ───────────────
-#
-# ps: ## 실행 중인 컨테이너 상태 보기
-# 	$(call run,$(BASE) ps)
-#
-# down-all: ## 모든 컨테이너 내리기 (데이터 유지)
-# 	$(call run,$(BASE) down)
-#
-# help: ## 이 도움말 출력
-# 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-# 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+## ─────────────── 공통 ───────────────
+
+ps: ## 실행 중인 컨테이너 상태 보기
+	$(call run,$(BASE) ps)
+
+down-all: ## 모든 컨테이너 내리기 (데이터 유지)
+	$(call run,$(BASE) down)
+
+help: ## 이 도움말 출력
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
