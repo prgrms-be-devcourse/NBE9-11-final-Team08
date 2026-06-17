@@ -5,7 +5,9 @@ import com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategor
 import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Component
@@ -36,14 +38,17 @@ public class CouponPolicyUpdater {
             return;
         }
 
+        Set<Long> currentIdSet = new HashSet<>(currentIds);
+        Set<Long> newIdSet = new HashSet<>(newIds);
+
         // 삭제할 항목
         currentIds.stream()
-                .filter(id -> !newIds.contains(id))
+                .filter(id -> !newIdSet.contains(id))
                 .forEach(remover);
 
         // 추가할 항목
         newIds.stream()
-                .filter(id -> !currentIds.contains(id))
+                .filter(id -> !currentIdSet.contains(id))
                 .forEach(adder);
     }
 }
