@@ -60,7 +60,7 @@ public class OrderService {
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
 
-        // Clear used cart items after order creation to prevent repeat orders from the same cart.
+        // 장바구니 주문 성공 후 동일 항목으로 재주문되는 것을 막기 위해 사용된 장바구니 항목을 비운다.
         cartItemRepository.deleteAllByCartId(cart.getId());
 
         return response;
@@ -136,7 +136,7 @@ public class OrderService {
     }
 
     private void validateOrderableCourse(Long userId, Course course) {
-        // Course status can change after cart insertion, so re-check it immediately before order creation.
+        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증한다.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }

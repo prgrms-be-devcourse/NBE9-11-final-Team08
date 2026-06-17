@@ -39,7 +39,7 @@ public class Order {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // Order items are part of immutable order history, so only persist is cascaded.
+    // OrderItem은 주문 이력의 일부이므로 삭제 전파 없이 신규 저장만 cascade 한다.
     @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST)
     private List<OrderItem> items = new ArrayList<>();
 
