@@ -50,4 +50,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 운영과 동일한 타임존(Asia/Seoul)으로 고정. CI 호스트가 UTC여도
+    // LocalDateTime 기반 시간 로직이 DB 세션 타임존(+09:00)과 일관되게 동작한다.
+    systemProperty("user.timezone", "Asia/Seoul")
 }

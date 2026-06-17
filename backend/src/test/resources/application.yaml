@@ -13,8 +13,10 @@ spring:
         speech: none
         transcription: none
   datasource:
-
-    url: jdbc:tc:mysql:8.4:///team08_test?sessionVariables
+    # 운영(Asia/Seoul)과 동일하게 DB 세션 타임존을 +09:00으로 맞춘다.
+    # 컨테이너 MySQL은 기본 UTC라, 이게 없으면 CURRENT_TIMESTAMP 가 JVM의
+    # LocalDateTime(KST)과 어긋나 만료 비교 같은 시간 로직이 깨진다.
+    url: jdbc:tc:mysql:8.4:///team08_test?sessionVariables=time_zone='%2B09:00'
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test
