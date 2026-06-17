@@ -32,12 +32,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
 import static java.util.UUID.randomUUID;
 
 @Slf4j
@@ -215,17 +209,8 @@ public class CourseService {
         course.validateOwner(instructorId);
 
         String targetDirName = randomUUID().toString();
-        File tempSourceFile;
 
-        try {
-            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "lecture-tmp-", ".mp4");
-            tempSourceFile = tempFilePath.toFile();
-            file.transferTo(tempSourceFile);
-        } catch (IOException e) {
-            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
-        }
-
-        mediaEncodingService.encodeToHls(tempSourceFile, targetDirName, lectureId);
+        mediaEncodingService.encodeToHls(file, targetDirName, lectureId);
     }
 
     @Component

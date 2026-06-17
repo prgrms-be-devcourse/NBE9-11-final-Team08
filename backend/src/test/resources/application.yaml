@@ -25,6 +25,15 @@ spring:
     open-in-view: false
     show-sql: false
 
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+      credentials:
+        instance-profile: false
+      s3:
+        bucket: test-bucket-name
+
 app:
   ai:
     model: stub

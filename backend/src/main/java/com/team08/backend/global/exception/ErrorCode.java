@@ -127,7 +127,10 @@ public enum ErrorCode {
     INVALID_VIDEO_FORMAT(HttpStatus.BAD_REQUEST, "MEDIA_001", "올바르지 않은 비디오 파일 형식입니다."),
     VIDEO_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_002", "로컬 디스크에 원본 비디오 파일 업로드를 실패했습니다."),
     VIDEO_ENCODING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_003", "HLS 비디오 스트리밍 인코딩 처리에 실패했습니다."),
-    MEDIA_TEMP_DIR_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_004", "임시 디렉터리 생성에 실패했습니다.");
+    MEDIA_TEMP_DIR_CREATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_004", "임시 디렉터리 생성에 실패했습니다."),
+    S3_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_005", "S3 원격 스토리치로의 파일 업로드에 실패했습니다."),
+    S3_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_006", "S3 원격 스토리지로부터의 파일 다운로드에 실패했습니다."),
+    S3_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "MEDIA_007", "S3 원격 스토리지의 파일 자원 삭제에 실패했습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
