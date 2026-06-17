@@ -1,6 +1,6 @@
 spring:
   flyway:
-    enabled: true
+    enabled: false
   ai:
     model:
       chat: none
@@ -12,7 +12,7 @@ spring:
         transcription: none
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
 springdoc:
   api-docs:
     enabled: true
@@ -22,7 +22,7 @@ app:
     model: stub
     prompt-version: v1
   data-init:
-    mode: bulk  # none | simple | bulk
+    mode: none  # none | simple | bulk
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
     refresh-cookie:
