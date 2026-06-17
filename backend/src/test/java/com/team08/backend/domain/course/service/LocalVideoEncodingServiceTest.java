@@ -74,7 +74,7 @@ class LocalVideoEncodingServiceTest {
 
         localVideoEncodingService.encodeToHls(realMockMultipartFile, targetDirName, lectureId);
 
-        verify(lectureDbService).updateLectureM3u8(lectureId, expectedDbPath);
+        verify(lectureDbService).updateLectureM3u8(lectureId, expectedDbPath, targetDirName);
 
         Path targetWorkspace = tempUploadDir.resolve(targetDirName);
         assertThat(Files.exists(targetWorkspace.resolve("output.m3u8"))).isTrue();

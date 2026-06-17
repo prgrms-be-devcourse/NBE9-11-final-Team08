@@ -59,7 +59,7 @@ public abstract class VideoEncodingTemplate {
             handleGeneratedFiles(localWorkspacePath, targetDirName, lectureId);
 
             String dbSavePath = getDbSavePath(targetDirName, lectureId);
-            lectureDbService.updateLectureM3u8(lectureId, dbSavePath);
+            lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
 
         } catch (Exception e) {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);

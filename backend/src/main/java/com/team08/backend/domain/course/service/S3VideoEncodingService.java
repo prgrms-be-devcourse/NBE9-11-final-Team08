@@ -83,4 +83,13 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
     protected String getDbSavePath(String targetDirName, Long lectureId) {
         return "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";
     }
+
+    public void deleteEncodedFolder(String targetDirName, Long lectureId) {
+        String s3FolderPath = "lectures/" + lectureId + "/" + targetDirName + "/";
+        try {
+            s3FileStorageService.deleteFile(s3FolderPath);
+        } catch (Exception e) {
+            log.error("Failed to rollback delete encoded HLS folder in S3. lectureId: {}, folder: {}", lectureId, s3FolderPath, e);
+        }
+    }
 }

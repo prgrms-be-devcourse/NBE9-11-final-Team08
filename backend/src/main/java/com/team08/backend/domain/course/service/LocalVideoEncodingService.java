@@ -101,4 +101,20 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     protected String getDbSavePath(String targetDirName, Long lectureId) {
         return targetDirName + "/output.m3u8";
     }
+
+    public void deleteEncodedFolder(String targetDirName) {
+        Path targetPath = Paths.get(uploadDir, targetDirName);
+        if (Files.exists(targetPath)) {
+            try (var stream = Files.walk(targetPath)) {
+                stream.sorted(reverseOrder())
+                        .forEach(path -> {
+                            try {
+                                Files.delete(path);
+                            } catch (IOException ignored) {}
+                        });
+            } catch (Exception e) {
+                log.error("Failed to rollback delete encoded HLS directory. folder: {}", targetPath, e);
+            }
+        }
+    }
 }
