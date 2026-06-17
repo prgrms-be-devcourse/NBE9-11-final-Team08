@@ -1,49 +1,51 @@
-package com.team08.backend.domain.couponpolicy.factory;
+package com.team08.backend.domain.couponpolicy.component;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicy.entity.CouponType;
-import com.team08.backend.domain.couponpolicy.service.CouponPolicyValidator;
+import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
-public class NormalCouponCreator extends AbstractCouponPolicyCreator {
+public class AllTargetCouponCreator extends AbstractCouponPolicyCreator {
 
-    public NormalCouponCreator(CouponPolicyValidator validator) {
+    public AllTargetCouponCreator(CouponPolicyValidator validator) {
         super(validator);
     }
 
     @Override
     public boolean supports(CouponPolicyCreateRequest request) {
-        return request.couponType() == CouponType.NORMAL;
+        return request.couponTarget() == CouponTarget.ALL;
     }
 
     @Override
     protected void validateSpecific(CouponPolicyCreateRequest request) {
-        // 일반 쿠폰 특화 검증: 수량 정보가 없어야 함
-        if (request.totalQuantity() != null) {
+        // 전체 대상 특화 검증
+        if ((request.categoryIds() != null && !request.categoryIds().isEmpty()) ||
+                (request.courseIds() != null && !request.courseIds().isEmpty())) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }
 
     @Override
     protected CouponPolicy createEntity(CouponPolicyCreateRequest request) {
-        return CouponPolicy.createNormalPolicy(
+        return CouponPolicy.createPolicy(
                 request.name(),
+                request.couponTarget(),
+                request.couponType(),
+                request.totalQuantity(),
+                request.usageType(),
+                request.isStackable(),
                 request.discountType(),
                 request.discountValue(),
                 request.maxDiscountAmount(),
                 request.minOrderAmount(),
                 request.validDays(),
-                request.categoryId(),
-                request.courseIds(),
-                request.couponTarget(),
-                request.usageType(),
-                request.isStackable(),
                 request.issueStartDate(),
-                request.issueEndDate()
+                request.issueEndDate(),
+                request.categoryIds(),
+                request.courseIds()
         );
     }
 }

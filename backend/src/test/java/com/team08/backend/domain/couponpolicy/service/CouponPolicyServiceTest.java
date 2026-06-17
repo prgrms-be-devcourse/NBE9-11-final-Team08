@@ -1,5 +1,8 @@
 package com.team08.backend.domain.couponpolicy.service;
 
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyFactory;
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyUpdater;
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyValidator;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
@@ -8,7 +11,6 @@ import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
-import com.team08.backend.domain.couponpolicy.factory.CouponPolicyFactory;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -24,6 +26,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +47,13 @@ class CouponPolicyServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
-    
+
+    @Mock
+    private CouponPolicyUpdater couponPolicyUpdater;
+
+    @Spy
+    private CouponPolicyValidator couponPolicyValidator = new CouponPolicyValidator();
+
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-16T10:00:00Z"), ZoneId.systemDefault());
 
@@ -56,29 +65,15 @@ class CouponPolicyServiceTest {
     void createCouponPolicy_success() {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
-                "테스트 쿠폰",
-                DiscountType.AMOUNT,
-                1000,
-                null,
-                30,
-                100,
-                null,
-                null,
-                null,
-                CouponType.NORMAL,
-                CouponTarget.ALL,
-                CouponUsageType.SINGLE_USE,
-                false,
-                null,
-                null
+                "테스트 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 30, null, null, null, null
         );
 
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                request.name(), request.discountType(), request.discountValue(),
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                request.name(), request.couponTarget(), request.couponType(), request.totalQuantity(),
+                request.usageType(), request.isStackable(), request.discountType(), request.discountValue(),
                 request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
-                request.categoryId(), request.courseIds(),
-                request.couponTarget(), request.usageType(),
-                request.isStackable(), request.issueStartDate(), request.issueEndDate()
+                request.issueStartDate(), request.issueEndDate(), request.categoryIds(), request.courseIds()
         );
 
         when(couponPolicyFactory.create(request)).thenReturn(policy);
@@ -99,14 +94,15 @@ class CouponPolicyServiceTest {
     void updateCouponPolicy_fail_whenAlreadyIssued() {
         // given
         Long policyId = 1L;
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         );
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(1L);
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
-                "수정 쿠폰", DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, CouponTarget.ALL, false, null, null
+                "수정 쿠폰", null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, null
         );
 
         // when & then
@@ -116,18 +112,44 @@ class CouponPolicyServiceTest {
     }
 
     @Test
+    @DisplayName("성공: 쿠폰 정책 수정 후에도 기존 적용 대상(CouponTarget)은 유지되어야 한다")
+    void updateCouponPolicy_shouldMaintainExistingTarget() {
+        // given
+        Long policyId = 1L;
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, List.of(100L)
+        );
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
+
+        // CouponTarget.COURSE인 경우 courseIds가 필수이므로 포함시켜야 함 (검증 통과를 위해)
+        CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
+                "수정 쿠폰", null, CouponUsageType.SINGLE_USE, true, DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, List.of(100L)
+        );
+
+        // when
+        CouponPolicyResponse response = couponPolicyService.updateCouponPolicy(policyId, updateRequest);
+
+        // then
+        assertThat(response.couponTarget()).isEqualTo(CouponTarget.COURSE);
+        assertThat(policy.getCouponTarget()).isEqualTo(CouponTarget.COURSE);
+    }
+
+    @Test
     @DisplayName("발급 이력이 없는 쿠폰 정책은 정상적으로 수정된다")
     void updateCouponPolicy_success() {
         // given
         Long policyId = 1L;
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         );
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
-                "수정 쿠폰", DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, CouponTarget.ALL, true, null, null
+                "수정 쿠폰", null, CouponUsageType.SINGLE_USE, true, DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, null
         );
 
         // when
@@ -145,8 +167,9 @@ class CouponPolicyServiceTest {
     void terminateCouponPolicy_success() {
         // given
         Long policyId = 1L;
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "종료할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "종료할 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         );
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
 
@@ -163,8 +186,9 @@ class CouponPolicyServiceTest {
     void deleteCouponPolicy_fail_whenAlreadyIssued() {
         // given
         Long policyId = 1L;
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "삭제 시도 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "삭제 시도 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         );
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(1L);
@@ -180,8 +204,9 @@ class CouponPolicyServiceTest {
     void deleteCouponPolicy_success() {
         // given
         Long policyId = 1L;
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "삭제할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "삭제할 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         );
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);

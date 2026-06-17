@@ -19,10 +19,9 @@ class CouponPolicyTest {
     void isApplicableTo_course_success() {
         // given
         List<Long> targetCourseIds = List.of(100L, 200L);
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "특정 코스 할인", DiscountType.AMOUNT, 1000, null, 0, 7, null,
-                targetCourseIds, CouponTarget.COURSE, CouponUsageType.SINGLE_USE,
-                false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "특정 코스 할인", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, targetCourseIds
         );
 
         // when & then
@@ -32,28 +31,27 @@ class CouponPolicyTest {
     }
 
     @Test
-    @DisplayName("성공: CATEGORY 타겟 쿠폰은 지정된 카테고리 ID에만 적용 가능하다")
+    @DisplayName("성공: CATEGORY 타겟 쿠폰은 지정된 카테고리 ID들에만 적용 가능하다")
     void isApplicableTo_category_success() {
         // given
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "카테고리 할인", DiscountType.AMOUNT, 1000, null, 0, 7, 50L,
-                null, CouponTarget.CATEGORY, CouponUsageType.SINGLE_USE,
-                false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "카테고리 할인", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, List.of(50L, 51L), null
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 일치
-        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 불일치
+        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 포함됨
+        assertThat(policy.isApplicableTo(1L, 51L)).isTrue();  // 카테고리 51 포함됨
+        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 미포함
     }
 
     @Test
     @DisplayName("성공: ALL 타겟 쿠폰은 모든 코스와 카테고리에 적용 가능하다")
     void isApplicableTo_all_success() {
         // given
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "전체 할인", DiscountType.AMOUNT, 1000, null, 0, 7, null,
-                null, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "전체 할인", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, null
         );
 
         // when & then
@@ -65,9 +63,9 @@ class CouponPolicyTest {
     @DisplayName("성공: 정률 할인 계산 시 정수 연산을 사용하여 정확한 금액을 반환한다 (내림 처리)")
     void calculateDiscountAmount_percent_success() {
         // given
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "테스트", DiscountType.PERCENT, 10, 10000, 0, 30, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.PERCENT, 10, 10000, 0, 30, null, null, null, null
         );
         int originalPrice = 10555; // 10% 면 1055.5원 -> 1055원 기대
 
@@ -83,9 +81,9 @@ class CouponPolicyTest {
     void validateIssuePeriod_success() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, now.minusDays(1), now.plusDays(1)
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.minusDays(1), now.plusDays(1), null, null
         );
 
         // when & then
@@ -97,9 +95,9 @@ class CouponPolicyTest {
     void validateIssuePeriod_fail_notStarted() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, now.plusDays(1), now.plusDays(2)
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.plusDays(1), now.plusDays(2), null, null
         );
 
         // when & then
@@ -112,9 +110,9 @@ class CouponPolicyTest {
     void validateIssuePeriod_fail_ended() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, now.minusDays(2), now.minusDays(1)
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.minusDays(2), now.minusDays(1), null, null
         );
 
         // when & then
@@ -126,9 +124,9 @@ class CouponPolicyTest {
     @DisplayName("실패: 쿠폰 수량이 0 이하일 때 차감을 시도하면 예외가 발생한다")
     void decreaseQuantity_fail_exhausted() {
         // given
-        CouponPolicy policy = CouponPolicy.createFcfsPolicy(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, 0, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.FCFS, 0, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 30, null, null, null, null
         );
 
         // when & then
@@ -137,13 +135,73 @@ class CouponPolicyTest {
     }
 
     @Test
+    @DisplayName("성공: 정률 할인 계산 시 최대 할인 금액 제한이 있으면 해당 금액까지만 할인된다")
+    void calculateDiscountAmount_percent_withMaxLimit() {
+        // given
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.PERCENT, 10, 2000, 0, 30, null, null, null, null
+        );
+        int originalPrice = 50000; // 10% 면 5000원이지만, 최대 2000원 제한
+
+        // when
+        int discount = policy.calculateDiscountAmount(originalPrice);
+
+        // then
+        assertThat(discount).isEqualTo(2000);
+    }
+
+    @Test
+    @DisplayName("성공: 정액 할인 계산 시 상품 가격이 할인 금액보다 작으면 상품 가격만큼만 할인된다")
+    void calculateDiscountAmount_amount_priceLowerThanDiscount() {
+        // given
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 0, 30, null, null, null, null
+        );
+        int originalPrice = 3000; // 5000원 할인 쿠폰이지만 상품이 3000원
+
+        // when
+        int discount = policy.calculateDiscountAmount(originalPrice);
+
+        // then
+        assertThat(discount).isEqualTo(3000);
+    }
+
+    @Test
+    @DisplayName("실패: COURSE 타겟 쿠폰에 코스 ID가 null로 전달되면 적용 불가능하다")
+    void isApplicableTo_course_fail_withNull() {
+        // given
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "코스 할인", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, List.of(100L)
+        );
+
+        // when & then
+        assertThat(policy.isApplicableTo(null, 1L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("실패: CATEGORY 타겟 쿠폰에 카테고리 ID가 null로 전달되면 적용 불가능하다")
+    void isApplicableTo_category_fail_withNull() {
+        // given
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "카테고리 할인", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, List.of(50L), null
+        );
+
+        // when & then
+        assertThat(policy.isApplicableTo(100L, null)).isFalse();
+    }
+
+    @Test
     @DisplayName("성공: 만료 시각 계산 시 현재 날짜 기준으로 유효 기간을 더해 해당 일의 마지막 시각을 반환한다")
     void calculateExpirationDate_success() {
         // given
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "테스트", DiscountType.AMOUNT, 1000, null, 0, 30, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 0, 30, null, null, null, null
         );
 
         // when

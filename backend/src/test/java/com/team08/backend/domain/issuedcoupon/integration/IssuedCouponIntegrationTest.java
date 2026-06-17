@@ -141,15 +141,9 @@ class IssuedCouponIntegrationTest {
     }
 
     private CouponPolicy savePolicy(String name, CouponType type) {
-        if (type == CouponType.FCFS) {
-            return couponPolicyRepository.save(CouponPolicy.createFcfsPolicy(
-                    name, DiscountType.AMOUNT, 1000, null, 0, 7, 100, null, null,
-                    CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
-            ));
-        }
-        return couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                name, DiscountType.AMOUNT, 1000, null, 0, 7, null, null,
-                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        return couponPolicyRepository.save(CouponPolicy.createPolicy(
+                name, CouponTarget.ALL, type, type == CouponType.FCFS ? 100 : null,
+                CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, null
         ));
     }
 

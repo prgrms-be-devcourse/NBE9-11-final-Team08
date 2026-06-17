@@ -28,7 +28,7 @@ class CouponPolicyRepositoryTest {
 
     @Autowired
     private CouponPolicyRepository couponPolicyRepository;
-
+    
     @Test
     @DisplayName("쿠폰명으로 정책을 필터링하여 조회한다")
     void findAllByCondition_filterByName() {
@@ -86,9 +86,9 @@ class CouponPolicyRepositoryTest {
     @DisplayName("상세 조회 시 연관된 강좌 목록까지 함께 조회한다")
     void findByIdWithDetails_success() {
         // given
-        CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "강좌 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7,
-                null, List.of(100L, 200L), CouponTarget.COURSE, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "강좌 쿠폰", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false,
+                DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, List.of(100L, 200L)
         );
         CouponPolicy savedPolicy = couponPolicyRepository.save(policy);
 
@@ -102,16 +102,9 @@ class CouponPolicyRepositoryTest {
     }
 
     private void savePolicy(String name, CouponType type, LocalDateTime start, LocalDateTime end) {
-        if (type == CouponType.FCFS) {
-            couponPolicyRepository.save(CouponPolicy.createFcfsPolicy(
-                    name, DiscountType.AMOUNT, 1000, null, 10000, 7, 100,
-                    null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, start, end
-            ));
-        } else {
-            couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                    name, DiscountType.AMOUNT, 1000, null, 10000, 7,
-                    null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, start, end
-            ));
-        }
+        couponPolicyRepository.save(CouponPolicy.createPolicy(
+                name, CouponTarget.ALL, type, type == CouponType.FCFS ? 100 : null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, 10000, 7, start, end, null, null
+        ));
     }
 }

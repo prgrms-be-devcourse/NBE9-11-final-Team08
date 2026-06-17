@@ -269,22 +269,29 @@ Table cart_items {
 Table coupon_policies {
   id bigint [pk, increment]
   name varchar(100) [not null]
+  coupon_target coupon_target [not null]
+  coupon_type coupon_type [not null]
+  total_quantity int
+  usage_type coupon_usage_type [not null]
+  is_stackable boolean [not null, default: false]
   discount_type discount_type [not null]
   discount_value int [not null]
   max_discount_amount int
   min_order_amount int
   valid_days int
-  total_quantity int
-  category_id bigint
-  coupon_type coupon_type [not null]
-  coupon_target coupon_target [not null]
-  usage_type coupon_usage_type [not null]
-  is_stackable boolean [not null, default: false]
   issue_start_date datetime
   issue_end_date datetime
   created_at datetime [not null]
   updated_at datetime [not null]
   deleted_at datetime
+}
+Table coupon_policy_categories {
+  id bigint [pk, increment]
+  coupon_policy_id bigint [not null]
+  category_id bigint [not null]
+  indexes {
+    (coupon_policy_id, category_id) [unique]
+  }
 }
 Table coupon_policy_courses {
   id bigint [pk, increment]
@@ -454,7 +461,8 @@ Ref: learning_events.lecture_id > lectures.id
 Ref: carts.user_id > users.id
 Ref: cart_items.cart_id > carts.id
 Ref: cart_items.course_id > courses.id
-Ref: coupon_policies.category_id > categories.id
+Ref: coupon_policy_categories.coupon_policy_id > coupon_policies.id
+Ref: coupon_policy_categories.category_id > categories.id
 Ref: coupon_policy_courses.coupon_policy_id > coupon_policies.id
 Ref: coupon_policy_courses.course_id > courses.id
 Ref: issued_coupons.policy_id > coupon_policies.id

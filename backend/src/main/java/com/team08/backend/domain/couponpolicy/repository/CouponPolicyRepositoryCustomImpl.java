@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.team08.backend.domain.couponpolicy.entity.QCouponPolicy.couponPolicy;
-import static com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyCourse.couponPolicyCourse;
+import static com.team08.backend.domain.couponpolicycategory.entity.QCouponPolicyCategory.couponPolicyCategory;
 
 @Repository
 public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryCustom {
@@ -57,13 +57,14 @@ public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryC
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
-    // 쿠폰 정책 상세 조회 (N+1 방지를 위한 fetchJoin 적용)
+    // 쿠폰 정책 상세 조회
     @Override
     public Optional<CouponPolicy> findByIdWithDetails(Long id) {
         return Optional.ofNullable(queryFactory
                 .selectFrom(couponPolicy)
-                .leftJoin(couponPolicy.targetCourses, couponPolicyCourse).fetchJoin()
+                .leftJoin(couponPolicy.targetCategories, couponPolicyCategory).fetchJoin()
                 .where(couponPolicy.id.eq(id))
+                .distinct()
                 .fetchOne());
     }
 

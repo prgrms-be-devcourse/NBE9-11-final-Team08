@@ -15,6 +15,20 @@ public record CouponPolicyCreateRequest(
         @NotBlank(message = "쿠폰 이름은 필수입니다.")
         String name,
 
+        @NotNull(message = "쿠폰 적용 대상은 필수입니다.")
+        CouponTarget couponTarget,
+
+        @NotNull(message = "쿠폰 발급 타입은 필수입니다.")
+        CouponType couponType,
+
+        Integer totalQuantity, // null이면 무제한
+
+        @NotNull(message = "쿠폰 사용 타입은 필수입니다.")
+        CouponUsageType usageType,
+
+        @NotNull(message = "중복 적용 여부는 필수입니다.")
+        Boolean isStackable,
+
         @NotNull(message = "할인 타입은 필수입니다.")
         DiscountType discountType,
 
@@ -28,26 +42,12 @@ public record CouponPolicyCreateRequest(
 
         Integer validDays, // null이면 무기한
 
-        Integer totalQuantity, // null이면 무제한
-
-        Long categoryId,
-
-        List<Long> courseIds,
-
-        @NotNull(message = "쿠폰 발급 타입은 필수입니다.")
-        CouponType couponType,
-
-        @NotNull(message = "쿠폰 적용 대상은 필수입니다.")
-        CouponTarget couponTarget,
-
-        @NotNull(message = "쿠폰 사용 타입은 필수입니다.")
-        CouponUsageType usageType,
-
-        @NotNull(message = "중복 적용 여부는 필수입니다.")
-        Boolean isStackable,
-
         LocalDateTime issueStartDate,
 
-        LocalDateTime issueEndDate
-) implements CouponPolicyValidatable {
+        LocalDateTime issueEndDate,
+
+        List<Long> categoryIds,
+
+        List<Long> courseIds
+) {
 }

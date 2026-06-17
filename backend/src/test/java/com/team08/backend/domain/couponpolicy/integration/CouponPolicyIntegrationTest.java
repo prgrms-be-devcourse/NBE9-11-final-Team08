@@ -56,6 +56,11 @@ class CouponPolicyIntegrationTest {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
                 "통합 테스트 쿠폰",
+                CouponTarget.ALL,
+                CouponType.NORMAL,
+                null,
+                CouponUsageType.SINGLE_USE,
+                false,
                 DiscountType.PERCENT,
                 10,
                 null,
@@ -63,11 +68,6 @@ class CouponPolicyIntegrationTest {
                 7,
                 null,
                 null,
-                null,
-                CouponType.NORMAL,
-                CouponTarget.ALL,
-                CouponUsageType.SINGLE_USE,
-                false,
                 null,
                 null
         );
@@ -88,11 +88,11 @@ class CouponPolicyIntegrationTest {
     @DisplayName("관리자 쿠폰 정책 목록 조회 API 통합 테스트")
     void getCoupons_IntegrationTest() throws Exception {
         // given
-        couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createNormalPolicy(
-                "쿠폰1", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createPolicy(
+                "쿠폰1", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
-        couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createNormalPolicy(
-                "쿠폰2", DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createPolicy(
+                "쿠폰2", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, null
         ));
 
         // when & then
@@ -111,8 +111,8 @@ class CouponPolicyIntegrationTest {
     @DisplayName("관리자 쿠폰 정책 상세 조회 API 통합 테스트")
     void getCoupon_IntegrationTest() throws Exception {
         // given
-        com.team08.backend.domain.couponpolicy.entity.CouponPolicy policy = couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createNormalPolicy(
-                "상세 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        com.team08.backend.domain.couponpolicy.entity.CouponPolicy policy = couponPolicyRepository.save(com.team08.backend.domain.couponpolicy.entity.CouponPolicy.createPolicy(
+                "상세 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
 
         // when & then
@@ -127,12 +127,12 @@ class CouponPolicyIntegrationTest {
     @DisplayName("발급 이력이 없는 쿠폰 정책 수정 API 통합 테스트")
     void updateCoupon_IntegrationTest_Success() throws Exception {
         // given
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
-                "수정 쿠폰", DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, CouponTarget.ALL, true, null, null
+                "수정 쿠폰", null, CouponUsageType.SINGLE_USE, true, DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, null
         );
 
         // when
@@ -153,14 +153,14 @@ class CouponPolicyIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰 정책 수정 시 실패 응답을 반환한다")
     void updateCoupon_IntegrationTest_FailWhenIssued() throws Exception {
         // given
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
 
         issuedCouponRepository.save(IssuedCoupon.create(policy, 1L, LocalDateTime.now()));
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
-                "수정 시도", DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, CouponTarget.ALL, false, null, null
+                "수정 시도", null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, null
         );
 
         // when & then
@@ -176,8 +176,8 @@ class CouponPolicyIntegrationTest {
     @DisplayName("쿠폰 정책 조기 종료 API 통합 테스트")
     void terminateCoupon_IntegrationTest() throws Exception {
         // given
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                "종료 예정 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createPolicy(
+                "종료 예정 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
 
         // when
@@ -197,8 +197,8 @@ class CouponPolicyIntegrationTest {
     @DisplayName("발급 이력이 없는 쿠폰 정책 소프트 삭제 API 통합 테스트")
     void deleteCoupon_IntegrationTest_Success() throws Exception {
         // given
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                "삭제할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createPolicy(
+                "삭제할 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
         em.flush();
         em.clear();
@@ -220,8 +220,8 @@ class CouponPolicyIntegrationTest {
     @DisplayName("발급 이력이 있는 쿠폰 정책 삭제 시 실패 응답을 반환한다")
     void deleteCoupon_IntegrationTest_FailWhenIssued() throws Exception {
         // given
-        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
-                "삭제 시도", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createPolicy(
+                "삭제 시도", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, null, null
         ));
         issuedCouponRepository.save(IssuedCoupon.create(policy, 1L, LocalDateTime.now()));
 
