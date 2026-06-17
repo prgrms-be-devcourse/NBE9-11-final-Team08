@@ -19,6 +19,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import org.hibernate.annotations.SQLRestriction;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +29,7 @@ import java.util.List;
 @Table(name = "coupon_policies")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLRestriction("deleted_at IS NULL")
 public class CouponPolicy extends BaseTimeEntity {
 
     @Id
@@ -74,6 +77,8 @@ public class CouponPolicy extends BaseTimeEntity {
     private LocalDateTime issueStartDate;
 
     private LocalDateTime issueEndDate;
+
+    private LocalDateTime deletedAt;
 
     private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity, Long categoryId, List<Long> courseIds, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
@@ -233,6 +238,11 @@ public class CouponPolicy extends BaseTimeEntity {
     // 쿠폰 정책 조기 종료
     public void terminate(LocalDateTime now) {
         this.issueEndDate = now;
+    }
+
+    // 쿠폰 정책 삭제
+    public void delete(LocalDateTime now) {
+        this.deletedAt = now;
     }
 }
 

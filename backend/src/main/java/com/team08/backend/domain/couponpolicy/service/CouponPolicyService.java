@@ -83,4 +83,19 @@ public class CouponPolicyService {
 
         policy.terminate(LocalDateTime.now());
     }
+
+    // 관리자 쿠폰 정책 삭제
+    @Transactional
+    public void deleteCouponPolicy(Long id) {
+        CouponPolicy policy = couponPolicyRepository.findById(id)
+                .orElseThrow(CouponPolicyNotFoundException::new);
+
+        // 발급 이력 확인
+        long issuedCount = issuedCouponRepository.countByPolicyId(id);
+        if (issuedCount > 0) {
+            throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE);
+        }
+
+        policy.delete(LocalDateTime.now());
+    }
 }

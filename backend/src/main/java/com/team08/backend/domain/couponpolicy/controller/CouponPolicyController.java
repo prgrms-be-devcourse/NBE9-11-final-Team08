@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -79,5 +80,12 @@ public class CouponPolicyController {
         couponPolicyService.terminateCouponPolicy(id);
     }
 
+    // [관리자] 쿠폰 정책 삭제 /api/admin/coupons/{id}
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "쿠폰 정책 삭제", description = "발급 이력이 없는 정책을 소프트 삭제합니다.")
+    public void deleteCoupon(@PathVariable Long id) {
+        couponPolicyService.deleteCouponPolicy(id);
+    }
 }
-

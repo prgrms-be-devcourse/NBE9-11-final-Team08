@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -187,5 +188,47 @@ class CouponPolicyIntegrationTest {
         // then
         CouponPolicy terminatedPolicy = couponPolicyRepository.findById(policy.getId()).orElseThrow();
         assertThat(terminatedPolicy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now());
+    }
+
+    @Autowired
+    private jakarta.persistence.EntityManager em;
+
+    @Test
+    @WithMockLoginUser(role = "ROLE_ADMIN")
+    @DisplayName("발급 이력이 없는 쿠폰 정책 소프트 삭제 API 통합 테스트")
+    void deleteCoupon_IntegrationTest_Success() throws Exception {
+        // given
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                "삭제할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
+        em.flush();
+        em.clear();
+
+        // when
+        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId()))
+                .andExpect(status().isNoContent());
+
+        em.flush();
+        em.clear();
+
+        // then
+        // @SQLRestriction 때문에 findById로 조회되지 않아야 함
+        assertThat(couponPolicyRepository.findById(policy.getId())).isEmpty();
+    }
+
+    @Test
+    @WithMockLoginUser(role = "ROLE_ADMIN")
+    @DisplayName("발급 이력이 있는 쿠폰 정책 삭제 시 실패 응답을 반환한다")
+    void deleteCoupon_IntegrationTest_FailWhenIssued() throws Exception {
+        // given
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                "삭제 시도", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
+        issuedCouponRepository.save(IssuedCoupon.create(policy, 1L, LocalDateTime.now()));
+
+        // when & then
+        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COUPON_011"));
     }
 }

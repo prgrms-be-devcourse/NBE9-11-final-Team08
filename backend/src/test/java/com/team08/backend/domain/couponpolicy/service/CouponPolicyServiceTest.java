@@ -147,5 +147,39 @@ class CouponPolicyServiceTest {
         // then
         assertThat(policy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now());
     }
+
+    @Test
+    @DisplayName("발급 이력이 있는 쿠폰 정책은 삭제 시 예외가 발생한다")
+    void deleteCouponPolicy_fail_whenAlreadyIssued() {
+        // given
+        Long policyId = 1L;
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                "삭제 시도 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        );
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(1L);
+
+        // when & then
+        assertThatThrownBy(() -> couponPolicyService.deleteCouponPolicy(policyId))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    @DisplayName("발급 이력이 없는 쿠폰 정책은 정상적으로 소프트 삭제된다")
+    void deleteCouponPolicy_success() {
+        // given
+        Long policyId = 1L;
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                "삭제할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        );
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
+
+        // when
+        couponPolicyService.deleteCouponPolicy(policyId);
+
+        // then
+        assertThat(policy.getDeletedAt()).isNotNull();
+    }
 }
 
