@@ -18,7 +18,7 @@ public class OrderItem {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    // Course 정보가 이후 변경되더라도 주문 내역은 주문 당시 값을 보존해야 하므로 스냅샷 필드로 저장한다.
+    // Course 정보가 이후 변경되더라도 주문 내역은 주문 당시 값을 보존해야 하므로 스냅샷 필드로 저장합니다.
     @Column(nullable = false)
     private Long courseId;
     @Column(nullable = false)
