@@ -20,11 +20,10 @@
  * 실행 방법
  * ----------------------------------------------------------------------------
  * [A] 완전 자동 (Docker 필요, compose-dev / build.gradle 불필요)
- *   cd src/test/k6
- *   docker compose -f compose.perf.yml up --build \
- *       --abort-on-container-exit --exit-code-from k6
- *     → MySQL + 앱(dev 프로필 + bulk 시드) + k6 를 모두 컨테이너로 띄워 실행한다.
- *     → 정리: docker compose -f compose.perf.yml down -v
+ *   make perf          # 프로젝트 루트에서: 인프라(MySQL+앱 dev/bulk) 기동 + 이 스크립트 실행
+ *   make perf-down     # 정리
+ *     → compose: infra/compose/compose.perf.yml
+ *     → 다른 스크립트: make perf PERF_SCRIPT=다른파일.js (같은 디렉토리)
  *
  * [B] 로컬 k6 바이너리로 직접 실행 (서버가 이미 떠 있을 때)
  *   BASE_URL=http://localhost:8080 \
