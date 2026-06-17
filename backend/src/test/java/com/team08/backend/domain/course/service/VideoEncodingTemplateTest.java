@@ -26,6 +26,7 @@ class VideoEncodingTemplateTest {
     private MockMultipartFile mockMultipartFile;
     private String targetDirName;
     private Long lectureId;
+    private Long instructorId;
 
     private boolean isPrepareCalled;
     private boolean isHandleCalled;
@@ -41,7 +42,9 @@ class VideoEncodingTemplateTest {
         isCompleteCalled = false;
         shouldThrowInPrepare = false;
 
-        videoEncodingTemplate = new VideoEncodingTemplate() {
+        EncodingResultHandler mockHandler = (id, path, dir, desc, instId) -> isCompleteCalled = true;
+
+        videoEncodingTemplate = new VideoEncodingTemplate(mockHandler) {
             @Override
             protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
                 isPrepareCalled = true;
@@ -61,11 +64,6 @@ class VideoEncodingTemplateTest {
                 isDbPathCalled = true;
                 return "dummy/path";
             }
-
-            @Override
-            protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
-                isCompleteCalled = true;
-            }
         };
 
         mockMultipartFile = new MockMultipartFile(
@@ -76,12 +74,13 @@ class VideoEncodingTemplateTest {
         );
         targetDirName = "test-dir";
         lectureId = 1L;
+        instructorId = 100L;
     }
 
     @Test
     void 파이프라인_실행_시_정해진_추상_메서드_생명주기가_순서대로_호출된다() {
         assertThrows(CustomException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
         );
 
         assertThat(isPrepareCalled).isTrue();
@@ -92,7 +91,7 @@ class VideoEncodingTemplateTest {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
         );
 
         assertThat(isHandleCalled).isFalse();

@@ -5,6 +5,8 @@ import com.team08.backend.domain.lecturemodificationrequest.service.LectureModif
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,18 +19,13 @@ public class LectureModificationRequestController {
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Void> createRequest(
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestPart("request") @Valid LectureModificationRequestCreateDto requestDto,
             @RequestPart("video") MultipartFile videoFile
     ) {
-        // TODO: SecurityContext 또는 커스텀 애노테이션에서 실제 로그인한 강사 ID 추출 필요
-        Long instructorId = 1L;
+        Long instructorId = Long.valueOf(userDetails.getUsername());
 
-        modificationService.createRequest(
-                requestDto.getLectureId(),
-                instructorId,
-                requestDto.getDescription(),
-                videoFile
-        );
+        modificationService.createRequest(requestDto, instructorId, videoFile);
 
         return ResponseEntity.ok().build();
     }

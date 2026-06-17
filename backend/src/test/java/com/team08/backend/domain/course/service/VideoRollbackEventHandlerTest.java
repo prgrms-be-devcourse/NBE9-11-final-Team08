@@ -1,7 +1,5 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
 import com.team08.backend.global.util.S3FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,7 +8,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -31,16 +28,7 @@ class VideoRollbackEventHandlerTest {
     private S3FileStorageService s3FileStorageService;
 
     @Mock
-    private LectureDbService lectureDbService;
-
-    @Mock
-    private LectureRepository lectureRepository;
-
-    @Mock
-    private LectureModificationRequestRepository requestRepository;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private EncodingResultHandler encodingResultHandler;
 
     private S3VideoEncodingService s3VideoEncodingService;
     private LocalVideoEncodingService localVideoEncodingService;
@@ -52,17 +40,12 @@ class VideoRollbackEventHandlerTest {
     @BeforeEach
     void setUp() {
         s3VideoEncodingService = spy(new S3VideoEncodingService(
-                lectureDbService,
-                s3FileStorageService,
-                lectureRepository,
-                requestRepository,
-                eventPublisher
+                encodingResultHandler,
+                s3FileStorageService
         ));
 
         LocalVideoEncodingService concreteLocalService = new LocalVideoEncodingService(
-                lectureDbService,
-                lectureRepository,
-                requestRepository
+                encodingResultHandler
         );
         ReflectionTestUtils.setField(concreteLocalService, "uploadDir", "src/test/resources/temp-upload");
         localVideoEncodingService = spy(concreteLocalService);

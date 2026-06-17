@@ -26,7 +26,7 @@ class S3VideoEncodingServiceTest {
     private S3FileStorageService s3FileStorageService;
 
     @Mock
-    private LectureDbService lectureDbService;
+    private EncodingResultHandler encodingResultHandler;
 
     @InjectMocks
     private S3VideoEncodingService s3VideoEncodingService;
@@ -96,7 +96,7 @@ class S3VideoEncodingServiceTest {
         );
 
         verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
-        verifyNoInteractions(lectureDbService);
+        verifyNoInteractions(encodingResultHandler);
     }
 
     @Test
