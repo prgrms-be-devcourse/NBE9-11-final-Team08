@@ -1,15 +1,19 @@
 package com.team08.backend.domain.order.entity;
 
+import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "orders")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,14 +40,50 @@ public class Order {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static Order createPendingPayment(Long userId, String orderNumber, int totalPrice, int discountPrice, int finalPrice, LocalDateTime orderedAt) {
+    // OrderItem은 주문 이력의 일부이므로 삭제 전파 없이 신규 저장만 cascade 합니다.
+    @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST)
+    private List<OrderItem> items = new ArrayList<>();
+
+    private Order(
+            Long id,
+            Long userId,
+            String orderNumber,
+            Integer totalPrice,
+            Integer discountPrice,
+            Integer finalPrice,
+            OrderStatus status,
+            LocalDateTime orderedAt,
+            LocalDateTime paidAt,
+            LocalDateTime canceledAt,
+            LocalDateTime refundedAt,
+            LocalDateTime expiredAt,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
+        this.id = id;
+        this.userId = userId;
+        this.orderNumber = orderNumber;
+        this.totalPrice = totalPrice;
+        this.discountPrice = discountPrice;
+        this.finalPrice = finalPrice;
+        this.status = status;
+        this.orderedAt = orderedAt;
+        this.paidAt = paidAt;
+        this.canceledAt = canceledAt;
+        this.refundedAt = refundedAt;
+        this.expiredAt = expiredAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    public static Order createPendingPayment(Long userId, String orderNumber, LocalDateTime orderedAt) {
         return new Order(
                 null,
                 userId,
                 orderNumber,
-                totalPrice,
-                discountPrice,
-                finalPrice,
+                0,
+                0,
+                0,
                 OrderStatus.PENDING_PAYMENT,
                 orderedAt,
                 null,
@@ -53,6 +93,22 @@ public class Order {
                 orderedAt,
                 null
         );
+    }
+
+    public void addItem(Long courseId, String courseTitle, int price, LocalDateTime createdAt) {
+        boolean alreadyAdded = items.stream()
+                .anyMatch(item -> Objects.equals(item.getCourseId(), courseId));
+        if (alreadyAdded) {
+            throw new CustomException(ErrorCode.ORDER_ITEM_ALREADY_EXISTS);
+        }
+
+        int discountPrice = 0;
+        int finalPrice = price - discountPrice;
+
+        items.add(OrderItem.createSnapshot(this, courseId, courseTitle, price, discountPrice, finalPrice, createdAt));
+        this.totalPrice += price;
+        this.discountPrice += discountPrice;
+        this.finalPrice += finalPrice;
     }
 
     public void markPaid(LocalDateTime paidAt) {
