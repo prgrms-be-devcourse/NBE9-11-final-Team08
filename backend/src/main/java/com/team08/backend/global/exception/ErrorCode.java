@@ -77,6 +77,7 @@ public enum ErrorCode {
     PAID_ORDER_CANNOT_BE_CANCELED(HttpStatus.CONFLICT,        "ORDER_004", "결제 완료 주문은 취소할 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.CONFLICT,        "ORDER_005", "취소할 수 없는 주문 상태입니다."),
     INVALID_ORDER_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "ORDER_006", "잘못된 주문 상태 전이입니다."),
+    ORDER_ITEM_ALREADY_EXISTS(HttpStatus.CONFLICT, "ORDER_007", "이미 주문에 포함된 강의입니다."),
 
     // ── Enrollment ───────────────────────────────────────────────────────
     ENROLLMENT_NOT_FOUND(HttpStatus.NOT_FOUND,  "ENROLLMENT_001", "수강 중인 강의를 찾을 수 없습니다."),

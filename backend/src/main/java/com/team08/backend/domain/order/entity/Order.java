@@ -9,6 +9,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
 @Table(name = "orders")
@@ -39,7 +40,7 @@ public class Order {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    // OrderItem은 주문 이력의 일부이므로 삭제 전파 없이 신규 저장만 cascade 한다.
+    // OrderItem은 주문 이력의 일부이므로 삭제 전파 없이 신규 저장만 cascade 합니다.
     @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -95,6 +96,12 @@ public class Order {
     }
 
     public void addItem(Long courseId, String courseTitle, int price, LocalDateTime createdAt) {
+        boolean alreadyAdded = items.stream()
+                .anyMatch(item -> Objects.equals(item.getCourseId(), courseId));
+        if (alreadyAdded) {
+            throw new CustomException(ErrorCode.ORDER_ITEM_ALREADY_EXISTS);
+        }
+
         int discountPrice = 0;
         int finalPrice = price - discountPrice;
 

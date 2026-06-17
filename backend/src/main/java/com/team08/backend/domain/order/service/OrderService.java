@@ -3,7 +3,6 @@ package com.team08.backend.domain.order.service;
 import com.team08.backend.domain.cart.entity.Cart;
 import com.team08.backend.domain.cart.repository.CartRepository;
 import com.team08.backend.domain.cartitem.entity.CartItem;
-import com.team08.backend.domain.cartitem.repository.CartItemRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
@@ -40,17 +39,16 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final Clock clock;
 
     @Transactional
     public OrderDetailResponse createOrderFromCart(Long userId) {
-        Cart cart = cartRepository.findByUserId(userId)
+        Cart cart = cartRepository.findByUserIdWithItems(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EMPTY_CART));
 
-        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+        List<CartItem> cartItems = cart.getItems();
         if (cartItems.isEmpty()) {
             throw new CustomException(ErrorCode.EMPTY_CART);
         }
@@ -62,8 +60,8 @@ public class OrderService {
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
 
-        // 장바구니 주문 성공 후 동일 항목으로 재주문되는 것을 막기 위해 사용된 장바구니 항목을 비운다.
-        cartItemRepository.deleteAllByCartId(cart.getId());
+        // 장바구니 주문 성공 후 동일 항목으로 재주문되지 않도록 Cart 도메인 메서드로 비웁니다.
+        cart.clearItems();
 
         return response;
     }
@@ -138,7 +136,7 @@ public class OrderService {
     }
 
     private void validateOrderableCourse(Long userId, Course course) {
-        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증한다.
+        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증합니다.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
