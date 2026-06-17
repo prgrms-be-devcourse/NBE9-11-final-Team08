@@ -14,15 +14,18 @@ import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +46,9 @@ class PaymentServiceTest {
     private static final Long ORDER_ID = 10L;
     private static final Long PAYMENT_ID = 100L;
     private static final Long COURSE_ID = 1000L;
+    private static final ZoneId ZONE_ID = ZoneId.of("Asia/Seoul");
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-06-18T10:00:00Z"), ZONE_ID);
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -56,8 +62,18 @@ class PaymentServiceTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
-    @InjectMocks
     private PaymentService paymentService;
+
+    @BeforeEach
+    void setUp() {
+        paymentService = new PaymentService(
+                paymentRepository,
+                orderRepository,
+                orderItemRepository,
+                enrollmentRepository,
+                FIXED_CLOCK
+        );
+    }
 
     @Test
     void pendingPaymentOrderCanBeConfirmed() {
@@ -83,15 +99,18 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(payment.getPaymentKey()).startsWith("MOCK-");
         assertThat(payment.getMethod()).isEqualTo("MOCK");
+        assertThat(payment.getPaidAt()).isEqualTo(FIXED_NOW);
+        assertThat(payment.getCreatedAt()).isEqualTo(FIXED_NOW);
+        assertThat(payment.getUpdatedAt()).isEqualTo(FIXED_NOW);
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(order.getPaidAt()).isNotNull();
+        assertThat(order.getPaidAt()).isEqualTo(FIXED_NOW);
         assertThat(response.paymentId()).isEqualTo(PAYMENT_ID);
         assertThat(response.orderId()).isEqualTo(ORDER_ID);
         assertThat(response.amount()).isEqualTo(30_000);
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(response.paidAt()).isNotNull();
+        assertThat(response.paidAt()).isEqualTo(FIXED_NOW);
         assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
 
         ArgumentCaptor<Iterable<Enrollment>> enrollmentCaptor = ArgumentCaptor.forClass(Iterable.class);
@@ -103,6 +122,8 @@ class PaymentServiceTest {
                     assertThat(enrollment.getCourseId()).isEqualTo(COURSE_ID);
                     assertThat(enrollment.getOrderId()).isEqualTo(ORDER_ID);
                     assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
+                    assertThat(enrollment.getEnrolledAt()).isEqualTo(FIXED_NOW);
+                    assertThat(enrollment.getCreatedAt()).isEqualTo(FIXED_NOW);
                 });
     }
 
