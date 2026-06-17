@@ -4,6 +4,7 @@ import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyDetailResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
 import com.team08.backend.domain.couponpolicy.service.CouponPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,8 +17,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -26,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/coupons")
 @RequiredArgsConstructor
-@Tag(name = "관리자 쿠폰 정책 API", description = "관리자용 쿠폰 생성 및 조회")
+@Tag(name = "관리자 쿠폰 정책 API", description = "관리자용 쿠폰 생성 및 조회/수정")
 public class CouponPolicyController {
 
     private final CouponPolicyService couponPolicyService;
@@ -58,5 +61,23 @@ public class CouponPolicyController {
     public CouponPolicyDetailResponse getCoupon(@PathVariable Long id) {
         return couponPolicyService.getCouponPolicy(id);
     }
+
+    // [관리자] 쿠폰 정책 수정 /api/admin/coupons/{id}
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/{id}")
+    @Operation(summary = "쿠폰 정책 수정", description = "발급 이력이 없는 정책의 핵심 정보를 수정합니다.")
+    public CouponPolicyResponse updateCoupon(@PathVariable Long id, @Valid @RequestBody CouponPolicyUpdateRequest request) {
+        return couponPolicyService.updateCouponPolicy(id, request);
+    }
+
+    // [관리자] 쿠폰 정책 조기 종료 /api/admin/coupons/{id}/terminate
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/terminate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "쿠폰 정책 조기 종료", description = "발급 기간을 현재 시간으로 종료하여 추가 발급을 막습니다.")
+    public void terminateCoupon(@PathVariable Long id) {
+        couponPolicyService.terminateCouponPolicy(id);
+    }
+
 }
 

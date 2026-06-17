@@ -202,4 +202,37 @@ public class CouponPolicy extends BaseTimeEntity {
                     .anyMatch(tc -> tc.getCourseId().equals(targetCourseId));
         };
     }
+
+    // 정책 핵심 정보 수정
+    public void update(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
+                       Integer minOrderAmount, Integer validDays, Integer totalQuantity, Long categoryId,
+                       List<Long> courseIds, CouponTarget couponTarget, Boolean isStackable,
+                       LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+        this.name = name;
+        this.discountType = discountType;
+        this.discountValue = discountValue;
+        this.maxDiscountAmount = maxDiscountAmount;
+        this.minOrderAmount = minOrderAmount;
+        this.validDays = validDays;
+        this.totalQuantity = totalQuantity;
+        this.categoryId = categoryId;
+        this.couponTarget = couponTarget;
+        this.isStackable = isStackable != null ? isStackable : false;
+        this.issueStartDate = issueStartDate;
+        this.issueEndDate = issueEndDate;
+
+        // 강좌 대상 업데이트
+        this.targetCourses.clear();
+        if (courseIds != null) {
+            for (Long courseId : courseIds) {
+                this.targetCourses.add(new com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse(this, courseId));
+            }
+        }
+    }
+
+    // 쿠폰 정책 조기 종료
+    public void terminate(LocalDateTime now) {
+        this.issueEndDate = now;
+    }
 }
+

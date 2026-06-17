@@ -2,11 +2,15 @@ package com.team08.backend.domain.couponpolicy.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,9 +21,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,6 +44,9 @@ class CouponPolicyIntegrationTest {
 
     @Autowired
     private CouponPolicyRepository couponPolicyRepository;
+
+    @Autowired
+    private IssuedCouponRepository issuedCouponRepository;
 
     @Test
     @WithMockLoginUser(role = "ROLE_ADMIN")
@@ -109,5 +120,72 @@ class CouponPolicyIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(policy.getId()))
                 .andExpect(jsonPath("$.name").value("상세 쿠폰"));
+    }
+
+    @Test
+    @WithMockLoginUser(role = "ROLE_ADMIN")
+    @DisplayName("발급 이력이 없는 쿠폰 정책 수정 API 통합 테스트")
+    void updateCoupon_IntegrationTest_Success() throws Exception {
+        // given
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
+
+        CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
+                "수정 쿠폰", DiscountType.PERCENT, 10, 5000, 20000, 14, null, null, null, CouponTarget.ALL, true, null, null
+        );
+
+        // when
+        mockMvc.perform(put("/api/admin/coupons/" + policy.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("수정 쿠폰"))
+                .andExpect(jsonPath("$.discountType").value("PERCENT"));
+
+        // then
+        CouponPolicy updatedPolicy = couponPolicyRepository.findById(policy.getId()).orElseThrow();
+        assertThat(updatedPolicy.getName()).isEqualTo("수정 쿠폰");
+    }
+
+    @Test
+    @WithMockLoginUser(role = "ROLE_ADMIN")
+    @DisplayName("발급 이력이 있는 쿠폰 정책 수정 시 실패 응답을 반환한다")
+    void updateCoupon_IntegrationTest_FailWhenIssued() throws Exception {
+        // given
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
+
+        issuedCouponRepository.save(IssuedCoupon.create(policy, 1L, LocalDateTime.now()));
+
+        CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
+                "수정 시도", DiscountType.AMOUNT, 2000, null, 20000, 7, null, null, null, CouponTarget.ALL, false, null, null
+        );
+
+        // when & then
+        mockMvc.perform(put("/api/admin/coupons/" + policy.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COUPON_010"));
+    }
+
+    @Test
+    @WithMockLoginUser(role = "ROLE_ADMIN")
+    @DisplayName("쿠폰 정책 조기 종료 API 통합 테스트")
+    void terminateCoupon_IntegrationTest() throws Exception {
+        // given
+        CouponPolicy policy = couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                "종료 예정 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
+
+        // when
+        mockMvc.perform(patch("/api/admin/coupons/" + policy.getId() + "/terminate"))
+                .andExpect(status().isNoContent());
+
+        // then
+        CouponPolicy terminatedPolicy = couponPolicyRepository.findById(policy.getId()).orElseThrow();
+        assertThat(terminatedPolicy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now());
     }
 }
