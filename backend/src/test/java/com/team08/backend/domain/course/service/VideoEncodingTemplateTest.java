@@ -26,6 +26,7 @@ class VideoEncodingTemplateTest {
     private MockMultipartFile mockMultipartFile;
     private String targetDirName;
     private Long lectureId;
+    private Long instructorId;
 
     private boolean isPrepareCalled;
     private boolean isHandleCalled;
@@ -63,7 +64,7 @@ class VideoEncodingTemplateTest {
             }
 
             @Override
-            protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
+            protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId) {
                 isCompleteCalled = true;
             }
         };
@@ -76,12 +77,13 @@ class VideoEncodingTemplateTest {
         );
         targetDirName = "test-dir";
         lectureId = 1L;
+        instructorId = 100L;
     }
 
     @Test
     void 파이프라인_실행_시_정해진_추상_메서드_생명주기가_순서대로_호출된다() {
         assertThrows(CustomException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
         );
 
         assertThat(isPrepareCalled).isTrue();
@@ -92,7 +94,7 @@ class VideoEncodingTemplateTest {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
         );
 
         assertThat(isHandleCalled).isFalse();

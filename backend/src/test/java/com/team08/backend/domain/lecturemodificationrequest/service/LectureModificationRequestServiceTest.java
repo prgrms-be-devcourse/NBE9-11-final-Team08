@@ -58,7 +58,8 @@ class LectureModificationRequestServiceTest {
                 eq(videoFile),
                 any(String.class),
                 eq(dto.lectureId()),
-                eq(dto.description())
+                eq(dto.description()),
+                eq(instructorId)
         );
     }
 
