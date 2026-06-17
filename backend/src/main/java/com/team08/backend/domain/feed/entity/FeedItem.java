@@ -1,4 +1,4 @@
-package com.team08.backend.domain.feeditem.entity;
+package com.team08.backend.domain.feed.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

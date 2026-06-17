@@ -1,4 +1,4 @@
-package com.team08.backend.domain.feeditem.service;
+package com.team08.backend.domain.feed.service;
 
 import org.springframework.stereotype.Component;
 

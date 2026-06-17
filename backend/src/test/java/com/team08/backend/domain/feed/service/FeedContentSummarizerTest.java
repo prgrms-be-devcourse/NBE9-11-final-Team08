@@ -1,6 +1,5 @@
 package com.team08.backend.domain.feed.service;
 
-import com.team08.backend.domain.feeditem.service.FeedContentSummarizer;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
