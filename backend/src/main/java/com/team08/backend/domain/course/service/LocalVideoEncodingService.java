@@ -62,7 +62,6 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
 
     @Override
     @Async("videoEncodingExecutor")
-    @Transactional
     public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description) {
         executePipeline(file, targetDirName, lectureId, description);
     }
@@ -122,7 +121,8 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     }
 
     @Override
-    protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
+    @Transactional
+    public void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
         if (description == null) {
             lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
             return;
