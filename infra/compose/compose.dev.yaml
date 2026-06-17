@@ -9,7 +9,7 @@
 #
 # nginx 라우팅/프록시까지 점검하고 싶을 때만 (선택):
 #   docker compose -f compose.yaml -f compose.dev.yaml --profile edge up -d db nginx-dev
-#   → http://localhost:8080 (nginx) → host.docker.internal:8080 (IntelliJ Spring Boot)
+#   → http://localhost:80 (nginx) → host.docker.internal:8080 (IntelliJ Spring Boot)
 
 services:
   db:
@@ -29,7 +29,7 @@ services:
     environment:
       DOMAIN: localhost
     ports:
-      - "8080:80"
+      - "80:80"
     extra_hosts:
       - "host.docker.internal:host-gateway"   # Linux 대응 (Mac/Win은 기본 지원)
     volumes:
