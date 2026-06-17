@@ -29,7 +29,7 @@ public class LectureModificationRequestService {
 
         String targetDirName = UUID.randomUUID().toString();
 
-        mediaEncodingService.encodeModificationToHls(videoFile, targetDirName, dto.lectureId(), dto.description());
+        mediaEncodingService.encodeModificationToHls(videoFile, targetDirName, dto.lectureId(), dto.description(), instructorId);
     }
 
     private void validateCourseOwnership(Lecture lecture, Long instructorId) {
