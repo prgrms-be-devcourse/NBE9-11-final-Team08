@@ -44,10 +44,7 @@ class CouponPolicyServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
-
-    @Spy
-    private CouponPolicyValidator couponPolicyValidator = new CouponPolicyValidator();
-
+    
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-16T10:00:00Z"), ZoneId.systemDefault());
 
@@ -105,7 +102,7 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
         );
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(1L);
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
@@ -115,6 +112,7 @@ class CouponPolicyServiceTest {
         // when & then
         assertThatThrownBy(() -> couponPolicyService.updateCouponPolicy(policyId, updateRequest))
                 .isInstanceOf(CustomException.class);
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
     }
 
     @Test
@@ -125,7 +123,7 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 "기존 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
         );
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
 
         CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
@@ -139,6 +137,7 @@ class CouponPolicyServiceTest {
         assertThat(response.name()).isEqualTo("수정 쿠폰");
         assertThat(response.discountType()).isEqualTo(DiscountType.PERCENT);
         assertThat(response.validDays()).isEqualTo(14);
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
     }
 
     @Test
@@ -149,13 +148,14 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 "종료할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
         );
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
 
         // when
         couponPolicyService.terminateCouponPolicy(policyId);
 
         // then
         assertThat(policy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now(clock));
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
     }
 
     @Test
@@ -166,12 +166,13 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 "삭제 시도 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
         );
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(1L);
 
         // when & then
         assertThatThrownBy(() -> couponPolicyService.deleteCouponPolicy(policyId))
                 .isInstanceOf(CustomException.class);
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
     }
 
     @Test
@@ -182,7 +183,7 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 "삭제할 쿠폰", DiscountType.AMOUNT, 1000, null, 10000, 7, null, null, CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
         );
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
 
         // when
@@ -191,5 +192,6 @@ class CouponPolicyServiceTest {
         // then
         assertThat(policy.getDeletedAt()).isNotNull();
         assertThat(policy.getDeletedAt()).isBeforeOrEqualTo(LocalDateTime.now(clock));
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
     }
 }

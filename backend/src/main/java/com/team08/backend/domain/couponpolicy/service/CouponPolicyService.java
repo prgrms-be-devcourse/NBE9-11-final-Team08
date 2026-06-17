@@ -58,7 +58,7 @@ public class CouponPolicyService {
     // 쿠폰 정책 수정
     @Transactional
     public CouponPolicyResponse updateCouponPolicy(Long id, CouponPolicyUpdateRequest request) {
-        CouponPolicy policy = couponPolicyRepository.findById(id)
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 발급 이력 확인
@@ -83,7 +83,7 @@ public class CouponPolicyService {
     // 쿠폰 정책 조기 종료
     @Transactional
     public void terminateCouponPolicy(Long id) {
-        CouponPolicy policy = couponPolicyRepository.findById(id)
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         policy.terminate(LocalDateTime.now(clock));
@@ -92,7 +92,7 @@ public class CouponPolicyService {
     // 쿠폰 정책 삭제
     @Transactional
     public void deleteCouponPolicy(Long id) {
-        CouponPolicy policy = couponPolicyRepository.findById(id)
+        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 발급 이력 확인
