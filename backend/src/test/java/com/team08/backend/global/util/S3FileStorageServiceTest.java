@@ -106,19 +106,21 @@ class S3FileStorageServiceTest {
     }
 
     @Test
-    void S3_디렉토리_내부_오브젝트_삭제_중_실패_시_S3_DELETE_FAILED_에러코드를_던진다() {
-        S3Resource mockResource = mock(S3Resource.class);
-        given(mockResource.getFilename()).willReturn("lectures/1/segment_001.ts");
-        given(s3Template.listObjects(anyString(), anyString())).willReturn(List.of(mockResource));
+    void S3_디렉토리_내부_오브젝트_삭제_중_일부_파일이_실패해도_튕기지_않고_나머지_삭제를_끝까지_수행한다() {
+        S3Resource mockResource1 = mock(S3Resource.class);
+        S3Resource mockResource2 = mock(S3Resource.class);
+
+        given(mockResource1.getFilename()).willReturn("lectures/1/segment_001.ts");
+        given(mockResource2.getFilename()).willReturn("lectures/1/segment_002.ts");
+        given(s3Template.listObjects(anyString(), anyString())).willReturn(List.of(mockResource1, mockResource2));
 
         doThrow(new RuntimeException())
                 .when(s3Template)
-                .deleteObject(anyString(), anyString());
+                .deleteObject(bucket, "lectures/1/segment_001.ts");
 
-        CustomException exception = assertThrows(CustomException.class, () ->
-                s3FileStorageService.deleteDirectory("lectures/1/")
-        );
+        s3FileStorageService.deleteDirectory("lectures/1/");
 
-        assertEquals(ErrorCode.S3_DELETE_FAILED, exception.getErrorCode());
+        verify(s3Template, times(1)).deleteObject(bucket, "lectures/1/segment_001.ts");
+        verify(s3Template, times(1)).deleteObject(bucket, "lectures/1/segment_002.ts");
     }
 }

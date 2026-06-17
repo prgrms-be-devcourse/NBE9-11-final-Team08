@@ -68,7 +68,7 @@ class VideoRollbackEventHandlerTest {
     void 특정_서비스에서_삭제_중_예외가_터져도_다른_서비스의_삭제_흐름에_영향을_주지_않는다() {
         doThrow(new RuntimeException())
                 .when(s3FileStorageService)
-                .deleteFile(anyString());
+                .deleteDirectory(anyString());
 
         videoRollbackEventHandler.cleanUpLeftoverVideos(videoRollbackEvent);
 

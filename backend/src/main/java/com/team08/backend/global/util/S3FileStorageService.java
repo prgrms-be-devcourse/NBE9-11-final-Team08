@@ -61,7 +61,6 @@ public class S3FileStorageService {
                     s3Template.deleteObject(bucket, s3Resource.getFilename());
                 } catch (Exception e) {
                     log.error("Failed to delete object during bulk directory clear. key: {}", s3Resource.getFilename(), e);
-                    throw new CustomException(ErrorCode.S3_DELETE_FAILED);
                 }
             });
         } catch (Exception e) {

@@ -98,4 +98,13 @@ class S3VideoEncodingServiceTest {
         verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
         verifyNoInteractions(lectureDbService);
     }
+
+    @Test
+    void 인코딩된_폴더_삭제_요청_시_S3의_해당_디렉토리Prefix_삭제_API를_호출한다() {
+        String expectedPrefix = "lectures/" + lectureId + "/" + targetDirName + "/";
+
+        s3VideoEncodingService.deleteEncodedFolder(targetDirName, lectureId);
+
+        verify(s3FileStorageService, times(1)).deleteDirectory(expectedPrefix);
+    }
 }
