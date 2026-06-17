@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -248,27 +249,20 @@ class PaymentServiceTest {
 
     private Order order(OrderStatus status) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new Order(
-                ORDER_ID,
-                USER_ID,
-                "ORD-20260612100000-ABC12345",
-                30_000,
-                0,
-                30_000,
-                status,
-                now,
-                null,
-                null,
-                null,
-                null,
-                now,
-                null
-        );
+        Order order = Order.createPendingPayment(USER_ID, "ORD-20260612100000-ABC12345", now);
+        ReflectionTestUtils.setField(order, "id", ORDER_ID);
+        ReflectionTestUtils.setField(order, "totalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "finalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "status", status);
+        return order;
     }
 
     private OrderItem orderItem(Long orderItemId, Long courseId, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new OrderItem(orderItemId, ORDER_ID, courseId, "Spring", price, 0, price, now, null);
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", price, 0, price, now);
+        ReflectionTestUtils.setField(orderItem, "id", orderItemId);
+        return orderItem;
     }
 
     private List<Enrollment> toList(Iterable<Enrollment> enrollments) {

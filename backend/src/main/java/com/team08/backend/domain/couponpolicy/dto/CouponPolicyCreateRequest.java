@@ -49,5 +49,5 @@ public record CouponPolicyCreateRequest(
         LocalDateTime issueStartDate,
 
         LocalDateTime issueEndDate
-) {
+) implements CouponPolicyValidatable {
 }

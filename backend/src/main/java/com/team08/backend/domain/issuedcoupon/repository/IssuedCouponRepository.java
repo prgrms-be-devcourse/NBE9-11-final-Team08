@@ -23,4 +23,7 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
             @Param("issuedStatus") CouponStatus issuedStatus,
             @Param("expiredStatus") CouponStatus expiredStatus
     );
+    
+    // 특정 정책으로부터 발급된 쿠폰 수 조회
+    long countByPolicyId(Long policyId);
 }

@@ -2,8 +2,6 @@ package com.team08.backend.domain.order.service;
 
 import com.team08.backend.domain.cart.entity.Cart;
 import com.team08.backend.domain.cart.repository.CartRepository;
-import com.team08.backend.domain.cartitem.entity.CartItem;
-import com.team08.backend.domain.cartitem.repository.CartItemRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
@@ -17,15 +15,16 @@ import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,9 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -45,6 +42,7 @@ class OrderServiceTest {
     private static final Long CART_ID = 10L;
     private static final Long ORDER_ID = 100L;
     private static final Long COURSE_ID = 1000L;
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.parse("2026-06-17T12:00:00");
 
     @Mock
     private OrderRepository orderRepository;
@@ -56,34 +54,42 @@ class OrderServiceTest {
     private CartRepository cartRepository;
 
     @Mock
-    private CartItemRepository cartItemRepository;
-
-    @Mock
     private CourseRepository courseRepository;
 
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
-    @InjectMocks
     private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        Clock fixedClock = Clock.fixed(
+                FIXED_NOW.atZone(ZoneId.systemDefault()).toInstant(),
+                ZoneId.systemDefault()
+        );
+        orderService = new OrderService(
+                orderRepository,
+                orderItemRepository,
+                cartRepository,
+                courseRepository,
+                enrollmentRepository,
+                fixedClock
+        );
+    }
 
     @Test
     void cartOrderCanBeCreated() {
-        Cart cart = cart(CART_ID, USER_ID);
-        CartItem firstCartItem = cartItem(1L, COURSE_ID);
-        CartItem secondCartItem = cartItem(2L, COURSE_ID + 1);
+        Cart cart = cart(CART_ID, USER_ID, COURSE_ID, COURSE_ID + 1);
         Course firstCourse = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
         Course secondCourse = course(COURSE_ID + 1, "JPA", 20_000, CourseStatus.ON_SALE);
 
-        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
-        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(firstCartItem, secondCartItem));
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID + 1, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         stubOrderSave();
-        stubOrderItemSaveAll();
 
         OrderDetailResponse response = orderService.createOrderFromCart(USER_ID);
 
@@ -92,17 +98,17 @@ class OrderServiceTest {
         assertThat(response.discountPrice()).isZero();
         assertThat(response.finalPrice()).isEqualTo(50_000);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.orderedAt()).isEqualTo(FIXED_NOW);
         assertThat(response.items()).hasSize(2);
         assertThat(response.items()).extracting("courseTitle").containsExactly("Spring", "JPA");
         assertThat(response.items()).extracting("price").containsExactly(30_000, 20_000);
-        verify(cartItemRepository).deleteAllByCartId(CART_ID);
+        assertThat(cart.getItems()).isEmpty();
     }
 
     @Test
     void emptyCartCannotCreateOrder() {
         Cart cart = cart(CART_ID, USER_ID);
-        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
-        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of());
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
 
         assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -113,12 +119,10 @@ class OrderServiceTest {
 
     @Test
     void nonOnSaleCourseCannotCreateOrder() {
-        Cart cart = cart(CART_ID, USER_ID);
-        CartItem cartItem = cartItem(1L, COURSE_ID);
+        Cart cart = cart(CART_ID, USER_ID, COURSE_ID);
         Course course = course(COURSE_ID, "Draft", 30_000, CourseStatus.DRAFT);
 
-        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
-        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(cartItem));
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(course));
 
         assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
@@ -126,17 +130,14 @@ class OrderServiceTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.COURSE_NOT_ON_SALE));
 
         verifyNoInteractions(orderRepository, orderItemRepository, enrollmentRepository);
-        verifyNoMoreInteractions(cartItemRepository);
     }
 
     @Test
     void activeEnrollmentCannotCreateOrder() {
-        Cart cart = cart(CART_ID, USER_ID);
-        CartItem cartItem = cartItem(1L, COURSE_ID);
+        Cart cart = cart(CART_ID, USER_ID, COURSE_ID);
         Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
 
-        given(cartRepository.findByUserId(USER_ID)).willReturn(Optional.of(cart));
-        given(cartItemRepository.findAllByCartId(CART_ID)).willReturn(List.of(cartItem));
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(course));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(true);
@@ -146,7 +147,6 @@ class OrderServiceTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LECTURE_ALREADY_ENROLLED));
 
         verifyNoInteractions(orderRepository, orderItemRepository);
-        verifyNoMoreInteractions(cartItemRepository);
     }
 
     @Test
@@ -157,7 +157,6 @@ class OrderServiceTest {
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         stubOrderSave();
-        stubOrderItemSaveAll();
 
         OrderDetailResponse response = orderService.createDirectOrder(USER_ID, COURSE_ID);
 
@@ -165,6 +164,7 @@ class OrderServiceTest {
         assertThat(response.totalPrice()).isEqualTo(30_000);
         assertThat(response.finalPrice()).isEqualTo(30_000);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.orderedAt()).isEqualTo(FIXED_NOW);
         assertThat(response.items()).singleElement()
                 .satisfies(item -> {
                     assertThat(item.courseId()).isEqualTo(COURSE_ID);
@@ -210,7 +210,7 @@ class OrderServiceTest {
         OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
 
         assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
-        assertThat(response.canceledAt()).isNotNull();
+        assertThat(response.canceledAt()).isEqualTo(FIXED_NOW);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
     }
 
@@ -229,79 +229,40 @@ class OrderServiceTest {
     private void stubOrderSave() {
         given(orderRepository.save(any(Order.class))).willAnswer(invocation -> {
             Order order = invocation.getArgument(0);
-            return new Order(
-                    ORDER_ID,
-                    order.getUserId(),
-                    order.getOrderNumber(),
-                    order.getTotalPrice(),
-                    order.getDiscountPrice(),
-                    order.getFinalPrice(),
-                    order.getStatus(),
-                    order.getOrderedAt(),
-                    order.getPaidAt(),
-                    order.getCanceledAt(),
-                    order.getRefundedAt(),
-                    order.getExpiredAt(),
-                    order.getCreatedAt(),
-                    order.getUpdatedAt()
-            );
-        });
-    }
-
-    private void stubOrderItemSaveAll() {
-        given(orderItemRepository.saveAll(any())).willAnswer(invocation -> {
-            Iterable<OrderItem> items = invocation.getArgument(0);
-            List<OrderItem> savedItems = new ArrayList<>();
+            ReflectionTestUtils.setField(order, "id", ORDER_ID);
             long id = 1L;
-            for (OrderItem item : items) {
-                savedItems.add(orderItem(
-                        id++,
-                        item.getOrderId(),
-                        item.getCourseId(),
-                        item.getCourseTitle(),
-                        item.getPrice()
-                ));
+            for (OrderItem item : order.getItems()) {
+                ReflectionTestUtils.setField(item, "id", id++);
             }
-            return savedItems;
+            return order;
         });
     }
 
     private Order order(Long orderId, Long userId, OrderStatus status) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new Order(
-                orderId,
-                userId,
-                "ORD-20260612100000-ABC12345",
-                30_000,
-                0,
-                30_000,
-                status,
-                now,
-                null,
-                null,
-                null,
-                null,
-                now,
-                null
-        );
+        Order order = Order.createPendingPayment(userId, "ORD-20260612100000-ABC12345", now);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        ReflectionTestUtils.setField(order, "totalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "finalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "status", status);
+        return order;
     }
 
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new OrderItem(orderItemId, orderId, courseId, courseTitle, price, 0, price, now, null);
+        Order order = order(orderId, USER_ID, OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, price, 0, price, now);
+        ReflectionTestUtils.setField(orderItem, "id", orderItemId);
+        return orderItem;
     }
 
-    private Cart cart(Long cartId, Long userId) {
+    private Cart cart(Long cartId, Long userId, Long... courseIds) {
         Cart cart = Cart.create(userId);
         ReflectionTestUtils.setField(cart, "id", cartId);
+        for (Long courseId : courseIds) {
+            cart.addItem(courseId);
+        }
         return cart;
-    }
-
-    private CartItem cartItem(Long cartItemId, Long courseId) {
-        CartItem cartItem = newInstance(CartItem.class);
-        ReflectionTestUtils.setField(cartItem, "id", cartItemId);
-        ReflectionTestUtils.setField(cartItem, "courseId", courseId);
-        return cartItem;
     }
 
     private Course course(Long courseId, String title, int price, CourseStatus status) {

@@ -78,6 +78,7 @@ public enum ErrorCode {
     PAID_ORDER_CANNOT_BE_CANCELED(HttpStatus.CONFLICT,        "ORDER_004", "결제 완료 주문은 취소할 수 없습니다."),
     INVALID_ORDER_STATUS(HttpStatus.CONFLICT,        "ORDER_005", "취소할 수 없는 주문 상태입니다."),
     INVALID_ORDER_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "ORDER_006", "잘못된 주문 상태 전이입니다."),
+    ORDER_ITEM_ALREADY_EXISTS(HttpStatus.CONFLICT, "ORDER_007", "이미 주문에 포함된 강의입니다."),
 
     // ── Enrollment ───────────────────────────────────────────────────────
     ENROLLMENT_NOT_FOUND(HttpStatus.NOT_FOUND,  "ENROLLMENT_001", "수강 중인 강의를 찾을 수 없습니다."),
@@ -119,6 +120,8 @@ public enum ErrorCode {
     COUPON_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_007", "존재하지 않는 쿠폰입니다."),
     COUPON_NOT_OWNED(HttpStatus.FORBIDDEN, "COUPON_008", "본인의 쿠폰만 사용할 수 있습니다."),
     COUPON_ALREADY_USED_OR_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_009", "사용할 수 없는 쿠폰 상태입니다."),
+    COUPON_POLICY_ALREADY_ISSUED(HttpStatus.BAD_REQUEST, "COUPON_010", "이미 발급된 쿠폰이 있는 정책은 수정할 수 없습니다."),
+    COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE(HttpStatus.BAD_REQUEST, "COUPON_011", "이미 발급된 쿠폰이 있는 정책은 삭제할 수 없습니다."),
 
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),

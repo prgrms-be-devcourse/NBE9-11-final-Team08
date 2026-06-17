@@ -9,6 +9,7 @@ import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 
@@ -188,22 +189,12 @@ class OrderPaymentStateTransitionTest {
     }
 
     private Order order(OrderStatus status) {
-        return new Order(
-                1L,
-                1L,
-                "ORDER-1",
-                10_000,
-                0,
-                10_000,
-                status,
-                CREATED_AT,
-                null,
-                null,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Order order = Order.createPendingPayment(1L, "ORDER-1", CREATED_AT);
+        ReflectionTestUtils.setField(order, "id", 1L);
+        ReflectionTestUtils.setField(order, "totalPrice", 10_000);
+        ReflectionTestUtils.setField(order, "finalPrice", 10_000);
+        ReflectionTestUtils.setField(order, "status", status);
+        return order;
     }
 
     private Payment payment(PaymentStatus status, String failedReason) {

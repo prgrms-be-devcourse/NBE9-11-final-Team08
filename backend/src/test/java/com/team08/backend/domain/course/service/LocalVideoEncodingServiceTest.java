@@ -1,5 +1,7 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +32,12 @@ class LocalVideoEncodingServiceTest {
 
     @Mock
     private EncodingResultHandler encodingResultHandler;
+
+    @Mock
+    private LectureRepository lectureRepository;
+
+    @Mock
+    private LectureModificationRequestRepository requestRepository;
 
     private Path tempUploadDir;
     private MockMultipartFile realMockMultipartFile;

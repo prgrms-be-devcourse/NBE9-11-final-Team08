@@ -24,6 +24,7 @@ public abstract class VideoEncodingTemplate {
     protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
         File sourceFile = prepareSourceFile(file, targetDirName, lectureId);
         Path localWorkspacePath = null;
+        Process process = null;
 
         try {
             localWorkspacePath = Files.createTempDirectory(Paths.get(System.getProperty("java.io.tmpdir")), "hls-work-");
@@ -31,7 +32,8 @@ public abstract class VideoEncodingTemplate {
             String outputM3u8 = localWorkspacePath.resolve("output.m3u8").toString();
             String segmentPattern = localWorkspacePath.resolve("segment_%03d.ts").toString();
 
-            runFFmpegProcess(sourceFile, outputM3u8, segmentPattern, lectureId);
+            process = startFFmpegProcess(sourceFile, outputM3u8, segmentPattern);
+            waitForProcess(process, lectureId);
 
             handleGeneratedFiles(localWorkspacePath, targetDirName, lectureId);
 
@@ -42,11 +44,11 @@ public abstract class VideoEncodingTemplate {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
-            cleanupTemporaryResources(sourceFile, localWorkspacePath);
+            cleanupTemporaryResources(process, sourceFile, localWorkspacePath);
         }
     }
 
-    private void runFFmpegProcess(File sourceFile, String outputM3u8, String segmentPattern, Long lectureId) throws IOException, InterruptedException {
+    private Process startFFmpegProcess(File sourceFile, String outputM3u8, String segmentPattern) throws IOException {
         ProcessBuilder pb = new ProcessBuilder(
                 "ffmpeg", "-i", sourceFile.getAbsolutePath(),
                 "-profile:v", "baseline", "-level", "3.0",
@@ -55,30 +57,28 @@ public abstract class VideoEncodingTemplate {
                 "-f", "hls", "-hls_segment_filename", segmentPattern,
                 outputM3u8
         );
-
         pb.inheritIO();
-        Process process = pb.start();
+        return pb.start();
+    }
 
-        try {
-            boolean finished = process.waitFor(10, TimeUnit.MINUTES);
-            if (!finished) {
-                log.error("HLS encoding timeout exceeded for lectureId: {}", lectureId);
-                throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
-            }
+    private void waitForProcess(Process process, Long lectureId) throws InterruptedException {
+        boolean finished = process.waitFor(10, TimeUnit.MINUTES);
+        if (!finished) {
+            log.error("HLS encoding timeout exceeded for lectureId: {}", lectureId);
+            throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
+        }
 
-            int exitCode = process.exitValue();
-            if (exitCode != 0) {
-                log.error("HLS encoding failed. exitCode: {}, lectureId: {}", exitCode, lectureId);
-                throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
-            }
-        } finally {
-            if (process.isAlive()) {
-                process.destroyForcibly();
-            }
+        int exitCode = process.exitValue();
+        if (exitCode != 0) {
+            log.error("HLS encoding failed. exitCode: {}, lectureId: {}", exitCode, lectureId);
+            throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         }
     }
 
-    private void cleanupTemporaryResources(File sourceFile, Path localWorkspacePath) {
+    private void cleanupTemporaryResources(Process process, File sourceFile, Path localWorkspacePath) {
+        if (process != null && process.isAlive()) {
+            process.destroyForcibly();
+        }
         if (sourceFile != null && sourceFile.exists()) {
             sourceFile.delete();
         }
