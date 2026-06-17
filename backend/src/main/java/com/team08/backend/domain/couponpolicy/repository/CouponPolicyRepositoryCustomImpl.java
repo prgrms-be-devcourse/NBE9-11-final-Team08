@@ -23,12 +23,12 @@ import static com.team08.backend.domain.couponpolicy.entity.QCouponPolicy.coupon
 import static com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyCourse.couponPolicyCourse;
 
 @Repository
-public class CouponPolicyRepositoryImpl implements CouponPolicyRepositoryCustom {
+public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
     private final Clock clock;
 
-    public CouponPolicyRepositoryImpl(EntityManager em, Clock clock) {
+    public CouponPolicyRepositoryCustomImpl(EntityManager em, Clock clock) {
         this.queryFactory = new JPAQueryFactory(em);
         this.clock = clock;
     }

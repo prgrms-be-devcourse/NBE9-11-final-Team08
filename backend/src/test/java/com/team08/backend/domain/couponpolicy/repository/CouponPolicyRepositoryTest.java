@@ -24,7 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import({JpaConfig.class, TimeConfig.class, CouponPolicyRepositoryImpl.class})
+@Import({JpaConfig.class, TimeConfig.class, CouponPolicyRepositoryCustomImpl.class})
 class CouponPolicyRepositoryTest {
 
     @Autowired
