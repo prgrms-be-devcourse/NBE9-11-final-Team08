@@ -1,5 +1,9 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
+import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
@@ -7,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -21,11 +26,19 @@ import static java.util.Comparator.reverseOrder;
 @Service
 public class LocalVideoEncodingService extends VideoEncodingTemplate implements MediaEncodingService {
 
+    private final LectureDbService lectureDbService;
+    private final LectureRepository lectureRepository;
+    private final LectureModificationRequestRepository requestRepository;
+
     @Value("${file.upload-dir}")
     private String uploadDir;
 
-    public LocalVideoEncodingService(LectureDbService lectureDbService) {
-        super(lectureDbService);
+    public LocalVideoEncodingService(LectureDbService lectureDbService,
+                                     LectureRepository lectureRepository,
+                                     LectureModificationRequestRepository requestRepository) {
+        this.lectureDbService = lectureDbService;
+        this.lectureRepository = lectureRepository;
+        this.requestRepository = requestRepository;
     }
 
     @PostConstruct
@@ -41,11 +54,17 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
         }
     }
 
-    // TODO: k6 부하 테스트 진행 후 서버 가용량(CPU/메모리/디스크 I/O) 측정치에 기반하여 videoEncodingExecutor 스레드 풀 제한(max-size, queue-capacity) 설정 반영 예정
     @Override
     @Async("videoEncodingExecutor")
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
-        executePipeline(file, targetDirName, lectureId);
+        executePipeline(file, targetDirName, lectureId, null);
+    }
+
+    @Override
+    @Async("videoEncodingExecutor")
+    @Transactional
+    public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description) {
+        executePipeline(file, targetDirName, lectureId, description);
     }
 
     @Override
@@ -100,6 +119,25 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     @Override
     protected String getDbSavePath(String targetDirName, Long lectureId) {
         return targetDirName + "/output.m3u8";
+    }
+
+    @Override
+    protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
+        if (description == null) {
+            lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
+            return;
+        }
+
+        Lecture lecture = lectureRepository.findById(lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+
+        LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
+                lecture,
+                lecture.getChapter().getCourse().getInstructorId(),
+                description,
+                dbSavePath
+        );
+        requestRepository.save(modificationRequest);
     }
 
     public void deleteEncodedFolder(String targetDirName) {
