@@ -20,7 +20,7 @@ public class FeedItem {
     private Long studyId;
 
     @Column(nullable = false)
-    private Long authorId;
+    private Long actorId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -35,9 +35,9 @@ public class FeedItem {
     @Column(nullable = false)
     private LocalDateTime occurredAt;
 
-    private FeedItem(Long studyId, Long authorId, FeedItemType type, Long sourceId, String content, LocalDateTime occurredAt) {
+    private FeedItem(Long studyId, Long actorId, FeedItemType type, Long sourceId, String content, LocalDateTime occurredAt) {
         this.studyId = studyId;
-        this.authorId = authorId;
+        this.actorId = actorId;
         this.type = type;
         this.sourceId = sourceId;
         this.content = content;

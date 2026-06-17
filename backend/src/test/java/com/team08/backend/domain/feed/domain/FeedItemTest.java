@@ -39,7 +39,7 @@ public class FeedItemTest {
 
         // then
         assertThat(feedItem.getStudyId()).isEqualTo(studyId);
-        assertThat(feedItem.getAuthorId()).isEqualTo(authorId);
+        assertThat(feedItem.getActorId()).isEqualTo(authorId);
         assertThat(feedItem.getType()).isEqualTo(FeedItemType.STUDY_ACTIVITY);
         assertThat(feedItem.getSourceId()).isEqualTo(studyActivityId);
         assertThat(feedItem.getContent()).isEqualTo(summaryContent);
