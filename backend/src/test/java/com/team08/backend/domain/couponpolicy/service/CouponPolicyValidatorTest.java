@@ -46,11 +46,11 @@ class CouponPolicyValidatorTest {
     }
 
     @Test
-    @DisplayName("수정 검증 실패: 카테고리 대상 쿠폰인데 카테고리 ID가 없으면 예외가 발생한다")
-    void validate_fail_category_target_without_id() {
+    @DisplayName("수정 검증 실패: 카테고리 대상 쿠폰인데 카테고리 ID 목록이 비어있으면 예외가 발생한다")
+    void validate_fail_category_target_without_ids() {
         // given
         CouponPolicyUpdateRequest request = new CouponPolicyUpdateRequest(
-                "테스트", DiscountType.AMOUNT, 5000, null, 0, 7, null, null, null, CouponTarget.CATEGORY, false, null, null
+                "테스트", DiscountType.AMOUNT, 5000, null, 0, 7, null, List.of(), null, CouponTarget.CATEGORY, false, null, null
         );
 
         // when & then

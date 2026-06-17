@@ -44,7 +44,10 @@ class CouponPolicyServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
-    
+
+    @Spy
+    private CouponPolicyValidator couponPolicyValidator = new CouponPolicyValidator();
+
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-16T10:00:00Z"), ZoneId.systemDefault());
 
@@ -76,7 +79,7 @@ class CouponPolicyServiceTest {
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
                 request.name(), request.discountType(), request.discountValue(),
                 request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
-                request.categoryId(), request.courseIds(),
+                request.categoryIds(), request.courseIds(),
                 request.couponTarget(), request.usageType(),
                 request.isStackable(), request.issueStartDate(), request.issueEndDate()
         );

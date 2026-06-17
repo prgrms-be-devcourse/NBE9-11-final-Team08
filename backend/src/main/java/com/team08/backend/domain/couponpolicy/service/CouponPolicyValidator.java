@@ -23,7 +23,7 @@ public class CouponPolicyValidator {
         }
 
         // 적용 대상별 검증
-        if (request.couponTarget() == CouponTarget.CATEGORY && request.categoryId() == null) {
+        if (request.couponTarget() == CouponTarget.CATEGORY && (request.categoryIds() == null || request.categoryIds().isEmpty())) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
         if (request.couponTarget() == CouponTarget.COURSE && (request.courseIds() == null || request.courseIds().isEmpty())) {

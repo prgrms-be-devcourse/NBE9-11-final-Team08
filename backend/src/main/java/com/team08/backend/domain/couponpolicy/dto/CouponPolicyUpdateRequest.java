@@ -15,7 +15,7 @@ public record CouponPolicyUpdateRequest(
         Integer minOrderAmount,
         Integer validDays,
         Integer totalQuantity,
-        Long categoryId,
+        List<Long> categoryIds,
         List<Long> courseIds,
         @NotNull CouponTarget couponTarget,
         Boolean isStackable,

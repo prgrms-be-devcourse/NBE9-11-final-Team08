@@ -14,7 +14,7 @@ public interface CouponPolicyValidatable {
     Integer minOrderAmount();
     Integer validDays();
     Integer totalQuantity();
-    Long categoryId();
+    List<Long> categoryIds();
     List<Long> courseIds();
     CouponTarget couponTarget();
     LocalDateTime issueStartDate();

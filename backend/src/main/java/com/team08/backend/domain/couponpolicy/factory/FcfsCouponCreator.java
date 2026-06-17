@@ -38,7 +38,7 @@ public class FcfsCouponCreator extends AbstractCouponPolicyCreator {
                 request.minOrderAmount(),
                 request.validDays(),
                 request.totalQuantity(),
-                request.categoryId(),
+                request.categoryIds(),
                 request.courseIds(),
                 request.couponTarget(),
                 request.usageType(),

@@ -72,7 +72,7 @@ public class CouponPolicyService {
         policy.update(
                 request.name(), request.discountType(), request.discountValue(),
                 request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
-                request.totalQuantity(), request.categoryId(), request.courseIds(),
+                request.totalQuantity(), request.categoryIds(), request.courseIds(),
                 request.couponTarget(), request.isStackable(),
                 request.issueStartDate(), request.issueEndDate()
         );

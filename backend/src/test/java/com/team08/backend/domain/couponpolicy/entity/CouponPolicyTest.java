@@ -32,18 +32,19 @@ class CouponPolicyTest {
     }
 
     @Test
-    @DisplayName("성공: CATEGORY 타겟 쿠폰은 지정된 카테고리 ID에만 적용 가능하다")
+    @DisplayName("성공: CATEGORY 타겟 쿠폰은 지정된 카테고리 ID들에만 적용 가능하다")
     void isApplicableTo_category_success() {
         // given
         CouponPolicy policy = CouponPolicy.createNormalPolicy(
-                "카테고리 할인", DiscountType.AMOUNT, 1000, null, 0, 7, 50L,
-                null, CouponTarget.CATEGORY, CouponUsageType.SINGLE_USE,
+                "카테고리 할인", DiscountType.AMOUNT, 1000, null, 0, 7,
+                List.of(50L, 51L), null, CouponTarget.CATEGORY, CouponUsageType.SINGLE_USE,
                 false, null, null
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 일치
-        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 불일치
+        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 포함됨
+        assertThat(policy.isApplicableTo(1L, 51L)).isTrue();  // 카테고리 51 포함됨
+        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 미포함
     }
 
     @Test

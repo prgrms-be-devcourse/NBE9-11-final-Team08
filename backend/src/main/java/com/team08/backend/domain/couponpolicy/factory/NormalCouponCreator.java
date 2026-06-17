@@ -37,7 +37,7 @@ public class NormalCouponCreator extends AbstractCouponPolicyCreator {
                 request.maxDiscountAmount(),
                 request.minOrderAmount(),
                 request.validDays(),
-                request.categoryId(),
+                request.categoryIds(),
                 request.courseIds(),
                 request.couponTarget(),
                 request.usageType(),

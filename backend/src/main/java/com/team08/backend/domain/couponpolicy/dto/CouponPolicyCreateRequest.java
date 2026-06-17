@@ -30,7 +30,7 @@ public record CouponPolicyCreateRequest(
 
         Integer totalQuantity, // null이면 무제한
 
-        Long categoryId,
+        List<Long> categoryIds,
 
         List<Long> courseIds,
 
