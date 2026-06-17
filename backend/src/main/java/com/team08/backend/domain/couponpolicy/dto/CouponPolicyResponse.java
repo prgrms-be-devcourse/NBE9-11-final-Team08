@@ -6,6 +6,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory;
+import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +26,8 @@ public record CouponPolicyResponse(
         Integer validDays,
         LocalDateTime issueStartDate,
         LocalDateTime issueEndDate,
-        List<Long> categoryIds
+        List<Long> categoryIds,
+        List<Long> courseIds
 ) {
     public static CouponPolicyResponse from(CouponPolicy policy) {
         return new CouponPolicyResponse(
@@ -43,7 +45,8 @@ public record CouponPolicyResponse(
                 policy.getValidDays(),
                 policy.getIssueStartDate(),
                 policy.getIssueEndDate(),
-                policy.getTargetCategories().stream().map(CouponPolicyCategory::getCategoryId).toList()
+                policy.getTargetCategories().stream().map(CouponPolicyCategory::getCategoryId).toList(),
+                policy.getTargetCourses().stream().map(CouponPolicyCourse::getCourseId).toList()
         );
     }
 }

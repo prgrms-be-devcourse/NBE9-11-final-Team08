@@ -80,11 +80,18 @@ public class CouponPolicyValidator {
         }
 
         // 적용 대상별 검증
-        if (target == CouponTarget.CATEGORY && (categoryIds == null || categoryIds.isEmpty())) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        if (target == CouponTarget.COURSE && (courseIds == null || courseIds.isEmpty())) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        if (target == CouponTarget.ALL) {
+            if ((categoryIds != null && !categoryIds.isEmpty()) || (courseIds != null && !courseIds.isEmpty())) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+        } else if (target == CouponTarget.CATEGORY) {
+            if (categoryIds == null || categoryIds.isEmpty() || (courseIds != null && !courseIds.isEmpty())) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+        } else if (target == CouponTarget.COURSE) {
+            if (courseIds == null || courseIds.isEmpty() || (categoryIds != null && !categoryIds.isEmpty())) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
         }
 
         // 기간 검증
