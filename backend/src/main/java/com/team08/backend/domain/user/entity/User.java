@@ -43,4 +43,9 @@ public class User extends BaseTimeEntity {
     public static User createSeller(String email, String password, String nickname, String profileImage) {
         return new User(email, password, nickname, profileImage, UserRole.ROLE_SELLER);
     }
+
+    // 더미데이터 생성용, 비즈니스 로직에선 안쓰임
+    public static User createAdmin(String email, String password, String nickname, String profileImage) {
+        return new User(email, password, nickname, profileImage, UserRole.ROLE_ADMIN);
+    }
 }

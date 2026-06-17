@@ -54,6 +54,8 @@ public class BulkDataInitializer {
 
         String password = passwordEncoder.encode("Test1234!");
 
+        userRepository.save(User.createAdmin("admin@test.com", password, "관리자", null));
+
         List<Category> categories = saveCategories();
         List<User> sellers        = saveSellers(password);
         saveRegularUsers(password);
