@@ -6,7 +6,8 @@
 # 개발: DB만 Docker로 띄우고 Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행.
 
 COMPOSE_DIR := infra/compose
-DC          := docker compose
+ENV_FILE    := --env-file .env.dev
+DC          := docker compose ${ENV_FILE}
 BASE        := -f compose.yaml
 DEV         := $(BASE) -f compose.dev.yaml
 PROD        := $(BASE) -f compose.prod.yaml
