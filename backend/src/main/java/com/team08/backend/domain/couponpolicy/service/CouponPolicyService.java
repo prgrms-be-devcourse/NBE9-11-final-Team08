@@ -30,7 +30,7 @@ public class CouponPolicyService {
     private final IssuedCouponRepository issuedCouponRepository;
     private final Clock clock;
 
-    // 관리자 쿠폰 정책 생성
+    // 쿠폰 정책 생성
     @Transactional
     public CouponPolicyResponse createCouponPolicy(CouponPolicyCreateRequest request) {
         CouponPolicy newPolicy = couponPolicyFactory.create(request);
@@ -39,14 +39,14 @@ public class CouponPolicyService {
         return CouponPolicyResponse.from(savedPolicy);
     }
 
-    // 관리자 쿠폰 정책 목록 조회
+    // 쿠폰 정책 목록 조회
     @Transactional(readOnly = true)
     public Page<CouponPolicyResponse> getCouponPolicies(CouponPolicySearchRequest condition, Pageable pageable) {
         return couponPolicyRepository.findAllByCondition(condition, pageable)
                 .map(CouponPolicyResponse::from);
     }
 
-    // 관리자 쿠폰 정책 상세 조회
+    // 쿠폰 정책 상세 조회
     @Transactional(readOnly = true)
     public CouponPolicyDetailResponse getCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findByIdWithDetails(id)
@@ -54,7 +54,7 @@ public class CouponPolicyService {
         return CouponPolicyDetailResponse.from(policy);
     }
 
-    // 관리자 쿠폰 정책 수정
+    // 쿠폰 정책 수정
     @Transactional
     public CouponPolicyResponse updateCouponPolicy(Long id, CouponPolicyUpdateRequest request) {
         CouponPolicy policy = couponPolicyRepository.findById(id)
@@ -77,7 +77,7 @@ public class CouponPolicyService {
         return CouponPolicyResponse.from(policy);
     }
 
-    // 관리자 쿠폰 정책 조기 종료
+    // 쿠폰 정책 조기 종료
     @Transactional
     public void terminateCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findById(id)
@@ -86,7 +86,7 @@ public class CouponPolicyService {
         policy.terminate(LocalDateTime.now(clock));
     }
 
-    // 관리자 쿠폰 정책 삭제
+    // 쿠폰 정책 삭제
     @Transactional
     public void deleteCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findById(id)

@@ -33,7 +33,7 @@ public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryC
         this.clock = clock;
     }
 
-    // 관리자 쿠폰 정책 목록 조회
+    // 쿠폰 정책 목록 조회
     @Override
     public Page<CouponPolicy> findAllByCondition(CouponPolicySearchRequest condition, Pageable pageable) {
         LocalDateTime now = LocalDateTime.now(clock);
