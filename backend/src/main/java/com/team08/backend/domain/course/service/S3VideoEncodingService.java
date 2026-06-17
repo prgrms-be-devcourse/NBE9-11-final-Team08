@@ -48,7 +48,9 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
         } finally {
             if (tempMultipartFile != null && tempMultipartFile.exists()) {
-                tempMultipartFile.delete();
+                if (!tempMultipartFile.delete()) {
+                    log.warn("Failed to delete temp multipart file: {}", tempMultipartFile.getAbsolutePath());
+                }
             }
         }
 

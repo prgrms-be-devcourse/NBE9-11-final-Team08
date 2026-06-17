@@ -31,7 +31,7 @@ class LectureDbServiceTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Test
-    void 강의가_존재하면_HLS_파일_경로가_정상적으로_변경되고_롤백_대비_이벤트를_발행한다() {
+    void 강의가_존재하면_독립_트랜잭션_내에서_HLS_경로가_변경되고_롤백_대비_이벤트를_발행한다() {
         Long lectureId = 1L;
         String targetDirName = "test-uuid";
         String dbSavePath = "lectures/1/test-uuid/output.m3u8";
