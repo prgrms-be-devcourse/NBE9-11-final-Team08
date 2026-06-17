@@ -269,16 +269,16 @@ Table cart_items {
 Table coupon_policies {
   id bigint [pk, increment]
   name varchar(100) [not null]
+  coupon_target coupon_target [not null]
+  coupon_type coupon_type [not null]
+  total_quantity int
+  usage_type coupon_usage_type [not null]
+  is_stackable boolean [not null, default: false]
   discount_type discount_type [not null]
   discount_value int [not null]
   max_discount_amount int
   min_order_amount int
   valid_days int
-  total_quantity int
-  coupon_type coupon_type [not null]
-  coupon_target coupon_target [not null]
-  usage_type coupon_usage_type [not null]
-  is_stackable boolean [not null, default: false]
   issue_start_date datetime
   issue_end_date datetime
   created_at datetime [not null]
