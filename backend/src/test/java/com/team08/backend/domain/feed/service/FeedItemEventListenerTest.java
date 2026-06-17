@@ -50,7 +50,7 @@ public class FeedItemEventListenerTest {
         FeedItem saved = captor.getValue();
 
         assertThat(saved.getStudyId()).isEqualTo(studyId);
-        assertThat(saved.getAuthorId()).isEqualTo(authorId);
+        assertThat(saved.getActorId()).isEqualTo(authorId);
         assertThat(saved.getType()).isEqualTo(FeedItemType.STUDY_ACTIVITY);
         assertThat(saved.getSourceId()).isEqualTo(studyActivity.getId());
         assertThat(saved.getContent()).isEqualTo(content);
