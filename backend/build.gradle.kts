@@ -49,8 +49,4 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-
-    environment("AWS_ACCESS_KEY_ID", "dummy-access-key")
-    environment("AWS_SECRET_ACCESS_KEY", "dummy-secret-key")
-    environment("AWS_S3_BUCKET_NAME", "dummy-bucket-name")
 }
