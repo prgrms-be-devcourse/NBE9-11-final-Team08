@@ -5,6 +5,8 @@ import com.team08.backend.domain.lecturemodificationrequest.service.LectureModif
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,10 +19,11 @@ public class LectureModificationRequestController {
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Void> createRequest(
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestPart("request") @Valid LectureModificationRequestCreateDto requestDto,
             @RequestPart("video") MultipartFile videoFile
     ) {
-        Long instructorId = 1L;
+        Long instructorId = Long.valueOf(userDetails.getUsername());
 
         modificationService.createRequest(requestDto, instructorId, videoFile);
 
