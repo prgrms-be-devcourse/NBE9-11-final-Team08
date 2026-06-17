@@ -17,7 +17,7 @@ public class VideoRollbackEventHandler {
     private final List<MediaEncodingService> mediaEncodingServices;
 
     @Async("videoEncodingExecutor")
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void cleanUpLeftoverVideos(VideoRollbackEvent event) {
         for (MediaEncodingService service : mediaEncodingServices) {
             if (service instanceof S3VideoEncodingService s3Service) {
