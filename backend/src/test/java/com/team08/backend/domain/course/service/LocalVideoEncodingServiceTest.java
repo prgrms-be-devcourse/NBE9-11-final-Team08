@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
+import static java.util.Comparator.reverseOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
@@ -55,7 +56,12 @@ class LocalVideoEncodingServiceTest {
     void tearDown() throws IOException {
         if (Files.exists(tempUploadDir)) {
             try (var stream = Files.walk(tempUploadDir)) {
-                stream.map(Path::toFile).forEach(File::delete);
+                stream.sorted(reverseOrder())
+                        .forEach(path -> {
+                            try {
+                                Files.delete(path);
+                            } catch (IOException ignored) {}
+                        });
             }
         }
     }
