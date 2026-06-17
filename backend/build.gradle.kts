@@ -34,7 +34,6 @@ dependencies {
     implementation("org.flywaydb:flyway-mysql")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
-    runtimeOnly("com.h2database:h2")
     runtimeOnly("com.mysql:mysql-connector-j")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
@@ -42,6 +41,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.batch:spring-batch-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:mysql")
     testCompileOnly("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")
@@ -49,4 +50,7 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // 운영과 동일한 타임존(Asia/Seoul)으로 고정. CI 호스트가 UTC여도
+    // LocalDateTime 기반 시간 로직이 DB 세션 타임존(+09:00)과 일관되게 동작한다.
+    systemProperty("user.timezone", "Asia/Seoul")
 }
