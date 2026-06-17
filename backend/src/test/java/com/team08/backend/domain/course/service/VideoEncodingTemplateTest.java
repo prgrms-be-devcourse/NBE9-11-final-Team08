@@ -42,7 +42,9 @@ class VideoEncodingTemplateTest {
         isCompleteCalled = false;
         shouldThrowInPrepare = false;
 
-        videoEncodingTemplate = new VideoEncodingTemplate() {
+        EncodingResultHandler mockHandler = (id, path, dir, desc, instId) -> isCompleteCalled = true;
+
+        videoEncodingTemplate = new VideoEncodingTemplate(mockHandler) {
             @Override
             protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
                 isPrepareCalled = true;
@@ -61,11 +63,6 @@ class VideoEncodingTemplateTest {
             protected String getDbSavePath(String targetDirName, Long lectureId) {
                 isDbPathCalled = true;
                 return "dummy/path";
-            }
-
-            @Override
-            protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId) {
-                isCompleteCalled = true;
             }
         };
 

@@ -1,7 +1,6 @@
 package com.team08.backend.domain.course.service;
 
 import com.team08.backend.global.exception.CustomException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +17,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
-import static java.util.Comparator.reverseOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
@@ -31,7 +29,7 @@ class LocalVideoEncodingServiceTest {
     private LocalVideoEncodingService localVideoEncodingService;
 
     @Mock
-    private LectureDbService lectureDbService;
+    private EncodingResultHandler encodingResultHandler;
 
     private Path tempUploadDir;
     private MockMultipartFile realMockMultipartFile;
@@ -52,20 +50,6 @@ class LocalVideoEncodingServiceTest {
         );
     }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        if (Files.exists(tempUploadDir)) {
-            try (var stream = Files.walk(tempUploadDir)) {
-                stream.sorted(reverseOrder())
-                        .forEach(path -> {
-                            try {
-                                Files.delete(path);
-                            } catch (IOException ignored) {}
-                        });
-            }
-        }
-    }
-
     @Test
     void 비디오_인코딩이_성공하면_HLS_파일_경로가_갱신된다() {
         Long lectureId = 1L;
@@ -74,7 +58,7 @@ class LocalVideoEncodingServiceTest {
 
         localVideoEncodingService.encodeToHls(realMockMultipartFile, targetDirName, lectureId);
 
-        verify(lectureDbService).updateLectureM3u8(lectureId, expectedDbPath, targetDirName);
+        verify(encodingResultHandler).handleSuccess(lectureId, expectedDbPath, targetDirName, null, null);
 
         Path targetWorkspace = tempUploadDir.resolve(targetDirName);
         assertThat(Files.exists(targetWorkspace.resolve("output.m3u8"))).isTrue();
@@ -112,6 +96,6 @@ class LocalVideoEncodingServiceTest {
         Path targetWorkspace = tempUploadDir.resolve(targetDirName);
         assertThat(Files.exists(targetWorkspace)).isFalse();
 
-        verifyNoInteractions(lectureDbService);
+        verifyNoInteractions(encodingResultHandler);
     }
 }
