@@ -76,7 +76,7 @@ public class PaymentService {
     }
 
     private void validateDuplicatePayment(Long orderId) {
-        if (paymentRepository.existsByOrderId(orderId)) {
+        if (paymentRepository.existsByOrder_Id(orderId)) {
             throw new CustomException(ErrorCode.ORDER_ALREADY_PAID);
         }
     }
@@ -95,14 +95,14 @@ public class PaymentService {
     }
 
     private Payment createSuccessfulMockPayment(Order order, LocalDateTime paidAt) {
-        Payment payment = Payment.createReady(order.getId(), order.getFinalPrice(), paidAt);
+        Payment payment = Payment.createReady(order, paidAt);
         payment.succeed(createMockPaymentKey(), MOCK_PAYMENT_METHOD, paidAt);
         return paymentRepository.save(payment);
     }
 
     private List<Enrollment> issueEnrollments(Long userId, Order order, List<OrderItem> orderItems, LocalDateTime enrolledAt) {
         List<Enrollment> enrollments = orderItems.stream()
-                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order.getId(), enrolledAt))
+                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order, enrolledAt))
                 .toList();
 
         return enrollmentRepository.saveAll(enrollments);

@@ -1,5 +1,6 @@
 package com.team08.backend.domain.payment.entity;
 
+import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
@@ -9,13 +10,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "payments")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false, unique = true)
-    private Long orderId;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false, unique = true)
+    private Order order;
     private String paymentKey;
     private String method;
     @Column(nullable = false)
@@ -30,13 +31,41 @@ public class Payment {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static Payment createReady(Long orderId, Integer amount, LocalDateTime requestedAt) {
+    private Payment(
+            Long id,
+            Order order,
+            String paymentKey,
+            String method,
+            Integer amount,
+            PaymentStatus status,
+            LocalDateTime paidAt,
+            String failedReason,
+            LocalDateTime canceledAt,
+            LocalDateTime refundedAt,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt
+    ) {
+        this.id = id;
+        this.order = order;
+        this.paymentKey = paymentKey;
+        this.method = method;
+        this.amount = amount;
+        this.status = status;
+        this.paidAt = paidAt;
+        this.failedReason = failedReason;
+        this.canceledAt = canceledAt;
+        this.refundedAt = refundedAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
+    public static Payment createReady(Order order, LocalDateTime requestedAt) {
         return new Payment(
                 null,
-                orderId,
+                order,
                 null,
                 null,
-                amount,
+                order.getFinalPrice(),
                 PaymentStatus.READY,
                 null,
                 null,

@@ -81,7 +81,7 @@ class PaymentServiceTest {
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
+        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
@@ -94,7 +94,7 @@ class PaymentServiceTest {
         verify(paymentRepository).save(paymentCaptor.capture());
 
         Payment payment = paymentCaptor.getValue();
-        assertThat(payment.getOrderId()).isEqualTo(ORDER_ID);
+        assertThat(payment.getOrder().getId()).isEqualTo(ORDER_ID);
         assertThat(payment.getAmount()).isEqualTo(30_000);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(payment.getPaymentKey()).startsWith("MOCK-");
@@ -120,7 +120,7 @@ class PaymentServiceTest {
                 .satisfies(enrollment -> {
                     assertThat(enrollment.getUserId()).isEqualTo(USER_ID);
                     assertThat(enrollment.getCourseId()).isEqualTo(COURSE_ID);
-                    assertThat(enrollment.getOrderId()).isEqualTo(ORDER_ID);
+                    assertThat(enrollment.getOrder().getId()).isEqualTo(ORDER_ID);
                     assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
                     assertThat(enrollment.getEnrolledAt()).isEqualTo(FIXED_NOW);
                     assertThat(enrollment.getCreatedAt()).isEqualTo(FIXED_NOW);
@@ -166,7 +166,7 @@ class PaymentServiceTest {
     void existingPaymentPreventsDuplicateConfirm() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(true);
+        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(true);
 
         assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -182,7 +182,7 @@ class PaymentServiceTest {
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
+        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(true);
@@ -204,7 +204,7 @@ class PaymentServiceTest {
         OrderItem secondItem = orderItem(2L, COURSE_ID + 1, 20_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrderId(ORDER_ID)).willReturn(false);
+        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
@@ -228,20 +228,8 @@ class PaymentServiceTest {
     private void stubPaymentSave() {
         given(paymentRepository.save(any(Payment.class))).willAnswer(invocation -> {
             Payment payment = invocation.getArgument(0);
-            return new Payment(
-                    PAYMENT_ID,
-                    payment.getOrderId(),
-                    payment.getPaymentKey(),
-                    payment.getMethod(),
-                    payment.getAmount(),
-                    payment.getStatus(),
-                    payment.getPaidAt(),
-                    payment.getFailedReason(),
-                    payment.getCanceledAt(),
-                    payment.getRefundedAt(),
-                    payment.getCreatedAt(),
-                    payment.getUpdatedAt()
-            );
+            ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+            return payment;
         });
     }
 
@@ -251,18 +239,8 @@ class PaymentServiceTest {
             List<Enrollment> savedEnrollments = new ArrayList<>();
             long id = 1L;
             for (Enrollment enrollment : enrollments) {
-                savedEnrollments.add(new Enrollment(
-                        id++,
-                        enrollment.getUserId(),
-                        enrollment.getCourseId(),
-                        enrollment.getOrderId(),
-                        enrollment.getStatus(),
-                        enrollment.getEnrolledAt(),
-                        enrollment.getCanceledAt(),
-                        enrollment.getExpiredAt(),
-                        enrollment.getCreatedAt(),
-                        enrollment.getUpdatedAt()
-                ));
+                ReflectionTestUtils.setField(enrollment, "id", id++);
+                savedEnrollments.add(enrollment);
             }
             return savedEnrollments;
         });
