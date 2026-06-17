@@ -19,6 +19,8 @@ import static java.util.Comparator.reverseOrder;
 @RequiredArgsConstructor
 public abstract class VideoEncodingTemplate {
 
+    private final EncodingResultHandler resultHandler;
+
     protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
         File sourceFile = prepareSourceFile(file, targetDirName, lectureId);
         Process process = null;
@@ -57,7 +59,7 @@ public abstract class VideoEncodingTemplate {
             handleGeneratedFiles(localWorkspacePath, targetDirName, lectureId);
 
             String dbSavePath = getDbSavePath(targetDirName, lectureId);
-            completePipeline(lectureId, dbSavePath, targetDirName, description, instructorId);
+            resultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, description, instructorId);
 
         } catch (Exception e) {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
@@ -91,6 +93,4 @@ public abstract class VideoEncodingTemplate {
     protected abstract void handleGeneratedFiles(Path workspacePath, String targetDirName, Long lectureId);
 
     protected abstract String getDbSavePath(String targetDirName, Long lectureId);
-
-    protected abstract void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId);
 }
