@@ -1,18 +1,12 @@
 package com.team08.backend.domain.course.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
-import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.S3FileStorageService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -25,22 +19,12 @@ import java.nio.file.Paths;
 @Profile("prod")
 public class S3VideoEncodingService extends VideoEncodingTemplate implements MediaEncodingService {
 
-    private final LectureDbService lectureDbService;
     private final S3FileStorageService s3FileStorageService;
-    private final LectureRepository lectureRepository;
-    private final LectureModificationRequestRepository requestRepository;
-    private final ApplicationEventPublisher eventPublisher;
 
-    public S3VideoEncodingService(LectureDbService lectureDbService,
-                                  S3FileStorageService s3FileStorageService,
-                                  LectureRepository lectureRepository,
-                                  LectureModificationRequestRepository requestRepository,
-                                  ApplicationEventPublisher eventPublisher) {
-        this.lectureDbService = lectureDbService;
+    public S3VideoEncodingService(EncodingResultHandler resultHandler,
+                                  S3FileStorageService s3FileStorageService) {
+        super(resultHandler);
         this.s3FileStorageService = s3FileStorageService;
-        this.lectureRepository = lectureRepository;
-        this.requestRepository = requestRepository;
-        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -106,28 +90,6 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
     @Override
     protected String getDbSavePath(String targetDirName, Long lectureId) {
         return "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";
-    }
-
-    @Override
-    @Transactional
-    public void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId) {
-        if (description == null) {
-            lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
-            return;
-        }
-
-        Lecture lecture = lectureRepository.findById(lectureId)
-                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
-
-        LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
-                lecture,
-                instructorId,
-                description,
-                dbSavePath
-        );
-        requestRepository.save(modificationRequest);
-
-        eventPublisher.publishEvent(new VideoRollbackEvent(lectureId, targetDirName));
     }
 
     public void deleteEncodedFolder(String targetDirName, Long lectureId) {
