@@ -70,13 +70,20 @@ public class CouponPolicyService {
             throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED);
         }
 
-        couponPolicyValidator.validate(request);
+        couponPolicyValidator.validateForUpdate(request, policy.getCouponType(), policy.getCouponTarget());
 
         policy.update(
-                request.name(), request.couponType(), request.discountType(), request.discountValue(),
-                request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
-                request.totalQuantity(), request.couponTarget(), request.isStackable(),
-                request.issueStartDate(), request.issueEndDate()
+                request.name(),
+                request.totalQuantity(),
+                request.usageType(),
+                request.isStackable(),
+                request.discountType(),
+                request.discountValue(),
+                request.maxDiscountAmount(),
+                request.minOrderAmount(),
+                request.validDays(),
+                request.issueStartDate(),
+                request.issueEndDate()
         );
 
         couponPolicyUpdater.updateTargets(policy, request.categoryIds(), request.courseIds());

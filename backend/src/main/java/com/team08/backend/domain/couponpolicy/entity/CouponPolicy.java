@@ -41,6 +41,23 @@ public class CouponPolicy extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    private CouponTarget couponTarget;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CouponType couponType;
+
+    private Integer totalQuantity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private CouponUsageType usageType;
+
+    @Column(nullable = false)
+    private Boolean isStackable = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private DiscountType discountType;
 
     @Column(nullable = false)
@@ -52,7 +69,9 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private Integer validDays;
 
-    private Integer totalQuantity;
+    private LocalDateTime issueStartDate;
+
+    private LocalDateTime issueEndDate;
 
     @OneToMany(mappedBy = "couponPolicy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CouponPolicyCategory> targetCategories = new ArrayList<>();
@@ -60,39 +79,20 @@ public class CouponPolicy extends BaseTimeEntity {
     @OneToMany(mappedBy = "couponPolicy", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CouponPolicyCourse> targetCourses = new ArrayList<>();
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CouponType couponType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CouponTarget couponTarget;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CouponUsageType usageType;
-
-    @Column(nullable = false)
-    private Boolean isStackable = false;
-
-    private LocalDateTime issueStartDate;
-
-    private LocalDateTime issueEndDate;
-
     private LocalDateTime deletedAt;
 
-    private CouponPolicy(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity, List<Long> categoryIds, List<Long> courseIds, CouponType couponType, CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+    private CouponPolicy(String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds) {
         this.name = name;
+        this.couponTarget = couponTarget;
+        this.couponType = couponType;
+        this.totalQuantity = totalQuantity;
+        this.usageType = usageType;
+        this.isStackable = isStackable != null ? isStackable : false;
         this.discountType = discountType;
         this.discountValue = discountValue;
         this.maxDiscountAmount = maxDiscountAmount;
         this.minOrderAmount = minOrderAmount;
         this.validDays = validDays;
-        this.totalQuantity = totalQuantity;
-        this.couponType = couponType;
-        this.couponTarget = couponTarget;
-        this.usageType = usageType;
-        this.isStackable = isStackable != null ? isStackable : false;
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
 
@@ -108,24 +108,6 @@ public class CouponPolicy extends BaseTimeEntity {
             }
         }
     }
-    // TODO 멘토링
-    /*
-    빌더 패턴이 하는 부분이 나중에 갔을 땐 필드값 추가마다 추가해야 됨
-    빌더 말고 별도의 객체로 만들어보면 좋다
-    여러가지의 정책들로 100개 여러가지 생성 정책
-    객체를 생성하는 여러가지 방법을 조건 기준마다 생성 규칙 표ㅕ준화 어디 필수 비필수 생성방법 검증
-    생성 방법이 빌더로 하면 너무 단편적이다
-    다양한 객체 생성 패턴을 익혀라
-    빌더 현업에서 잘 안 씀
-    인터페이스 두고 여러 생성방법 정의 내리기
-    쿠폰에 대한 서비스 == 컴퍼넌트
-    팩토리
-    빌더는 단순 (MVP만)
-    코틀린 생성자 역할이 클래스가 함
-    객체 생성에 대한 다양한 방식
-     */
-
-    // 대량 데이터 서버랑 동일하다
 
     // 연관관계 편의 메서드
     public void addTargetCourse(Long courseId) {
@@ -150,18 +132,12 @@ public class CouponPolicy extends BaseTimeEntity {
 
     // 쿠폰 정책 생성
     public static CouponPolicy createPolicy(
-            String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
-            Integer minOrderAmount, Integer validDays, Integer totalQuantity, List<Long> categoryIds,
-            List<Long> courseIds, CouponType couponType, CouponTarget couponTarget,
-            CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate
+            String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
     ) {
         return new CouponPolicy(
-                name, discountType, discountValue, maxDiscountAmount,
-                minOrderAmount, validDays, totalQuantity, categoryIds, courseIds,
-                couponType, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
+                name, couponTarget, couponType, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
         );
     }
-
 
     public LocalDateTime calculateExpirationDate(LocalDateTime now) {
         if (this.validDays == null) {
@@ -222,20 +198,16 @@ public class CouponPolicy extends BaseTimeEntity {
     }
 
     // 정책 핵심 정보 수정
-    public void update(String name, CouponType couponType, DiscountType discountType, Integer discountValue,
-                       Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity,
-                       CouponTarget couponTarget, Boolean isStackable,
-                       LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+    public void update(String name, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
-        this.couponType = couponType;
+        this.totalQuantity = totalQuantity;
+        this.usageType = usageType;
+        this.isStackable = isStackable != null ? isStackable : false;
         this.discountType = discountType;
         this.discountValue = discountValue;
         this.maxDiscountAmount = maxDiscountAmount;
         this.minOrderAmount = minOrderAmount;
         this.validDays = validDays;
-        this.totalQuantity = totalQuantity;
-        this.couponTarget = couponTarget;
-        this.isStackable = isStackable != null ? isStackable : false;
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
     }
@@ -250,4 +222,3 @@ public class CouponPolicy extends BaseTimeEntity {
         this.deletedAt = now;
     }
 }
-

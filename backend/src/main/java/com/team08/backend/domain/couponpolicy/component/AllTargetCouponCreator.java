@@ -32,20 +32,20 @@ public class AllTargetCouponCreator extends AbstractCouponPolicyCreator {
     protected CouponPolicy createEntity(CouponPolicyCreateRequest request) {
         return CouponPolicy.createPolicy(
                 request.name(),
+                request.couponTarget(),
+                request.couponType(),
+                request.totalQuantity(),
+                request.usageType(),
+                request.isStackable(),
                 request.discountType(),
                 request.discountValue(),
                 request.maxDiscountAmount(),
                 request.minOrderAmount(),
                 request.validDays(),
-                request.totalQuantity(),
-                request.categoryIds(),
-                request.courseIds(),
-                request.couponType(),
-                request.couponTarget(),
-                request.usageType(),
-                request.isStackable(),
                 request.issueStartDate(),
-                request.issueEndDate()
+                request.issueEndDate(),
+                request.categoryIds(),
+                request.courseIds()
         );
     }
 }
