@@ -7,7 +7,6 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,77 +19,102 @@ class CouponPolicyFactoryTest {
 
     private final CouponPolicyValidator validator = new CouponPolicyValidator();
     private final CouponPolicyFactory factory = new CouponPolicyFactory(List.of(
-            new FcfsCouponCreator(validator),
-            new NormalCouponCreator(validator)
+            new AllTargetCouponCreator(validator),
+            new CategoryTargetCouponCreator(validator),
+            new CourseTargetCouponCreator(validator)
     ));
 
     @Test
-    @DisplayName("성공: 선착순(FCFS) 쿠폰 요청 시 FcfsCouponCreator가 엔티티를 생성한다")
-    void create_fcfs_success() {
+    @DisplayName("성공: ALL 타겟 쿠폰 요청 시 AllTargetCouponCreator가 엔티티를 생성한다")
+    void create_all_target_success() {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
-                "선착순 쿠폰", DiscountType.AMOUNT, 5000, null, 20000, 30, 100,
-                null, null, CouponType.FCFS, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                true, null, null
+                "전체 쿠폰", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, null, null
         );
 
         // when
         CouponPolicy policy = factory.create(request);
 
         // then
-        assertThat(policy).isNotNull();
-        assertThat(policy.getCouponType()).isEqualTo(CouponType.FCFS);
-        assertThat(policy.getTotalQuantity()).isEqualTo(100);
+        assertThat(policy.getCouponTarget()).isEqualTo(CouponTarget.ALL);
+        assertThat(policy.getTargetCategories()).isEmpty();
+        assertThat(policy.getTargetCourses()).isEmpty();
     }
 
     @Test
-    @DisplayName("성공: 일반(NORMAL) 쿠폰 요청 시 NormalCouponCreator가 엔티티를 생성한다")
-    void create_normal_success() {
+    @DisplayName("성공: CATEGORY 타겟 쿠폰 요청 시 CategoryTargetCouponCreator가 엔티티를 생성한다")
+    void create_category_target_success() {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
-                "일반 쿠폰", DiscountType.PERCENT, 10, 10000, 0, 7, null,
-                null, null, CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                false, null, null
+                "카테고리 쿠폰", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, List.of(1L, 2L), null
         );
 
         // when
         CouponPolicy policy = factory.create(request);
 
         // then
-        assertThat(policy).isNotNull();
-        assertThat(policy.getCouponType()).isEqualTo(CouponType.NORMAL);
-        assertThat(policy.getTotalQuantity()).isNull();
+        assertThat(policy.getCouponTarget()).isEqualTo(CouponTarget.CATEGORY);
+        assertThat(policy.getTargetCategories()).hasSize(2);
     }
 
     @Test
-    @DisplayName("실패: 선착순 쿠폰인데 수량이 없으면 예외가 발생한다 (FcfsCouponCreator 검증)")
-    void create_fcfs_fail_no_quantity() {
+    @DisplayName("성공: COURSE 타겟 쿠폰 요청 시 CourseTargetCouponCreator가 엔티티를 생성한다")
+    void create_course_target_success() {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
-                "선착순 실패", DiscountType.AMOUNT, 1000, null, 0, 30, null,
-                null, null, CouponType.FCFS, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                false, null, null
+                "코스 쿠폰", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, null, List.of(10L, 20L)
+        );
+
+        // when
+        CouponPolicy policy = factory.create(request);
+
+        // then
+        assertThat(policy.getCouponTarget()).isEqualTo(CouponTarget.COURSE);
+        assertThat(policy.getTargetCourses()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("실패: ALL 타겟인데 카테고리나 코스가 포함되면 예외가 발생한다")
+    void create_all_target_fail_with_ids() {
+        // given
+        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+                "전체 실패", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, List.of(1L), null
         );
 
         // when & then
         assertThatThrownBy(() -> factory.create(request))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+                .isInstanceOf(CustomException.class);
     }
 
     @Test
-    @DisplayName("실패: 일반 쿠폰인데 수량이 설정되어 있으면 예외가 발생한다 (NormalCouponCreator 검증)")
-    void create_normal_fail_with_quantity() {
+    @DisplayName("실패: CATEGORY 타겟인데 카테고리 ID가 없으면 예외가 발생한다")
+    void create_category_target_fail_without_ids() {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
-                "일반 실패", DiscountType.AMOUNT, 1000, null, 0, 30, 100,
-                null, null, CouponType.NORMAL, CouponTarget.ALL, CouponUsageType.SINGLE_USE,
-                false, null, null
+                "카테고리 실패", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, null, null
         );
 
         // when & then
         assertThatThrownBy(() -> factory.create(request))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    @DisplayName("실패: COURSE 타겟인데 코스 ID가 없으면 예외가 발생한다")
+    void create_course_target_fail_without_ids() {
+        // given
+        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+                "코스 실패", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 20000, 30, null, null, null, null
+        );
+
+        // when & then
+        assertThatThrownBy(() -> factory.create(request))
+                .isInstanceOf(CustomException.class);
     }
 }
