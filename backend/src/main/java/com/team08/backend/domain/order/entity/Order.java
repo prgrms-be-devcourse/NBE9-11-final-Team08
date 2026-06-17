@@ -44,7 +44,7 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.PERSIST)
     private List<OrderItem> items = new ArrayList<>();
 
-    public Order(
+    private Order(
             Long id,
             Long userId,
             String orderNumber,

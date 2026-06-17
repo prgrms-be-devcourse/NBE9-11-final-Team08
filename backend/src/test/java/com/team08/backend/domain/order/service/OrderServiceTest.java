@@ -240,22 +240,12 @@ class OrderServiceTest {
 
     private Order order(Long orderId, Long userId, OrderStatus status) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new Order(
-                orderId,
-                userId,
-                "ORD-20260612100000-ABC12345",
-                30_000,
-                0,
-                30_000,
-                status,
-                now,
-                null,
-                null,
-                null,
-                null,
-                now,
-                null
-        );
+        Order order = Order.createPendingPayment(userId, "ORD-20260612100000-ABC12345", now);
+        ReflectionTestUtils.setField(order, "id", orderId);
+        ReflectionTestUtils.setField(order, "totalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "finalPrice", 30_000);
+        ReflectionTestUtils.setField(order, "status", status);
+        return order;
     }
 
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
