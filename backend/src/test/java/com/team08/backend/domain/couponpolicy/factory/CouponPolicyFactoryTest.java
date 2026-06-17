@@ -2,6 +2,7 @@ package com.team08.backend.domain.couponpolicy.factory;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.entity.*;
+import com.team08.backend.domain.couponpolicy.service.CouponPolicyValidator;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -14,9 +15,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CouponPolicyFactoryTest {
 
+    private final CouponPolicyValidator validator = new CouponPolicyValidator();
     private final CouponPolicyFactory factory = new CouponPolicyFactory(List.of(
-            new FcfsCouponCreator(),
-            new NormalCouponCreator()
+            new FcfsCouponCreator(validator),
+            new NormalCouponCreator(validator)
     ));
 
     @Test

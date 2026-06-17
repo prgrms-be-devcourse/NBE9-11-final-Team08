@@ -28,6 +28,7 @@ public class CouponPolicyService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final CouponPolicyFactory couponPolicyFactory;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final CouponPolicyValidator couponPolicyValidator;
     private final Clock clock;
 
     // 쿠폰 정책 생성
@@ -65,6 +66,8 @@ public class CouponPolicyService {
         if (issuedCount > 0) {
             throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED);
         }
+
+        couponPolicyValidator.validate(request);
 
         policy.update(
                 request.name(), request.discountType(), request.discountValue(),

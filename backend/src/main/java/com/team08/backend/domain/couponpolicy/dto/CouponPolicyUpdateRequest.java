@@ -21,5 +21,5 @@ public record CouponPolicyUpdateRequest(
         Boolean isStackable,
         LocalDateTime issueStartDate,
         LocalDateTime issueEndDate
-) {
+) implements CouponPolicyValidatable {
 }

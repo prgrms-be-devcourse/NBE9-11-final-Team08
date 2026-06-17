@@ -3,12 +3,17 @@ package com.team08.backend.domain.couponpolicy.factory;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.service.CouponPolicyValidator;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.springframework.stereotype.Component;
 
 @Component
 public class NormalCouponCreator extends AbstractCouponPolicyCreator {
+
+    public NormalCouponCreator(CouponPolicyValidator validator) {
+        super(validator);
+    }
 
     @Override
     public boolean supports(CouponPolicyCreateRequest request) {

@@ -46,6 +46,9 @@ class CouponPolicyServiceTest {
     private IssuedCouponRepository issuedCouponRepository;
 
     @Spy
+    private CouponPolicyValidator couponPolicyValidator = new CouponPolicyValidator();
+
+    @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-16T10:00:00Z"), ZoneId.systemDefault());
 
     @InjectMocks
