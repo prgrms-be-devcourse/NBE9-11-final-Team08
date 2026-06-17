@@ -8,6 +8,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.global.config.JpaConfig;
+import com.team08.backend.global.config.TimeConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import({JpaConfig.class, CouponPolicyRepositoryImpl.class})
+@Import({JpaConfig.class, TimeConfig.class, CouponPolicyRepositoryImpl.class})
 class CouponPolicyRepositoryTest {
 
     @Autowired

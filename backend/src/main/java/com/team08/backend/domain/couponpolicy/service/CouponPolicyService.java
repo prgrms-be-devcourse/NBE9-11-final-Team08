@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Service
@@ -27,6 +28,7 @@ public class CouponPolicyService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final CouponPolicyFactory couponPolicyFactory;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final Clock clock;
 
     // 관리자 쿠폰 정책 생성
     @Transactional
@@ -81,7 +83,7 @@ public class CouponPolicyService {
         CouponPolicy policy = couponPolicyRepository.findById(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        policy.terminate(LocalDateTime.now());
+        policy.terminate(LocalDateTime.now(clock));
     }
 
     // 관리자 쿠폰 정책 삭제
@@ -96,6 +98,6 @@ public class CouponPolicyService {
             throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE);
         }
 
-        policy.delete(LocalDateTime.now());
+        policy.delete(LocalDateTime.now(clock));
     }
 }

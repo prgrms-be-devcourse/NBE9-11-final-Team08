@@ -17,9 +17,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +44,9 @@ class CouponPolicyServiceTest {
 
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
+
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-06-16T10:00:00Z"), ZoneId.systemDefault());
 
     @InjectMocks
     private CouponPolicyService couponPolicyService;
@@ -145,7 +152,7 @@ class CouponPolicyServiceTest {
         couponPolicyService.terminateCouponPolicy(policyId);
 
         // then
-        assertThat(policy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now());
+        assertThat(policy.getIssueEndDate()).isBeforeOrEqualTo(LocalDateTime.now(clock));
     }
 
     @Test
@@ -180,6 +187,6 @@ class CouponPolicyServiceTest {
 
         // then
         assertThat(policy.getDeletedAt()).isNotNull();
+        assertThat(policy.getDeletedAt()).isBeforeOrEqualTo(LocalDateTime.now(clock));
     }
 }
-

@@ -14,6 +14,7 @@ import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -25,15 +26,17 @@ import static com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyC
 public class CouponPolicyRepositoryImpl implements CouponPolicyRepositoryCustom {
 
     private final JPAQueryFactory queryFactory;
+    private final Clock clock;
 
-    public CouponPolicyRepositoryImpl(EntityManager em) {
+    public CouponPolicyRepositoryImpl(EntityManager em, Clock clock) {
         this.queryFactory = new JPAQueryFactory(em);
+        this.clock = clock;
     }
 
-    // 관리자 쿠폰 정책 목록 조회 (필터링 및 페이징)
+    // 관리자 쿠폰 정책 목록 조회
     @Override
     public Page<CouponPolicy> findAllByCondition(CouponPolicySearchRequest condition, Pageable pageable) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         List<CouponPolicy> content = queryFactory
                 .selectFrom(couponPolicy)
@@ -59,7 +62,7 @@ public class CouponPolicyRepositoryImpl implements CouponPolicyRepositoryCustom 
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
-    // 쿠폰 정책 상세 조회 (N+1 방지를 위한 fetchJoin 적용)
+    // 쿠폰 정책 상세 조회
     @Override
     public Optional<CouponPolicy> findByIdWithDetails(Long id) {
         return Optional.ofNullable(queryFactory
