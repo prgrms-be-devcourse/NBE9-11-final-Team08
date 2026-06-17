@@ -19,11 +19,12 @@
  *
  * 실행 방법
  * ----------------------------------------------------------------------------
- * [A] 완전 자동 (Docker 필요, compose-dev 불필요)
- *   ./gradlew perfTest
- *     → jdbc:tc 가 MySQL 8.4 컨테이너를 띄우고, dev 프로필 + bulk 시드로
- *       데이터를 적재한 뒤, grafana/k6 컨테이너가 이 스크립트를 실행한다.
- *     → 진입점: src/test/java/com/team08/backend/perf/LearningEventPerfTest.java
+ * [A] 완전 자동 (Docker 필요, compose-dev / build.gradle 불필요)
+ *   cd src/test/k6
+ *   docker compose -f compose.perf.yml up --build \
+ *       --abort-on-container-exit --exit-code-from k6
+ *     → MySQL + 앱(dev 프로필 + bulk 시드) + k6 를 모두 컨테이너로 띄워 실행한다.
+ *     → 정리: docker compose -f compose.perf.yml down -v
  *
  * [B] 로컬 k6 바이너리로 직접 실행 (서버가 이미 떠 있을 때)
  *   BASE_URL=http://localhost:8080 \
