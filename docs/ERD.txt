@@ -284,6 +284,7 @@ Table coupon_policies {
   issue_end_date datetime
   created_at datetime [not null]
   updated_at datetime [not null]
+  deleted_at datetime
 }
 Table coupon_policy_courses {
   id bigint [pk, increment]
