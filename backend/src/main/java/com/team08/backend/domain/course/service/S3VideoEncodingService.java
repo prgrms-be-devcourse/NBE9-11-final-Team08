@@ -116,7 +116,7 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
             return;
         }
 
-        Lecture lecture = lectureRepository.findById(lectureId)
+        Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
