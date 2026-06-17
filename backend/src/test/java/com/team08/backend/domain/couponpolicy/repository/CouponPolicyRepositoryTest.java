@@ -8,7 +8,6 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.global.config.JpaConfig;
-import com.team08.backend.global.config.TimeConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
-@Import({JpaConfig.class, TimeConfig.class, CouponPolicyRepositoryCustomImpl.class})
+@Import({JpaConfig.class, CouponPolicyRepositoryCustomImpl.class})
 class CouponPolicyRepositoryTest {
 
     @Autowired
@@ -40,7 +39,7 @@ class CouponPolicyRepositoryTest {
         CouponPolicySearchRequest condition = new CouponPolicySearchRequest("할인", null, null);
 
         // when
-        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, PageRequest.of(0, 10));
+        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, LocalDateTime.now(), PageRequest.of(0, 10));
 
         // then
         assertThat(result.getContent()).hasSize(1);
@@ -59,7 +58,7 @@ class CouponPolicyRepositoryTest {
         CouponPolicySearchRequest condition = new CouponPolicySearchRequest(null, null, CouponStatus.ONGOING);
 
         // when
-        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, PageRequest.of(0, 10));
+        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, now, PageRequest.of(0, 10));
 
         // then
         assertThat(result.getContent()).hasSize(1);
@@ -76,7 +75,7 @@ class CouponPolicyRepositoryTest {
         CouponPolicySearchRequest condition = new CouponPolicySearchRequest(null, CouponType.FCFS, null);
 
         // when
-        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, PageRequest.of(0, 10));
+        Page<CouponPolicy> result = couponPolicyRepository.findAllByCondition(condition, LocalDateTime.now(), PageRequest.of(0, 10));
 
         // then
         assertThat(result.getContent()).hasSize(1);

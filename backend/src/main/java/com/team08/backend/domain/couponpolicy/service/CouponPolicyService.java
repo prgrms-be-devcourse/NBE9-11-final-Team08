@@ -42,7 +42,7 @@ public class CouponPolicyService {
     // 쿠폰 정책 목록 조회
     @Transactional(readOnly = true)
     public Page<CouponPolicyResponse> getCouponPolicies(CouponPolicySearchRequest condition, Pageable pageable) {
-        return couponPolicyRepository.findAllByCondition(condition, pageable)
+        return couponPolicyRepository.findAllByCondition(condition, LocalDateTime.now(clock), pageable)
                 .map(CouponPolicyResponse::from);
     }
 
