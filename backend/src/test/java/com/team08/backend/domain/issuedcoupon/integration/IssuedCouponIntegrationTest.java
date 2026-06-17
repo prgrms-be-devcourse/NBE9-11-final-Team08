@@ -1,6 +1,5 @@
 package com.team08.backend.domain.issuedcoupon.integration;
 
-import com.team08.backend.domain.couponpolicy.command.CouponPolicyCreateCommand;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -142,22 +141,16 @@ class IssuedCouponIntegrationTest {
     }
 
     private CouponPolicy savePolicy(String name, CouponType type) {
-        CouponPolicyCreateCommand command = new CouponPolicyCreateCommand(
-                name,
-                DiscountType.AMOUNT,
-                1000,
-                7,
-                100,
-                null,
-                type,
-                CouponTarget.ALL,
-                CouponUsageType.SINGLE_USE,
-                false,
-                null,
-                null
-        );
-        CouponPolicy policy = CouponPolicy.create(command);
-        return couponPolicyRepository.save(policy);
+        if (type == CouponType.FCFS) {
+            return couponPolicyRepository.save(CouponPolicy.createFcfsPolicy(
+                    name, DiscountType.AMOUNT, 1000, null, 0, 7, 100, null, null,
+                    CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+            ));
+        }
+        return couponPolicyRepository.save(CouponPolicy.createNormalPolicy(
+                name, DiscountType.AMOUNT, 1000, null, 0, 7, null, null,
+                CouponTarget.ALL, CouponUsageType.SINGLE_USE, false, null, null
+        ));
     }
 
     private User createUserInstance() {

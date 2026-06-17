@@ -7,6 +7,7 @@ import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
+import com.team08.backend.domain.couponpolicy.factory.CouponPolicyFactory;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,9 @@ class CouponPolicyServiceTest {
     @Mock
     private CouponPolicyRepository couponPolicyRepository;
 
+    @Mock
+    private CouponPolicyFactory couponPolicyFactory;
+
     @InjectMocks
     private CouponPolicyService couponPolicyService;
 
@@ -38,8 +42,11 @@ class CouponPolicyServiceTest {
                 "테스트 쿠폰",
                 DiscountType.AMOUNT,
                 1000,
+                null,
                 30,
                 100,
+                null,
+                null,
                 null,
                 CouponType.NORMAL,
                 CouponTarget.ALL,
@@ -49,6 +56,15 @@ class CouponPolicyServiceTest {
                 null
         );
 
+        CouponPolicy policy = CouponPolicy.createNormalPolicy(
+                request.name(), request.discountType(), request.discountValue(),
+                request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
+                request.categoryId(), request.courseIds(),
+                request.couponTarget(), request.usageType(),
+                request.isStackable(), request.issueStartDate(), request.issueEndDate()
+        );
+
+        when(couponPolicyFactory.create(request)).thenReturn(policy);
         when(couponPolicyRepository.save(any(CouponPolicy.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
@@ -57,6 +73,7 @@ class CouponPolicyServiceTest {
         // then
         assertThat(response).isNotNull();
         assertThat(response.name()).isEqualTo("테스트 쿠폰");
+        verify(couponPolicyFactory, times(1)).create(request);
         verify(couponPolicyRepository, times(1)).save(any(CouponPolicy.class));
     }
 }

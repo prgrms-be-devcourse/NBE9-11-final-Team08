@@ -272,7 +272,8 @@ Table coupon_policies {
   discount_type discount_type [not null]
   discount_value int [not null]
   max_discount_amount int
-  valid_days int [not null]
+  min_order_amount int
+  valid_days int
   total_quantity int
   category_id bigint
   coupon_type coupon_type [not null]
@@ -283,6 +284,14 @@ Table coupon_policies {
   issue_end_date datetime
   created_at datetime [not null]
   updated_at datetime [not null]
+}
+Table coupon_policy_courses {
+  id bigint [pk, increment]
+  coupon_policy_id bigint [not null]
+  course_id bigint [not null]
+  indexes {
+    (coupon_policy_id, course_id) [unique]
+  }
 }
 Table issued_coupons {
   id bigint [pk, increment]
@@ -445,6 +454,8 @@ Ref: carts.user_id > users.id
 Ref: cart_items.cart_id > carts.id
 Ref: cart_items.course_id > courses.id
 Ref: coupon_policies.category_id > categories.id
+Ref: coupon_policy_courses.coupon_policy_id > coupon_policies.id
+Ref: coupon_policy_courses.course_id > courses.id
 Ref: issued_coupons.policy_id > coupon_policies.id
 Ref: issued_coupons.user_id > users.id
 Ref: seller.user_id > users.id
