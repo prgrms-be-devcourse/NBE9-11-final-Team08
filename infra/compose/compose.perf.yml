@@ -1,0 +1,97 @@
+# ============================================================================
+# 부하 테스트 - 독립 실행 환경 (compose-dev / build.gradle 무관)
+# ----------------------------------------------------------------------------
+# 이 파일은 MySQL + 백엔드 앱(인프라)만 정의한다.
+# k6 스크립트 실행은 Makefile 이 제어한다 → 다른 k6 스크립트에도 재사용 가능.
+# (k6 서비스는 profile 로 분리되어 일반 up 에서는 뜨지 않는다.)
+#
+# 실행 (프로젝트 루트에서):
+#   make perf                          # 인프라 기동 + learning-event-perf.js 실행
+#   make perf PERF_SCRIPT=other.js     # 같은 디렉토리의 다른 스크립트 실행
+#   make perf-down                     # 정리
+# ============================================================================
+
+name: team08-perf
+
+services:
+  # --------------------------------------------------------------------------
+  # MySQL 8.4 (운영과 동일, KST)
+  # --------------------------------------------------------------------------
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-team08}
+      MYSQL_USER: ${DB_USERNAME:-team08}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-team08pw}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks: [perf]
+
+  # --------------------------------------------------------------------------
+  # 백엔드 앱 (dev 프로필 + bulk 시드)
+  #   - dev 프로필: flyway off + ddl-auto=update 로 스키마 자동 생성
+  #   - bulk 시드: admin/seller1/user1(비번 Test1234!) + 강의/챕터/강의영상 생성
+  #   - S3/AI 는 부하 테스트에서 쓰지 않으므로 더미값으로 컨텍스트만 통과시킨다
+  # --------------------------------------------------------------------------
+  app:
+    build:
+      context: ../../backend          # backend/ 루트 (이 파일 기준 src/test/k6 → ../../..)
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      APP_DATA_INIT_MODE: bulk
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-team08}
+      DB_USERNAME: ${DB_USERNAME:-team08}
+      DB_PASSWORD: ${DB_PASSWORD:-team08pw}
+      JWT_SECRET: ${JWT_SECRET:-perf-secret-key-that-is-at-least-32-characters-long}
+      IS_COOKIE_SECURE: "false"
+      SAME_SITE: Lax
+      # 업로드 디렉토리: 컨테이너는 비루트(spring) 유저라 /app 하위에 못 쓴다 → /tmp
+      LOCAL_UPLOAD_DIR: /tmp/videos-local
+      # 부하 테스트는 외부 연동을 호출하지 않음 → 더미값(컨텍스트 로딩용).
+      # region 은 AWS SDK 표준 env 로 줘야 한다(앱 yaml 의 cloud.aws.region.static 은
+      # spring-cloud-aws 3.x 의 prefix(spring.cloud.aws.*)와 달라 무시됨).
+      AWS_REGION: ap-northeast-2
+      AWS_ACCESS_KEY_ID: dummy
+      AWS_SECRET_ACCESS_KEY: dummy
+      AWS_S3_BUCKET_NAME: dummy-bucket
+      OPENAI_API_KEY: dummy
+      TZ: Asia/Seoul
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    networks: [perf]
+
+  # --------------------------------------------------------------------------
+  # k6 (스크립트 실행은 Makefile 이 제어)
+  #   make perf 가 `compose run --rm k6 run /scripts/<script>` 형태로 호출한다.
+  #   - profiles: 일반 up 에서는 뜨지 않음 (make 가 인프라만 먼저 띄움)
+  #   - volumes: 스크립트 디렉토리 전체를 마운트 → 다른 k6 스크립트도 재사용
+  # --------------------------------------------------------------------------
+  k6:
+    image: grafana/k6:0.49.0
+    profiles: ["k6"]
+    environment:
+      BASE_URL: http://app:8080
+    volumes:
+      - ../../backend/src/test/k6:/scripts:ro
+    networks: [perf]
+
+networks:
+  perf:
