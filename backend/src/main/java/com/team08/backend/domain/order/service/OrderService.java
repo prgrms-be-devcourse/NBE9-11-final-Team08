@@ -60,7 +60,7 @@ public class OrderService {
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
 
-        // MVP 정책상 장바구니 주문이 성공하면 재주문 방지를 위해 주문에 사용한 장바구니 항목을 비웁니다.
+        // Clear used cart items after order creation to prevent repeat orders from the same cart.
         cartItemRepository.deleteAllByCartId(cart.getId());
 
         return response;
@@ -102,29 +102,17 @@ public class OrderService {
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
         courses.forEach(course -> validateOrderableCourse(userId, course));
 
-        int totalPrice = courses.stream()
-                .mapToInt(Course::getPrice)
-                .sum();
-        int discountPrice = 0;
-        int finalPrice = totalPrice - discountPrice;
         LocalDateTime orderedAt = LocalDateTime.now();
-
-        // 이번 이슈는 결제 연동 전 단계이므로 주문은 결제 대기 상태까지만 생성합니다.
-        Order order = orderRepository.save(Order.createPendingPayment(
+        Order order = Order.createPendingPayment(
                 userId,
                 createOrderNumber(orderedAt),
-                totalPrice,
-                discountPrice,
-                finalPrice,
                 orderedAt
-        ));
+        );
 
-        List<OrderItem> orderItems = courses.stream()
-                .map(course -> toOrderItem(order.getId(), course, orderedAt))
-                .toList();
-        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
+        courses.forEach(course -> order.addItem(course.getId(), course.getTitle(), course.getPrice(), orderedAt));
+        Order savedOrder = orderRepository.save(order);
 
-        return OrderDetailResponse.from(order, savedItems);
+        return OrderDetailResponse.from(savedOrder, savedOrder.getItems());
     }
 
     private Map<Long, Course> findCourseMap(List<CartItem> cartItems) {
@@ -148,7 +136,7 @@ public class OrderService {
     }
 
     private void validateOrderableCourse(Long userId, Course course) {
-        // 장바구니에 담은 뒤 판매 상태가 바뀔 수 있으므로 주문 생성 직전에 Course 상태를 다시 검증합니다.
+        // Course status can change after cart insertion, so re-check it immediately before order creation.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
@@ -156,22 +144,6 @@ public class OrderService {
         if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, course.getId(), EnrollmentStatus.ACTIVE)) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
-    }
-
-    private OrderItem toOrderItem(Long orderId, Course course, LocalDateTime createdAt) {
-        int discountPrice = 0;
-        int finalPrice = course.getPrice() - discountPrice;
-
-        // 강의명과 가격은 이후 Course가 수정되어도 주문 내역이 변하지 않도록 주문 시점 값으로 저장합니다.
-        return OrderItem.createSnapshot(
-                orderId,
-                course.getId(),
-                course.getTitle(),
-                course.getPrice(),
-                discountPrice,
-                finalPrice,
-                createdAt
-        );
     }
 
     private String createOrderNumber(LocalDateTime orderedAt) {

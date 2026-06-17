@@ -1,19 +1,24 @@
 package com.team08.backend.domain.orderitem.entity;
 
+import com.team08.backend.domain.order.entity.Order;
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "order_items")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderItem {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(nullable = false)
-    private Long orderId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id", nullable = false)
+    private Order order;
+
+    // Course can change later, so order items store the purchase-time snapshot values.
     @Column(nullable = false)
     private Long courseId;
     @Column(nullable = false)
@@ -28,17 +33,17 @@ public class OrderItem {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static OrderItem createSnapshot(Long orderId, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
-        return new OrderItem(
-                null,
-                orderId,
-                courseId,
-                courseTitle,
-                price,
-                discountPrice,
-                finalPrice,
-                createdAt,
-                null
-        );
+    private OrderItem(Order order, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
+        this.order = order;
+        this.courseId = courseId;
+        this.courseTitle = courseTitle;
+        this.price = price;
+        this.discountPrice = discountPrice;
+        this.finalPrice = finalPrice;
+        this.createdAt = createdAt;
+    }
+
+    public static OrderItem createSnapshot(Order order, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
+        return new OrderItem(order, courseId, courseTitle, price, discountPrice, finalPrice, createdAt);
     }
 }

@@ -25,7 +25,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -83,7 +82,6 @@ class OrderServiceTest {
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID + 1, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         stubOrderSave();
-        stubOrderItemSaveAll();
 
         OrderDetailResponse response = orderService.createOrderFromCart(USER_ID);
 
@@ -157,7 +155,6 @@ class OrderServiceTest {
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         stubOrderSave();
-        stubOrderItemSaveAll();
 
         OrderDetailResponse response = orderService.createDirectOrder(USER_ID, COURSE_ID);
 
@@ -229,40 +226,12 @@ class OrderServiceTest {
     private void stubOrderSave() {
         given(orderRepository.save(any(Order.class))).willAnswer(invocation -> {
             Order order = invocation.getArgument(0);
-            return new Order(
-                    ORDER_ID,
-                    order.getUserId(),
-                    order.getOrderNumber(),
-                    order.getTotalPrice(),
-                    order.getDiscountPrice(),
-                    order.getFinalPrice(),
-                    order.getStatus(),
-                    order.getOrderedAt(),
-                    order.getPaidAt(),
-                    order.getCanceledAt(),
-                    order.getRefundedAt(),
-                    order.getExpiredAt(),
-                    order.getCreatedAt(),
-                    order.getUpdatedAt()
-            );
-        });
-    }
-
-    private void stubOrderItemSaveAll() {
-        given(orderItemRepository.saveAll(any())).willAnswer(invocation -> {
-            Iterable<OrderItem> items = invocation.getArgument(0);
-            List<OrderItem> savedItems = new ArrayList<>();
+            ReflectionTestUtils.setField(order, "id", ORDER_ID);
             long id = 1L;
-            for (OrderItem item : items) {
-                savedItems.add(orderItem(
-                        id++,
-                        item.getOrderId(),
-                        item.getCourseId(),
-                        item.getCourseTitle(),
-                        item.getPrice()
-                ));
+            for (OrderItem item : order.getItems()) {
+                ReflectionTestUtils.setField(item, "id", id++);
             }
-            return savedItems;
+            return order;
         });
     }
 
@@ -288,7 +257,10 @@ class OrderServiceTest {
 
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
-        return new OrderItem(orderItemId, orderId, courseId, courseTitle, price, 0, price, now, null);
+        Order order = order(orderId, USER_ID, OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, price, 0, price, now);
+        ReflectionTestUtils.setField(orderItem, "id", orderItemId);
+        return orderItem;
     }
 
     private Cart cart(Long cartId, Long userId) {
