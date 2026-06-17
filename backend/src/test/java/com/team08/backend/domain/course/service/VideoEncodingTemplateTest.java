@@ -30,6 +30,7 @@ class VideoEncodingTemplateTest {
     private boolean isPrepareCalled;
     private boolean isHandleCalled;
     private boolean isDbPathCalled;
+    private boolean isCompleteCalled;
     private boolean shouldThrowInPrepare;
 
     @BeforeEach
@@ -37,9 +38,10 @@ class VideoEncodingTemplateTest {
         isPrepareCalled = false;
         isHandleCalled = false;
         isDbPathCalled = false;
+        isCompleteCalled = false;
         shouldThrowInPrepare = false;
 
-        videoEncodingTemplate = new VideoEncodingTemplate(lectureDbService) {
+        videoEncodingTemplate = new VideoEncodingTemplate() {
             @Override
             protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
                 isPrepareCalled = true;
@@ -59,6 +61,11 @@ class VideoEncodingTemplateTest {
                 isDbPathCalled = true;
                 return "dummy/path";
             }
+
+            @Override
+            protected void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
+                isCompleteCalled = true;
+            }
         };
 
         mockMultipartFile = new MockMultipartFile(
@@ -74,7 +81,7 @@ class VideoEncodingTemplateTest {
     @Test
     void 파이프라인_실행_시_정해진_추상_메서드_생명주기가_순서대로_호출된다() {
         assertThrows(CustomException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
         );
 
         assertThat(isPrepareCalled).isTrue();
@@ -85,11 +92,12 @@ class VideoEncodingTemplateTest {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null)
         );
 
         assertThat(isHandleCalled).isFalse();
         assertThat(isDbPathCalled).isFalse();
+        assertThat(isCompleteCalled).isFalse();
         verifyNoInteractions(lectureDbService);
     }
 }

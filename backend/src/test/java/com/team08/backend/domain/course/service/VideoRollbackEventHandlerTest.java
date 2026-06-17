@@ -1,5 +1,7 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
 import com.team08.backend.global.util.S3FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -30,6 +33,15 @@ class VideoRollbackEventHandlerTest {
     @Mock
     private LectureDbService lectureDbService;
 
+    @Mock
+    private LectureRepository lectureRepository;
+
+    @Mock
+    private LectureModificationRequestRepository requestRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private S3VideoEncodingService s3VideoEncodingService;
     private LocalVideoEncodingService localVideoEncodingService;
 
@@ -39,9 +51,19 @@ class VideoRollbackEventHandlerTest {
 
     @BeforeEach
     void setUp() {
-        s3VideoEncodingService = spy(new S3VideoEncodingService(lectureDbService, s3FileStorageService));
+        s3VideoEncodingService = spy(new S3VideoEncodingService(
+                lectureDbService,
+                s3FileStorageService,
+                lectureRepository,
+                requestRepository,
+                eventPublisher
+        ));
 
-        LocalVideoEncodingService concreteLocalService = new LocalVideoEncodingService(lectureDbService);
+        LocalVideoEncodingService concreteLocalService = new LocalVideoEncodingService(
+                lectureDbService,
+                lectureRepository,
+                requestRepository
+        );
         ReflectionTestUtils.setField(concreteLocalService, "uploadDir", "src/test/resources/temp-upload");
         localVideoEncodingService = spy(concreteLocalService);
 
