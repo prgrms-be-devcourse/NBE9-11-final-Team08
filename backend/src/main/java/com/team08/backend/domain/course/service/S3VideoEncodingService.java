@@ -46,13 +46,13 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
     @Override
     @Async("videoEncodingExecutor")
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
-        executePipeline(file, targetDirName, lectureId, null);
+        executePipeline(file, targetDirName, lectureId, null, null);
     }
 
     @Override
     @Async("videoEncodingExecutor")
-    public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description) {
-        executePipeline(file, targetDirName, lectureId, description);
+    public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
+        executePipeline(file, targetDirName, lectureId, description, instructorId);
     }
 
     @Override
@@ -110,18 +110,18 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
 
     @Override
     @Transactional
-    public void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description) {
+    public void completePipeline(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId) {
         if (description == null) {
             lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
             return;
         }
 
-        Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
+        Lecture lecture = lectureRepository.findById(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
                 lecture,
-                lecture.getChapter().getCourse().getInstructorId(),
+                instructorId,
                 description,
                 dbSavePath
         );
