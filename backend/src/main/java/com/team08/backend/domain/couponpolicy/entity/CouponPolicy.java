@@ -148,31 +148,17 @@ public class CouponPolicy extends BaseTimeEntity {
         this.targetCategories.removeIf(tc -> tc.getCategoryId().equals(categoryId));
     }
 
-    // 선착순 쿠폰 생성
-    public static CouponPolicy createFcfsPolicy(
+    // 쿠폰 정책 생성
+    public static CouponPolicy createPolicy(
             String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
-            Integer minOrderAmount, Integer validDays, int totalQuantity, List<Long> categoryIds, List<Long> courseIds,
-            CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable,
-            LocalDateTime issueStartDate, LocalDateTime issueEndDate
+            Integer minOrderAmount, Integer validDays, Integer totalQuantity, List<Long> categoryIds,
+            List<Long> courseIds, CouponType couponType, CouponTarget couponTarget,
+            CouponUsageType usageType, Boolean isStackable, LocalDateTime issueStartDate, LocalDateTime issueEndDate
     ) {
         return new CouponPolicy(
                 name, discountType, discountValue, maxDiscountAmount,
                 minOrderAmount, validDays, totalQuantity, categoryIds, courseIds,
-                CouponType.FCFS, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
-        );
-    }
-
-    // 일반 쿠폰 생성
-    public static CouponPolicy createNormalPolicy(
-            String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
-            Integer minOrderAmount, Integer validDays, List<Long> categoryIds, List<Long> courseIds,
-            CouponTarget couponTarget, CouponUsageType usageType, Boolean isStackable,
-            LocalDateTime issueStartDate, LocalDateTime issueEndDate
-    ) {
-        return new CouponPolicy(
-                name, discountType, discountValue, maxDiscountAmount,
-                minOrderAmount, validDays, null, categoryIds, courseIds,
-                CouponType.NORMAL, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
+                couponType, couponTarget, usageType, isStackable, issueStartDate, issueEndDate
         );
     }
 
@@ -236,11 +222,12 @@ public class CouponPolicy extends BaseTimeEntity {
     }
 
     // 정책 핵심 정보 수정
-    public void update(String name, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount,
-                       Integer minOrderAmount, Integer validDays, Integer totalQuantity, List<Long> categoryIds,
-                       List<Long> courseIds, CouponTarget couponTarget, Boolean isStackable,
+    public void update(String name, CouponType couponType, DiscountType discountType, Integer discountValue,
+                       Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, Integer totalQuantity,
+                       CouponTarget couponTarget, Boolean isStackable,
                        LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
+        this.couponType = couponType;
         this.discountType = discountType;
         this.discountValue = discountValue;
         this.maxDiscountAmount = maxDiscountAmount;
@@ -251,58 +238,6 @@ public class CouponPolicy extends BaseTimeEntity {
         this.isStackable = isStackable != null ? isStackable : false;
         this.issueStartDate = issueStartDate;
         this.issueEndDate = issueEndDate;
-
-        // 카테고리 대상 업데이트
-        updateTargetCategories(categoryIds);
-
-        // 강좌 대상 업데이트
-        updateTargetCourses(courseIds);
-    }
-
-    private void updateTargetCategories(List<Long> categoryIds) {
-        if (categoryIds == null || categoryIds.isEmpty()) {
-            this.targetCategories.clear();
-            return;
-        }
-
-        List<Long> currentIds = this.targetCategories.stream()
-                .map(CouponPolicyCategory::getCategoryId)
-                .toList();
-
-        // 삭제할 항목: 기존에 있지만 요청에 없는 것
-        List<Long> toRemove = currentIds.stream()
-                .filter(id -> !categoryIds.contains(id))
-                .toList();
-        toRemove.forEach(this::removeTargetCategory);
-
-        // 추가할 항목: 요청에 있지만 기존에 없는 것
-        List<Long> toAdd = categoryIds.stream()
-                .filter(id -> !currentIds.contains(id))
-                .toList();
-        toAdd.forEach(this::addTargetCategory);
-    }
-
-    private void updateTargetCourses(List<Long> courseIds) {
-        if (courseIds == null || courseIds.isEmpty()) {
-            this.targetCourses.clear();
-            return;
-        }
-
-        List<Long> currentIds = this.targetCourses.stream()
-                .map(CouponPolicyCourse::getCourseId)
-                .toList();
-
-        // 삭제할 항목
-        List<Long> toRemove = currentIds.stream()
-                .filter(id -> !courseIds.contains(id))
-                .toList();
-        toRemove.forEach(this::removeTargetCourse);
-
-        // 추가할 항목
-        List<Long> toAdd = courseIds.stream()
-                .filter(id -> !currentIds.contains(id))
-                .toList();
-        toAdd.forEach(this::addTargetCourse);
     }
 
     // 쿠폰 정책 조기 종료

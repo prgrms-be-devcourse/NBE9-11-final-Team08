@@ -1,5 +1,6 @@
 package com.team08.backend.domain.couponpolicy.service;
 
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyValidator;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;

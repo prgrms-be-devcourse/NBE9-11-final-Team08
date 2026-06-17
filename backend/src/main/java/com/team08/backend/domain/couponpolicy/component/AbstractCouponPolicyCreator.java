@@ -1,8 +1,7 @@
-package com.team08.backend.domain.couponpolicy.factory;
+package com.team08.backend.domain.couponpolicy.component;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicy.service.CouponPolicyValidator;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor

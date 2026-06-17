@@ -1,5 +1,7 @@
 package com.team08.backend.domain.couponpolicy.service;
 
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyFactory;
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyValidator;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
@@ -8,7 +10,6 @@ import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
-import com.team08.backend.domain.couponpolicy.factory.CouponPolicyFactory;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;

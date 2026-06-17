@@ -1,5 +1,8 @@
 package com.team08.backend.domain.couponpolicy.service;
 
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyFactory;
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyUpdater;
+import com.team08.backend.domain.couponpolicy.component.CouponPolicyValidator;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyDetailResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
@@ -7,7 +10,6 @@ import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
-import com.team08.backend.domain.couponpolicy.factory.CouponPolicyFactory;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -29,6 +31,7 @@ public class CouponPolicyService {
     private final CouponPolicyFactory couponPolicyFactory;
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyValidator couponPolicyValidator;
+    private final CouponPolicyUpdater couponPolicyUpdater;
     private final Clock clock;
 
     // 쿠폰 정책 생성
@@ -70,12 +73,13 @@ public class CouponPolicyService {
         couponPolicyValidator.validate(request);
 
         policy.update(
-                request.name(), request.discountType(), request.discountValue(),
+                request.name(), request.couponType(), request.discountType(), request.discountValue(),
                 request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
-                request.totalQuantity(), request.categoryIds(), request.courseIds(),
-                request.couponTarget(), request.isStackable(),
+                request.totalQuantity(), request.couponTarget(), request.isStackable(),
                 request.issueStartDate(), request.issueEndDate()
         );
+
+        couponPolicyUpdater.updateTargets(policy, request.categoryIds(), request.courseIds());
 
         return CouponPolicyResponse.from(policy);
     }
