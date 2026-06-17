@@ -17,14 +17,16 @@ import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +46,7 @@ class OrderServiceTest {
     private static final Long CART_ID = 10L;
     private static final Long ORDER_ID = 100L;
     private static final Long COURSE_ID = 1000L;
+    private static final LocalDateTime FIXED_NOW = LocalDateTime.parse("2026-06-17T12:00:00");
 
     @Mock
     private OrderRepository orderRepository;
@@ -63,8 +66,24 @@ class OrderServiceTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
-    @InjectMocks
     private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        Clock fixedClock = Clock.fixed(
+                FIXED_NOW.atZone(ZoneId.systemDefault()).toInstant(),
+                ZoneId.systemDefault()
+        );
+        orderService = new OrderService(
+                orderRepository,
+                orderItemRepository,
+                cartRepository,
+                cartItemRepository,
+                courseRepository,
+                enrollmentRepository,
+                fixedClock
+        );
+    }
 
     @Test
     void cartOrderCanBeCreated() {
@@ -90,6 +109,7 @@ class OrderServiceTest {
         assertThat(response.discountPrice()).isZero();
         assertThat(response.finalPrice()).isEqualTo(50_000);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.orderedAt()).isEqualTo(FIXED_NOW);
         assertThat(response.items()).hasSize(2);
         assertThat(response.items()).extracting("courseTitle").containsExactly("Spring", "JPA");
         assertThat(response.items()).extracting("price").containsExactly(30_000, 20_000);
@@ -162,6 +182,7 @@ class OrderServiceTest {
         assertThat(response.totalPrice()).isEqualTo(30_000);
         assertThat(response.finalPrice()).isEqualTo(30_000);
         assertThat(response.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.orderedAt()).isEqualTo(FIXED_NOW);
         assertThat(response.items()).singleElement()
                 .satisfies(item -> {
                     assertThat(item.courseId()).isEqualTo(COURSE_ID);
@@ -207,7 +228,7 @@ class OrderServiceTest {
         OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
 
         assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
-        assertThat(response.canceledAt()).isNotNull();
+        assertThat(response.canceledAt()).isEqualTo(FIXED_NOW);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
     }
 

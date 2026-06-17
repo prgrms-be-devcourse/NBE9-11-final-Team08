@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class OrderService {
     private final CartItemRepository cartItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final Clock clock;
 
     @Transactional
     public OrderDetailResponse createOrderFromCart(Long userId) {
@@ -93,7 +95,7 @@ public class OrderService {
     public OrderDetailResponse cancelMyOrder(Long userId, Long orderId) {
         Order order = findMyOrder(userId, orderId);
 
-        order.cancel(LocalDateTime.now());
+        order.cancel(LocalDateTime.now(clock));
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         return OrderDetailResponse.from(order, orderItems);
@@ -102,7 +104,7 @@ public class OrderService {
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
         courses.forEach(course -> validateOrderableCourse(userId, course));
 
-        LocalDateTime orderedAt = LocalDateTime.now();
+        LocalDateTime orderedAt = LocalDateTime.now(clock);
         Order order = Order.createPendingPayment(
                 userId,
                 createOrderNumber(orderedAt),
