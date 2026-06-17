@@ -1,17 +1,14 @@
 # ============================================================================
-# 학습 이벤트 API 부하 테스트 - 독립 실행 환경
+# 부하 테스트 - 독립 실행 환경 (compose-dev / build.gradle 무관)
 # ----------------------------------------------------------------------------
-# compose-dev / build.gradle 을 건드리지 않고, 이 파일 하나로
-# MySQL + 백엔드 앱 + k6 를 모두 컨테이너로 띄워 learning-event-perf.js 를 돌린다.
+# 이 파일은 MySQL + 백엔드 앱(인프라)만 정의한다.
+# k6 스크립트 실행은 Makefile 이 제어한다 → 다른 k6 스크립트에도 재사용 가능.
+# (k6 서비스는 profile 로 분리되어 일반 up 에서는 뜨지 않는다.)
 #
-# 실행 (이 디렉토리에서):
-#   docker compose -f compose.perf.yml up --build \
-#       --abort-on-container-exit --exit-code-from k6
-#     → k6 가 끝나면 전체 종료되고, k6 의 종료코드가 그대로 반환된다
-#       (threshold 미달 시 != 0).
-#
-# 정리:
-#   docker compose -f compose.perf.yml down -v
+# 실행 (프로젝트 루트에서):
+#   make perf                          # 인프라 기동 + learning-event-perf.js 실행
+#   make perf PERF_SCRIPT=other.js     # 같은 디렉토리의 다른 스크립트 실행
+#   make perf-down                     # 정리
 # ============================================================================
 
 name: team08-perf
@@ -47,7 +44,7 @@ services:
   # --------------------------------------------------------------------------
   app:
     build:
-      context: ../../..          # backend/ 루트 (이 파일 기준 src/test/k6 → ../../..)
+      context: ../../backend          # backend/ 루트 (이 파일 기준 src/test/k6 → ../../..)
     environment:
       SPRING_PROFILES_ACTIVE: dev
       APP_DATA_INIT_MODE: bulk
@@ -82,18 +79,18 @@ services:
     networks: [perf]
 
   # --------------------------------------------------------------------------
-  # k6 (앱이 healthy 된 뒤 부하 인가)
+  # k6 (스크립트 실행은 Makefile 이 제어)
+  #   make perf 가 `compose run --rm k6 run /scripts/<script>` 형태로 호출한다.
+  #   - profiles: 일반 up 에서는 뜨지 않음 (make 가 인프라만 먼저 띄움)
+  #   - volumes: 스크립트 디렉토리 전체를 마운트 → 다른 k6 스크립트도 재사용
   # --------------------------------------------------------------------------
   k6:
     image: grafana/k6:0.49.0
-    depends_on:
-      app:
-        condition: service_healthy
+    profiles: ["k6"]
     environment:
       BASE_URL: http://app:8080
     volumes:
-      - ./learning-event-perf.js:/scripts/perf.js:ro
-    command: ["run", "/scripts/perf.js"]
+      - ../../backend/src/test/k6:/scripts:ro
     networks: [perf]
 
 networks:

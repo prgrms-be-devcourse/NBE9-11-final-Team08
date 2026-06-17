@@ -12,9 +12,10 @@ BASE        := -f compose.yaml
 DEV         := $(BASE) -f compose.dev.yaml
 PROD        := $(BASE) -f compose.prod.yaml
 
-# 부하 테스트(k6) - 독립 compose (compose-dev 와 무관, 자체 MySQL+앱+k6)
-PERF_DIR     := backend/src/test/k6
+# 부하 테스트(k6) - 독립 compose (compose-dev 와 무관, 자체 MySQL+앱)
+PERF_DIR     := infra/compose
 PERF_DC      := docker compose -f compose.perf.yml
+PERF_SCRIPT  ?= learning-event-perf.js   # make perf PERF_SCRIPT=other.js 로 교체 가능
 
 # 모든 compose 명령은 infra/compose 디렉토리에서 실행
 define run
@@ -27,7 +28,7 @@ define run-perf
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down dev-logs db-reset edge edge-down prod prod-pull prod-down prod-logs ps down-all perf-build perf perf-down perf-logs
+.PHONY: help dev dev-down dev-logs db-reset edge edge-down prod prod-pull prod-down prod-logs ps down-all perf perf-down perf-logs
 
 ## ─────────────── 개발 (DB만) ───────────────
 
@@ -49,20 +50,17 @@ db-reset: ## [개발] DB 완전 초기화 (볼륨 삭제 후 재기동) ⚠️ �
 
 ## ─────────────── 부하 테스트 (k6) ───────────────
 
-perf-build: ## [부하] 앱 이미지 빌드 (실행 전 1회, 코드 변경 시 다시)
-	$(call run-perf,build)
-	@echo "✅ 빌드 완료. 실행: make perf"
-
-perf: ## [부하] 부하 테스트 실행 (사전 빌드 필요: make perf-build)
-	$(call run-perf,up --abort-on-container-exit --exit-code-from k6)
+perf: ## [부하] 인프라(MySQL+앱) 기동 후 k6 스크립트 실행 (PERF_SCRIPT 로 교체 가능)
+	$(call run-perf,up -d --build --wait app)
+	$(call run-perf,run --rm k6 run /scripts/$(PERF_SCRIPT))
 	@echo "ℹ️  정리하려면: make perf-down"
 
 perf-down: ## [부하] 부하 테스트 컨테이너/볼륨 정리
-	$(call run-perf,down -v)
+	$(call run-perf,--profile k6 down -v)
 	@echo "✅ 부하 테스트 환경 정리 완료."
 
-perf-logs: ## [부하] k6 로그 실시간 보기
-	$(call run-perf,logs -f k6)
+perf-logs: ## [부하] 앱 로그 실시간 보기
+	$(call run-perf,logs -f app)
 
 
 # 이후 flyway 자세한 설정 issue에서 MAKEFILE을 하나의 PR로 제대로 다룰 예정
