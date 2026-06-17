@@ -198,34 +198,17 @@ class OrderPaymentStateTransitionTest {
     }
 
     private Payment payment(PaymentStatus status, String failedReason) {
-        return new Payment(
-                1L,
-                1L,
-                null,
-                null,
-                10_000,
-                status,
-                null,
-                failedReason,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Payment payment = Payment.createReady(order(OrderStatus.PENDING_PAYMENT), CREATED_AT);
+        ReflectionTestUtils.setField(payment, "id", 1L);
+        ReflectionTestUtils.setField(payment, "status", status);
+        ReflectionTestUtils.setField(payment, "failedReason", failedReason);
+        return payment;
     }
 
     private Enrollment enrollment(EnrollmentStatus status) {
-        return new Enrollment(
-                1L,
-                1L,
-                1L,
-                1L,
-                status,
-                CREATED_AT,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Enrollment enrollment = Enrollment.createActive(1L, 1L, order(OrderStatus.PAID), CREATED_AT);
+        ReflectionTestUtils.setField(enrollment, "id", 1L);
+        ReflectionTestUtils.setField(enrollment, "status", status);
+        return enrollment;
     }
 }

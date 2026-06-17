@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -31,31 +32,37 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final Clock clock;
 
     @Transactional
     public ConfirmPaymentResponse confirmPayment(Long userId, Long orderId) {
-        Order order = orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+        Order order = findPaymentOrder(userId, orderId);
 
+        // 주문 상태와 Payment 존재 여부를 함께 확인해 중복 결제를 방어한다.
         validatePaymentOrder(order);
         validateDuplicatePayment(orderId);
 
-        List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        List<OrderItem> orderItems = findOrderItems(order);
         validateDuplicateEnrollment(userId, orderItems);
 
-        LocalDateTime paidAt = LocalDateTime.now();
-        Payment payment = Payment.createReady(order.getId(), order.getFinalPrice(), paidAt);
-        payment.succeed(createMockPaymentKey(), MOCK_PAYMENT_METHOD, paidAt);
-        Payment savedPayment = paymentRepository.save(payment);
+        LocalDateTime paidAt = LocalDateTime.now(clock);
+        Payment savedPayment = createSuccessfulMockPayment(order, paidAt);
 
         order.markPaid(paidAt);
 
-        List<Enrollment> enrollments = orderItems.stream()
-                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order.getId(), paidAt))
-                .toList();
-        List<Enrollment> savedEnrollments = enrollmentRepository.saveAll(enrollments);
+        // 결제 완료 시점과 수강권 발급 시점을 동일하게 맞춘다.
+        List<Enrollment> savedEnrollments = issueEnrollments(userId, order, orderItems, paidAt);
 
         return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
+    }
+
+    private Order findPaymentOrder(Long userId, Long orderId) {
+        return orderRepository.findByIdAndUserId(orderId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private List<OrderItem> findOrderItems(Order order) {
+        return orderItemRepository.findAllByOrderId(order.getId());
     }
 
     private void validatePaymentOrder(Order order) {
@@ -69,7 +76,7 @@ public class PaymentService {
     }
 
     private void validateDuplicatePayment(Long orderId) {
-        if (paymentRepository.existsByOrderId(orderId)) {
+        if (paymentRepository.existsByOrder_Id(orderId)) {
             throw new CustomException(ErrorCode.ORDER_ALREADY_PAID);
         }
     }
@@ -85,6 +92,20 @@ public class PaymentService {
         if (hasActiveEnrollment) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
+    }
+
+    private Payment createSuccessfulMockPayment(Order order, LocalDateTime paidAt) {
+        Payment payment = Payment.createReady(order, paidAt);
+        payment.succeed(createMockPaymentKey(), MOCK_PAYMENT_METHOD, paidAt);
+        return paymentRepository.save(payment);
+    }
+
+    private List<Enrollment> issueEnrollments(Long userId, Order order, List<OrderItem> orderItems, LocalDateTime enrolledAt) {
+        List<Enrollment> enrollments = orderItems.stream()
+                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order, enrolledAt))
+                .toList();
+
+        return enrollmentRepository.saveAll(enrollments);
     }
 
     private String createMockPaymentKey() {
