@@ -20,15 +20,9 @@ public class LectureModificationRequestController {
             @RequestPart("request") @Valid LectureModificationRequestCreateDto requestDto,
             @RequestPart("video") MultipartFile videoFile
     ) {
-        // TODO: SecurityContext 또는 커스텀 애노테이션에서 실제 로그인한 강사 ID 추출 필요
         Long instructorId = 1L;
 
-        modificationService.createRequest(
-                requestDto.getLectureId(),
-                instructorId,
-                requestDto.getDescription(),
-                videoFile
-        );
+        modificationService.createRequest(requestDto, instructorId, videoFile);
 
         return ResponseEntity.ok().build();
     }

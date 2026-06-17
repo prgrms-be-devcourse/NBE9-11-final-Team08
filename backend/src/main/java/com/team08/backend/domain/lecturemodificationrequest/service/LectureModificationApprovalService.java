@@ -34,7 +34,7 @@ public class LectureModificationApprovalService {
 
     @Transactional
     public void rejectRequest(Long requestId, Long adminId, LectureModificationApprovalRequest approvalRequest) {
-        if (approvalRequest.getRejectedReason() == null || approvalRequest.getRejectedReason().isBlank()) {
+        if (approvalRequest.rejectedReason() == null || approvalRequest.rejectedReason().isBlank()) {
             throw new CustomException(ErrorCode.REJECT_REASON_REQUIRED);
         }
 
@@ -45,6 +45,6 @@ public class LectureModificationApprovalService {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        request.reject(approvalRequest.getRejectedReason(), adminId);
+        request.reject(approvalRequest.rejectedReason(), adminId);
     }
 }
