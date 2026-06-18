@@ -15,7 +15,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,20 +39,21 @@ public class CurriculumService {
         List<Chapter> dbChapters = chapterRepository.findByCourseIdOrderByOrderNo(courseId);
         curriculumValidator.validateSize(dbChapters.size(), request.reorders().size());
 
-        Set<Long> dbIds = dbChapters.stream().map(Chapter::getId).collect(Collectors.toSet());
+        Map<Long, Chapter> chapterMap = dbChapters.stream()
+                .collect(Collectors.toMap(Chapter::getId, Function.identity()));
+
         Set<Long> requestIds = request.reorders().stream()
                 .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
                 .collect(Collectors.toSet());
-        curriculumValidator.validateIds(dbIds, requestIds);
+        curriculumValidator.validateIds(chapterMap.keySet(), requestIds);
 
-        List<Integer> sortedOrders = request.reorders().stream()
+        curriculumValidator.validateOrderSequence(request.reorders().stream()
                 .map(ChapterReorderRequest.ChapterOrderElement::orderNo)
                 .sorted()
-                .toList();
-        curriculumValidator.validateOrderSequence(sortedOrders);
+                .toList());
 
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
-            chapterRepository.updateOrderNo(element.chapterId(), element.orderNo(), courseId);
+            chapterMap.get(element.chapterId()).updateOrderNo(element.orderNo());
         }
     }
 
@@ -63,20 +66,21 @@ public class CurriculumService {
         List<Lecture> dbLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId);
         curriculumValidator.validateSize(dbLectures.size(), request.reorders().size());
 
-        Set<Long> dbIds = dbLectures.stream().map(Lecture::getId).collect(Collectors.toSet());
+        Map<Long, Lecture> lectureMap = dbLectures.stream()
+                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
+
         Set<Long> requestIds = request.reorders().stream()
                 .map(LectureReorderRequest.LectureOrderElement::lectureId)
                 .collect(Collectors.toSet());
-        curriculumValidator.validateIds(dbIds, requestIds);
+        curriculumValidator.validateIds(lectureMap.keySet(), requestIds);
 
-        List<Integer> sortedOrders = request.reorders().stream()
+        curriculumValidator.validateOrderSequence(request.reorders().stream()
                 .map(LectureReorderRequest.LectureOrderElement::orderNo)
                 .sorted()
-                .toList();
-        curriculumValidator.validateOrderSequence(sortedOrders);
+                .toList());
 
         for (LectureReorderRequest.LectureOrderElement element : request.reorders()) {
-            lectureRepository.updateOrderNo(element.lectureId(), element.orderNo(), chapterId);
+            lectureMap.get(element.lectureId()).updateOrderNo(element.orderNo());
         }
     }
 }

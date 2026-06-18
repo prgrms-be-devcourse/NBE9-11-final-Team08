@@ -60,7 +60,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderChapters(courseId, instructorId, request);
 
-        verify(chapterRepository).updateOrderNo(10L, 1, courseId);
+        verify(chapter).updateOrderNo(1);
     }
 
     @Test
@@ -164,7 +164,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderLectures(chapterId, instructorId, request);
 
-        verify(lectureRepository).updateOrderNo(100L, 1, chapterId);
+        verify(lecture).updateOrderNo(1);
     }
 
     @Test
