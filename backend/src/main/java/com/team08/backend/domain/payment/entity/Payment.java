@@ -87,7 +87,13 @@ public class Payment {
     }
 
     public void fail(String failedReason, LocalDateTime failedAt) {
+        fail(null, null, failedReason, failedAt);
+    }
+
+    public void fail(String paymentKey, String method, String failedReason, LocalDateTime failedAt) {
         validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
+        this.paymentKey = paymentKey;
+        this.method = method;
         this.status = PaymentStatus.FAILED;
         this.failedReason = failedReason;
         this.updatedAt = failedAt;
