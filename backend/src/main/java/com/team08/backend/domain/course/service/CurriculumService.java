@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -33,86 +35,74 @@ public class CurriculumService {
     public void reorderChapters(Long courseId, Long instructorId, ChapterReorderRequest request) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-
         course.validateOwner(instructorId);
 
         List<Chapter> dbChapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
+        validateSize(dbChapters.size(), request.reorders().size());
 
-        if (dbChapters.size() != request.reorders().size()) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-        }
+        Map<Long, Chapter> chapterMap = dbChapters.stream()
+                .collect(Collectors.toMap(Chapter::getId, Function.identity()));
 
-        Set<Long> dbChapterIds = dbChapters.stream()
-                .map(Chapter::getId)
-                .collect(Collectors.toSet());
-
-        Set<Long> requestIds = request.reorders().stream()
-                .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
-                .collect(Collectors.toSet());
-
-        if (!dbChapterIds.equals(requestIds)) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-        }
+        validateIds(chapterMap.keySet(), request.reorders().stream().map(ChapterReorderRequest.ChapterOrderElement::chapterId).collect(Collectors.toSet()));
 
         List<Integer> sortedOrders = request.reorders().stream()
                 .map(ChapterReorderRequest.ChapterOrderElement::orderNo)
                 .sorted()
                 .toList();
-
         validateOrderSequence(sortedOrders);
 
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
-            chapterRepository.updateOrderNo(element.chapterId(), element.orderNo(), courseId);
+            chapterMap.get(element.chapterId()).updateOrderNo(element.orderNo());
         }
     }
 
     @Transactional
     public void reorderLectures(Long chapterId, Long instructorId, LectureReorderRequest request) {
         Chapter chapter = chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-
+                .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
         chapter.getCourse().validateOwner(instructorId);
 
         List<Lecture> dbLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId);
+        validateSize(dbLectures.size(), request.reorders().size());
 
-        if (dbLectures.size() != request.reorders().size()) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-        }
+        Map<Long, Lecture> lectureMap = dbLectures.stream()
+                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
 
-        Set<Long> dbLectureIds = dbLectures.stream()
-                .map(Lecture::getId)
-                .collect(Collectors.toSet());
-
-        Set<Long> requestIds = request.reorders().stream()
-                .map(LectureReorderRequest.LectureOrderElement::lectureId)
-                .collect(Collectors.toSet());
-
-        if (!dbLectureIds.equals(requestIds)) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-        }
+        validateIds(lectureMap.keySet(), request.reorders().stream().map(LectureReorderRequest.LectureOrderElement::lectureId).collect(Collectors.toSet()));
 
         List<Integer> sortedOrders = request.reorders().stream()
                 .map(LectureReorderRequest.LectureOrderElement::orderNo)
                 .sorted()
                 .toList();
-
         validateOrderSequence(sortedOrders);
 
         for (LectureReorderRequest.LectureOrderElement element : request.reorders()) {
-            lectureRepository.updateOrderNo(element.lectureId(), element.orderNo(), chapterId);
+            lectureMap.get(element.lectureId()).updateOrderNo(element.orderNo());
+        }
+    }
+
+    private void validateSize(int dbSize, int requestSize) {
+        if (dbSize != requestSize) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
+        }
+    }
+
+    private void validateIds(Set<Long> dbIds, Set<Long> requestIds) {
+        if (!dbIds.equals(requestIds)) {
+            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
         }
     }
 
     private void validateOrderSequence(List<Integer> sortedOrders) {
         if (new HashSet<>(sortedOrders).size() != sortedOrders.size()) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
         }
 
         boolean isInvalid = IntStream.range(0, sortedOrders.size())
                 .anyMatch(i -> sortedOrders.get(i) != i + 1);
 
         if (isInvalid) {
-            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
         }
     }
 }

@@ -101,4 +101,8 @@ public class Chapter extends BaseTimeEntity {
             }
         }
     }
+
+    public void updateOrderNo(int orderNo) {
+        this.orderNo = orderNo;
+    }
 }

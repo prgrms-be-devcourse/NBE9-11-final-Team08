@@ -81,4 +81,8 @@ public class Lecture extends BaseTimeEntity {
     public void updateM3u8Path(String m3u8Path) {
         this.m3u8Path = m3u8Path;
     }
+
+    public void updateOrderNo(int orderNo) {
+        this.orderNo = orderNo;
+    }
 }

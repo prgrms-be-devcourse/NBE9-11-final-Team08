@@ -22,8 +22,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -58,7 +57,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderChapters(courseId, instructorId, request);
 
-        verify(chapterRepository).updateOrderNo(10L, 1, courseId);
+        verify(chapter).updateOrderNo(1);
     }
 
     @Test
@@ -136,7 +135,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderLectures(chapterId, instructorId, request);
 
-        verify(lectureRepository).updateOrderNo(100L, 1, chapterId);
+        verify(lecture).updateOrderNo(1);
     }
 
     @Test
