@@ -39,17 +39,20 @@ class VideoAccessServiceTest {
     private CloudFrontCookieSigner cloudFrontCookieSigner;
 
     @Test
-    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_배열을_반환한다() {
+    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_배열과_경로를_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
+        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
         Lecture lecture = mock(Lecture.class);
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(true);
 
-        ResponseCookie[] result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
+        VideoAccessService.VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
-        assertThat(result).isEmpty();
+        assertThat(result.path()).isEqualTo(m3u8Path);
+        assertThat(result.cookies()).isEmpty();
         verifyNoInteractions(enrollmentRepository);
         verifyNoInteractions(cloudFrontCookieSigner);
     }
@@ -59,12 +62,14 @@ class VideoAccessServiceTest {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
+        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
 
         Lecture lecture = mock(Lecture.class);
         Chapter chapter = mock(Chapter.class);
         Course course = mock(Course.class);
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(false);
         given(lecture.getChapter()).willReturn(chapter);
         given(chapter.getCourse()).willReturn(course);
@@ -81,7 +86,7 @@ class VideoAccessServiceTest {
     }
 
     @Test
-    void 유효한_수강생이면_Signed_Cookie_배열을_생성하여_반환한다() {
+    void 유효한_수강생이면_Signed_Cookie_배열과_경로를_DTO로_묶어_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
@@ -109,23 +114,10 @@ class VideoAccessServiceTest {
         given(cloudFrontCookieSigner.createSignedCookies(lectureId, "sample-uuid-path"))
                 .willReturn(expectedCookies);
 
-        ResponseCookie[] result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
+        VideoAccessService.VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
-        assertThat(result).hasSize(3);
-        assertThat(result).containsExactly(dummyCookie1, dummyCookie2, dummyCookie3);
-    }
-
-    @Test
-    void 강의_재생_경로를_정상적으로_조회한다() {
-        Long lectureId = 1L;
-        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
-        Lecture lecture = mock(Lecture.class);
-
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
-        given(lecture.getM3u8Path()).willReturn(m3u8Path);
-
-        String result = videoAccessService.getPlayableM3u8Path(lectureId);
-
-        assertThat(result).isEqualTo(m3u8Path);
+        assertThat(result.path()).isEqualTo(m3u8Path);
+        assertThat(result.cookies()).hasSize(3);
+        assertThat(result.cookies()).containsExactly(dummyCookie1, dummyCookie2, dummyCookie3);
     }
 }

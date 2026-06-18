@@ -8,10 +8,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Arrays;
 
 @RestController
 @RequestMapping("/api/courses/{courseId}/chapters/{chapterId}/lectures")
@@ -36,15 +37,11 @@ public class LectureController {
             @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
 
-        ResponseCookie[] cookies = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
-        String path = videoAccessService.getPlayableM3u8Path(lectureId);
+        VideoAccessService.VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
 
         return ResponseEntity.ok()
-                .headers(headers -> {
-                    for (ResponseCookie cookie : cookies) {
-                        headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
-                    }
-                })
-                .body(path);
+                .headers(headers -> Arrays.stream(streamResponse.cookies())
+                        .forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString())))
+                .body(streamResponse.path());
     }
 }

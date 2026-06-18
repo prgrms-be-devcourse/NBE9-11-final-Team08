@@ -74,8 +74,8 @@ class LectureControllerTest {
                 ResponseCookie.from("CloudFront-Policy", "dummy").build()
         };
 
-        given(videoAccessService.verifyAndGenerateStreamCookies(eq(lectureId), eq(userId))).willReturn(mockCookies);
-        given(videoAccessService.getPlayableM3u8Path(eq(lectureId))).willReturn(expectedUrl);
+        VideoAccessService.VideoStreamResponse mockResponse = new VideoAccessService.VideoStreamResponse(expectedUrl, mockCookies);
+        given(videoAccessService.verifyAndGenerateStreamCookies(eq(lectureId), eq(userId))).willReturn(mockResponse);
 
         mockMvc.perform(get("/api/courses/{courseId}/chapters/{chapterId}/lectures/{lectureId}/stream", courseId, chapterId, lectureId))
                 .andExpect(status().isOk())
