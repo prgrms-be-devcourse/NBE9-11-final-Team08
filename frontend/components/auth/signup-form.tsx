@@ -9,10 +9,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { api } from '@/lib/api'
 
 export function SignupForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [agree, setAgree] = useState(false)
@@ -20,7 +23,7 @@ export function SignupForm() {
 
   const passwordMismatch = confirm.length > 0 && password !== confirm
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (passwordMismatch) {
       toast.error('비밀번호가 일치하지 않습니다')
@@ -31,11 +34,21 @@ export function SignupForm() {
       return
     }
     setSubmitting(true)
-    // Mock signup: in production this POSTs to POST /api/auth/signup on the Spring backend.
-    setTimeout(() => {
+
+    try {
+      await api.signup({
+        email,
+        password,
+        nickname: name,
+        userRole: 'USER', // Default to USER for standard signup
+      })
+      toast.success('회원가입이 완료되었습니다!')
+      router.push('/login')
+    } catch (err: any) {
+      toast.error(err.message || '회원가입 중 오류가 발생했습니다')
+    } finally {
       setSubmitting(false)
-      router.push('/signup/complete')
-    }, 600)
+    }
   }
 
   return (
@@ -53,7 +66,14 @@ export function SignupForm() {
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="name">이름</Label>
-          <Input id="name" required placeholder="김아무개" autoComplete="name" />
+          <Input
+            id="name"
+            required
+            placeholder="PlayLearn의 새로운 멤버 (예: 홍길동)"
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
 
         <div className="flex flex-col gap-2">
@@ -62,8 +82,10 @@ export function SignupForm() {
             id="email"
             type="email"
             required
-            placeholder="emailforemail@email.com"
+            placeholder="discovery@playlearn.dev"
             autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
@@ -77,7 +99,7 @@ export function SignupForm() {
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="8자 이상 입력하세요"
+              placeholder="안전한 비밀번호 (8자 이상)"
               autoComplete="new-password"
               className="pr-10"
             />
@@ -100,7 +122,7 @@ export function SignupForm() {
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            placeholder="비밀번호를 다시 입력하세요"
+            placeholder="한 번 더 입력해 주세요"
             autoComplete="new-password"
             aria-invalid={passwordMismatch}
           />

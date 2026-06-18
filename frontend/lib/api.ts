@@ -34,6 +34,7 @@ import type {
   Study,
   StudyReport,
   UserProfile,
+  SignupRequest,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? ''
@@ -53,7 +54,31 @@ async function request<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+async function mutate<T>(path: string, method: string, body: any): Promise<T> {
+  if (!BASE_URL) return {} as T
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}))
+    throw new Error(errorData.message || `Error ${res.status}`)
+  }
+  if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
+    return {} as T
+  }
+  try {
+    return (await res.json()) as T
+  } catch (e) {
+    return {} as T
+  }
+}
+
 export const api = {
+  // POST /api/auth/signup
+  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
+
   // GET /api/courses
   getCourses: () => request<Course[]>('/api/courses', courses),
 

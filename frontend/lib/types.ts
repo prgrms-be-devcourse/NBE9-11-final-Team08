@@ -160,6 +160,18 @@ export interface MyComment {
   createdAt: string
 }
 
+// --- Auth ---
+
+export type SignupRole = 'USER' | 'SELLER'
+
+export interface SignupRequest {
+  email: string
+  password: string
+  nickname: string
+  profileImage?: string
+  userRole: SignupRole
+}
+
 // --- Study room (스터디) ---
 // 강좌 1개 = 스터디 1개. 강좌 구매자가 자동 참여하는 학습 공간.
 
