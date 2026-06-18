@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,6 +41,10 @@ public class CurriculumService {
 
         List<Chapter> existingChapters = chapterRepository.findAllById(chapterIds);
 
+        if (existingChapters.size() != chapterIds.size()) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
+
         for (Chapter chapter : existingChapters) {
             if (!chapter.getCourse().getId().equals(courseId)) {
                 throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
@@ -53,7 +57,7 @@ public class CurriculumService {
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
             Chapter chapter = chapterMap.get(element.chapterId());
             if (chapter != null) {
-                chapter.updateGeneralInfo(chapter.getTitle(), element.orderNo(), new ArrayList<>());
+                chapter.updateGeneralInfo(chapter.getTitle(), element.orderNo(), Collections.emptyList());
             }
         }
     }
@@ -70,6 +74,10 @@ public class CurriculumService {
                 .toList();
 
         List<Lecture> existingLectures = lectureRepository.findAllById(lectureIds);
+
+        if (existingLectures.size() != lectureIds.size()) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
 
         for (Lecture lecture : existingLectures) {
             if (!lecture.getChapter().getId().equals(chapterId)) {

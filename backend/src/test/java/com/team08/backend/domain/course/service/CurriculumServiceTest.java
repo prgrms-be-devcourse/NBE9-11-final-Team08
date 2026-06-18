@@ -60,6 +60,24 @@ class CurriculumServiceTest {
     }
 
     @Test
+    void 요청한_챕터ID_일부가_존재하지_않으면_예외를_던진다() {
+        Long courseId = 1L;
+        Long instructorId = 100L;
+        Course course = mock(Course.class);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(chapterRepository.findAllById(List.of(10L, 20L))).willReturn(List.of());
+
+        ChapterReorderRequest request = new ChapterReorderRequest(List.of(
+                new ChapterReorderRequest.ChapterOrderElement(10L, 1),
+                new ChapterReorderRequest.ChapterOrderElement(20L, 2)
+        ));
+
+        assertThatThrownBy(() -> curriculumService.reorderChapters(courseId, instructorId, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
     void 다른_강좌에_속한_챕터ID가_요청에_포함되면_예외를_던진다() {
         Long courseId = 1L;
         Long instructorId = 100L;
@@ -99,6 +117,26 @@ class CurriculumServiceTest {
         ));
 
         curriculumService.reorderLectures(chapterId, instructorId, request);
+    }
+
+    @Test
+    void 요청한_강의ID_일부가_존재하지_않으면_예외를_던진다() {
+        Long chapterId = 10L;
+        Long instructorId = 100L;
+        Chapter chapter = mock(Chapter.class);
+        Course course = mock(Course.class);
+
+        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
+        given(chapter.getCourse()).willReturn(course);
+        given(lectureRepository.findAllById(List.of(100L, 200L))).willReturn(List.of());
+
+        LectureReorderRequest request = new LectureReorderRequest(List.of(
+                new LectureReorderRequest.LectureOrderElement(100L, 1),
+                new LectureReorderRequest.LectureOrderElement(200L, 2)
+        ));
+
+        assertThatThrownBy(() -> curriculumService.reorderLectures(chapterId, instructorId, request))
+                .isInstanceOf(CustomException.class);
     }
 
     @Test
