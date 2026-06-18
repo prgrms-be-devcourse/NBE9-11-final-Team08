@@ -9,21 +9,31 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { api } from '@/lib/api'
 
 export function LoginForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setSubmitting(true)
-    // Mock auth: in production this POSTs to POST /api/auth/login on the Spring backend.
-    setTimeout(() => {
+
+    try {
+      const response = await api.login({ email, password })
+      if (response.accessToken) {
+        localStorage.setItem('accessToken', response.accessToken)
+        toast.success('환영합니다! 로그인이 완료되었습니다.')
+        router.push('/')
+      }
+    } catch (err: any) {
+      toast.error(err.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.')
+    } finally {
       setSubmitting(false)
-      toast.success('로그인되었습니다')
-      router.push('/')
-    }, 600)
+    }
   }
 
   return (
@@ -45,8 +55,10 @@ export function LoginForm() {
             id="email"
             type="email"
             required
-            placeholder="emailforemail@email.com"
+            placeholder="discovery@playlearn.dev"
             autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
@@ -65,9 +77,11 @@ export function LoginForm() {
               id="password"
               type={showPassword ? 'text' : 'password'}
               required
-              placeholder="비밀번호를 입력하세요"
+              placeholder="비밀번호를 입력해 주세요"
               autoComplete="current-password"
               className="pr-10"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
             />
             <button
               type="button"

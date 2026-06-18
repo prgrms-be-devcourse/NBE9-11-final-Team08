@@ -172,6 +172,15 @@ export interface SignupRequest {
   userRole: SignupRole
 }
 
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface LoginResponse {
+  accessToken: string
+}
+
 // --- Study room (스터디) ---
 // 강좌 1개 = 스터디 1개. 강좌 구매자가 자동 참여하는 학습 공간.
 

@@ -35,15 +35,26 @@ import type {
   StudyReport,
   UserProfile,
   SignupRequest,
+  LoginRequest,
+  LoginResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? ''
+
+const getAuthHeaders = () => {
+  if (typeof window === 'undefined') return {}
+  const token = localStorage.getItem('accessToken')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 async function request<T>(path: string, fallback: T): Promise<T> {
   if (!BASE_URL) return fallback
   try {
     const res = await fetch(`${BASE_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
       cache: 'no-store',
     })
     if (!res.ok) throw new Error(`API ${res.status}`)
@@ -58,7 +69,10 @@ async function mutate<T>(path: string, method: string, body: any): Promise<T> {
   if (!BASE_URL) return {} as T
   const res = await fetch(`${BASE_URL}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -78,6 +92,12 @@ async function mutate<T>(path: string, method: string, body: any): Promise<T> {
 export const api = {
   // POST /api/auth/signup
   signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
+
+  // POST /api/auth/login
+  login: (data: LoginRequest) => mutate<LoginResponse>('/api/auth/login', 'POST', data),
+
+  // POST /api/auth/logout
+  logout: () => mutate<void>('/api/auth/logout', 'POST', {}),
 
   // GET /api/courses
   getCourses: () => request<Course[]>('/api/courses', courses),
