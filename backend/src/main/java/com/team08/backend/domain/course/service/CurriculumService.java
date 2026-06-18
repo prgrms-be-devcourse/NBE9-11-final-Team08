@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -57,11 +58,7 @@ public class CurriculumService {
                 .sorted()
                 .toList();
 
-        for (int i = 0; i < sortedOrders.size(); i++) {
-            if (sortedOrders.get(i) != (i + 1)) {
-                throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-            }
-        }
+        validateOrderSequence(sortedOrders);
 
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
             chapterRepository.updateOrderNo(element.chapterId(), element.orderNo(), courseId);
@@ -98,14 +95,19 @@ public class CurriculumService {
                 .sorted()
                 .toList();
 
-        for (int i = 0; i < sortedOrders.size(); i++) {
-            if (sortedOrders.get(i) != (i + 1)) {
-                throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
-            }
-        }
+        validateOrderSequence(sortedOrders);
 
         for (LectureReorderRequest.LectureOrderElement element : request.reorders()) {
             lectureRepository.updateOrderNo(element.lectureId(), element.orderNo(), chapterId);
+        }
+    }
+
+    private void validateOrderSequence(List<Integer> sortedOrders) {
+        boolean isInvalid = IntStream.range(0, sortedOrders.size())
+                .anyMatch(i -> sortedOrders.get(i) != i + 1);
+
+        if (isInvalid) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
         }
     }
 }
