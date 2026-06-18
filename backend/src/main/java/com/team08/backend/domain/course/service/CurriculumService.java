@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,10 +41,8 @@ public class CurriculumService {
         Map<Long, Chapter> chapterMap = dbChapters.stream()
                 .collect(Collectors.toMap(Chapter::getId, Function.identity()));
 
-        Set<Long> requestIds = request.reorders().stream()
-                .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
-                .collect(Collectors.toSet());
-        curriculumValidator.validateIds(chapterMap.keySet(), requestIds);
+        curriculumValidator.validateIds(chapterMap.keySet(),
+                request.reorders().stream().map(ChapterReorderRequest.ChapterOrderElement::chapterId).collect(Collectors.toSet()));
 
         curriculumValidator.validateOrderSequence(request.reorders().stream()
                 .map(ChapterReorderRequest.ChapterOrderElement::orderNo)
@@ -69,10 +66,8 @@ public class CurriculumService {
         Map<Long, Lecture> lectureMap = dbLectures.stream()
                 .collect(Collectors.toMap(Lecture::getId, Function.identity()));
 
-        Set<Long> requestIds = request.reorders().stream()
-                .map(LectureReorderRequest.LectureOrderElement::lectureId)
-                .collect(Collectors.toSet());
-        curriculumValidator.validateIds(lectureMap.keySet(), requestIds);
+        curriculumValidator.validateIds(lectureMap.keySet(),
+                request.reorders().stream().map(LectureReorderRequest.LectureOrderElement::lectureId).collect(Collectors.toSet()));
 
         curriculumValidator.validateOrderSequence(request.reorders().stream()
                 .map(LectureReorderRequest.LectureOrderElement::orderNo)
