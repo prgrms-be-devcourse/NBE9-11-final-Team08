@@ -34,10 +34,10 @@ public class CloudFrontCookieSigner {
 
     @PostConstruct
     public void init() {
+        if ("dummy-id".equals(keyPairId) || privateKeyPem.contains("MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3")) {
+            return;
+        }
         try {
-            if (privateKeyPem.contains("dummy") || privateKeyPem.length() < 100) {
-                return;
-            }
             String privateKeyRaw = privateKeyPem
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
@@ -49,11 +49,12 @@ public class CloudFrontCookieSigner {
             this.privateKey = kf.generatePrivate(spec);
         } catch (Exception e) {
             log.error("CloudFront private key initialization failed", e);
+            throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
         }
     }
 
-    public ResponseCookie[] createSignedCookies(Long lectureId, String uuid) {
-        String resourcePath = "https://" + distributionDomain + "/lectures/" + lectureId + "/" + uuid + "/*";
+    public ResponseCookie[] createSignedCookies(String clientPath) {
+        String resourcePath = "https://" + distributionDomain + clientPath;
         long expires = Instant.now().plus(Duration.ofHours(1)).getEpochSecond();
 
         String policy = "{\"Statement\":[{\"Resource\":\"" + resourcePath +

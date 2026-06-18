@@ -19,7 +19,7 @@ class CloudFrontCookieSignerTest {
     void setUp() throws Exception {
         cloudFrontCookieSigner = new CloudFrontCookieSigner();
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "distributionDomain", "localhost");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "dummy-id");
+        ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "real-id");
 
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
@@ -35,11 +35,10 @@ class CloudFrontCookieSignerTest {
     }
 
     @Test
-    void 유효한_강의ID와_UUID로_서명된_쿠키_배열을_정상_생성한다() {
-        Long lectureId = 1L;
-        String uuid = "sample-uuid";
+    void 유효한_경로로_서명된_쿠키_배열을_정상_생성한다() {
+        String clientPath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
 
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(lectureId, uuid);
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(clientPath);
 
         assertThat(cookies).hasSize(3);
         assertThat(cookies[0].getName()).isEqualTo("CloudFront-Policy");
@@ -48,7 +47,7 @@ class CloudFrontCookieSignerTest {
 
         assertThat(cookies[0].getValue()).doesNotContain("+", "/", "=");
         assertThat(cookies[1].getValue()).doesNotContain("+", "/", "=");
-        assertThat(cookies[2].getValue()).isEqualTo("dummy-id");
+        assertThat(cookies[2].getValue()).isEqualTo("real-id");
 
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.isHttpOnly()).isTrue();

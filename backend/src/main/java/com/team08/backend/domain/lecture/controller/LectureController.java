@@ -38,9 +38,11 @@ public class LectureController {
 
         VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
 
+        HttpHeaders headers = new HttpHeaders();
+        streamResponse.cookies().forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString()));
+
         return ResponseEntity.ok()
-                .headers(headers -> streamResponse.cookies()
-                        .forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString())))
+                .headers(headers)
                 .body(streamResponse.path());
     }
 }

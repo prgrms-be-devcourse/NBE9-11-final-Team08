@@ -9,14 +9,17 @@ import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VideoAccessService {
@@ -47,19 +50,22 @@ public class VideoAccessService {
         }
 
         String uuid = extractUuid(m3u8Path);
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(lectureId, uuid);
+        String clientPath = "/lectures/" + lectureId + "/" + uuid + "/*";
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(clientPath);
 
-        return new VideoStreamResponse(m3u8Path, List.of(cookies));
+        return new VideoStreamResponse(m3u8Path, List.copyOf(Arrays.asList(cookies)));
     }
 
     private String extractUuid(String m3u8Path) {
         if (m3u8Path == null) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            log.error("Lecture m3u8 path data integrity violation: path is null");
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
         Matcher matcher = LECTURE_PATH_PATTERN.matcher(m3u8Path);
         if (matcher.matches()) {
             return matcher.group(1);
         }
-        throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        log.error("Lecture m3u8 path format mismatch validation failed: {}", m3u8Path);
+        throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
     }
 }
