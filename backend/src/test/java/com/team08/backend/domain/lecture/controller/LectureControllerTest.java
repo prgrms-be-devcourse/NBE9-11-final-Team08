@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -59,7 +60,6 @@ class LectureControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$").value(50L));
     }
-    // TODO: lecture 단일 입장도 고려
 
     @Test
     @WithMockLoginUser
@@ -70,7 +70,12 @@ class LectureControllerTest {
         Long userId = 1L;
         String expectedUrl = "https://cdn.com/lectures/50/uuid-123/index.m3u8";
 
-        given(videoAccessService.verifyAndGenerateStreamUrl(eq(lectureId), eq(userId), any())).willReturn(expectedUrl);
+        ResponseCookie[] mockCookies = new ResponseCookie[]{
+                ResponseCookie.from("CloudFront-Policy", "dummy").build()
+        };
+
+        given(videoAccessService.verifyAndGenerateStreamCookies(eq(lectureId), eq(userId))).willReturn(mockCookies);
+        given(videoAccessService.getPlayableM3u8Path(eq(lectureId))).willReturn(expectedUrl);
 
         mockMvc.perform(get("/api/courses/{courseId}/chapters/{chapterId}/lectures/{lectureId}/stream", courseId, chapterId, lectureId))
                 .andExpect(status().isOk())

@@ -9,7 +9,6 @@ import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
-import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,22 +38,18 @@ class VideoAccessServiceTest {
     @Mock
     private CloudFrontCookieSigner cloudFrontCookieSigner;
 
-    @Mock
-    private HttpServletResponse response;
-
     @Test
-    void 무료_미리보기_강의는_권한_검증_없이_스트리밍_주소를_즉시_반환한다() {
+    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_배열을_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Lecture lecture = mock(Lecture.class);
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.isFreePreview()).willReturn(true);
-        given(lecture.getM3u8Path()).willReturn("https://cdn.com/lectures/1/uuid-123/index.m3u8");
 
-        String result = videoAccessService.verifyAndGenerateStreamUrl(lectureId, userId, response);
+        ResponseCookie[] result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
-        assertThat(result).isEqualTo("https://cdn.com/lectures/1/uuid-123/index.m3u8");
+        assertThat(result).isEmpty();
         verifyNoInteractions(enrollmentRepository);
         verifyNoInteractions(cloudFrontCookieSigner);
     }
@@ -78,7 +73,7 @@ class VideoAccessServiceTest {
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
 
-        assertThatThrownBy(() -> videoAccessService.verifyAndGenerateStreamUrl(lectureId, userId, response))
+        assertThatThrownBy(() -> videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.VIDEO_ACCESS_DENIED.getMessage());
 
@@ -86,7 +81,7 @@ class VideoAccessServiceTest {
     }
 
     @Test
-    void 유효한_수강생이면_Signed_Cookie를_헤더에_설정하고_스트리밍_주소를_반환한다() {
+    void 유효한_수강생이면_Signed_Cookie_배열을_생성하여_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
@@ -109,13 +104,28 @@ class VideoAccessServiceTest {
         ResponseCookie dummyCookie1 = ResponseCookie.from("CloudFront-Policy", "policy").build();
         ResponseCookie dummyCookie2 = ResponseCookie.from("CloudFront-Signature", "sig").build();
         ResponseCookie dummyCookie3 = ResponseCookie.from("CloudFront-Key-Pair-Id", "key").build();
+        ResponseCookie[] expectedCookies = new ResponseCookie[]{dummyCookie1, dummyCookie2, dummyCookie3};
 
         given(cloudFrontCookieSigner.createSignedCookies(lectureId, "sample-uuid-path"))
-                .willReturn(new ResponseCookie[]{dummyCookie1, dummyCookie2, dummyCookie3});
+                .willReturn(expectedCookies);
 
-        String result = videoAccessService.verifyAndGenerateStreamUrl(lectureId, userId, response);
+        ResponseCookie[] result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
+
+        assertThat(result).hasSize(3);
+        assertThat(result).containsExactly(dummyCookie1, dummyCookie2, dummyCookie3);
+    }
+
+    @Test
+    void 강의_재생_경로를_정상적으로_조회한다() {
+        Long lectureId = 1L;
+        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
+        Lecture lecture = mock(Lecture.class);
+
+        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lecture.getM3u8Path()).willReturn(m3u8Path);
+
+        String result = videoAccessService.getPlayableM3u8Path(lectureId);
 
         assertThat(result).isEqualTo(m3u8Path);
-        verify(response, times(3)).addHeader(eq("Set-Cookie"), anyString());
     }
 }
