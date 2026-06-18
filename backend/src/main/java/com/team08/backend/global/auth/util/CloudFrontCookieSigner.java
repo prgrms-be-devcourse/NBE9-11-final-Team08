@@ -2,6 +2,7 @@ package com.team08.backend.global.auth.util;
 
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 
+@Slf4j
 @Component
 public class CloudFrontCookieSigner {
 
@@ -62,6 +64,7 @@ public class CloudFrontCookieSigner {
 
             return encodeBase64(sig.sign());
         } catch (Exception e) {
+            log.error("CloudFront signature generation failed", e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }

@@ -12,9 +12,6 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 @Service
 @RequiredArgsConstructor
 public class VideoAccessService {
@@ -22,7 +19,6 @@ public class VideoAccessService {
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
-    private static final Pattern UUID_PATTERN = Pattern.compile("/lectures/\\d+/([^/]+)/");
 
     @Transactional(readOnly = true)
     public ResponseCookie[] verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
@@ -54,9 +50,9 @@ public class VideoAccessService {
     }
 
     private String extractUuid(String m3u8Path) {
-        Matcher matcher = UUID_PATTERN.matcher(m3u8Path);
-        if (matcher.find()) {
-            return matcher.group(1);
+        String[] parts = m3u8Path.split("/");
+        if (parts.length >= 6) {
+            return parts[5];
         }
         throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
     }

@@ -39,12 +39,12 @@ public class LectureController {
         ResponseCookie[] cookies = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
         String path = videoAccessService.getPlayableM3u8Path(lectureId);
 
-        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok();
-
-        for (ResponseCookie cookie : cookies) {
-            responseBuilder.header(HttpHeaders.SET_COOKIE, cookie.toString());
-        }
-
-        return responseBuilder.body(path);
+        return ResponseEntity.ok()
+                .headers(headers -> {
+                    for (ResponseCookie cookie : cookies) {
+                        headers.add(HttpHeaders.SET_COOKIE, cookie.toString());
+                    }
+                })
+                .body(path);
     }
 }
