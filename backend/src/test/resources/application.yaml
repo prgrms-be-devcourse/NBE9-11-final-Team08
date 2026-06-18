@@ -47,6 +47,8 @@ app:
   ai:
     model: stub
     prompt-version: v1
+  data-init:
+    mode: none
   jwt:
     secret: test-secret-key-test-secret-key-test-secret-key
     expiration-millis: 3600000
