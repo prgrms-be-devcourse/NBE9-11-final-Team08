@@ -14,13 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +26,7 @@ public class CurriculumService {
     private final CourseRepository courseRepository;
     private final ChapterRepository chapterRepository;
     private final LectureRepository lectureRepository;
+    private final CurriculumValidator curriculumValidator;
 
     @Transactional
     public void reorderChapters(Long courseId, Long instructorId, ChapterReorderRequest request) {
@@ -37,22 +34,23 @@ public class CurriculumService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
         course.validateOwner(instructorId);
 
-        List<Chapter> dbChapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
-        validateSize(dbChapters.size(), request.reorders().size());
+        List<Chapter> dbChapters = chapterRepository.findByCourseIdOrderByOrderNo(courseId);
+        curriculumValidator.validateSize(dbChapters.size(), request.reorders().size());
 
-        Map<Long, Chapter> chapterMap = dbChapters.stream()
-                .collect(Collectors.toMap(Chapter::getId, Function.identity()));
-
-        validateIds(chapterMap.keySet(), request.reorders().stream().map(ChapterReorderRequest.ChapterOrderElement::chapterId).collect(Collectors.toSet()));
+        Set<Long> dbIds = dbChapters.stream().map(Chapter::getId).collect(Collectors.toSet());
+        Set<Long> requestIds = request.reorders().stream()
+                .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
+                .collect(Collectors.toSet());
+        curriculumValidator.validateIds(dbIds, requestIds);
 
         List<Integer> sortedOrders = request.reorders().stream()
                 .map(ChapterReorderRequest.ChapterOrderElement::orderNo)
                 .sorted()
                 .toList();
-        validateOrderSequence(sortedOrders);
+        curriculumValidator.validateOrderSequence(sortedOrders);
 
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
-            chapterMap.get(element.chapterId()).updateOrderNo(element.orderNo());
+            chapterRepository.updateOrderNo(element.chapterId(), element.orderNo(), courseId);
         }
     }
 
@@ -63,46 +61,22 @@ public class CurriculumService {
         chapter.getCourse().validateOwner(instructorId);
 
         List<Lecture> dbLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId);
-        validateSize(dbLectures.size(), request.reorders().size());
+        curriculumValidator.validateSize(dbLectures.size(), request.reorders().size());
 
-        Map<Long, Lecture> lectureMap = dbLectures.stream()
-                .collect(Collectors.toMap(Lecture::getId, Function.identity()));
-
-        validateIds(lectureMap.keySet(), request.reorders().stream().map(LectureReorderRequest.LectureOrderElement::lectureId).collect(Collectors.toSet()));
+        Set<Long> dbIds = dbLectures.stream().map(Lecture::getId).collect(Collectors.toSet());
+        Set<Long> requestIds = request.reorders().stream()
+                .map(LectureReorderRequest.LectureOrderElement::lectureId)
+                .collect(Collectors.toSet());
+        curriculumValidator.validateIds(dbIds, requestIds);
 
         List<Integer> sortedOrders = request.reorders().stream()
                 .map(LectureReorderRequest.LectureOrderElement::orderNo)
                 .sorted()
                 .toList();
-        validateOrderSequence(sortedOrders);
+        curriculumValidator.validateOrderSequence(sortedOrders);
 
         for (LectureReorderRequest.LectureOrderElement element : request.reorders()) {
-            lectureMap.get(element.lectureId()).updateOrderNo(element.orderNo());
-        }
-    }
-
-    private void validateSize(int dbSize, int requestSize) {
-        if (dbSize != requestSize) {
-            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
-        }
-    }
-
-    private void validateIds(Set<Long> dbIds, Set<Long> requestIds) {
-        if (!dbIds.equals(requestIds)) {
-            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
-        }
-    }
-
-    private void validateOrderSequence(List<Integer> sortedOrders) {
-        if (new HashSet<>(sortedOrders).size() != sortedOrders.size()) {
-            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
-        }
-
-        boolean isInvalid = IntStream.range(0, sortedOrders.size())
-                .anyMatch(i -> sortedOrders.get(i) != i + 1);
-
-        if (isInvalid) {
-            throw new CustomException(ErrorCode.INVALID_ORDER_REQUEST);
+            lectureRepository.updateOrderNo(element.lectureId(), element.orderNo(), chapterId);
         }
     }
 }

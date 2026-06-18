@@ -40,6 +40,9 @@ class CurriculumServiceTest {
     @Mock
     private LectureRepository lectureRepository;
 
+    @Mock
+    private CurriculumValidator curriculumValidator;
+
     @Test
     void 강좌_내_챕터_순서가_정상적으로_일괄_변경된다() {
         Long courseId = 1L;
@@ -48,7 +51,7 @@ class CurriculumServiceTest {
         Chapter chapter = mock(Chapter.class);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of(chapter));
+        given(chapterRepository.findByCourseIdOrderByOrderNo(courseId)).willReturn(List.of(chapter));
         given(chapter.getId()).willReturn(10L);
 
         ChapterReorderRequest request = new ChapterReorderRequest(List.of(
@@ -57,7 +60,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderChapters(courseId, instructorId, request);
 
-        verify(chapter).updateOrderNo(1);
+        verify(chapterRepository).updateOrderNo(10L, 1, courseId);
     }
 
     @Test
@@ -67,7 +70,8 @@ class CurriculumServiceTest {
         Course course = mock(Course.class);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of());
+        given(chapterRepository.findByCourseIdOrderByOrderNo(courseId)).willReturn(List.of());
+        doThrow(CustomException.class).when(curriculumValidator).validateSize(anyInt(), anyInt());
 
         ChapterReorderRequest request = new ChapterReorderRequest(List.of(
                 new ChapterReorderRequest.ChapterOrderElement(10L, 1),
@@ -86,8 +90,9 @@ class CurriculumServiceTest {
         Chapter chapter = mock(Chapter.class);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of(chapter));
+        given(chapterRepository.findByCourseIdOrderByOrderNo(courseId)).willReturn(List.of(chapter));
         given(chapter.getId()).willReturn(999L);
+        doThrow(CustomException.class).when(curriculumValidator).validateIds(any(), any());
 
         ChapterReorderRequest request = new ChapterReorderRequest(List.of(
                 new ChapterReorderRequest.ChapterOrderElement(10L, 1)
@@ -105,11 +110,35 @@ class CurriculumServiceTest {
         Chapter chapter = mock(Chapter.class);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of(chapter));
+        given(chapterRepository.findByCourseIdOrderByOrderNo(courseId)).willReturn(List.of(chapter));
         given(chapter.getId()).willReturn(10L);
+        doThrow(CustomException.class).when(curriculumValidator).validateOrderSequence(any());
 
         ChapterReorderRequest request = new ChapterReorderRequest(List.of(
                 new ChapterReorderRequest.ChapterOrderElement(10L, 3)
+        ));
+
+        assertThatThrownBy(() -> curriculumService.reorderChapters(courseId, instructorId, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 챕터_순서_번호가_중복되면_예외를_던진다() {
+        Long courseId = 1L;
+        Long instructorId = 100L;
+        Course course = mock(Course.class);
+        Chapter chapter1 = mock(Chapter.class);
+        Chapter chapter2 = mock(Chapter.class);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(chapterRepository.findByCourseIdOrderByOrderNo(courseId)).willReturn(List.of(chapter1, chapter2));
+        given(chapter1.getId()).willReturn(10L);
+        given(chapter2.getId()).willReturn(20L);
+        doThrow(CustomException.class).when(curriculumValidator).validateOrderSequence(any());
+
+        ChapterReorderRequest request = new ChapterReorderRequest(List.of(
+                new ChapterReorderRequest.ChapterOrderElement(10L, 1),
+                new ChapterReorderRequest.ChapterOrderElement(20L, 1) // 중복
         ));
 
         assertThatThrownBy(() -> curriculumService.reorderChapters(courseId, instructorId, request))
@@ -135,7 +164,7 @@ class CurriculumServiceTest {
 
         curriculumService.reorderLectures(chapterId, instructorId, request);
 
-        verify(lecture).updateOrderNo(1);
+        verify(lectureRepository).updateOrderNo(100L, 1, chapterId);
     }
 
     @Test
@@ -148,6 +177,7 @@ class CurriculumServiceTest {
         given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
         given(chapter.getCourse()).willReturn(course);
         given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId)).willReturn(List.of());
+        doThrow(CustomException.class).when(curriculumValidator).validateSize(anyInt(), anyInt());
 
         LectureReorderRequest request = new LectureReorderRequest(List.of(
                 new LectureReorderRequest.LectureOrderElement(100L, 1),
@@ -170,6 +200,7 @@ class CurriculumServiceTest {
         given(chapter.getCourse()).willReturn(course);
         given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId)).willReturn(List.of(lecture));
         given(lecture.getId()).willReturn(999L);
+        doThrow(CustomException.class).when(curriculumValidator).validateIds(any(), any());
 
         LectureReorderRequest request = new LectureReorderRequest(List.of(
                 new LectureReorderRequest.LectureOrderElement(100L, 1)
@@ -191,34 +222,13 @@ class CurriculumServiceTest {
         given(chapter.getCourse()).willReturn(course);
         given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId)).willReturn(List.of(lecture));
         given(lecture.getId()).willReturn(100L);
+        doThrow(CustomException.class).when(curriculumValidator).validateOrderSequence(any());
 
         LectureReorderRequest request = new LectureReorderRequest(List.of(
                 new LectureReorderRequest.LectureOrderElement(100L, 5)
         ));
 
         assertThatThrownBy(() -> curriculumService.reorderLectures(chapterId, instructorId, request))
-                .isInstanceOf(CustomException.class);
-    }
-
-    @Test
-    void 챕터_순서_번호가_중복되면_예외를_던진다() {
-        Long courseId = 1L;
-        Long instructorId = 100L;
-        Course course = mock(Course.class);
-        Chapter chapter1 = mock(Chapter.class);
-        Chapter chapter2 = mock(Chapter.class);
-
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of(chapter1, chapter2));
-        given(chapter1.getId()).willReturn(10L);
-        given(chapter2.getId()).willReturn(20L);
-
-        ChapterReorderRequest request = new ChapterReorderRequest(List.of(
-                new ChapterReorderRequest.ChapterOrderElement(10L, 1),
-                new ChapterReorderRequest.ChapterOrderElement(20L, 1) // 중복
-        ));
-
-        assertThatThrownBy(() -> curriculumService.reorderChapters(courseId, instructorId, request))
                 .isInstanceOf(CustomException.class);
     }
 
@@ -236,6 +246,7 @@ class CurriculumServiceTest {
         given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId)).willReturn(List.of(lecture1, lecture2));
         given(lecture1.getId()).willReturn(100L);
         given(lecture2.getId()).willReturn(200L);
+        doThrow(CustomException.class).when(curriculumValidator).validateOrderSequence(any());
 
         LectureReorderRequest request = new LectureReorderRequest(List.of(
                 new LectureReorderRequest.LectureOrderElement(100L, 1),
