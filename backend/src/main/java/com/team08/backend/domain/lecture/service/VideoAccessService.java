@@ -12,6 +12,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,7 +33,7 @@ public class VideoAccessService {
         String m3u8Path = lecture.getM3u8Path();
 
         if (lecture.isFreePreview()) {
-            return new VideoStreamResponse(m3u8Path, new ResponseCookie[0]);
+            return new VideoStreamResponse(m3u8Path, List.of());
         }
 
         Long courseId = lecture.getChapter().getCourse().getId();
@@ -47,7 +48,7 @@ public class VideoAccessService {
         String uuid = extractUuid(m3u8Path);
         ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(lectureId, uuid);
 
-        return new VideoStreamResponse(m3u8Path, cookies);
+        return new VideoStreamResponse(m3u8Path, List.of(cookies));
     }
 
     private String extractUuid(String m3u8Path) {
@@ -61,5 +62,5 @@ public class VideoAccessService {
         throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
 
-    public record VideoStreamResponse(String path, ResponseCookie[] cookies) {}
+    public record VideoStreamResponse(String path, List<ResponseCookie> cookies) {}
 }

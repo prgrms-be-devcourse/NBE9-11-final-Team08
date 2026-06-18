@@ -12,8 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Arrays;
-
 @RestController
 @RequestMapping("/api/courses/{courseId}/chapters/{chapterId}/lectures")
 @RequiredArgsConstructor
@@ -40,7 +38,7 @@ public class LectureController {
         VideoAccessService.VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
 
         return ResponseEntity.ok()
-                .headers(headers -> Arrays.stream(streamResponse.cookies())
+                .headers(headers -> streamResponse.cookies()
                         .forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString())))
                 .body(streamResponse.path());
     }

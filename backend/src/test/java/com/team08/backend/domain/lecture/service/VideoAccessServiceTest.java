@@ -39,7 +39,7 @@ class VideoAccessServiceTest {
     private CloudFrontCookieSigner cloudFrontCookieSigner;
 
     @Test
-    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_배열과_경로를_반환한다() {
+    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_리스트와_경로를_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
@@ -86,7 +86,7 @@ class VideoAccessServiceTest {
     }
 
     @Test
-    void 유효한_수강생이면_Signed_Cookie_배열과_경로를_DTO로_묶어_반환한다() {
+    void 유효한_수강생이면_Signed_Cookie_리스트와_경로를_DTO로_묶어_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;

@@ -14,6 +14,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -74,7 +76,7 @@ class LectureControllerTest {
                 ResponseCookie.from("CloudFront-Policy", "dummy").build()
         };
 
-        VideoAccessService.VideoStreamResponse mockResponse = new VideoAccessService.VideoStreamResponse(expectedUrl, mockCookies);
+        VideoAccessService.VideoStreamResponse mockResponse = new VideoAccessService.VideoStreamResponse(expectedUrl, List.of(mockCookies));
         given(videoAccessService.verifyAndGenerateStreamCookies(eq(lectureId), eq(userId))).willReturn(mockResponse);
 
         mockMvc.perform(get("/api/courses/{courseId}/chapters/{chapterId}/lectures/{lectureId}/stream", courseId, chapterId, lectureId))
