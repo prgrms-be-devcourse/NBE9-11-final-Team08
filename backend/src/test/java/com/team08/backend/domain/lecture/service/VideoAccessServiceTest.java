@@ -112,7 +112,7 @@ class VideoAccessServiceTest {
         ResponseCookie dummyCookie3 = ResponseCookie.from("CloudFront-Key-Pair-Id", "key").build();
         ResponseCookie[] expectedCookies = new ResponseCookie[]{dummyCookie1, dummyCookie2, dummyCookie3};
 
-        given(cloudFrontCookieSigner.createSignedCookies("/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*"))
+        given(cloudFrontCookieSigner.createSignedCookies("/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*", "/lectures/1/"))
                 .willReturn(expectedCookies);
 
         VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);

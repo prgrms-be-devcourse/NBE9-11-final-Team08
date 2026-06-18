@@ -53,20 +53,20 @@ public class CloudFrontCookieSigner {
         }
     }
 
-    public ResponseCookie[] createSignedCookies(String clientPath) {
-        String resourcePath = "https://" + distributionDomain + clientPath;
+    public ResponseCookie[] createSignedCookies(String resourcePath, String cookiePath) {
+        String fullResourceUrl = "https://" + distributionDomain + resourcePath;
         long expires = Instant.now().plus(Duration.ofHours(1)).getEpochSecond();
 
-        String policy = "{\"Statement\":[{\"Resource\":\"" + resourcePath +
+        String policy = "{\"Statement\":[{\"Resource\":\"" + fullResourceUrl +
                 "\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":" + expires + "}}}]}";
 
         String base64Policy = encodeBase64(policy.getBytes(StandardCharsets.UTF_8));
         String signature = signPolicy(policy);
 
         return new ResponseCookie[]{
-                buildCookie("CloudFront-Policy", base64Policy),
-                buildCookie("CloudFront-Signature", signature),
-                buildCookie("CloudFront-Key-Pair-Id", keyPairId)
+                buildCookie("CloudFront-Policy", base64Policy, cookiePath),
+                buildCookie("CloudFront-Signature", signature, cookiePath),
+                buildCookie("CloudFront-Key-Pair-Id", keyPairId, cookiePath)
         };
     }
 
@@ -86,12 +86,12 @@ public class CloudFrontCookieSigner {
         }
     }
 
-    private ResponseCookie buildCookie(String name, String value) {
+    private ResponseCookie buildCookie(String name, String value, String path) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
-                .path("/")
+                .path(path)
                 .maxAge(Duration.ofHours(1))
                 .build();
     }

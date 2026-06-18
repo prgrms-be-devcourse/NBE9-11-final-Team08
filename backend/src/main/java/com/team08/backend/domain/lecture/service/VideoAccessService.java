@@ -50,22 +50,23 @@ public class VideoAccessService {
         }
 
         String uuid = extractUuid(m3u8Path);
-        String clientPath = "/lectures/" + lectureId + "/" + uuid + "/*";
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(clientPath);
+        String resourcePath = "/lectures/" + lectureId + "/" + uuid + "/*";
+        String cookiePath = "/lectures/" + lectureId + "/";
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
 
         return new VideoStreamResponse(m3u8Path, List.copyOf(Arrays.asList(cookies)));
     }
 
     private String extractUuid(String m3u8Path) {
         if (m3u8Path == null) {
-            log.error("Lecture m3u8 path data integrity violation: path is null");
+            log.warn("Lecture m3u8 path data integrity violation: path is null");
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
         Matcher matcher = LECTURE_PATH_PATTERN.matcher(m3u8Path);
         if (matcher.matches()) {
             return matcher.group(1);
         }
-        log.error("Lecture m3u8 path format mismatch validation failed: {}", m3u8Path);
+        log.warn("Lecture m3u8 path format mismatch validation failed: {}", m3u8Path);
         throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
     }
 }

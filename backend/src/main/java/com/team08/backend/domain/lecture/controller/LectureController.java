@@ -7,7 +7,6 @@ import com.team08.backend.domain.lecture.service.VideoAccessService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,11 +37,8 @@ public class LectureController {
 
         VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
 
-        HttpHeaders headers = new HttpHeaders();
-        streamResponse.cookies().forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString()));
-
         return ResponseEntity.ok()
-                .headers(headers)
+                .headers(streamResponse.asHttpHeaders())
                 .body(streamResponse.path());
     }
 }

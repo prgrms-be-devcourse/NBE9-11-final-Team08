@@ -36,9 +36,10 @@ class CloudFrontCookieSignerTest {
 
     @Test
     void 유효한_경로로_서명된_쿠키_배열을_정상_생성한다() {
-        String clientPath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
+        String resourcePath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
+        String cookiePath = "/lectures/1/";
 
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(clientPath);
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
 
         assertThat(cookies).hasSize(3);
         assertThat(cookies[0].getName()).isEqualTo("CloudFront-Policy");
@@ -53,7 +54,7 @@ class CloudFrontCookieSignerTest {
             assertThat(cookie.isHttpOnly()).isTrue();
             assertThat(cookie.isSecure()).isTrue();
             assertThat(cookie.getSameSite()).isEqualTo("Lax");
-            assertThat(cookie.getPath()).isEqualTo("/");
+            assertThat(cookie.getPath()).isEqualTo(cookiePath);
         }
     }
 }
