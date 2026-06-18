@@ -2,6 +2,7 @@ package com.team08.backend.global.auth.util;
 
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
@@ -29,6 +30,28 @@ public class CloudFrontCookieSigner {
     @Value("${cloud.aws.cloudfront.private-key:-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----}")
     private String privateKeyPem;
 
+    private PrivateKey privateKey;
+
+    @PostConstruct
+    public void init() {
+        try {
+            if (privateKeyPem.contains("dummy") || privateKeyPem.length() < 100) {
+                return;
+            }
+            String privateKeyRaw = privateKeyPem
+                    .replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replaceAll("\\s+", "");
+
+            byte[] keyBytes = Base64.getDecoder().decode(privateKeyRaw);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            this.privateKey = kf.generatePrivate(spec);
+        } catch (Exception e) {
+            log.error("CloudFront private key initialization failed", e);
+        }
+    }
+
     public ResponseCookie[] createSignedCookies(Long lectureId, String uuid) {
         String resourcePath = "https://" + distributionDomain + "/lectures/" + lectureId + "/" + uuid + "/*";
         long expires = Instant.now().plus(Duration.ofHours(1)).getEpochSecond();
@@ -48,16 +71,9 @@ public class CloudFrontCookieSigner {
 
     private String signPolicy(String policy) {
         try {
-            String privateKeyRaw = privateKeyPem
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .replaceAll("\\s+", "");
-
-            byte[] keyBytes = Base64.getDecoder().decode(privateKeyRaw);
-            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            PrivateKey privateKey = kf.generatePrivate(spec);
-
+            if (privateKey == null) {
+                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            }
             Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initSign(privateKey);
             sig.update(policy.getBytes(StandardCharsets.UTF_8));

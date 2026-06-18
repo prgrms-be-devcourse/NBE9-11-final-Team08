@@ -1,6 +1,7 @@
 package com.team08.backend.domain.lecture.controller;
 
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
+import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lecture.service.VideoAccessService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -35,7 +36,7 @@ public class LectureController {
             @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
 
-        VideoAccessService.VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
+        VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
 
         return ResponseEntity.ok()
                 .headers(headers -> streamResponse.cookies()

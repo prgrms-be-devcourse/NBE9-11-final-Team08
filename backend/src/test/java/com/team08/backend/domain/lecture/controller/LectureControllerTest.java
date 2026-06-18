@@ -2,6 +2,7 @@ package com.team08.backend.domain.lecture.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
+import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lecture.service.VideoAccessService;
 import com.team08.backend.support.security.WithMockLoginUser;
@@ -70,13 +71,13 @@ class LectureControllerTest {
         Long chapterId = 1L;
         Long lectureId = 50L;
         Long userId = 1L;
-        String expectedUrl = "https://cdn.com/lectures/50/uuid-123/index.m3u8";
+        String expectedUrl = "https://cdn.com/lectures/50/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
 
         ResponseCookie[] mockCookies = new ResponseCookie[]{
                 ResponseCookie.from("CloudFront-Policy", "dummy").build()
         };
 
-        VideoAccessService.VideoStreamResponse mockResponse = new VideoAccessService.VideoStreamResponse(expectedUrl, List.of(mockCookies));
+        VideoStreamResponse mockResponse = new VideoStreamResponse(expectedUrl, List.of(mockCookies));
         given(videoAccessService.verifyAndGenerateStreamCookies(eq(lectureId), eq(userId))).willReturn(mockResponse);
 
         mockMvc.perform(get("/api/courses/{courseId}/chapters/{chapterId}/lectures/{lectureId}/stream", courseId, chapterId, lectureId))

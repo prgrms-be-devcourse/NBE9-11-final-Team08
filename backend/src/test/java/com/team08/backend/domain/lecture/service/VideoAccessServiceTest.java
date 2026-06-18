@@ -4,6 +4,7 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
@@ -42,14 +43,14 @@ class VideoAccessServiceTest {
     void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_리스트와_경로를_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
-        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
+        String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
         Lecture lecture = mock(Lecture.class);
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(true);
 
-        VideoAccessService.VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
+        VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
         assertThat(result.path()).isEqualTo(m3u8Path);
         assertThat(result.cookies()).isEmpty();
@@ -62,7 +63,7 @@ class VideoAccessServiceTest {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
-        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
+        String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
 
         Lecture lecture = mock(Lecture.class);
         Chapter chapter = mock(Chapter.class);
@@ -90,7 +91,7 @@ class VideoAccessServiceTest {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
-        String m3u8Path = "https://cdn.com/lectures/1/sample-uuid-path/index.m3u8";
+        String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
 
         Lecture lecture = mock(Lecture.class);
         Chapter chapter = mock(Chapter.class);
@@ -111,10 +112,10 @@ class VideoAccessServiceTest {
         ResponseCookie dummyCookie3 = ResponseCookie.from("CloudFront-Key-Pair-Id", "key").build();
         ResponseCookie[] expectedCookies = new ResponseCookie[]{dummyCookie1, dummyCookie2, dummyCookie3};
 
-        given(cloudFrontCookieSigner.createSignedCookies(lectureId, "sample-uuid-path"))
+        given(cloudFrontCookieSigner.createSignedCookies(lectureId, "c0a80101-1234-5678-90ab-cdef12345678"))
                 .willReturn(expectedCookies);
 
-        VideoAccessService.VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
+        VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
         assertThat(result.path()).isEqualTo(m3u8Path);
         assertThat(result.cookies()).hasSize(3);

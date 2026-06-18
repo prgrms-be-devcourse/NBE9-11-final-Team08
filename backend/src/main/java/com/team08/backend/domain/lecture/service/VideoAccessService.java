@@ -2,6 +2,7 @@ package com.team08.backend.domain.lecture.service;
 
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
@@ -23,7 +24,7 @@ public class VideoAccessService {
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
-    private static final Pattern LECTURE_PATH_PATTERN = Pattern.compile("^https://[^/]+/lectures/\\d+/([^/]+)/index\\.m3u8$");
+    private static final Pattern LECTURE_PATH_PATTERN = Pattern.compile("^https://[^/]+/lectures/\\d+/([a-f0-9\\-]{36})/index\\.m3u8$");
 
     @Transactional(readOnly = true)
     public VideoStreamResponse verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
@@ -61,6 +62,4 @@ public class VideoAccessService {
         }
         throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
-
-    public record VideoStreamResponse(String path, List<ResponseCookie> cookies) {}
 }

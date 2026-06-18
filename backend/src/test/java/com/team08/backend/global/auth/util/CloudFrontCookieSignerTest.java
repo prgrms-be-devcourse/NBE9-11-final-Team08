@@ -31,6 +31,7 @@ class CloudFrontCookieSignerTest {
                 "\n-----END PRIVATE KEY-----";
 
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", generatedPem);
+        cloudFrontCookieSigner.init();
     }
 
     @Test
