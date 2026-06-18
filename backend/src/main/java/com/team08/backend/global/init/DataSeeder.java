@@ -10,10 +10,7 @@ import com.team08.backend.domain.category.entity.Category;
 import com.team08.backend.domain.category.repository.CategoryRepository;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
-import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
-import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
-import com.team08.backend.domain.couponpolicy.entity.DiscountType;
+import com.team08.backend.domain.couponpolicy.entity.*;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
@@ -42,8 +39,6 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
-import com.team08.backend.domain.orderitem.entity.OrderItem;
-import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.seller.entity.Seller;
@@ -111,7 +106,6 @@ public class DataSeeder {
     private final CouponPolicyRepository couponPolicyRepository;
     private final IssuedCouponRepository issuedCouponRepository;
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final PaymentRepository paymentRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -296,10 +290,28 @@ public class DataSeeder {
         // 쿠폰 정책 (CouponPolicyCourse 는 cascade 로 함께 저장)
         List<CouponPolicy> policies = new ArrayList<>();
         for (int p = 0; p < policyCount; p++) {
-            policies.add(CouponPolicy.createNormalPolicy(
-                    "쿠폰 정책 " + (p + 1), DiscountType.PERCENT, 10, 5000, 0, 30, null,
-                    List.of(courses.get(p).getId()), CouponTarget.COURSE, CouponUsageType.SINGLE_USE,
-                    false, now.minusDays(1), now.plusDays(30)));
+            policies.add(
+                    CouponPolicy.createPolicy(
+                            "쿠폰 정책 " + (p + 1),
+                            CouponTarget.COURSE,
+                            CouponType.AUTO,
+                            10, // totalQuantity
+                            CouponUsageType.SINGLE_USE,
+                            false,
+
+                            DiscountType.PERCENT,
+                            10,     // discountValue
+                            5000,   // maxDiscountAmount
+                            0,      // minOrderAmount
+                            30,     // validDays
+
+                            now.minusDays(1),
+                            now.plusDays(30),
+
+                            null, // categoryIds
+                            List.of(courses.get(p).getId()) // courseIds
+                    )
+            );
         }
         List<CouponPolicy> savedPolicies = couponPolicyRepository.saveAll(policies);
 
@@ -310,42 +322,33 @@ public class DataSeeder {
         }
         List<IssuedCoupon> savedCoupons = issuedCouponRepository.saveAll(coupons);
 
-        // 주문 (결제 완료 상태)
+        // 주문 (결제 완료 상태) — OrderItem 은 addItem 으로 추가되어 cascade 저장된다.
         List<Order> orders = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             Course course = courses.get(i);
-            int price = course.getPrice();
-            int discount = savedPolicies.get(i % policyCount).calculateDiscountAmount(price);
-            int finalPrice = price - discount;
-            Order order = Order.createPendingPayment(
-                    users.get(i).getId(), "ORD-SEED-" + (i + 1), price, discount, finalPrice, now);
+            Order order = Order.createPendingPayment(users.get(i).getId(), "ORD-SEED-" + (i + 1), now);
+            order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
             order.markPaid(now);
             orders.add(order);
         }
         List<Order> savedOrders = orderRepository.saveAll(orders);
 
-        // 주문상품 / 결제 / 수강등록 / 쿠폰사용
-        List<OrderItem> items = new ArrayList<>();
+        // 결제 / 수강등록 / 쿠폰사용
         List<Payment> payments = new ArrayList<>();
         List<Enrollment> enrollments = new ArrayList<>();
         List<OrderCouponUsage> usages = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             Course course = courses.get(i);
             Order order = savedOrders.get(i);
-            int price = order.getTotalPrice();
-            int discount = order.getDiscountPrice();
-            int finalPrice = order.getFinalPrice();
+            int discount = savedPolicies.get(i % policyCount).calculateDiscountAmount(course.getPrice());
 
-            items.add(OrderItem.createSnapshot(order.getId(), course.getId(), course.getTitle(), price, discount, finalPrice, now));
-
-            Payment payment = Payment.createReady(order.getId(), finalPrice, now);
+            Payment payment = Payment.createReady(order, now);
             payment.succeed("PAY-SEED-" + (i + 1), "CARD", now);
             payments.add(payment);
 
-            enrollments.add(Enrollment.createActive(users.get(i).getId(), course.getId(), order.getId(), now));
+            enrollments.add(Enrollment.createActive(users.get(i).getId(), course.getId(), order, now));
             usages.add(new OrderCouponUsage(null, order.getId(), savedCoupons.get(i).getId(), discount));
         }
-        orderItemRepository.saveAll(items);
         paymentRepository.saveAll(payments);
         enrollmentRepository.saveAll(enrollments);
         orderCouponUsageRepository.saveAll(usages);
