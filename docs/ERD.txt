@@ -22,7 +22,8 @@ Enum course_status {
   DRAFT
   IN_REVIEW
   ON_SALE
-  SUSPENDED 
+  SUSPENDED
+  DELETED
 }
 Enum requests_status {
 	PENDING
@@ -32,7 +33,8 @@ Enum requests_status {
 Enum study_status { 
   DRAFT
   ACTIVE
-  READONLY 
+  READONLY
+  INACTIVE
 }
 Enum study_member_role { 
   OWNER
@@ -42,10 +44,6 @@ Enum study_member_status {
   ACTIVE
   KICKED
   LEFT 
-}
-Enum post_type { 
-  ACTIVITY
-  NOTICE 
 }
 Enum discount_type { 
   AMOUNT
@@ -74,7 +72,8 @@ Enum ai_feedback_status {
   PENDING
   PROCESSING
   COMPLETED
-  FAILED 
+  FAILED
+  STALE
 }
 Enum learning_event_type {
   LECTURE_ENTER
@@ -99,6 +98,16 @@ Table users {
   profile_image varchar
   role user_role [not null]
   created_at timestamp [not null]
+  updated_at timestamp [not null]
+}
+Table refresh_tokens {
+  id bigint [pk, increment]
+  user_id bigint
+  token_hash varchar [not null, unique]
+  expires_at datetime [not null]
+  revoked_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
 }
 // =====================================
 // COURSE DOMAIN
@@ -112,10 +121,10 @@ Table categories {
 Table courses {
   id bigint [pk, increment]
   instructor_id bigint [not null]
-  category_id bigint
+  category_id bigint [not null]
   title varchar [not null]
-  description text
-  thumbnail varchar
+  description text [not null]
+  thumbnail varchar [not null]
   price int [not null]
   status course_status [not null]
   view_count int [not null, default: 0]
@@ -131,6 +140,7 @@ Table course_status_histories {
   reason text
   changed_by bigint [not null]
   created_at datetime [not null]
+  updated_at datetime [not null]
 }
 Table chapters {
   id bigint [pk, increment]
@@ -156,7 +166,6 @@ Table lectures {
 }
 Table lecture_modification_requests {
   id bigint [pk, increment]
-  course_id bigint [not null]       // 어떤 강좌의
   lecture_id bigint [not null]      // 어떤 강의 영상이 바뀌는지
   instructor_id bigint [not null]   // 신청한 강사 식별자
   
@@ -165,7 +174,7 @@ Table lecture_modification_requests {
   before_m3u8_path varchar [not null] // 변경 전 기존 구버전 영상 UUID 경로
   after_m3u8_path varchar [not null]  // FFmpeg 변환이 완료된 신버전 영상 UUID 경로
   
-  status varchar [not null]         // 신청 상태 (PENDING, APPROVED, REJECTED)
+  status requests_status [not null] // 신청 상태 (PENDING, APPROVED, REJECTED)
   rejected_reason text              // 관리자가 반려할 경우 적는 반려 사유
 
   managed_by bigint                 // 검토한 관리자 식별자
@@ -211,6 +220,7 @@ Table lecture_reflections {
   lecture_id bigint [not null]
   user_id bigint [not null]
   content text [not null]
+  created_at datetime [not null]
   updated_at datetime [not null]
   indexes {
     (user_id, lecture_id) [unique]
@@ -366,7 +376,7 @@ Table payments {
 Table studies {
   id bigint [pk, increment]
   course_id bigint [not null, unique]
-  owner_id bigint [not null]
+  user_id bigint [not null]
   title varchar(255) [not null]
   description text
   status study_status [not null]
@@ -393,7 +403,7 @@ Table study_activities {
   content text [not null]
   created_at datetime [not null]
   updated_at datetime [not null]
-  deleted_at datetime [not null]
+  deleted_at datetime
 }
 Table ai_feedbacks {
   id bigint [pk, increment]
@@ -434,13 +444,13 @@ Table study_reports {
 // RELATIONS
 // =====================================
 Ref: categories.parent_category_id > categories.id
+Ref: refresh_tokens.user_id > users.id
 Ref: courses.instructor_id > users.id
 Ref: courses.category_id > categories.id
 Ref: course_status_histories.course_id > courses.id
 Ref: course_status_histories.changed_by > users.id
 Ref: chapters.course_id > courses.id
 Ref: lectures.chapter_id > chapters.id
-Ref: lecture_modification_requests.course_id > courses.id
 Ref: lecture_modification_requests.lecture_id > lectures.id
 Ref: lecture_modification_requests.instructor_id > users.id
 Ref: lecture_modification_requests.managed_by > users.id
@@ -475,7 +485,7 @@ Ref: order_coupon_usages.order_id > orders.id
 Ref: order_coupon_usages.issued_coupon_id > issued_coupons.id
 Ref: payments.order_id > orders.id
 Ref: studies.course_id > courses.id
-Ref: studies.owner_id > users.id
+Ref: studies.user_id > users.id
 Ref: study_members.study_id > studies.id
 Ref: study_members.user_id > users.id
 Ref: study_activities.study_id > studies.id
