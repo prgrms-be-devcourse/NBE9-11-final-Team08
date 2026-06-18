@@ -113,6 +113,22 @@ public class Payment {
         this.updatedAt = refundedAt;
     }
 
+    public boolean isCompleted() {
+        return this.status == PaymentStatus.SUCCESS;
+    }
+
+    public boolean canRetry() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+    }
+
+    public boolean canCancelBeforePaid() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+    }
+
+    public boolean canRefund() {
+        return this.status == PaymentStatus.SUCCESS;
+    }
+
     private void validateStatus(PaymentStatus... expectedStatuses) {
         for (PaymentStatus expectedStatus : expectedStatuses) {
             if (this.status == expectedStatus) {

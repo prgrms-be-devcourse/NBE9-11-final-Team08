@@ -14,7 +14,6 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
-import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -98,7 +97,7 @@ public class OrderService {
 
         LocalDateTime canceledAt = LocalDateTime.now(clock);
         order.cancel(canceledAt);
-        cancelPendingPayment(order, canceledAt);
+        cancelCancelablePayment(order, canceledAt);
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         return OrderDetailResponse.from(order, orderItems);
@@ -160,9 +159,9 @@ public class OrderService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 
-    private void cancelPendingPayment(Order order, LocalDateTime canceledAt) {
+    private void cancelCancelablePayment(Order order, LocalDateTime canceledAt) {
         paymentRepository.findByOrder_Id(order.getId())
-                .filter(payment -> payment.getStatus() == PaymentStatus.READY || payment.getStatus() == PaymentStatus.FAILED)
+                .filter(payment -> payment.canCancelBeforePaid())
                 .ifPresent(payment -> payment.cancel(canceledAt));
     }
 }
