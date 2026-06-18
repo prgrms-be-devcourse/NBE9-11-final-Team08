@@ -27,11 +27,11 @@ public class VideoAccessService {
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
-    private static final Pattern LECTURE_PATH_PATTERN = Pattern.compile("^https://[^/]+/lectures/\\d+/([a-f0-9\\-]{36})/index\\.m3u8$");
+    private static final Pattern LECTURE_PATH_PATTERN = Pattern.compile("/lectures/\\d+/([a-f0-9\\-]{36})(?:/|$)");
 
     @Transactional(readOnly = true)
     public VideoStreamResponse verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
-        Lecture lecture = lectureRepository.findById(lectureId)
+        Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         String m3u8Path = lecture.getM3u8Path();
@@ -54,19 +54,19 @@ public class VideoAccessService {
         String cookiePath = "/lectures/" + lectureId + "/";
         ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
 
-        return new VideoStreamResponse(m3u8Path, List.copyOf(Arrays.asList(cookies)));
+        return new VideoStreamResponse(m3u8Path, Arrays.asList(cookies));
     }
 
     private String extractUuid(String m3u8Path) {
         if (m3u8Path == null) {
-            log.warn("Lecture m3u8 path data integrity violation: path is null");
+            log.warn("Lecture path data integrity violation: path is null");
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
         Matcher matcher = LECTURE_PATH_PATTERN.matcher(m3u8Path);
-        if (matcher.matches()) {
+        if (matcher.find()) {
             return matcher.group(1);
         }
-        log.warn("Lecture m3u8 path format mismatch validation failed: {}", m3u8Path);
+        log.warn("Lecture path format mismatch validation failed. Input: [{}], Expected Pattern: [{}]", m3u8Path, LECTURE_PATH_PATTERN.pattern());
         throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
     }
 }

@@ -6,6 +6,10 @@ import java.util.List;
 
 public record VideoStreamResponse(String path, List<ResponseCookie> cookies) {
 
+    public VideoStreamResponse {
+        cookies = List.copyOf(cookies);
+    }
+
     public HttpHeaders asHttpHeaders() {
         HttpHeaders headers = new HttpHeaders();
         cookies.forEach(cookie -> headers.add(HttpHeaders.SET_COOKIE, cookie.toString()));

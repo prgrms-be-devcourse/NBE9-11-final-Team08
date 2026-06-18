@@ -46,7 +46,7 @@ class VideoAccessServiceTest {
         String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
         Lecture lecture = mock(Lecture.class);
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(true);
 
@@ -69,7 +69,7 @@ class VideoAccessServiceTest {
         Chapter chapter = mock(Chapter.class);
         Course course = mock(Course.class);
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(false);
         given(lecture.getChapter()).willReturn(chapter);
@@ -97,7 +97,7 @@ class VideoAccessServiceTest {
         Chapter chapter = mock(Chapter.class);
         Course course = mock(Course.class);
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.isFreePreview()).willReturn(false);
         given(lecture.getChapter()).willReturn(chapter);
         given(chapter.getCourse()).willReturn(course);
@@ -120,5 +120,60 @@ class VideoAccessServiceTest {
         assertThat(result.path()).isEqualTo(m3u8Path);
         assertThat(result.cookies()).hasSize(3);
         assertThat(result.cookies()).containsExactly(dummyCookie1, dummyCookie2, dummyCookie3);
+    }
+
+    @Test
+    void m3u8경로가_null인_경우_잘못된_파라미터_예외를_던진다() {
+        Long lectureId = 1L;
+        Long userId = 100L;
+        Long courseId = 50L;
+
+        Lecture lecture = mock(Lecture.class);
+        Chapter chapter = mock(Chapter.class);
+        Course course = mock(Course.class);
+
+        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
+        given(lecture.isFreePreview()).willReturn(false);
+        given(lecture.getChapter()).willReturn(chapter);
+        given(chapter.getCourse()).willReturn(course);
+        given(course.getId()).willReturn(courseId);
+        given(lecture.getM3u8Path()).willReturn(null);
+
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_INPUT_VALUE.getMessage());
+
+        verifyNoInteractions(cloudFrontCookieSigner);
+    }
+
+    @Test
+    void m3u8경로에_유효한_UUID가_없는_경우_잘못된_파라미터_예외를_던진다() {
+        Long lectureId = 1L;
+        Long userId = 100L;
+        Long courseId = 50L;
+        String invalidM3u8Path = "https://cdn.com/lectures/1/invalid-format-path/index.m3u8";
+
+        Lecture lecture = mock(Lecture.class);
+        Chapter chapter = mock(Chapter.class);
+        Course course = mock(Course.class);
+
+        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
+        given(lecture.isFreePreview()).willReturn(false);
+        given(lecture.getChapter()).willReturn(chapter);
+        given(chapter.getCourse()).willReturn(course);
+        given(course.getId()).willReturn(courseId);
+        given(lecture.getM3u8Path()).willReturn(invalidM3u8Path);
+
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
+                .willReturn(true);
+
+        assertThatThrownBy(() -> videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_INPUT_VALUE.getMessage());
+
+        verifyNoInteractions(cloudFrontCookieSigner);
     }
 }
