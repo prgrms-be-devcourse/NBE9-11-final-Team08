@@ -56,7 +56,7 @@ public class CloudFrontCookieSigner {
             KeyFactory kf = KeyFactory.getInstance("RSA");
             PrivateKey privateKey = kf.generatePrivate(spec);
 
-            Signature sig = Signature.getInstance("SHA1withRSA");
+            Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initSign(privateKey);
             sig.update(policy.getBytes(StandardCharsets.UTF_8));
 
