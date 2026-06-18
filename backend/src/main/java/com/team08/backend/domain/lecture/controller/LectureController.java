@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,7 +29,6 @@ public class LectureController {
 
         return lectureService.createLecture(courseId, chapterId, request);
     }
-    // TODO: lecture 단일 입장도 고려
 
     @GetMapping("/{lectureId}/stream")
     @ResponseStatus(HttpStatus.OK)
@@ -37,6 +37,12 @@ public class LectureController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
             HttpServletResponse response) {
 
-        return videoAccessService.verifyAndGenerateStreamUrl(lectureId, loginUserPrincipal.user().id(), response);
+        ResponseCookie[] cookies = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
+
+        for (ResponseCookie cookie : cookies) {
+            response.addHeader("Set-Cookie", cookie.toString());
+        }
+
+        return videoAccessService.getPlayableM3u8Path(lectureId);
     }
 }
