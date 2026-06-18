@@ -200,4 +200,50 @@ class CurriculumServiceTest {
         assertThatThrownBy(() -> curriculumService.reorderLectures(chapterId, instructorId, request))
                 .isInstanceOf(CustomException.class);
     }
+
+    @Test
+    void 챕터_순서_번호가_중복되면_예외를_던진다() {
+        Long courseId = 1L;
+        Long instructorId = 100L;
+        Course course = mock(Course.class);
+        Chapter chapter1 = mock(Chapter.class);
+        Chapter chapter2 = mock(Chapter.class);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId)).willReturn(List.of(chapter1, chapter2));
+        given(chapter1.getId()).willReturn(10L);
+        given(chapter2.getId()).willReturn(20L);
+
+        ChapterReorderRequest request = new ChapterReorderRequest(List.of(
+                new ChapterReorderRequest.ChapterOrderElement(10L, 1),
+                new ChapterReorderRequest.ChapterOrderElement(20L, 1) // 중복
+        ));
+
+        assertThatThrownBy(() -> curriculumService.reorderChapters(courseId, instructorId, request))
+                .isInstanceOf(CustomException.class);
+    }
+
+    @Test
+    void 강의_순서_번호가_중복되면_예외를_던진다() {
+        Long chapterId = 10L;
+        Long instructorId = 100L;
+        Chapter chapter = mock(Chapter.class);
+        Lecture lecture1 = mock(Lecture.class);
+        Lecture lecture2 = mock(Lecture.class);
+        Course course = mock(Course.class);
+
+        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
+        given(chapter.getCourse()).willReturn(course);
+        given(lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId)).willReturn(List.of(lecture1, lecture2));
+        given(lecture1.getId()).willReturn(100L);
+        given(lecture2.getId()).willReturn(200L);
+
+        LectureReorderRequest request = new LectureReorderRequest(List.of(
+                new LectureReorderRequest.LectureOrderElement(100L, 1),
+                new LectureReorderRequest.LectureOrderElement(200L, 1) // 중복
+        ));
+
+        assertThatThrownBy(() -> curriculumService.reorderLectures(chapterId, instructorId, request))
+                .isInstanceOf(CustomException.class);
+    }
 }

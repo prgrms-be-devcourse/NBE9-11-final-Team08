@@ -14,7 +14,7 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
     @Query("SELECT DISTINCT c FROM Chapter c LEFT JOIN FETCH c.lectures l WHERE c.course.id = :courseId ORDER BY c.orderNo ASC")
     List<Chapter> findByCourseIdWithLecturesOrderByOrderNo(@Param("courseId") Long courseId);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE Chapter c SET c.orderNo = :orderNo WHERE c.id = :id AND c.course.id = :courseId")
     void updateOrderNo(@Param("id") Long id, @Param("orderNo") Integer orderNo, @Param("courseId") Long courseId);
 }
