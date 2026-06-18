@@ -14,9 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,30 +34,37 @@ public class CurriculumService {
 
         course.validateOwner(instructorId);
 
-        List<Long> chapterIds = request.reorders().stream()
-                .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
-                .toList();
+        List<Chapter> dbChapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
 
-        List<Chapter> existingChapters = chapterRepository.findAllById(chapterIds);
-
-        if (existingChapters.size() != chapterIds.size()) {
+        if (dbChapters.size() != request.reorders().size()) {
             throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
         }
 
-        for (Chapter chapter : existingChapters) {
-            if (!chapter.getCourse().getId().equals(courseId)) {
-                throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+        Set<Long> dbChapterIds = dbChapters.stream()
+                .map(Chapter::getId)
+                .collect(Collectors.toSet());
+
+        Set<Long> requestIds = request.reorders().stream()
+                .map(ChapterReorderRequest.ChapterOrderElement::chapterId)
+                .collect(Collectors.toSet());
+
+        if (!dbChapterIds.equals(requestIds)) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
+
+        List<Integer> sortedOrders = request.reorders().stream()
+                .map(ChapterReorderRequest.ChapterOrderElement::orderNo)
+                .sorted()
+                .toList();
+
+        for (int i = 0; i < sortedOrders.size(); i++) {
+            if (sortedOrders.get(i) != (i + 1)) {
+                throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
             }
         }
 
-        Map<Long, Chapter> chapterMap = existingChapters.stream()
-                .collect(Collectors.toMap(Chapter::getId, c -> c));
-
         for (ChapterReorderRequest.ChapterOrderElement element : request.reorders()) {
-            Chapter chapter = chapterMap.get(element.chapterId());
-            if (chapter != null) {
-                chapter.updateGeneralInfo(chapter.getTitle(), element.orderNo(), Collections.emptyList());
-            }
+            chapterRepository.updateOrderNo(element.chapterId(), element.orderNo(), courseId);
         }
     }
 
@@ -69,36 +75,37 @@ public class CurriculumService {
 
         chapter.getCourse().validateOwner(instructorId);
 
-        List<Long> lectureIds = request.reorders().stream()
-                .map(LectureReorderRequest.LectureOrderElement::lectureId)
-                .toList();
+        List<Lecture> dbLectures = lectureRepository.findByChapterIdOrderByOrderNoAsc(chapterId);
 
-        List<Lecture> existingLectures = lectureRepository.findAllById(lectureIds);
-
-        if (existingLectures.size() != lectureIds.size()) {
+        if (dbLectures.size() != request.reorders().size()) {
             throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
         }
 
-        for (Lecture lecture : existingLectures) {
-            if (!lecture.getChapter().getId().equals(chapterId)) {
-                throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+        Set<Long> dbLectureIds = dbLectures.stream()
+                .map(Lecture::getId)
+                .collect(Collectors.toSet());
+
+        Set<Long> requestIds = request.reorders().stream()
+                .map(LectureReorderRequest.LectureOrderElement::lectureId)
+                .collect(Collectors.toSet());
+
+        if (!dbLectureIds.equals(requestIds)) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
+
+        List<Integer> sortedOrders = request.reorders().stream()
+                .map(LectureReorderRequest.LectureOrderElement::orderNo)
+                .sorted()
+                .toList();
+
+        for (int i = 0; i < sortedOrders.size(); i++) {
+            if (sortedOrders.get(i) != (i + 1)) {
+                throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
             }
         }
 
-        Map<Long, Lecture> lectureMap = existingLectures.stream()
-                .collect(Collectors.toMap(Lecture::getId, l -> l));
-
         for (LectureReorderRequest.LectureOrderElement element : request.reorders()) {
-            Lecture lecture = lectureMap.get(element.lectureId());
-            if (lecture != null) {
-                lecture.updateGeneralInfo(
-                        lecture.getTitle(),
-                        lecture.getSummary(),
-                        lecture.getDurationSeconds(),
-                        element.orderNo(),
-                        lecture.isFreePreview()
-                );
-            }
+            lectureRepository.updateOrderNo(element.lectureId(), element.orderNo(), chapterId);
         }
     }
 }

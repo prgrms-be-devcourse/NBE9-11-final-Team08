@@ -18,7 +18,7 @@ public record ChapterReorderRequest(
 
             @NotNull(message = "순서 번호는 필수입니다.")
             @Min(value = 1, message = "순서 번호는 1 이상이어야 합니다.")
-            @Schema(description = "새로운 노출 순서 번화 (1부터 시작)")
+            @Schema(description = "새로운 노출 순서 번호 (1부터 시작)")
             Integer orderNo
     ) {}
 }
