@@ -367,7 +367,7 @@ public class DataSeeder {
         List<LectureProgress> progresses = new ArrayList<>();
         List<LearningEvent> events = new ArrayList<>();
         // TODO: 학습 도메인이아니라 커머스/쿠폰 도메인으로 옮겨야함
-        // TODO: 비기능적 요구사항에 의거한 데이터 규모를 채택해야해서 수치적인 부분은 추가 결정 필요
+        // TODO: 비기능적 요구사항에 의거한 데이터 규모를 채택해야해서 얼마만큼의 데이터를 생성할지는 추가 결정 필요
         List<Attendance> attendances = new ArrayList<>();
         List<LectureReflection> reflections = new ArrayList<>();
         for (int i = 0; i < count; i++) {
