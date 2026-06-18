@@ -2,6 +2,7 @@ package com.team08.backend.domain.lecture.repository;
 
 import com.team08.backend.domain.lecture.entity.Lecture;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,4 +26,8 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
             "JOIN FETCH ch.course c " +
             "WHERE l.id = :lectureId")
     Optional<Lecture> findByIdWithChapterAndCourse(@Param("lectureId") Long lectureId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Lecture l SET l.orderNo = :orderNo WHERE l.id = :id AND l.chapter.id = :chapterId")
+    void updateOrderNo(@Param("id") Long id, @Param("orderNo") Integer orderNo, @Param("chapterId") Long chapterId);
 }

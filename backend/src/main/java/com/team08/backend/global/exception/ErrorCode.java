@@ -60,6 +60,7 @@ public enum ErrorCode {
     REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "COURSE_006", "강좌 심사 반려 시 사유는 필수입니다."),
     COURSE_HAS_ACTIVE_ENROLLMENTS(HttpStatus.BAD_REQUEST, "COURSE_007", "수강 중인 활성 수강생이 존재하여 강좌를 삭제할 수 없습니다."),
     LECTURE_MODIFICATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COURSE_008", "강의 변경 신청 내역을 찾을 수 없습니다."),
+    INVALID_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "COURSE_009", "유효하지 않은 순서 변경 요청입니다."),
 
     // ── Lecture ──────────────────────────────────────────────────────────
     LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_001", "강의를 찾을 수 없습니다."),
