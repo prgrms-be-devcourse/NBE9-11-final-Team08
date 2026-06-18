@@ -7,7 +7,6 @@ import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
@@ -26,12 +25,12 @@ public class VideoAccessService {
     private static final Pattern UUID_PATTERN = Pattern.compile("/lectures/\\d+/([^/]+)/");
 
     @Transactional(readOnly = true)
-    public String verifyAndGenerateStreamUrl(Long lectureId, Long userId, HttpServletResponse response) {
+    public ResponseCookie[] verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
         Lecture lecture = lectureRepository.findById(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         if (lecture.isFreePreview()) {
-            return lecture.getM3u8Path();
+            return new ResponseCookie[0];
         }
 
         Long courseId = lecture.getChapter().getCourse().getId();
@@ -44,12 +43,13 @@ public class VideoAccessService {
         }
 
         String uuid = extractUuid(lecture.getM3u8Path());
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(lectureId, uuid);
+        return cloudFrontCookieSigner.createSignedCookies(lectureId, uuid);
+    }
 
-        for (ResponseCookie cookie : cookies) {
-            response.addHeader("Set-Cookie", cookie.toString());
-        }
-
+    @Transactional(readOnly = true)
+    public String getPlayableM3u8Path(Long lectureId) {
+        Lecture lecture = lectureRepository.findById(lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
         return lecture.getM3u8Path();
     }
 

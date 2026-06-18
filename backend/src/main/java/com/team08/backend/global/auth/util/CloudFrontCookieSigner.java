@@ -34,7 +34,7 @@ public class CloudFrontCookieSigner {
         String policy = "{\"Statement\":[{\"Resource\":\"" + resourcePath +
                 "\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":" + expires + "}}}]}";
 
-        String base64Policy = ServiceBase64.encode(policy.getBytes(StandardCharsets.UTF_8));
+        String base64Policy = encodeBase64(policy.getBytes(StandardCharsets.UTF_8));
         String signature = signPolicy(policy);
 
         return new ResponseCookie[]{
@@ -60,7 +60,7 @@ public class CloudFrontCookieSigner {
             sig.initSign(privateKey);
             sig.update(policy.getBytes(StandardCharsets.UTF_8));
 
-            return ServiceBase64.encode(sig.sign());
+            return encodeBase64(sig.sign());
         } catch (Exception e) {
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
@@ -76,13 +76,8 @@ public class CloudFrontCookieSigner {
                 .build();
     }
 
-    private static class ServiceBase64 {
-        public static String encode(byte[] bytes) {
-            return Base64.getEncoder().encodeToString(bytes)
-                    .replace('+', '-')
-                    .replace('=', '_')
-                    .replace('/', '~')
-                    .replaceAll("\\s+", "");
-        }
+    private String encodeBase64(byte[] bytes) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+                .replace('_', '~');
     }
 }
