@@ -1,8 +1,9 @@
+// frontend/components/study/study-post-view.tsx
 'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowLeft,
   MessageCircle,
@@ -16,7 +17,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import type { BoardPost, Study, StudyComment } from '@/lib/types'
+import { api } from '@/lib/api'
+import type { Study, StudyActivityResponse, StructuredFeedback } from '@/lib/types'
 
 const AI_DAILY_LIMIT = 3
 
@@ -26,21 +28,28 @@ export function StudyPostView({
   currentUser,
 }: {
   study: Study
-  post: BoardPost
+  post: StudyActivityResponse
   currentUser: string
 }) {
   const router = useRouter()
-  const base = `/study/${study.id}`
-  const isAuthor = post.author === currentUser
+  const base = `/study/${study.courseId}`
+  const isAuthor = post.authorName === currentUser
 
-  const [comments, setComments] = useState<StudyComment[]>(post.comments)
+  const [comments, setComments] = useState<any[]>([])
   const [comment, setComment] = useState('')
-  const [feedback, setFeedback] = useState(post.aiFeedback)
+  const [feedback, setFeedback] = useState<StructuredFeedback | null>(null)
   const [loading, setLoading] = useState(false)
-  // AI 코치 일일 이용 횟수 (1일 3회 제한)
   const [aiUsed, setAiUsed] = useState(0)
 
   const remaining = AI_DAILY_LIMIT - aiUsed
+
+  useEffect(() => {
+    if (post.aiFeedbackId) {
+      api.getAiFeedback(post.studyId, post.id)
+         .then(res => setFeedback(res?.feedback ?? null))
+         .catch(err => console.error(err))
+    }
+  }, [post.aiFeedbackId, post.studyId, post.id])
 
   const submitComment = () => {
     if (!comment.trim()) return
@@ -50,29 +59,31 @@ export function StudyPostView({
         id: `c-${Date.now()}`,
         author: currentUser,
         content: comment.trim(),
-        createdAt: new Date()
-          .toLocaleString('ko-KR', { hour12: false })
-          .replace(/\. /g, '.'),
+        createdAt: new Date().toLocaleString(),
       },
     ])
     setComment('')
     toast.success('댓글이 등록되었습니다.')
   }
 
-  const requestFeedback = () => {
+  const requestFeedback = async () => {
     if (remaining <= 0) {
       toast.error('오늘 AI 코치 이용 횟수를 모두 사용했어요. (1일 3회)')
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      setFeedback(
-        '학습 기록을 구체적으로 정리하셨습니다. 개념을 본인의 언어로 다시 설명하고, 헷갈렸던 부분과 보완할 점을 한 줄로 덧붙이면 회고의 완성도가 높아집니다. 정답 여부보다 이해의 깊이에 집중해보세요.',
-      )
-      setAiUsed((n) => n + 1)
+    try {
+      const res = await api.generateAiFeedback(post.studyId, post.id)
+      if (res.feedback) {
+        setFeedback(res.feedback)
+        setAiUsed((n) => n + 1)
+        toast.success('AI 코치 피드백이 도착했습니다.')
+      }
+    } catch (error) {
+      toast.error('AI 피드백 생성에 실패했습니다.')
+    } finally {
       setLoading(false)
-      toast.success('AI 코치 피드백이 도착했습니다.')
-    }, 1200)
+    }
   }
 
   const deletePost = () => {
@@ -91,16 +102,16 @@ export function StudyPostView({
 
       <article className="rounded-xl border bg-card">
         <div className="border-b px-6 py-5">
-          <h1 className="text-xl font-bold text-balance">{post.title}</h1>
+          <h1 className="text-xl font-bold text-balance">{post.content.split('\n')[0] || '내용 없음'}</h1>
           <div className="mt-3 flex items-center gap-3">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                {post.author[0]}
+                {post.authorName ? post.authorName.charAt(0) : '?'}
               </AvatarFallback>
             </Avatar>
             <div className="text-sm">
-              <p className="font-medium">{post.author}</p>
-              <p className="text-xs text-muted-foreground">{post.createdAt}</p>
+              <p className="font-medium">{post.authorName}</p>
+              <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleString()}</p>
             </div>
             {isAuthor && (
               <div className="ml-auto flex items-center gap-2">
@@ -119,14 +130,19 @@ export function StudyPostView({
           </p>
         </div>
 
-        {/* AI 코치 */}
         <div className="border-t px-6 py-5">
           {feedback ? (
-            <div className="rounded-lg bg-secondary/60 p-4">
+            <div className="space-y-2 rounded-lg bg-secondary/60 p-4">
               <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
                 <Sparkles className="h-3.5 w-3.5" /> AI 코치 피드백
               </p>
-              <p className="mt-2 text-sm leading-relaxed">{feedback}</p>
+              <p className="text-sm font-medium">{feedback.summary}</p>
+              {feedback.strengths && (
+                <p className="text-xs text-muted-foreground"><strong className="text-foreground">👍 잘한 점:</strong> {feedback.strengths}</p>
+              )}
+              {feedback.improvements && (
+                <p className="text-xs text-muted-foreground"><strong className="text-foreground">💡 보완점:</strong> {feedback.improvements}</p>
+              )}
             </div>
           ) : isAuthor ? (
             <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
@@ -149,7 +165,6 @@ export function StudyPostView({
         </div>
       </article>
 
-      {/* 댓글 */}
       <section className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 border-b px-6 py-3">
           <MessageCircle className="h-4 w-4" />

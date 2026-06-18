@@ -1,6 +1,3 @@
-// Domain types shared between the React frontend and the Spring backend (REST API).
-// These mirror the JSON DTOs returned by the Java/Spring controllers.
-
 export interface Instructor {
   id: string
   name: string
@@ -11,8 +8,8 @@ export interface Instructor {
 export interface Lecture {
   id: string
   title: string
-  duration: string // e.g. "15:08"
-  progress: number // 0 - 100
+  duration: string
+  progress: number
   completed: boolean
 }
 
@@ -39,15 +36,100 @@ export interface Course {
   tags: string[]
   instructor: Instructor
   chapters: Chapter[]
-  badges?: string[] // e.g. ["New", "답변 활발", "미션"]
+  badges?: string[]
   status?: 'PUBLISHED' | 'DRAFT' | 'REVIEW'
 }
 
-export interface CartItem {
-  courseId: string
+export interface CourseCardResponse {
+  id: number
+  instructorId: number
+  categoryId: number
   title: string
-  thumbnailUrl: string
+  thumbnail: string
   price: number
+  viewCount: number
+}
+
+export interface LectureInfoResponse {
+  id: number
+  title: string
+  m3u8Path: string | null
+  durationSeconds: number
+  orderNo: number
+  isFreePreview: boolean
+}
+
+export interface ChapterInfoResponse {
+  id: number
+  title: string
+  orderNo: number
+  lectures: LectureInfoResponse[]
+}
+
+export interface CourseDetailResponse {
+  id: number
+  instructorId: number
+  categoryId: number
+  title: string
+  description: string
+  thumbnail: string
+  price: number
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  viewCount: number
+  chapters: ChapterInfoResponse[]
+}
+
+export interface PageResponse<T> {
+  content: T[]
+  pageable: {
+    pageNumber: number
+    pageSize: number
+  }
+  totalElements: number
+  totalPages: number
+  last: boolean
+}
+
+export interface CartItemResponse {
+  cartItemId: number
+  courseId: number
+  title: string
+  price: number
+}
+
+export interface CartResponse {
+  items: CartItemResponse[]
+  totalPrice: number
+}
+
+export interface OrderItemResponse {
+  orderItemId: number
+  courseId: number
+  courseTitle: string
+  price: number
+  discountPrice: number
+  finalPrice: number
+}
+
+export interface OrderDetailResponse {
+  orderId: number
+  orderNumber: string
+  totalPrice: number
+  discountPrice: number
+  finalPrice: number
+  status: string
+  orderedAt: string
+  canceledAt?: string
+  items: OrderItemResponse[]
+}
+
+export interface OrderSummaryResponse {
+  orderId: number
+  orderNumber: string
+  orderedAt: string
+  status: string
+  totalPrice: number
+  finalPrice: number
 }
 
 export interface Coupon {
@@ -59,9 +141,6 @@ export interface Coupon {
   type: 'discount' | 'attendance' | 'firstcome'
 }
 
-// --- Admin: coupon policy management ---
-// Mirrors the Spring `CouponPolicy` entity / DTO.
-
 export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'
@@ -71,7 +150,7 @@ export type CouponStatus = 'SCHEDULED' | 'ACTIVE' | 'ENDED'
 export interface AdminCoupon {
   id: number
   name: string
-  totalQuantity: number | null // null = 무제한
+  totalQuantity: number | null
   type: CouponPolicyType
   target: CouponApplyTarget
   useType: CouponUseType
@@ -80,23 +159,63 @@ export interface AdminCoupon {
   discountValue: number
   maxDiscount: number | null
   minOrderAmount: number
-  validDays: number | null // 발급 후 N일
-  startAt: string // ISO datetime
-  endAt: string // ISO datetime
+  validDays: number | null
+  startAt: string
+  endAt: string
   status: CouponStatus
   issuedCount: number
   targetCategories?: string[]
   targetCourses?: string[]
 }
 
+export interface CouponListResponse {
+  issuedCouponId: number
+  policyId: number
+  policyName: string
+  discountType: string
+  discountValue: number
+  validUntil: string
+  status: string
+}
+
 export interface QnaPost {
   id: string
   author: string
   role: 'student' | 'instructor'
-  timestamp: string // lecture timecode e.g "3:58"
+  timestamp: string
   content: string
   createdAt: string
   answers?: QnaPost[]
+}
+
+export interface QnaAnswerSummary {
+  id: number
+  authorId: number
+  authorName: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface QnaQuestionResponse {
+  id: number
+  lectureId: number
+  authorId: number
+  authorName: string
+  title: string
+  content: string
+  createdAt: string
+  updatedAt: string
+  answers: QnaAnswerSummary[]
+}
+
+export interface LectureReflectionResponse {
+  id: number
+  lectureId: number
+  userId: number
+  content: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface ActivityFeedItem {
@@ -145,7 +264,7 @@ export interface EnrolledCourse {
   title: string
   instructor: string
   thumbnailUrl: string
-  progress: number // 0 - 100
+  progress: number
   totalLectures: number
   completedLectures: number
   dday?: number
@@ -160,8 +279,6 @@ export interface MyComment {
   createdAt: string
 }
 
-// --- Auth ---
-
 export type SignupRole = 'USER' | 'SELLER'
 
 export interface SignupRequest {
@@ -170,6 +287,33 @@ export interface SignupRequest {
   nickname: string
   profileImage?: string
   userRole: SignupRole
+}
+
+export interface CourseCreateRequest {
+  title: string
+  description: string
+  categoryId: number
+  price: number
+  thumbnail: string
+}
+
+export interface LectureUpdateRequest {
+  id: number | null
+  title: string
+  durationSeconds: number
+  orderNo: number
+  isFreePreview: boolean
+}
+
+export interface ChapterUpdateRequest {
+  id: number | null
+  title: string
+  orderNo: number
+  lectures: LectureUpdateRequest[]
+}
+
+export interface CourseUpdateRequest extends CourseCreateRequest {
+  chapters: ChapterUpdateRequest[]
 }
 
 export interface LoginRequest {
@@ -181,16 +325,13 @@ export interface LoginResponse {
   accessToken: string
 }
 
-// --- Study room (스터디) ---
-// 강좌 1개 = 스터디 1개. 강좌 구매자가 자동 참여하는 학습 공간.
-
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'
-export type StudyRole = 'owner' | 'member'
+export type StudyRole = 'owner' | 'member' | 'OWNER' | 'MEMBER'
 
 export interface StudyMember {
   id: string
   name: string
-  progress: number // 0 - 100
+  progress: number
   role: StudyRole
   joinedAt: string
 }
@@ -222,23 +363,84 @@ export interface BoardPost {
   content: string
   createdAt: string
   comments: StudyComment[]
-  // AI 코치: 학습 활동에 대한 AI 피드백 (작성자 요청 시 생성)
   aiFeedback?: string
 }
 
 export interface Study {
-  id: string // 강좌 id와 동일
+  id: string
   courseId: string
   name: string
   intro: string
   status: StudyStatus
   ownerName: string
   myRole: StudyRole
-  progress: number // 내 진행률
+  progress: number
   members: StudyMember[]
   applicants: StudyApplicant[]
   announcements: StudyAnnouncement[]
   posts: BoardPost[]
+}
+
+export interface StudySummaryResponse {
+  studyId: number
+  title: string
+  description: string
+  ownerNickname: string
+}
+
+export interface StudyDetailResponse {
+  studyId: number
+  courseId: number
+  title: string
+  description: string
+  status: string
+  ownerNickname: string
+  myRole: string
+}
+
+export interface StudyActivityResponse {
+  id: number
+  studyId: number
+  memberId: number
+  authorName: string
+  content: string
+  createdAt: string
+  updatedAt: string
+  aiFeedbackId: number | null
+}
+
+export interface StructuredFeedback {
+  summary: string
+  strengths: string
+  improvements: string
+  additionalStudy: string
+}
+
+export interface AiFeedbackResponse {
+  id: number
+  studyId: number
+  activityId: number
+  status: 'REQUESTED' | 'GENERATING' | 'COMPLETED' | 'FAILED'
+  feedback: StructuredFeedback | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LearningEventResponse {
+  id: number
+  userId: number
+  eventType: string
+  courseId: number
+  chapterId: number | null
+  lectureId: number | null
+  createdAt: string
+}
+
+export interface AttendanceResponse {
+  userId: number
+  date: string
+  continuousDays: number
+  totalDays: number
 }
 
 export interface StudyReport {

@@ -1,9 +1,10 @@
+// frontend/components/checkout/cart-view.tsx
 'use client'
 
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShoppingCart, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -13,21 +14,35 @@ import { formatKRW } from '@/lib/utils'
 
 export function CartView() {
   const router = useRouter()
-  const { items, removeItem, removeItems } = useCart()
-  const [selected, setSelected] = useState<string[]>(items.map((i) => i.courseId))
+  const { items, total: providerTotal, removeItem, removeItems, loading } = useCart()
+  const [selected, setSelected] = useState<number[]>([])
 
-  // keep selection in sync if an item is removed elsewhere
-  const validSelected = selected.filter((id) => items.some((i) => i.courseId === id))
+  useEffect(() => {
+    if (!loading && selected.length === 0 && items.length > 0) {
+      setSelected(items.map((i) => i.cartItemId))
+    }
+  }, [loading, items, selected.length])
+
+  const validSelected = selected.filter((id) => items.some((i) => i.cartItemId === id))
   const allChecked = items.length > 0 && validSelected.length === items.length
 
-  const toggle = (id: string) =>
+  const toggle = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
 
   const toggleAll = () =>
-    setSelected(allChecked ? [] : items.map((i) => i.courseId))
+    setSelected(allChecked ? [] : items.map((i) => i.cartItemId))
 
-  const selectedItems = items.filter((i) => validSelected.includes(i.courseId))
-  const total = selectedItems.reduce((s, i) => s + i.price, 0)
+  const selectedItems = items.filter((i) => validSelected.includes(i.cartItemId))
+  
+  const total = allChecked ? providerTotal : selectedItems.reduce((s, i) => s + i.price, 0)
+
+  if (loading) {
+    return (
+      <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed py-20 text-center">
+        <p className="mt-4 text-sm text-muted-foreground">장바구니 정보를 불러오는 중입니다...</p>
+      </div>
+    )
+  }
 
   if (items.length === 0) {
     return (
@@ -61,14 +76,14 @@ export function CartView() {
 
         <ul className="mt-3 space-y-3">
           {items.map((item) => (
-            <li key={item.courseId} className="flex items-center gap-3 rounded-xl border bg-card p-3">
+            <li key={item.cartItemId} className="flex items-center gap-3 rounded-xl border bg-card p-3">
               <Checkbox
-                checked={validSelected.includes(item.courseId)}
-                onCheckedChange={() => toggle(item.courseId)}
+                checked={validSelected.includes(item.cartItemId)}
+                onCheckedChange={() => toggle(item.cartItemId)}
               />
               <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-muted">
                 <Image
-                  src={item.thumbnailUrl || '/placeholder.svg'}
+                  src={'/placeholder.svg'}
                   alt={item.title}
                   fill
                   sizes="112px"
@@ -83,7 +98,7 @@ export function CartView() {
                 variant="ghost"
                 size="icon"
                 aria-label="삭제"
-                onClick={() => removeItem(item.courseId)}
+                onClick={() => removeItem(item.cartItemId)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

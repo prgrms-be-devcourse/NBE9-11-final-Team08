@@ -1,9 +1,11 @@
+// frontend/components/course/course-detail.tsx
 'use client'
 
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Clock, PlayCircle, Star, Users } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, Clock, PlayCircle, Star, Users, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,53 +20,79 @@ import {
 import { useCart } from '@/components/providers/cart-provider'
 import type { Course } from '@/lib/types'
 import { discountedPrice, formatKRW } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 export function CourseDetail({ course }: { course: Course }) {
   const router = useRouter()
   const { addItem, has } = useCart()
+  const [buying, setBuying] = useState(false)
+  const [adding, setAdding] = useState(false)
+  
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
   const inCart = has(course.id)
 
-  const handleAdd = () => {
-    addItem(course)
-    toast.success('장바구니에 담았습니다.')
+  const handleAdd = async () => {
+    if (inCart) return
+    setAdding(true)
+    try {
+      if ('addToCart' in api) {
+        await (api as any).addToCart(Number(course.id))
+      }
+      addItem(course)
+      toast.success('장바구니에 담았습니다.')
+    } catch (err) {
+      toast.error('장바구니 담기에 실패했습니다.')
+    } finally {
+      setAdding(false)
+    }
   }
 
-  const handleBuy = () => {
-    addItem(course)
-    router.push('/cart')
+  const handleBuy = async () => {
+    setBuying(true)
+    try {
+      if ('createDirectOrder' in api) {
+        const order = await (api as any).createDirectOrder(Number(course.id))
+        router.push(`/orders/${order.orderId || order.id}`)
+      } else {
+        addItem(course)
+        router.push('/cart')
+      }
+    } catch (err) {
+      toast.error('주문 생성에 실패했습니다.')
+    } finally {
+      setBuying(false)
+    }
   }
 
   return (
     <div className="bg-card">
-      {/* Hero */}
       <div className="border-b bg-foreground text-background">
         <div className="mx-auto max-w-7xl px-4 py-10 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10">
           <div>
             <Badge variant="secondary" className="mb-3">
-              {course.category} · {course.subCategory}
+              {course.category} · {course.subCategory || '분류 없음'}
             </Badge>
             <h1 className="text-2xl font-bold leading-tight text-balance sm:text-3xl">
               {course.title}
             </h1>
-            <p className="mt-3 text-base leading-relaxed text-background/80">{course.subtitle}</p>
+            <p className="mt-3 text-base leading-relaxed text-background/80">{course.subtitle || course.description?.substring(0, 100)}</p>
             <div className="mt-5 flex flex-wrap items-center gap-4 text-sm">
               <span className="flex items-center gap-1 text-amber-400">
                 <Star className="h-4 w-4 fill-current" />
-                <span className="font-semibold">{course.rating.toFixed(1)}</span>
-                <span className="text-background/70">({course.reviewCount}개 수강평)</span>
+                <span className="font-semibold">{(course.rating || 0).toFixed(1)}</span>
+                <span className="text-background/70">({course.reviewCount || 0}개 수강평)</span>
               </span>
               <span className="flex items-center gap-1 text-background/80">
                 <Users className="h-4 w-4" />
-                {course.studentCount.toLocaleString('ko-KR')}명 참여
+                {(course.studentCount || 0).toLocaleString('ko-KR')}명 참여
               </span>
               <Badge className="bg-primary text-primary-foreground">{course.level}</Badge>
             </div>
             <div className="mt-4 flex items-center gap-3">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {course.instructor.name[0]}
+                  {course.instructor.name?.[0] || '?'}
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -77,13 +105,12 @@ export function CourseDetail({ course }: { course: Course }) {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-10 lg:grid lg:grid-cols-[1fr_360px] lg:gap-10">
-        {/* Main content */}
         <div className="space-y-10">
           <section>
             <h2 className="mb-3 text-xl font-bold">강좌 소개</h2>
             <p className="leading-relaxed text-muted-foreground">{course.description}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              {course.tags.map((t) => (
+              {course.tags?.map((t) => (
                 <Badge key={t} variant="outline">
                   {t}
                 </Badge>
@@ -98,36 +125,42 @@ export function CourseDetail({ course }: { course: Course }) {
                 총 {course.chapters.length}개 챕터 · {totalLectures}개 강의
               </p>
             </div>
-            <Accordion type="multiple" defaultValue={[course.chapters[0]?.id]} className="rounded-xl border">
-              {course.chapters.map((ch) => (
-                <AccordionItem key={ch.id} value={ch.id} className="px-4 last:border-b-0">
-                  <AccordionTrigger className="text-sm font-semibold">{ch.title}</AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="space-y-1">
-                      {ch.lectures.map((lec) => (
-                        <li
-                          key={lec.id}
-                          className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-secondary"
-                        >
-                          <span className="flex items-center gap-2">
-                            {lec.completed ? (
-                              <CheckCircle2 className="h-4 w-4 text-primary" />
-                            ) : (
-                              <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                            )}
-                            {lec.title}
-                          </span>
-                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {lec.duration}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+            {course.chapters.length > 0 ? (
+              <Accordion multiple defaultValue={[course.chapters[0]?.id]} className="rounded-xl border">
+                {course.chapters.map((ch) => (
+                  <AccordionItem key={ch.id} value={ch.id} className="px-4 last:border-b-0">
+                    <AccordionTrigger className="text-sm font-semibold">{ch.title}</AccordionTrigger>
+                    <AccordionContent>
+                      <ul className="space-y-1">
+                        {ch.lectures.map((lec) => (
+                          <li
+                            key={lec.id}
+                            className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-secondary"
+                          >
+                            <span className="flex items-center gap-2">
+                              {lec.completed ? (
+                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                              ) : (
+                                <PlayCircle className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              {lec.title}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              {lec.duration}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            ) : (
+              <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
+                등록된 커리큘럼이 없습니다.
+              </div>
+            )}
           </section>
 
           <section>
@@ -135,7 +168,7 @@ export function CourseDetail({ course }: { course: Course }) {
             <div className="flex items-start gap-4 rounded-xl border p-5">
               <Avatar className="h-14 w-14">
                 <AvatarFallback className="bg-primary text-lg text-primary-foreground">
-                  {course.instructor.name[0]}
+                  {course.instructor.name?.[0] || '?'}
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -146,7 +179,6 @@ export function CourseDetail({ course }: { course: Course }) {
           </section>
         </div>
 
-        {/* Sticky purchase card */}
         <div className="mt-8 lg:mt-0">
           <div className="lg:sticky lg:top-20">
             <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
@@ -178,11 +210,12 @@ export function CourseDetail({ course }: { course: Course }) {
                   </p>
                 ) : null}
 
-                <Button onClick={handleBuy} className="w-full" size="lg">
+                <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
+                  {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   코스 구매하기
                 </Button>
-                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={inCart}>
-                  {inCart ? '장바구니에 담김' : '장바구니 담기'}
+                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={inCart || adding}>
+                  {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : inCart ? '장바구니에 담김' : '장바구니 담기'}
                 </Button>
                 <Button asChild variant="outline" className="w-full">
                   <Link href={`/study/${course.id}`}>스터디 입장</Link>
@@ -200,7 +233,7 @@ export function CourseDetail({ course }: { course: Course }) {
                   </li>
                   <li className="flex justify-between">
                     <span>수강 대상</span>
-                    <span className="font-medium text-foreground">{course.subCategory}</span>
+                    <span className="font-medium text-foreground">{course.subCategory || '분류 없음'}</span>
                   </li>
                 </ul>
               </div>

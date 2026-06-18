@@ -1,7 +1,8 @@
+// frontend/components/admin/coupon-manager.tsx
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Eye, MoreHorizontal, Pencil, Plus, Search, StopCircle, Trash2 } from 'lucide-react'
+import { Eye, MoreHorizontal, Pencil, Plus, Search, StopCircle, Trash2, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +48,7 @@ import {
   couponTypeLabel,
 } from '@/lib/coupon-labels'
 import type { AdminCoupon, CouponPolicyType, CouponStatus } from '@/lib/types'
+import { api } from '@/lib/api'
 
 type ConfirmAction = { type: 'end' | 'delete'; coupon: AdminCoupon } | null
 
@@ -65,6 +67,7 @@ export function CouponManager({
   const [detail, setDetail] = useState<AdminCoupon | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmAction>(null)
+  const [processing, setProcessing] = useState(false)
 
   const filtered = useMemo(
     () =>
@@ -101,20 +104,35 @@ export function CouponManager({
     })
   }
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!confirm) return
-    if (confirm.type === 'delete') {
-      setCoupons((prev) => prev.filter((c) => c.id !== confirm.coupon.id))
-      toast.success('쿠폰이 삭제되었습니다.')
-    } else {
-      setCoupons((prev) =>
-        prev.map((c) =>
-          c.id === confirm.coupon.id ? { ...c, status: 'ENDED' } : c,
-        ),
-      )
-      toast.success('쿠폰이 조기 종료되었습니다.')
+    setProcessing(true)
+    try {
+      if (confirm.type === 'delete') {
+        // [TODO] api.ts에 deleteCouponPolicy 추가 필요
+        if ('deleteCouponPolicy' in api) {
+          await (api as any).deleteCouponPolicy(confirm.coupon.id)
+        }
+        setCoupons((prev) => prev.filter((c) => c.id !== confirm.coupon.id))
+        toast.success('쿠폰이 삭제되었습니다.')
+      } else {
+        // [TODO] api.ts에 updateCouponPolicyStatus 추가 필요
+        if ('updateCouponPolicyStatus' in api) {
+          await (api as any).updateCouponPolicyStatus(confirm.coupon.id, 'ENDED')
+        }
+        setCoupons((prev) =>
+          prev.map((c) =>
+            c.id === confirm.coupon.id ? { ...c, status: 'ENDED' } : c,
+          ),
+        )
+        toast.success('쿠폰이 조기 종료되었습니다.')
+      }
+    } catch (error) {
+      toast.error('작업 처리에 실패했습니다.')
+    } finally {
+      setProcessing(false)
+      setConfirm(null)
     }
-    setConfirm(null)
   }
 
   const discountText = (c: AdminCoupon) =>
@@ -136,7 +154,6 @@ export function CouponManager({
         </Button>
       </div>
 
-      {/* 필터 바 */}
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -185,7 +202,6 @@ export function CouponManager({
         </Select>
       </div>
 
-      {/* 데이터 테이블 */}
       <div className="rounded-xl border bg-card">
         <Table>
           <TableHeader>
@@ -201,7 +217,7 @@ export function CouponManager({
           </TableHeader>
           <TableBody>
             {filtered.map((c) => {
-              const status = couponStatusMeta[c.status]
+              const status = couponStatusMeta[c.status] || couponStatusMeta['ACTIVE']
               return (
                 <TableRow key={c.id}>
                   <TableCell className="text-muted-foreground">{c.id}</TableCell>
@@ -295,15 +311,17 @@ export function CouponManager({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel disabled={processing}>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirm}
+              disabled={processing}
               className={
                 confirm?.type === 'delete'
                   ? 'bg-destructive text-white hover:bg-destructive/90'
                   : undefined
               }
             >
+              {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {confirm?.type === 'delete' ? '삭제' : '조기 종료'}
             </AlertDialogAction>
           </AlertDialogFooter>

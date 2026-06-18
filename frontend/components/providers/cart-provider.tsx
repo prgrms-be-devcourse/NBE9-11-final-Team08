@@ -1,43 +1,107 @@
+// frontend/components/providers/cart-provider.tsx
 'use client'
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import type { CartItem, Course } from '@/lib/types'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { CartItemResponse, Course } from '@/lib/types'
+import { api } from '@/lib/api'
+import { usePathname } from 'next/navigation'
+import { toast } from 'sonner'
 
 interface CartContextValue {
-  items: CartItem[]
-  addItem: (course: Course) => void
-  removeItem: (courseId: string) => void
-  removeItems: (courseIds: string[]) => void
-  clear: () => void
-  has: (courseId: string) => boolean
+  items: CartItemResponse[]
+  addItem: (course: Course) => Promise<void>
+  removeItem: (cartItemId: number) => Promise<void>
+  removeItems: (cartItemIds: number[]) => Promise<void>
+  clear: () => Promise<void>
+  has: (courseId: string | number) => boolean
   total: number
+  loading: boolean
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([])
+  const [items, setItems] = useState<CartItemResponse[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const pathname = usePathname()
 
-  const addItem = (course: Course) => {
-    setItems((prev) => {
-      if (prev.some((i) => i.courseId === course.id)) return prev
-      const price = course.discountRate
-        ? Math.round((course.price * (100 - course.discountRate)) / 100)
-        : course.price
-      return [
-        ...prev,
-        { courseId: course.id, title: course.title, thumbnailUrl: course.thumbnailUrl, price },
-      ]
-    })
+  const refreshCart = async () => {
+    try {
+      const res = await api.getCart()
+      setItems(res.items || [])
+      setTotal(res.totalPrice || 0)
+    } catch (e) {
+      console.error("장바구니 갱신 실패:", e)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const removeItem = (courseId: string) =>
-    setItems((prev) => prev.filter((i) => i.courseId !== courseId))
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      refreshCart()
+    } else {
+      setItems([])
+      setTotal(0)
+      setLoading(false)
+    }
+  }, [pathname])
 
-  const removeItems = (courseIds: string[]) =>
-    setItems((prev) => prev.filter((i) => !courseIds.includes(i.courseId)))
+  const addItem = async (course: Course) => {
+    // 1. 프론트에서 먼저 중복 체크
+    if (items.some((i) => i.courseId.toString() === course.id.toString())) {
+      toast.warning("이미 장바구니에 담긴 강의입니다.")
+      return
+    }
 
-  const clear = () => setItems([])
+    try {
+      // 2. API 호출
+      await api.addToCart(Number(course.id))
+      
+      // 3. 성공 시 장바구니 갱신
+      await refreshCart()
+      toast.success("장바구니에 담겼습니다.")
+    } catch (e: any) {
+      // 4. 여기서 에러를 잡아서 처리 (앱이 죽지 않음)
+      const errorMessage = e.message || ""
+      if (errorMessage.includes("이미 장바구니에 담긴")) {
+        toast.warning("이미 장바구니에 담긴 강의입니다.")
+      } else {
+        toast.error("장바구니 담기에 실패했습니다.")
+      }
+      console.error("장바구니 추가 에러:", e)
+    }
+  }
+
+  const removeItem = async (cartItemId: number) => {
+    try {
+      await api.removeFromCart(cartItemId)
+      await refreshCart()
+      toast.success("제거되었습니다.")
+    } catch (e) {
+      toast.error("제거에 실패했습니다.")
+      console.error(e)
+    }
+  }
+
+  const removeItems = async (cartItemIds: number[]) => {
+    for (const id of cartItemIds) {
+      await removeItem(id)
+    }
+  }
+
+  const clear = async () => {
+    try {
+      await api.clearCart()
+      await refreshCart()
+      toast.success("장바구니를 비웠습니다.")
+    } catch (e) {
+      toast.error("장바구니 비우기에 실패했습니다.")
+      console.error(e)
+    }
+  }
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -46,10 +110,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       removeItems,
       clear,
-      has: (courseId: string) => items.some((i) => i.courseId === courseId),
-      total: items.reduce((sum, i) => sum + i.price, 0),
+      has: (courseId: string | number) => items.some((i) => i.courseId.toString() === courseId.toString()),
+      total,
+      loading
     }),
-    [items],
+    [items, total, loading],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

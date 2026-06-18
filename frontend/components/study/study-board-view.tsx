@@ -3,16 +3,16 @@ import { MessageCircle, PenLine, Sparkles } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { BoardPost, Study } from '@/lib/types'
+import type { Study, StudyActivityResponse } from '@/lib/types'
 
 export function StudyBoardView({
   study,
   posts,
 }: {
   study: Study
-  posts: BoardPost[]
+  posts: StudyActivityResponse[]
 }) {
-  const base = `/study/${study.id}`
+  const base = `/study/${study.courseId}`
 
   return (
     <div className="space-y-5">
@@ -40,16 +40,16 @@ export function StudyBoardView({
         </div>
       ) : (
         <ul className="overflow-hidden rounded-xl border bg-card">
-          {posts.map((post) => (
-            <li key={post.id} className="border-b last:border-b-0">
+          {posts.map((post, index) => (
+            <li key={post.id?.toString() || `post-${index}`} className="border-b last:border-b-0">
               <Link
-                href={`${base}/board/${post.id}`}
+                href={`${base}/board/${post.id?.toString() || '0'}`}
                 className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/60"
               >
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 truncate font-medium">
-                    {post.title}
-                    {post.aiFeedback && (
+                    {post.content.split('\n')[0] || '내용 없음'}
+                    {post.aiFeedbackId && (
                       <Badge
                         variant="secondary"
                         className="h-5 shrink-0 gap-1 px-1.5 text-[10px]"
@@ -65,18 +65,18 @@ export function StudyBoardView({
                 </div>
                 <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                   <MessageCircle className="h-3.5 w-3.5" />
-                  {post.comments.length}
+                  0
                 </span>
                 <div className="hidden w-28 shrink-0 items-center gap-2 sm:flex">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
-                      {post.author[0]}
+                      {post.authorName ? post.authorName.charAt(0) : '?'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="truncate text-xs">{post.author}</span>
+                  <span className="truncate text-xs">{post.authorName}</span>
                 </div>
                 <span className="hidden shrink-0 text-xs text-muted-foreground md:block">
-                  {post.createdAt}
+                  {new Date(post.createdAt).toLocaleDateString()}
                 </span>
               </Link>
             </li>

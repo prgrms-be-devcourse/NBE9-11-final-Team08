@@ -9,15 +9,18 @@ export default async function StudyPostPage({
   params: Promise<{ id: string; postId: string }>
 }) {
   const { id, postId } = await params
-  const [study, post, profile] = await Promise.all([
-    api.getStudy(id),
-    api.getBoardPost(id, postId),
+  const study = await api.getStudy(id)
+  if (!study) notFound()
+
+  const [post, profile] = await Promise.all([
+    api.getBoardPost(study.id, postId),
     api.getProfile(),
   ])
-  if (!study || !post) notFound()
+  if (!post) notFound()
+
   return (
     <StudyShell study={study}>
-      <StudyPostView study={study} post={post} currentUser={profile.name} />
+      <StudyPostView study={study} post={post} currentUser={profile?.name ?? ''} />
     </StudyShell>
   )
 }

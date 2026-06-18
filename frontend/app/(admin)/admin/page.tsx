@@ -4,6 +4,22 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 
 export default async function AdminDashboardPage() {
+  const userProfile = await api.getProfile()
+
+  if (!userProfile || !userProfile.isSeller) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <h1 className="text-3xl font-bold">접근 권한 없음</h1>
+        <p className="mt-2 text-muted-foreground">
+          이 페이지에 접근하려면 관리자 권한이 필요합니다.
+        </p>
+        <Button asChild className="mt-6">
+          <Link href="/">메인 페이지로 돌아가기</Link>
+        </Button>
+      </div>
+    )
+  }
+
   const coupons = await api.getAdminCoupons()
   const active = coupons.filter((c) => c.status === 'ACTIVE').length
   const scheduled = coupons.filter((c) => c.status === 'SCHEDULED').length

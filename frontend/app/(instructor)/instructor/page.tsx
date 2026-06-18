@@ -6,6 +6,6 @@ export const metadata = {
 }
 
 export default async function InstructorPage() {
-  const courses = await api.getCourses()
-  return <ProductManager courses={courses} />
+  const response = await api.getCourses()
+  return <ProductManager courses={response.content} />
 }

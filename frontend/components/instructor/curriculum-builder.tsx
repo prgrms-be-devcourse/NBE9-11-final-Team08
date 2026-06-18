@@ -1,13 +1,15 @@
+// frontend/components/instructor/curriculum-builder.tsx
 'use client'
 
-import { useState } from 'react'
-import { FileVideo, GripVertical, ImageUp, Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileVideo, GripVertical, ImageUp, Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 interface LectureDraft {
   id: string
@@ -23,36 +25,42 @@ interface ChapterDraft {
   lectures: LectureDraft[]
 }
 
-let idCounter = 100
-const nextId = () => `c${idCounter++}`
+export function CurriculumBuilder({ courseId }: { courseId?: string }) {
+  const [chapters, setChapters] = useState<ChapterDraft[]>([])
+  const [activeId, setActiveId] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
 
-const initialChapters: ChapterDraft[] = [
-  {
-    id: 's1',
-    title: '섹션 1. 오리엔테이션',
-    lectures: [
-      {
-        id: 'l1',
-        title: '강의 소개와 학습 목표',
-        description: '강의의 전체 구성과 학습 목표를 안내합니다.',
-      },
-      { id: 'l2', title: '개발 환경 세팅', description: '실습에 필요한 개발 환경을 설정합니다.' },
-    ],
-  },
-  {
-    id: 's2',
-    title: '섹션 2. 핵심 개념',
-    lectures: [
-      { id: 'l3', title: '영속성 컨텍스트의 이해', description: 'JPA의 핵심 개념을 설명합니다.' },
-    ],
-  },
-]
-
-export function CurriculumBuilder() {
-  const [chapters, setChapters] = useState<ChapterDraft[]>(initialChapters)
-  const [activeId, setActiveId] = useState<string>(initialChapters[0]?.id ?? '')
+  useEffect(() => {
+    if (courseId) {
+      api.getCourse(courseId)
+        .then((course) => {
+          if (course && course.chapters) {
+            const mappedChapters = course.chapters.map(ch => ({
+              id: ch.id.toString(),
+              title: ch.title,
+              lectures: ch.lectures.map(lec => ({
+                id: lec.id.toString(),
+                title: lec.title,
+                description: '',
+              }))
+            }))
+            setChapters(mappedChapters)
+            if (mappedChapters.length > 0) {
+              setActiveId(mappedChapters[0].id)
+            }
+          }
+        })
+        .catch(() => toast.error('커리큘럼 정보를 불러오는데 실패했습니다.'))
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [courseId])
 
   const active = chapters.find((c) => c.id === activeId) ?? chapters[0]
+
+  const nextId = () => `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
   const addChapter = () => {
     const id = nextId()
@@ -96,11 +104,7 @@ export function CurriculumBuilder() {
       ),
     )
 
-  const updateLecture = (
-    cid: string,
-    lid: string,
-    patch: Partial<LectureDraft>,
-  ) =>
+  const updateLecture = (cid: string, lid: string, patch: Partial<LectureDraft>) =>
     setChapters((prev) =>
       prev.map((c) =>
         c.id === cid
@@ -112,11 +116,32 @@ export function CurriculumBuilder() {
       ),
     )
 
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      if ('saveCurriculum' in api && courseId) {
+        await (api as any).saveCurriculum(courseId, chapters)
+      }
+      toast.success('커리큘럼이 성공적으로 저장되었습니다.')
+    } catch (error) {
+      toast.error('커리큘럼 저장에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const totalLectures = chapters.reduce((acc, c) => acc + c.lectures.length, 0)
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-      {/* Chapter list */}
       <aside className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">챕터 목록</h2>
@@ -155,9 +180,18 @@ export function CurriculumBuilder() {
         >
           <Plus className="size-4" /> 새 챕터 추가
         </Button>
+
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="mt-6 w-full gap-1.5"
+        >
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          커리큘럼 저장
+        </Button>
       </aside>
 
-      {/* Lecture list for active chapter */}
       <section className="space-y-4">
         {active ? (
           <>

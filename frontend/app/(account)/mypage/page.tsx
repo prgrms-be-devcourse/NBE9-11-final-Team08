@@ -1,3 +1,4 @@
+// frontend/app/(account)/mypage/page.tsx
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { EnrolledCard } from '@/components/account/enrolled-card'
@@ -10,7 +11,7 @@ export const metadata = {
 
 export default async function MyPage() {
   const [enrolled, purchased] = await Promise.all([
-    api.getEnrolledCourses(),
+    api.getMyStudies(),
     api.getPurchasedCourses(),
   ])
 

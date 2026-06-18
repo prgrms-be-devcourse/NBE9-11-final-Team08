@@ -1,23 +1,79 @@
+// frontend/components/events/attendance-view.tsx
 'use client'
 
-import { useState } from 'react'
-import { CalendarDays, Check, Flame } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CalendarDays, Check, Flame, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 
 export function AttendanceView() {
   const [checkedToday, setCheckedToday] = useState(false)
-  const [monthTotal, setMonthTotal] = useState(18)
-  const [streak, setStreak] = useState(6)
-  const today = 19
-  const checkedDays = Array.from({ length: 18 }, (_, i) => i + 1)
+  const [monthTotal, setMonthTotal] = useState(0)
+  const [streak, setStreak] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [checking, setChecking] = useState(false)
+  
+  const today = new Date().getDate()
+  const currentMonth = new Date().getMonth() + 1
+  const daysInMonth = new Date(new Date().getFullYear(), currentMonth, 0).getDate()
+  const [checkedDays, setCheckedDays] = useState<number[]>([])
 
-  const handleCheck = () => {
-    setCheckedToday(true)
-    setMonthTotal((v) => v + 1)
-    setStreak((v) => v + 1)
-    toast.success('출석 완료! 포인트가 적립되었습니다.')
+  useEffect(() => {
+    if ('getAttendance' in api) {
+      (api as any).getAttendance()
+        .then((res: any) => {
+          if (res) {
+            setMonthTotal(res.totalDays || 0)
+            setStreak(res.continuousDays || 0)
+            
+            const lastDate = res.date ? new Date(res.date) : null
+            const isTodayChecked = lastDate && lastDate.toDateString() === new Date().toDateString()
+            setCheckedToday(!!isTodayChecked)
+            
+            const mockDays = []
+            if (!!isTodayChecked) mockDays.push(today)
+            setCheckedDays(mockDays)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [today])
+
+  const handleCheck = async () => {
+    setChecking(true)
+    try {
+      if ('checkAttendance' in api) {
+        const res: any = await (api as any).checkAttendance()
+        if (res) {
+          setMonthTotal(res.totalDays || monthTotal + 1)
+          setStreak(res.continuousDays || streak + 1)
+        }
+      } else {
+        setMonthTotal((v) => v + 1)
+        setStreak((v) => v + 1)
+      }
+      
+      setCheckedToday(true)
+      setCheckedDays(prev => [...prev, today])
+      toast.success('출석 완료! 포인트가 적립되었습니다.')
+    } catch (err) {
+      toast.error('출석 체크에 실패했습니다.')
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mt-6 flex h-40 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -44,9 +100,9 @@ export function AttendanceView() {
       </div>
 
       <div className="rounded-xl border bg-card p-6">
-        <h2 className="mb-4 text-sm font-semibold">6월 출석 현황</h2>
+        <h2 className="mb-4 text-sm font-semibold">{currentMonth}월 출석 현황</h2>
         <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: 30 }, (_, i) => i + 1).map((day) => {
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
             const checked = checkedDays.includes(day) || (day === today && checkedToday)
             const isToday = day === today
             return (
@@ -65,8 +121,8 @@ export function AttendanceView() {
         </div>
       </div>
 
-      <Button size="lg" className="w-full" onClick={handleCheck} disabled={checkedToday}>
-        {checkedToday ? '오늘 출석 완료' : '출석 체크하기'}
+      <Button size="lg" className="w-full" onClick={handleCheck} disabled={checkedToday || checking}>
+        {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : checkedToday ? '오늘 출석 완료' : '출석 체크하기'}
       </Button>
     </div>
   )

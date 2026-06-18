@@ -9,11 +9,12 @@ export default async function StudyCoursePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [study, course] = await Promise.all([
-    api.getStudy(id),
-    api.getCourse(id),
-  ])
-  if (!study || !course) notFound()
+  const study = await api.getStudy(id)
+  if (!study) notFound()
+
+  const course = await api.getCourse(study.courseId)
+  if (!course) notFound()
+
   return (
     <StudyShell study={study}>
       <StudyCourseView study={study} course={course} />

@@ -1,3 +1,4 @@
+// frontend/app/(account)/orders/[id]/page.tsx
 import { notFound } from 'next/navigation'
 import { api } from '@/lib/api'
 import { OrderDetailView } from '@/components/checkout/order-detail-view'
@@ -9,6 +10,8 @@ export default async function OrderDetailPage({
 }) {
   const { id } = await params
   const order = await api.getOrder(id)
+  
   if (!order) notFound()
-  return <OrderDetailView order={order} />
+    
+  return <OrderDetailView order={order as any} />
 }

@@ -1,7 +1,8 @@
+// frontend/components/study/study-view.tsx
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -22,11 +23,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ReflectionEditor } from '@/components/study/reflection-editor'
 import { cn } from '@/lib/utils'
-import type { Course, Lecture, QnaPost } from '@/lib/types'
+import { api } from '@/lib/api'
+import type { Course, Lecture, QnaQuestionResponse } from '@/lib/types'
 
 interface StudyViewProps {
   course: Course
-  qna: QnaPost[]
+  qna?: any[]
 }
 
 const LESSON_NOTE = `영속성(Persistence)이란 프로그램이 종료되거나 시스템이 재시작되더라도 데이터가 사라지지 않고 저장되는 특성을 의미한다.
@@ -41,7 +43,7 @@ const LESSON_NOTE = `영속성(Persistence)이란 프로그램이 종료되거�
 만약 모든 데이터를 메모리에만 저장한다면 다음과 같은 문제가 발생한다.
 예시: 쇼핑몰 회원 정보가 서버 재시작 시 모두 사라진다면 서비스를 운영할 수 없다.`
 
-export function StudyView({ course, qna }: StudyViewProps) {
+export function StudyView({ course }: StudyViewProps) {
   const lectures = useMemo(
     () => course.chapters.flatMap((c) => c.lectures),
     [course],
@@ -52,42 +54,53 @@ export function StudyView({ course, qna }: StudyViewProps) {
   const [openChapters, setOpenChapters] = useState<string[]>(
     course.chapters.map((c) => c.id),
   )
-  const [posts, setPosts] = useState<QnaPost[]>(qna)
+  const [posts, setPosts] = useState<QnaQuestionResponse[]>([])
   const [question, setQuestion] = useState('')
 
-  const active =
-    lectures.find((l) => l.id === activeId) ?? lectures[0]
+  const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
   const totalProgress = Math.round(
     lectures.reduce((s, l) => s + l.progress, 0) / Math.max(lectures.length, 1),
   )
+
+  useEffect(() => {
+    if (active?.id) {
+      api.getQna(active.id).then((res) => {
+        setPosts(res as unknown as QnaQuestionResponse[])
+      }).catch(() => setPosts([]))
+    }
+  }, [active?.id])
 
   const toggleChapter = (id: string) =>
     setOpenChapters((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     )
 
-  const submitQuestion = () => {
+  const submitQuestion = async () => {
     if (!question.trim()) return
-    setPosts((prev) => [
-      {
-        id: `q-${Date.now()}`,
-        author: '김아무개',
-        role: 'student',
-        timestamp: '0:00',
+    
+    try {
+      const newQuestion = {
+        id: Date.now(),
+        lectureId: Number(active.id),
+        authorId: 1,
+        authorName: '현재 사용자',
+        title: question.trim().substring(0, 20),
         content: question.trim(),
-        createdAt: new Date()
-          .toLocaleString('ko-KR', { hour12: false })
-          .replace(/\. /g, '.'),
-      },
-      ...prev,
-    ])
-    setQuestion('')
-    toast.success('질문이 게시되었습니다.')
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        answers: []
+      }
+      
+      setPosts((prev) => [newQuestion, ...prev])
+      setQuestion('')
+      toast.success('질문이 게시되었습니다.')
+    } catch (err) {
+      toast.error('질문 게시에 실패했습니다.')
+    }
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Study top bar */}
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card px-4">
         <Button asChild variant="ghost" size="icon" aria-label="스터디로 돌아가기">
           <Link href={`/study/${course.id}`}>
@@ -109,7 +122,6 @@ export function StudyView({ course, qna }: StudyViewProps) {
       </header>
 
       <div className="grid flex-1 lg:grid-cols-[300px_1fr_340px]">
-        {/* Curriculum sidebar */}
         <aside className="order-2 border-t lg:order-1 lg:border-r lg:border-t-0">
           <div className="flex items-center justify-between px-4 py-3">
             <h2 className="text-sm font-semibold">커리큘럼</h2>
@@ -154,7 +166,6 @@ export function StudyView({ course, qna }: StudyViewProps) {
           </nav>
         </aside>
 
-        {/* Player + lesson content */}
         <main className="order-1 lg:order-2">
           <div className="relative aspect-video w-full bg-foreground">
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-background">
@@ -184,11 +195,10 @@ export function StudyView({ course, qna }: StudyViewProps) {
               ))}
             </article>
 
-            <ReflectionSection lectureTitle={active?.title ?? ''} />
+            <ReflectionSection lectureId={active?.id} lectureTitle={active?.title ?? ''} />
           </div>
         </main>
 
-        {/* QnA panel */}
         <aside className="order-3 border-t lg:border-l lg:border-t-0">
           <div className="flex items-center gap-2 px-4 py-3">
             <MessageCircleQuestion className="h-4 w-4" />
@@ -261,44 +271,38 @@ function LectureRow({
   )
 }
 
-function QnaThread({ post }: { post: QnaPost }) {
+function QnaThread({ post }: { post: QnaQuestionResponse }) {
   return (
     <li className="rounded-lg border p-3">
       <div className="flex items-center gap-2">
         <Avatar className="h-7 w-7">
           <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-            {post.author[0]}
+            {post.authorName ? post.authorName.charAt(0) : '?'}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0">
           <p className="text-xs font-semibold">
-            Q. {post.author}
-            <span className="ml-1 font-normal text-muted-foreground">
-              {post.timestamp}
-            </span>
+            Q. {post.authorName}
           </p>
-          <p className="text-[11px] text-muted-foreground">{post.createdAt}</p>
+          <p className="text-[11px] text-muted-foreground">{new Date(post.createdAt).toLocaleString()}</p>
         </div>
       </div>
-      <p className="mt-2 text-sm leading-relaxed">{post.content}</p>
+      <p className="mt-2 text-sm font-semibold">{post.title}</p>
+      <p className="mt-1 text-sm leading-relaxed">{post.content}</p>
 
       {post.answers?.map((ans) => (
         <div key={ans.id} className="mt-3 rounded-md bg-secondary/60 p-3">
           <p className="text-xs font-semibold text-primary">
-            A. {ans.author}
-            <span className="ml-1 font-normal text-muted-foreground">
-              {ans.timestamp}
-            </span>
+            A. {ans.authorName}
           </p>
           <p className="mt-1 text-sm leading-relaxed">{ans.content}</p>
-          <p className="mt-1 text-[11px] text-muted-foreground">{ans.createdAt}</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{new Date(ans.createdAt).toLocaleString()}</p>
         </div>
       ))}
     </li>
   )
 }
 
-// Tiptap이 비어있을 때 반환하는 HTML들. 실제 내용 유무 판단에 사용한다.
 function isEmptyHtml(html: string) {
   const stripped = html
     .replace(/<[^>]*>/g, '')
@@ -307,14 +311,21 @@ function isEmptyHtml(html: string) {
   return stripped.length === 0
 }
 
-function ReflectionSection({ lectureTitle }: { lectureTitle: string }) {
+function ReflectionSection({ lectureId, lectureTitle }: { lectureId?: string, lectureTitle: string }) {
   const [reflection, setReflection] = useState('')
   const [requestAi, setRequestAi] = useState(true)
   const [editing, setEditing] = useState(false)
-  // 편집 중에만 사용하는 임시 입력값. 취소 시 버려져 기존 내용이 유지된다.
   const [draft, setDraft] = useState('')
 
   const hasReflection = !isEmptyHtml(reflection)
+
+  useEffect(() => {
+    if (lectureId) {
+      setReflection('')
+      setDraft('')
+      setEditing(false)
+    }
+  }, [lectureId])
 
   const startEdit = () => {
     setDraft(reflection)
@@ -322,7 +333,6 @@ function ReflectionSection({ lectureTitle }: { lectureTitle: string }) {
   }
 
   const cancelEdit = () => {
-    // 기존 회고 내용을 그대로 유지하고 조회 모드로 복귀
     setEditing(false)
     setDraft('')
   }

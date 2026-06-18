@@ -9,11 +9,11 @@ export default async function StudyBoardPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [study, posts] = await Promise.all([
-    api.getStudy(id),
-    api.getBoardPosts(id),
-  ])
+  const study = await api.getStudy(id)
   if (!study) notFound()
+
+  const posts = await api.getBoardPosts(study.id)
+
   return (
     <StudyShell study={study}>
       <StudyBoardView study={study} posts={posts} />

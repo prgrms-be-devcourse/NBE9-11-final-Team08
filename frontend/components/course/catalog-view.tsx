@@ -1,38 +1,62 @@
+// frontend/components/course/catalog-view.tsx
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, SlidersHorizontal, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CourseCard } from '@/components/course/course-card'
 import { categories } from '@/lib/mock-data'
 import type { Course } from '@/lib/types'
+import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-const sorts = ['추천순', '인기순', '최신순'] as const
-const filters = ['AI 생성 콘텐츠 제외', '무료', '할인', '얼리버드 할인']
+const sorts = ['VIEW_DESC', 'LATEST', 'PRICE_ASC'] as const
+const sortLabels: Record<string, string> = {
+  VIEW_DESC: '인기순',
+  LATEST: '최신순',
+  PRICE_ASC: '낮은가격순',
+}
+const filters = ['무료', '할인']
 
-export function CatalogView({ courses }: { courses: Course[] }) {
+export function CatalogView() {
   const [category, setCategory] = useState('전체')
-  const [sort, setSort] = useState<(typeof sorts)[number]>('추천순')
+  const [sort, setSort] = useState<(typeof sorts)[number]>('VIEW_DESC')
   const [query, setQuery] = useState('')
+  
+  const [courses, setCourses] = useState<Course[]>([])
+  const [totalElements, setTotalElements] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      setLoading(true)
+      try {
+        // Fetch up to 100 items to allow efficient client-side filtering by category
+        const response = await api.getCourses(0, 100, sort)
+        setCourses(response.content)
+        setTotalElements(response.totalElements)
+      } catch (err) {
+        console.error('Failed to fetch courses', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchCourses()
+  }, [sort])
 
   const visible = useMemo(() => {
     let list = courses.filter(
       (c) =>
-        (category === '전체' || c.category === category) &&
+        (category === '전체' || c.category === category || c.category === categories.indexOf(category).toString()) &&
         (query === '' || c.title.toLowerCase().includes(query.toLowerCase())),
     )
-    if (sort === '인기순') list = [...list].sort((a, b) => b.studentCount - a.studentCount)
-    if (sort === '최신순') list = [...list].reverse()
-    if (sort === '추천순') list = [...list].sort((a, b) => b.rating - a.rating)
     return list
-  }, [courses, category, sort, query])
+  }, [courses, category, query])
 
   return (
     <div className="mx-auto max-w-7xl gap-8 px-4 py-8 lg:grid lg:grid-cols-[220px_1fr]">
-      {/* Category sidebar */}
       <aside className="hidden lg:block">
         <div className="sticky top-20">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
@@ -57,7 +81,6 @@ export function CatalogView({ courses }: { courses: Course[] }) {
       </aside>
 
       <div>
-        {/* Hero banner */}
         <div className="mb-6 overflow-hidden rounded-2xl bg-primary px-6 py-10 text-primary-foreground sm:px-10">
           <p className="text-sm font-medium opacity-90">요즘 대세는</p>
           <h1 className="mt-1 text-2xl font-bold text-balance sm:text-3xl">
@@ -68,7 +91,6 @@ export function CatalogView({ courses }: { courses: Course[] }) {
           </p>
         </div>
 
-        {/* Mobile search + category */}
         <div className="mb-4 lg:hidden">
           <div className="relative flex items-center">
             <Search className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground" />
@@ -97,7 +119,6 @@ export function CatalogView({ courses }: { courses: Course[] }) {
           </div>
         </div>
 
-        {/* Filter chips */}
         <div className="mb-4 flex flex-wrap gap-2">
           {filters.map((f) => (
             <Badge key={f} variant="outline" className="cursor-pointer font-normal">
@@ -106,7 +127,6 @@ export function CatalogView({ courses }: { courses: Course[] }) {
           ))}
         </div>
 
-        {/* Sort + count */}
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             전체 강의 <span className="font-semibold text-foreground">{visible.length}</span>개
@@ -119,14 +139,18 @@ export function CatalogView({ courses }: { courses: Course[] }) {
                 size="sm"
                 onClick={() => setSort(s)}
               >
-                {s}
+                {sortLabels[s]}
               </Button>
             ))}
           </div>
         </div>
 
-        {/* Grid */}
-        {visible.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
+            <p className="text-sm text-muted-foreground">강좌를 불러오는 중입니다...</p>
+          </div>
+        ) : visible.length === 0 ? (
           <p className="py-16 text-center text-sm text-muted-foreground">
             조건에 맞는 강좌가 없습니다.
           </p>

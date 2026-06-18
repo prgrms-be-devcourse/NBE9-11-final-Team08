@@ -1,19 +1,21 @@
+
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
-import { Clock, Flame, Sparkles, TrendingUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Clock, Flame, Sparkles, TrendingUp, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import type { ActivityFeedItem, EnrolledCourse } from '@/lib/types'
+import type { EnrolledCourse, StudyActivityResponse, StructuredFeedback } from '@/lib/types'
+import { api } from '@/lib/api'
 
 interface DashboardViewProps {
   courses: EnrolledCourse[]
-  feed: ActivityFeedItem[]
+  feed: StudyActivityResponse[]
 }
 
 export function DashboardView({ courses, feed }: DashboardViewProps) {
@@ -39,7 +41,6 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
         </p>
       </div>
 
-      {/* 수강현황 summary */}
       <section className="grid grid-cols-3 gap-3">
         {summary.map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
@@ -51,7 +52,6 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
       </section>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_330px]">
-        {/* 강좌 progress */}
         <section>
           <h2 className="mb-4 text-lg font-bold">강좌별 진행 현황</h2>
           <ul className="space-y-3">
@@ -84,12 +84,11 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
           </ul>
         </section>
 
-        {/* 학습 활동 피드 */}
         <section>
-          <h2 className="mb-4 text-lg font-bold">학습 활동 피드</h2>
+          <h2 className="mb-4 text-lg font-bold">최근 스터디 활동</h2>
           <ul className="space-y-3">
-            {feed.map((item) => (
-              <ActivityCard key={item.id} item={item} />
+            {feed.map((item, index) => (
+              <ActivityCard key={item.id?.toString() || `activity-${index}`} item={item} />
             ))}
           </ul>
         </section>
@@ -98,42 +97,62 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
   )
 }
 
-function ActivityCard({ item }: { item: ActivityFeedItem }) {
-  const [feedback, setFeedback] = useState(item.aiFeedback)
+function ActivityCard({ item }: { item: StudyActivityResponse }) {
+  const [feedback, setFeedback] = useState<StructuredFeedback | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const requestFeedback = () => {
+  useEffect(() => {
+    if (item.aiFeedbackId) {
+      api.getAiFeedback(item.studyId, item.id)
+         .then(res => setFeedback(res?.feedback ?? null))
+         .catch(err => console.error(err))
+    }
+  }, [item.aiFeedbackId, item.studyId, item.id])
+
+  const requestFeedback = async () => {
     setLoading(true)
-    setTimeout(() => {
-      setFeedback(
-        '회고 내용을 잘 정리하셨습니다. 핵심 개념을 본인의 언어로 다시 설명해보면 이해가 더 단단해져요. 다음 강의와 연결해 학습해보세요.',
-      )
+    try {
+      const res = await api.generateAiFeedback(item.studyId, item.id)
+      if (res.feedback) {
+        setFeedback(res.feedback)
+        toast.success('AI 피드백이 도착했습니다.')
+      }
+    } catch (error) {
+      toast.error('AI 피드백 생성에 실패했습니다.')
+    } finally {
       setLoading(false)
-      toast.success('AI 피드백이 도착했습니다.')
-    }, 1200)
+    }
   }
+
+  const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''
 
   return (
     <li className="rounded-xl border bg-card p-4">
       <div className="flex items-center gap-2">
         <Avatar className="h-7 w-7">
           <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-            {item.author[0]}
+            {item.authorName?.charAt(0) || '?'}
           </AvatarFallback>
         </Avatar>
         <div>
-          <p className="text-xs font-semibold">{item.author}</p>
-          <p className="text-[11px] text-muted-foreground">{item.date}</p>
+          <p className="text-xs font-semibold">{item.authorName}</p>
+          <p className="text-[11px] text-muted-foreground">{dateStr}</p>
         </div>
       </div>
-      <p className="mt-2 text-sm leading-relaxed">{item.content}</p>
+      <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
 
       {feedback ? (
-        <div className="mt-3 rounded-lg bg-secondary/60 p-3">
+        <div className="mt-3 space-y-2 rounded-lg bg-secondary/60 p-3">
           <p className="flex items-center gap-1 text-xs font-semibold text-primary">
-            <Sparkles className="h-3.5 w-3.5" /> AI 피드백
+            <Sparkles className="h-3.5 w-3.5" /> AI 코치 피드백
           </p>
-          <p className="mt-1 text-sm leading-relaxed">{feedback}</p>
+          <p className="text-sm font-medium">{feedback.summary}</p>
+          {feedback.strengths && (
+            <p className="text-xs text-muted-foreground"><strong className="text-foreground">👍 잘한 점:</strong> {feedback.strengths}</p>
+          )}
+          {feedback.improvements && (
+            <p className="text-xs text-muted-foreground"><strong className="text-foreground">💡 보완점:</strong> {feedback.improvements}</p>
+          )}
         </div>
       ) : (
         <>
@@ -145,7 +164,7 @@ function ActivityCard({ item }: { item: ActivityFeedItem }) {
             onClick={requestFeedback}
             disabled={loading}
           >
-            <Sparkles className="mr-1 h-4 w-4" />
+            {loading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
             {loading ? '피드백 생성 중…' : 'AI 피드백 요청'}
           </Button>
         </>

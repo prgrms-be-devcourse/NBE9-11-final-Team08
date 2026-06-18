@@ -1,15 +1,8 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { CartProvider } from '@/components/providers/cart-provider'
 import './globals.css'
-
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
 
 export const metadata: Metadata = {
   title: 'PlayLearn — 배우고 성장하는 온라인 러닝 스페이스',
@@ -31,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`light ${geistSans.variable} ${geistMono.variable}`}
+      className="light"
     >
       <body className="bg-background font-sans antialiased">
         <CartProvider>{children}</CartProvider>

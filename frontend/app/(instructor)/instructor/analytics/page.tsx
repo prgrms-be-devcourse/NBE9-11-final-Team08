@@ -6,6 +6,6 @@ export const metadata = {
 }
 
 export default async function AnalyticsPage() {
-  const courses = await api.getCourses()
-  return <AnalyticsView courses={courses} />
+  const response = await api.getCourses()
+  return <AnalyticsView courses={response.content} />
 }

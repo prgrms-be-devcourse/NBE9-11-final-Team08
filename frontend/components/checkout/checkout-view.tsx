@@ -1,9 +1,11 @@
+// frontend/components/checkout/checkout-view.tsx
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useCart } from '@/components/providers/cart-provider'
+import { api } from '@/lib/api'
 import { formatKRW } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,11 +21,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 const POINTS_AVAILABLE = 12000
 
-// Selectable discount coupons (amount in KRW or percent off)
-const checkoutCoupons = [
+// 기본 제공되는 테스트용 쿠폰 데이터 (실제 데이터 로드 전 Fallback)
+const fallbackCoupons = [
   { id: 'welcome', name: '신규 가입 5,000원 할인', kind: 'amount' as const, value: 5000 },
   { id: 'firstcome', name: '오전 10시 선착순 10% 할인', kind: 'percent' as const, value: 10 },
   { id: 'book', name: '작가의 날 10% 할인', kind: 'percent' as const, value: 10 },
@@ -36,18 +39,50 @@ export function CheckoutView() {
   const [points, setPoints] = useState(0)
   const [method, setMethod] = useState('card')
   const [agree, setAgree] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [userCoupons, setUserCoupons] = useState<any[]>([])
+
+  useEffect(() => {
+    // 사용자가 보유한 쿠폰 목록 불러오기 연동
+    const fetchCoupons = async () => {
+      try {
+        if ('getCoupons' in api) {
+          const res = await (api as any).getCoupons()
+          if (Array.isArray(res) && res.length > 0) {
+            // 백엔드 구조에 맞춰 변환 (CouponListResponse)
+            const mapped = res.map((c: any) => ({
+              id: c.issuedCouponId?.toString() || c.id,
+              name: c.policyName || c.name,
+              kind: c.discountType === 'RATE' || c.type === 'percent' ? 'percent' : 'amount',
+              value: Number(c.discountValue) || Number(c.amount?.replace(/[^0-9]/g, '') || 0),
+            }))
+            setUserCoupons(mapped)
+          } else {
+            setUserCoupons(fallbackCoupons)
+          }
+        }
+      } catch (err) {
+        setUserCoupons(fallbackCoupons)
+      }
+    }
+    fetchCoupons()
+  }, [])
 
   const subtotal = useMemo(
     () => items.reduce((sum, c) => sum + c.price, 0),
     [items],
   )
 
-  const coupon = checkoutCoupons.find((c) => c.id === couponId)
+  const activeCoupons = userCoupons.length > 0 ? userCoupons : fallbackCoupons
+  const coupon = activeCoupons.find((c) => c.id === couponId)
+  
   const couponDiscount = coupon
     ? coupon.kind === 'percent'
       ? Math.round((subtotal * coupon.value) / 100)
       : coupon.value
     : 0
+    
   const usablePoints = Math.max(
     0,
     Math.min(points || 0, POINTS_AVAILABLE, subtotal - couponDiscount),
@@ -65,14 +100,28 @@ export function CheckoutView() {
     )
   }
 
-  function handlePay() {
+  async function handlePay() {
     if (!agree) {
       toast.error('결제 정보 확인 및 동의가 필요합니다.')
       return
     }
-    const orderId = `PL${Date.now().toString().slice(-8)}`
-    clear()
-    router.push(`/orders/complete?orderId=${orderId}&amount=${total}`)
+    
+    setIsSubmitting(true)
+    try {
+      // 결제 생성 API (api.createOrderFromCart)
+      const order = await api.createOrderFromCart()
+      await clear() // 결제 성공 시 장바구니 비우기
+      
+      // 결제 완료 페이지로 리다이렉트 (주문 번호 및 금액 전달)
+      const orderNum = order.orderNumber || order.orderId || 'NEW_ORDER'
+      const finalPrice = order.finalPrice || total
+      router.push(`/orders/complete?orderId=${orderNum}&amount=${finalPrice}`)
+      toast.success('결제가 완료되었습니다.')
+    } catch (e: any) {
+      toast.error(e.message || '주문 생성에 실패했습니다.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -86,10 +135,10 @@ export function CheckoutView() {
             </CardHeader>
             <CardContent className="space-y-4">
               {items.map((c) => (
-                <div key={c.courseId} className="flex gap-4">
+                <div key={c.courseId || c.cartItemId} className="flex gap-4">
                   <Image
-                    src={c.thumbnailUrl || '/placeholder.svg'}
-                    alt=""
+                    src={'/placeholder.svg'}
+                    alt={c.title}
                     width={96}
                     height={56}
                     className="h-14 w-24 rounded-md object-cover"
@@ -112,13 +161,13 @@ export function CheckoutView() {
             <CardContent className="space-y-5">
               <div className="space-y-2">
                 <Label>쿠폰</Label>
-                <Select value={couponId} onValueChange={setCouponId}>
+                <Select value={couponId} onValueChange={(value) => setCouponId(value ?? 'none')}>
                   <SelectTrigger>
                     <SelectValue placeholder="사용할 쿠폰을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">선택 안함</SelectItem>
-                    {checkoutCoupons.map((c) => (
+                    {activeCoupons.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
@@ -216,8 +265,9 @@ export function CheckoutView() {
                 />
                 주문 내용을 확인했으며 결제에 동의합니다.
               </Label>
-              <Button className="w-full" size="lg" onClick={handlePay}>
-                {formatKRW(total)} 결제하기
+              <Button className="w-full" size="lg" onClick={handlePay} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isSubmitting ? '결제 처리 중...' : `${formatKRW(total)} 결제하기`}
               </Button>
             </CardContent>
           </Card>

@@ -1,9 +1,10 @@
+// frontend/components/auth/login-form.tsx
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, GraduationCap } from 'lucide-react'
+import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,9 +26,14 @@ export function LoginForm() {
     try {
       const response = await api.login({ email, password })
       if (response.accessToken) {
+        // 1. 클라이언트용: localStorage 저장
         localStorage.setItem('accessToken', response.accessToken)
+        // 2. 서버 컴포넌트(SSR)용: Cookie 에도 동일하게 저장
+        document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; samesite=lax`
+        
         toast.success('환영합니다! 로그인이 완료되었습니다.')
         router.push('/')
+        router.refresh() // 쿠키 변경 후 서버 컴포넌트들 리렌더링
       }
     } catch (err: any) {
       toast.error(err.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.')
@@ -102,6 +108,7 @@ export function LoginForm() {
         </div>
 
         <Button type="submit" size="lg" disabled={submitting}>
+          {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {submitting ? '로그인 중...' : '로그인'}
         </Button>
       </form>

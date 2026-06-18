@@ -1,9 +1,10 @@
+// frontend/components/instructor/course-form.tsx
 'use client'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ArrowLeft, ImagePlus, ListChecks, Sparkles, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, ListChecks, Sparkles, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { categories } from '@/lib/mock-data'
+import { api } from '@/lib/api'
 import type { Course } from '@/lib/types'
 
 const subCategories = ['백엔드', '프론트엔드', '데브옵스', '프로그래밍 언어', '업무 생산성']
@@ -26,6 +28,7 @@ const subCategories = ['백엔드', '프론트엔드', '데브옵스', '프로�
 export function CourseForm({ course }: { course?: Course }) {
   const router = useRouter()
   const editing = Boolean(course)
+  
   const [title, setTitle] = useState(course?.title ?? '')
   const [mainCat, setMainCat] = useState(course?.category ?? '')
   const [subCat, setSubCat] = useState(course?.subCategory ?? '')
@@ -33,11 +36,49 @@ export function CourseForm({ course }: { course?: Course }) {
   const [description, setDescription] = useState(course?.description ?? '')
   const [tags, setTags] = useState<string[]>(course?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const addTag = () => {
     const v = tagInput.trim()
     if (v && !tags.includes(v)) setTags((p) => [...p, v])
     setTagInput('')
+  }
+
+  const handleSubmit = async (status: 'DRAFT' | 'REVIEW') => {
+    if (!title.trim() || !price) {
+      toast.error('필수 항목(제목, 가격)을 입력해주세요.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const payload = {
+        title,
+        description,
+        categoryId: 1, // TODO: 실제 카테고리 ID 매핑 필요
+        price: Number(price),
+        thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450', // TODO: 파일 업로드 연동 필요
+      }
+
+      if (editing && course) {
+        // [TODO] api.ts에 updateCourse 추가 필요
+        if ('updateCourse' in api) {
+          await (api as any).updateCourse(course.id, payload)
+        }
+        toast.success('강의가 수정되었습니다.')
+      } else {
+        // [TODO] api.ts에 createCourse 추가 필요
+        if ('createCourse' in api) {
+          await (api as any).createCourse(payload)
+        }
+        toast.success(status === 'REVIEW' ? '검수 요청이 접수되었습니다.' : '임시저장되었습니다.')
+      }
+      router.push('/instructor')
+    } catch (error) {
+      toast.error('강의 저장에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -69,7 +110,7 @@ export function CourseForm({ course }: { course?: Course }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>대분류</Label>
-                <Select value={mainCat} onValueChange={setMainCat}>
+                <Select value={mainCat} onValueChange={(value) => setMainCat(value ?? '')}>
                   <SelectTrigger>
                     <SelectValue placeholder="대분류 선택" />
                   </SelectTrigger>
@@ -86,7 +127,7 @@ export function CourseForm({ course }: { course?: Course }) {
               </div>
               <div className="grid gap-2">
                 <Label>소분류</Label>
-                <Select value={subCat} onValueChange={setSubCat}>
+                <Select value={subCat} onValueChange={(value) => setSubCat(value ?? '')}>
                   <SelectTrigger>
                     <SelectValue placeholder="소분류 선택" />
                   </SelectTrigger>
@@ -203,20 +244,17 @@ export function CourseForm({ course }: { course?: Course }) {
           <section className="space-y-2 rounded-xl border bg-card p-5">
             <Button
               className="w-full"
-              onClick={() => {
-                toast.success('검수 요청이 접수되었습니다.')
-                router.push('/instructor')
-              }}
+              onClick={() => handleSubmit('REVIEW')}
+              disabled={loading}
             >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               검수 요청하기
             </Button>
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => {
-                toast.success('임시저장되었습니다.')
-                router.push('/instructor')
-              }}
+              onClick={() => handleSubmit('DRAFT')}
+              disabled={loading}
             >
               임시저장
             </Button>

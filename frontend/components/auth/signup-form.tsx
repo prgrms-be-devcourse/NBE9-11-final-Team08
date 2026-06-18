@@ -1,9 +1,10 @@
+// frontend/components/auth/signup-form.tsx
 'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Eye, EyeOff, GraduationCap } from 'lucide-react'
+import { Check, Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,7 +66,7 @@ export function SignupForm() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="name">이름</Label>
+          <Label htmlFor="name">이름 (닉네임)</Label>
           <Input
             id="name"
             required
@@ -150,6 +151,7 @@ export function SignupForm() {
         </div>
 
         <Button type="submit" size="lg" disabled={submitting}>
+          {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {submitting ? '가입 중...' : '회원가입'}
         </Button>
       </form>

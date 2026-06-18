@@ -1,3 +1,4 @@
+// frontend/components/study/reflection-editor.tsx
 'use client'
 
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -12,11 +13,6 @@ interface ReflectionEditorProps {
   className?: string
 }
 
-/**
- * 노션처럼 입력창에 마크다운이 즉시 반영되는 WYSIWYG 에디터.
- * StarterKit의 input rules 덕분에 "# ", "- ", "> ", "**굵게**" 등을
- * 입력하는 즉시 해당 스타일로 변환된다.
- */
 export function ReflectionEditor({
   content,
   editable,
@@ -45,17 +41,14 @@ export function ReflectionEditor({
     },
   })
 
-  // editable 상태가 바뀌면 에디터에 반영
   useEffect(() => {
     editor?.setEditable(editable)
   }, [editor, editable])
 
-  // 외부에서 content가 교체되면(예: 편집 시작/취소) 동기화
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
       editor.commands.setContent(content, { emitUpdate: false })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, editor])
 
   return <EditorContent editor={editor} className={className} />
