@@ -1,10 +1,8 @@
 # ============================================================================
 # 부하 테스트 stack — k6(부하 발생) + influxdb(이력) + grafana(대시보드)
 # ----------------------------------------------------------------------------
-# 측정 대상 서버(app/db)는 여기 없다. deploy 쪽에서 띄운다:
-#   dev  : make dev  + IntelliJ 로 backend 실행 (host:8080)
-#   prod : make prod
-# k6 는 docker 내부망이 아니라 호스트 밖 서버를 친다:
+# 측정 대상 서버(app/db)는 이 stack 에 없다.
+# k6 는 별도 클라이언트 stack 에서 BASE_URL 로 지정한 서버를 친다:
 #     BASE_URL: http://host.docker.internal:8080
 # 관측 도구(influxdb/grafana)를 측정 대상과 분리해 자원 경합/오염을 막는다.
 #
@@ -42,9 +40,7 @@ services:
     profiles: ["k6"]
     depends_on: [influxdb]
     environment:
-      BASE_URL: http://host.docker.internal:8080    # 측정 대상 서버를 호스트 경유로 호출
-    extra_hosts:
-      - "host.docker.internal:host-gateway"          # Linux 호환용 (Mac 은 기본 지원)
+      BASE_URL: ${BASE_URL:-http://host.docker.internal:8080}
     volumes:
       - ./k6:/scripts:ro
     networks: [perf]
