@@ -108,7 +108,7 @@ public class PaymentService {
                 throw new CustomException(ErrorCode.ORDER_ALREADY_PAID);
             }
 
-            if (!existingPayment.canRetry()) {
+            if (!existingPayment.canBeConfirmed()) {
                 throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
             }
         });

@@ -117,7 +117,7 @@ public class Payment {
         return this.status == PaymentStatus.SUCCESS;
     }
 
-    public boolean canRetry() {
+    public boolean canBeConfirmed() {
         return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
     }
 
