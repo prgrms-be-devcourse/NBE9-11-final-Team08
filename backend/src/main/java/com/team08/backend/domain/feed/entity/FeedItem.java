@@ -8,7 +8,16 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "feed_items")
+@Table(
+        name = "feed_items",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"type", "sourceId"}),
+        indexes = {
+                @Index(
+                        name = "idx_study_feed",
+                        columnList = "study_id, occurred_at, id"
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FeedItem {
