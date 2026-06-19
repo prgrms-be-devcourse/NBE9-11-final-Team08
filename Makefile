@@ -31,7 +31,7 @@ define run-prod
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down dev-logs db-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
+.PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
 
 ## ─────────────── 개발 (DB만) ───────────────
 
@@ -45,7 +45,7 @@ dev-down: ## [개발] DB 컨테이너 내리기 (데이터 유지)
 dev-logs: ## [개발] DB 로그 실시간 보기
 	$(call run,$(DEV) logs -f db)
 
-db-reset: ## [개발] DB 완전 초기화 (볼륨 삭제 후 재기동) ⚠️ 데이터 전부 삭제
+dev-reset: ## [개발] DB 완전 초기화 (볼륨 삭제 후 재기동) ⚠️ 데이터 전부 삭제
 	$(call run,$(DEV) down -v)
 	$(call run,$(DEV) up -d db)
 	@echo "✅ DB 초기화 완료. Flyway 마이그레이션 + dev 더미데이터가 백엔드 기동 시 다시 생성됩니다."
