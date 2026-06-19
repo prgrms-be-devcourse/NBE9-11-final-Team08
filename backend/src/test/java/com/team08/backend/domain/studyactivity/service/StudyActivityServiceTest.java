@@ -1,15 +1,18 @@
 package com.team08.backend.domain.studyactivity.service;
 
 import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
+import com.team08.backend.domain.fixture.UserFixture;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.fixture.StudyFixture;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreatedEvent;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -18,11 +21,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -31,11 +31,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudyActivityServiceTest {
@@ -51,6 +49,9 @@ class StudyActivityServiceTest {
 
     @Mock
     private AiFeedbackInvalidator aiFeedbackInvalidator;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private StudyActivityService studyActivityService;
@@ -648,6 +649,41 @@ class StudyActivityServiceTest {
                 .isEqualTo(ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED);
 
         assertThat(activity.getDeletedAt()).isNull();
+    }
+
+    @Test
+    void createActivity_성공하면_StudyActivityCreatedEvent를_발행한다() {
+        // given
+        Study study = StudyFixture.activeStudy();
+        User user = UserFixture.builder().build();
+        Long activityId = 100L;
+        Long studyId = study.getId();
+        Long userId = user.getId();
+        StudyActivity activity = activity(activityId, studyId, userId);
+
+        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
+                studyId, userId, StudyMemberStatus.ACTIVE
+        )).willReturn(true);
+        given(studyActivityRepository.save(
+                any(StudyActivity.class)
+        )).willReturn(activity);
+
+        // when
+        studyActivityService.createActivity(studyId, userId, activity.getContent());
+
+        // then
+        ArgumentCaptor<StudyActivityCreatedEvent> captor =
+                ArgumentCaptor.forClass(StudyActivityCreatedEvent.class);
+
+        verify(eventPublisher).publishEvent(captor.capture());
+
+        StudyActivityCreatedEvent event = captor.getValue();
+
+        assertThat(event.studyActivityId()).isEqualTo(activity.getId());
+        assertThat(event.studyId()).isEqualTo(studyId);
+        assertThat(event.authorId()).isEqualTo(userId);
+        assertThat(event.content()).isEqualTo(activity.getContent());
     }
 
     private void assertInactiveStudyCannotCreate(Study study) {

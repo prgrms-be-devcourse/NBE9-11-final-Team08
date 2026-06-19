@@ -6,12 +6,14 @@ import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreatedEvent;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,7 @@ public class StudyActivityService {
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
     private final AiFeedbackInvalidator aiFeedbackInvalidator;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
@@ -36,6 +39,8 @@ public class StudyActivityService {
 
         StudyActivity activity = StudyActivity.create(studyId, userId, content);
         StudyActivity savedActivity = studyActivityRepository.save(activity);
+
+        eventPublisher.publishEvent(StudyActivityCreatedEvent.from(savedActivity));
 
         return StudyActivityResponse.from(savedActivity);
     }
