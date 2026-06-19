@@ -9,9 +9,12 @@ import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
 import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
+import com.team08.backend.domain.studyreport.util.StudyReportJson;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,7 +48,16 @@ class StudyReportServiceTest {
     @Mock LectureRepository lectureRepository;
     @Mock QnaQuestionRepository qnaQuestionRepository;
 
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final StudyReportJson studyReportJson = new StudyReportJson(objectMapper);
+
     @InjectMocks StudyReportService studyReportService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(studyReportService, "studyReportJson", studyReportJson);
+        org.springframework.test.util.ReflectionTestUtils.setField(studyReportService, "objectMapper", objectMapper);
+    }
 
     // ── generateReport ────────────────────────────────────────────────────
 

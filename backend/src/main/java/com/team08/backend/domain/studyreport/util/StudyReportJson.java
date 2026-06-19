@@ -1,43 +1,23 @@
 package com.team08.backend.domain.studyreport.util;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
+@Component
+@RequiredArgsConstructor
+public class StudyReportJson {
 
-final class StudyReportJson {
+    private final ObjectMapper objectMapper;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule());
-
-    private StudyReportJson() {}
-
-    static <T> String write(T value) {
+    public String write(Object value) {
         try {
-            return MAPPER.writeValueAsString(value);
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException("StudyReport 직렬화 실패", e);
-        }
-    }
-
-    static <T> List<T> readList(String json, TypeReference<List<T>> type) {
-        if (json == null) return List.of();
-        try {
-            return MAPPER.readValue(json, type);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("StudyReport 역직렬화 실패", e);
-        }
-    }
-
-    static Map<String, Integer> readMap(String json) {
-        if (json == null) return Map.of();
-        try {
-            return MAPPER.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("StudyReport 역직렬화 실패", e);
+            throw new CustomException(ErrorCode.STUDY_REPORT_SERIALIZATION_FAILED);
         }
     }
 }

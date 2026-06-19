@@ -2,7 +2,6 @@ package com.team08.backend.domain.studyreport.dto;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 
 import java.math.BigDecimal;
@@ -19,28 +18,26 @@ public record StudyReportResponse(
         List<DailyProgressEntry> dailyProgress,
         Map<String, Integer> dailyActivityMap
 ) {
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
-
-    public static StudyReportResponse from(StudyReport report) {
+    public static StudyReportResponse from(StudyReport report, ObjectMapper objectMapper) {
         return new StudyReportResponse(
                 report.getStudyId(),
                 report.getTotalWatchTime(),
                 report.getTotalQnaCount(),
                 report.getProgressRate(),
                 report.getStudyDays(),
-                parseList(report.getTopLectures(), new TypeReference<>() {}),
-                parseList(report.getDailyProgress(), new TypeReference<>() {}),
-                parseMap(report.getDailyActivityMap())
+                parseList(objectMapper, report.getTopLectures(), new TypeReference<>() {}),
+                parseList(objectMapper, report.getDailyProgress(), new TypeReference<>() {}),
+                parseMap(objectMapper, report.getDailyActivityMap())
         );
     }
 
-    private static <T> List<T> parseList(String json, TypeReference<List<T>> type) {
+    private static <T> List<T> parseList(ObjectMapper mapper, String json, TypeReference<List<T>> type) {
         if (json == null) return List.of();
-        try { return MAPPER.readValue(json, type); } catch (Exception e) { return List.of(); }
+        try { return mapper.readValue(json, type); } catch (Exception e) { return List.of(); }
     }
 
-    private static Map<String, Integer> parseMap(String json) {
+    private static Map<String, Integer> parseMap(ObjectMapper mapper, String json) {
         if (json == null) return Map.of();
-        try { return MAPPER.readValue(json, new TypeReference<>() {}); } catch (Exception e) { return Map.of(); }
+        try { return mapper.readValue(json, new TypeReference<>() {}); } catch (Exception e) { return Map.of(); }
     }
 }

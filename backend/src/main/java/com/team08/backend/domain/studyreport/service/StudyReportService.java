@@ -1,8 +1,5 @@
 package com.team08.backend.domain.studyreport.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -16,6 +13,8 @@ import com.team08.backend.domain.studyreport.dto.TopLectureEntry;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
+import com.team08.backend.domain.studyreport.util.StudyReportJson;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,14 +32,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StudyReportService {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
-
     private final StudyReportRepository studyReportRepository;
     private final StudyRepository studyRepository;
     private final LearningEventRepository learningEventRepository;
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
     private final QnaQuestionRepository qnaQuestionRepository;
+    private final StudyReportJson studyReportJson;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public StudyReportResponse generateReport(Long userId, Long studyId) {
@@ -75,21 +74,21 @@ public class StudyReportService {
         report.update(totalWatchTime, totalQnaCount, progressRate, studyDays,
                 topLecturesJson, dailyProgressJson, dailyActivityMapJson);
 
-        return StudyReportResponse.from(report);
+        return StudyReportResponse.from(report, objectMapper);
     }
 
     @Transactional(readOnly = true)
     public StudyReportResponse getReport(Long userId, Long studyId) {
         StudyReport report = studyReportRepository.findByUserIdAndStudyId(userId, studyId)
                 .orElseThrow(StudyReportNotFoundException::new);
-        return StudyReportResponse.from(report);
+        return StudyReportResponse.from(report, objectMapper);
     }
 
     // ── 집계 헬퍼 ─────────────────────────────────────────────────────────
 
     private String buildTopLecturesJson(Long userId, Long courseId) {
         List<Object[]> rows = learningEventRepository.findTopLecturesByWatchTime(userId, courseId);
-        if (rows.isEmpty()) return toJson(List.of());
+        if (rows.isEmpty()) return studyReportJson.write(List.of());
 
         List<Long> lectureIds = rows.stream()
                 .map(r -> ((Number) r[0]).longValue())
@@ -105,11 +104,11 @@ public class StudyReportService {
                         ((Number) r[1]).intValue()))
                 .toList();
 
-        return toJson(result);
+        return studyReportJson.write(result);
     }
 
     private String buildDailyProgressJson(Long userId, Long courseId, int totalLectureCount) {
-        if (totalLectureCount == 0) return toJson(List.of());
+        if (totalLectureCount == 0) return studyReportJson.write(List.of());
 
         List<Object[]> rows = learningEventRepository.findDailyCompletionCounts(userId, courseId);
         List<DailyProgressEntry> entries = new ArrayList<>();
@@ -125,7 +124,7 @@ public class StudyReportService {
             entries.add(new DailyProgressEntry(date, rate));
         }
 
-        return toJson(entries);
+        return studyReportJson.write(entries);
     }
 
     private String buildDailyActivityMapJson(Long userId, Long courseId) {
@@ -134,14 +133,6 @@ public class StudyReportService {
         for (Object[] row : rows) {
             map.put(row[0].toString(), ((Number) row[1]).intValue());
         }
-        return toJson(map);
-    }
-
-    private String toJson(Object value) {
-        try {
-            return MAPPER.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("StudyReport 직렬화 실패", e);
-        }
+        return studyReportJson.write(map);
     }
 }
