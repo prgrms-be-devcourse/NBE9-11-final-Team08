@@ -394,11 +394,17 @@ class LearningEventServiceTest {
     }
 
     private Course mockCourse(Long courseId, Long instructorId) {
-        Course course = new Course(
-                instructorId, 1L, "테스트 강좌", "설명",
-                "thumbnail.jpg", 50000,
-                CourseStatus.ON_SALE
+        // 리팩토링 포인트: 빌더 및 public 생성자 제거 대응으로 createDraft 정적 팩토리 메서드 도입
+        Course course = Course.createDraft(
+                instructorId,
+                1L,
+                "테스트 강좌",
+                "설명",
+                "thumbnail.jpg",
+                50000
         );
+        // 테스트 시나리오 충족을 위해 status 상태 필드를 리플렉션으로 강제 전이 제어
+        ReflectionTestUtils.setField(course, "status", CourseStatus.ON_SALE);
         ReflectionTestUtils.setField(course, "id", courseId);
         return course;
     }

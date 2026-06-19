@@ -13,7 +13,6 @@ import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.couponpolicy.entity.*;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
@@ -63,11 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * 더미 데이터 생성 로직을 한곳에 모은 공유 시더.
@@ -187,7 +182,6 @@ public class DataSeeder {
     }
 
     private CatalogData saveCourses(SeedConfig cfg, List<User> sellers, List<Category> categories) {
-        CourseStatus[] statuses = {CourseStatus.ON_SALE, CourseStatus.ON_SALE, CourseStatus.ON_SALE, CourseStatus.DRAFT};
         int categoryCount = categories.size();
         int batchSize = cfg.batchSize();
 
@@ -200,15 +194,14 @@ public class DataSeeder {
             User seller = sellers.get(s);
             for (int c = 0; c < cfg.coursesPerSeller(); c++) {
                 int idx = s * cfg.coursesPerSeller() + c + 1;
-                courseBatch.add(Course.builder()
-                        .instructorId(seller.getId())
-                        .categoryId(categories.get(idx % categoryCount).getId())
-                        .title("강의 " + idx + " - " + categories.get(idx % categoryCount).getName())
-                        .description("강의 " + idx + "에 대한 설명입니다.")
-                        .thumbnail("thumb" + idx + ".jpg")
-                        .price((idx % 5 + 1) * 10000)
-                        .status(statuses[idx % statuses.length])
-                        .build());
+                courseBatch.add(Course.createDraft(
+                        seller.getId(),
+                        categories.get(idx % categoryCount).getId(),
+                        "강의 " + idx + " - " + categories.get(idx % categoryCount).getName(),
+                        "강의 " + idx + "에 대한 설명입니다.",
+                        "thumb" + idx + ".jpg",
+                        (idx % 5 + 1) * 10000
+                ));
             }
         }
 
@@ -217,11 +210,11 @@ public class DataSeeder {
 
         for (Course course : savedCourses) {
             for (int i = 1; i <= cfg.chaptersPerCourse(); i++) {
-                chapterBatch.add(Chapter.builder()
-                        .title(course.getTitle() + " - " + i + "장")
-                        .orderNo(i)
-                        .course(course)
-                        .build());
+                chapterBatch.add(Chapter.create(
+                        course.getTitle() + " - " + i + "장",
+                        i,
+                        course
+                ));
 
                 if (chapterBatch.size() >= batchSize) {
                     addLectures(cfg, chapterRepository.saveAll(chapterBatch), lectureBatch);
@@ -250,15 +243,15 @@ public class DataSeeder {
     private void addLectures(SeedConfig cfg, List<Chapter> chapters, List<Lecture> buffer) {
         for (Chapter chapter : chapters) {
             for (int j = 1; j <= cfg.lecturesPerChapter(); j++) {
-                buffer.add(Lecture.builder()
-                        .title(chapter.getTitle() + " - " + j + "강")
-                        .summary("강의 요약")
-                        .durationSeconds(600 * j)
-                        .orderNo(j)
-                        .isFreePreview(j == 1)
-                        .m3u8Path("/hls/" + chapter.getId() + "/" + j + "/index.m3u8")
-                        .chapter(chapter)
-                        .build());
+                buffer.add(Lecture.createWithStream(
+                        "/hls/" + chapter.getId() + "/" + j + "/index.m3u8",
+                        chapter.getTitle() + " - " + j + "강",
+                        "강의 요약",
+                        600 * j,
+                        j,
+                        j == 1,
+                        chapter
+                ));
             }
         }
     }

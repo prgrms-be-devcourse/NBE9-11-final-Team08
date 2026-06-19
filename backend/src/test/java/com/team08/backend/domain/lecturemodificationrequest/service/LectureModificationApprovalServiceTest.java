@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lecturemodificationrequest.service;
 
+import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecturemodificationrequest.dto.LectureModificationApprovalRequest;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -42,10 +44,17 @@ class LectureModificationApprovalServiceTest {
         requestId = 1L;
         adminId = 999L;
 
-        lecture = Lecture.builder()
-                .m3u8Path("old-path/output.m3u8")
-                .title("테스트 강의")
-                .build();
+        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드(createWithStream) 주입 및 의존성 매핑
+        Chapter mockChapter = mock(Chapter.class);
+        lecture = Lecture.createWithStream(
+                "old-path/output.m3u8",
+                "테스트 강의",
+                "요약",
+                600,
+                1,
+                false,
+                mockChapter
+        );
 
         pendingRequest = LectureModificationRequest.createPending(
                 lecture,
