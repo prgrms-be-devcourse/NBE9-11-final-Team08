@@ -29,6 +29,8 @@ services:
       timeout: 5s
       retries: 20
       start_period: 30s
+    volumes:
+      - mysql-data:/var/lib/mysql   # named 볼륨 — down(유지) 시 시드 보존 → 재기동 시 재시딩 스킵
     networks: [server]
 
   app:
@@ -67,3 +69,6 @@ services:
 
 networks:
   server:
+
+volumes:
+  mysql-data:

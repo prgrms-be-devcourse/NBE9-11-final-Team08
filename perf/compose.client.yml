@@ -17,6 +17,8 @@ services:
     image: influxdb:1.8
     environment:
       INFLUXDB_DB: k6
+    volumes:
+      - influxdb-data:/var/lib/influxdb   # named 볼륨 — 지난 런 메트릭 이력 보존
     networks: [client]
 
   grafana:
@@ -29,6 +31,7 @@ services:
       GF_AUTH_BASIC_ENABLED: "false"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana    # named 볼륨 — import 한 대시보드 보존
     depends_on: [influxdb]
     networks: [client]
 
@@ -46,3 +49,7 @@ services:
 
 networks:
   client:
+
+volumes:
+  influxdb-data:
+  grafana-data:
