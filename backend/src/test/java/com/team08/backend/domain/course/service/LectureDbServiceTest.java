@@ -1,5 +1,6 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -15,6 +16,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -36,12 +38,16 @@ class LectureDbServiceTest {
         String targetDirName = "test-uuid";
         String dbSavePath = "lectures/1/test-uuid/output.m3u8";
 
-        Lecture lecture = Lecture.builder()
-                .title("테스트 강의")
-                .m3u8Path("")
-                .durationSeconds(600)
-                .orderNo(1)
-                .build();
+        // 리팩토링 포인트: 빌더 제거 후 도메인 규칙에 맞는 정적 팩토리 메서드(createDraft)로 교체
+        Chapter mockChapter = mock(Chapter.class);
+        Lecture lecture = Lecture.createDraft(
+                "테스트 강의",
+                "",
+                600,
+                1,
+                false,
+                mockChapter
+        );
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
 

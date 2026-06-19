@@ -15,10 +15,6 @@ public record ChapterCreateRequest(
         int orderNo
 ) {
     public Chapter toEntity(Course course) {
-        return Chapter.builder()
-                .title(this.title)
-                .orderNo(this.orderNo)
-                .course(course)
-                .build();
+        return Chapter.create(this.title, this.orderNo, course);
     }
 }

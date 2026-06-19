@@ -1,6 +1,7 @@
 package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
+import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -162,5 +164,62 @@ class AttendanceServiceTest {
         // then
         assertEquals(7, response.consecutiveDays());
         verify(issuedCouponService, times(1)).issueAttendanceCoupon(userId);
+    }
+
+    @Test
+    @DisplayName("이번 달 출석 현황을 조회한다")
+    void getMyAttendance_returnsMonthlyStatus() {
+        // given
+        Long userId = 1L;
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
+        LocalDate endOfMonth = YearMonth.from(today).atEndOfMonth();
+
+        Attendance firstLog = Attendance.record(userId, today.minusDays(2), Optional.empty(), 0, now.minusDays(2));
+        Attendance yesterdayLog = Attendance.record(userId, today.minusDays(1), Optional.of(firstLog), 1, now.minusDays(1));
+        Attendance todayLog = Attendance.record(userId, today, Optional.of(yesterdayLog), 2, now);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(attendanceRepository.findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(
+                userId,
+                startOfMonth,
+                endOfMonth
+        )).thenReturn(List.of(firstLog, yesterdayLog, todayLog));
+
+        // when
+        AttendanceStatusResponse response = attendanceService.getMyAttendance(userId);
+
+        // then
+        assertEquals(true, response.checkedToday());
+        assertEquals(3, response.consecutiveDays());
+        assertEquals(3, response.monthlyTotalDays());
+        assertEquals(List.of(today.minusDays(2).getDayOfMonth(), today.minusDays(1).getDayOfMonth(), today.getDayOfMonth()), response.checkedDays());
+    }
+
+    @Test
+    @DisplayName("오늘 출석하지 않았으면 어제까지의 현황을 조회한다")
+    void getMyAttendance_notCheckedToday_returnsPreviousStatus() {
+        // given
+        Long userId = 1L;
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
+        LocalDate endOfMonth = YearMonth.from(today).atEndOfMonth();
+
+        Attendance firstLog = Attendance.record(userId, today.minusDays(2), Optional.empty(), 0, now.minusDays(2));
+        Attendance yesterdayLog = Attendance.record(userId, today.minusDays(1), Optional.of(firstLog), 1, now.minusDays(1));
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(attendanceRepository.findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(
+                userId,
+                startOfMonth,
+                endOfMonth
+        )).thenReturn(List.of(firstLog, yesterdayLog));
+
+        // when
+        AttendanceStatusResponse response = attendanceService.getMyAttendance(userId);
+
+        // then
+        assertEquals(false, response.checkedToday());
+        assertEquals(2, response.consecutiveDays());
+        assertEquals(2, response.monthlyTotalDays());
+        assertEquals(List.of(today.minusDays(2).getDayOfMonth(), today.minusDays(1).getDayOfMonth()), response.checkedDays());
     }
 }

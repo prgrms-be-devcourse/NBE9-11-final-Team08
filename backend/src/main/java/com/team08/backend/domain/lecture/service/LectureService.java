@@ -21,7 +21,7 @@ public class LectureService {
 
     @Transactional
     public Long createLecture(Long courseId, Long chapterId, LectureCreateRequest request) {
-        Chapter chapter = chapterRepository.findById(chapterId)
+        Chapter chapter = chapterRepository.findByIdWithCourse(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
 
         if (!chapter.getCourse().getId().equals(courseId)) {

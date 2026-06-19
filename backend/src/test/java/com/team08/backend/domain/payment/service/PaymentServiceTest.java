@@ -8,7 +8,10 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
+import com.team08.backend.domain.payment.dto.FailPaymentRequest;
+import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
@@ -81,14 +84,14 @@ class PaymentServiceTest {
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
         stubPaymentSave();
         stubEnrollmentSaveAll();
 
-        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID);
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
         ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).save(paymentCaptor.capture());
@@ -97,8 +100,8 @@ class PaymentServiceTest {
         assertThat(payment.getOrder().getId()).isEqualTo(ORDER_ID);
         assertThat(payment.getAmount()).isEqualTo(30_000);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(payment.getPaymentKey()).startsWith("MOCK-");
-        assertThat(payment.getMethod()).isEqualTo("MOCK");
+        assertThat(payment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(payment.getMethod()).isEqualTo("CARD");
         assertThat(payment.getPaidAt()).isEqualTo(FIXED_NOW);
         assertThat(payment.getCreatedAt()).isEqualTo(FIXED_NOW);
         assertThat(payment.getUpdatedAt()).isEqualTo(FIXED_NOW);
@@ -131,7 +134,7 @@ class PaymentServiceTest {
     void orderNotFoundCannotBeConfirmed() {
         given(orderRepository.findByIdAndUserId(ORDER_ID, OTHER_USER_ID)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentService.confirmPayment(OTHER_USER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentService.confirmPayment(OTHER_USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_NOT_FOUND));
 
@@ -143,7 +146,7 @@ class PaymentServiceTest {
         Order order = order(OrderStatus.PAID);
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_ALREADY_PAID));
 
@@ -155,7 +158,7 @@ class PaymentServiceTest {
         Order order = order(OrderStatus.CANCELED);
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_ORDER_STATUS));
 
@@ -166,9 +169,9 @@ class PaymentServiceTest {
     void existingPaymentPreventsDuplicateConfirm() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(true);
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment(order, PaymentStatus.SUCCESS)));
 
-        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_ALREADY_PAID));
 
@@ -182,12 +185,12 @@ class PaymentServiceTest {
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(true);
 
-        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID))
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LECTURE_ALREADY_ENROLLED));
 
@@ -204,7 +207,7 @@ class PaymentServiceTest {
         OrderItem secondItem = orderItem(2L, COURSE_ID + 1, 20_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.existsByOrder_Id(ORDER_ID)).willReturn(false);
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
@@ -213,7 +216,7 @@ class PaymentServiceTest {
         stubPaymentSave();
         stubEnrollmentSaveAll();
 
-        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID);
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
         assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID, COURSE_ID + 1);
 
@@ -223,6 +226,105 @@ class PaymentServiceTest {
         assertThat(enrollments).hasSize(2);
         assertThat(enrollments).extracting(Enrollment::getCourseId)
                 .containsExactly(COURSE_ID, COURSE_ID + 1);
+    }
+
+    @Test
+    void paymentFailureKeepsOrderPendingAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        stubPaymentSave();
+
+        PaymentResponse response = paymentService.failPayment(USER_ID, ORDER_ID, failRequest(30_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(payment.getMethod()).isEqualTo("CARD");
+        assertThat(payment.getFailedReason()).isEqualTo("승인 실패");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verifyNoInteractions(orderItemRepository, enrollmentRepository);
+    }
+
+    @Test
+    void failedPaymentCanBeConfirmedAgain() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment failedPayment = payment(order, PaymentStatus.FAILED);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(failedPayment));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        stubPaymentSave();
+        stubEnrollmentSaveAll();
+
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(failedPayment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
+        verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void amountMismatchPreventsConfirm() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(29_000)))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYMENT_AMOUNT_MISMATCH));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verifyNoInteractions(orderItemRepository, enrollmentRepository);
+    }
+
+    @Test
+    void paidOrderCanBeRefunded() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.SUCCESS);
+        Enrollment enrollment = Enrollment.createActive(USER_ID, COURSE_ID, order, FIXED_NOW.minusDays(1));
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(List.of(enrollment));
+
+        PaymentResponse response = paymentService.refundPayment(USER_ID, ORDER_ID);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.REFUNDED);
+        assertThat(order.getRefundedAt()).isEqualTo(FIXED_NOW);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(payment.getRefundedAt()).isEqualTo(FIXED_NOW);
+        assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.CANCELED);
+        assertThat(enrollment.getCanceledAt()).isEqualTo(FIXED_NOW);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+    }
+
+    @Test
+    void refundedOrderCannotBeRefundedAgain() {
+        Order order = order(OrderStatus.REFUNDED);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> paymentService.refundPayment(USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_ORDER_STATUS));
+
+        verifyNoInteractions(paymentRepository, orderItemRepository, enrollmentRepository);
     }
 
     private void stubPaymentSave() {
@@ -262,6 +364,30 @@ class PaymentServiceTest {
         OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", price, 0, price, now);
         ReflectionTestUtils.setField(orderItem, "id", orderItemId);
         return orderItem;
+    }
+
+    private Payment payment(Order order, PaymentStatus status) {
+        Payment payment = Payment.createReady(order, FIXED_NOW.minusDays(1));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        if (status == PaymentStatus.SUCCESS) {
+            payment.succeed("existing-payment-key", "CARD", FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.FAILED) {
+            payment.fail("existing-payment-key", "CARD", "기존 실패", FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.CANCELED) {
+            payment.cancel(FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.REFUNDED) {
+            payment.succeed("existing-payment-key", "CARD", FIXED_NOW.minusDays(2));
+            payment.refund(FIXED_NOW.minusDays(1));
+        }
+        return payment;
+    }
+
+    private ConfirmPaymentRequest confirmRequest(int amount) {
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount);
+    }
+
+    private FailPaymentRequest failRequest(int amount) {
+        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패");
     }
 
     private List<Enrollment> toList(Iterable<Enrollment> enrollments) {

@@ -1,7 +1,6 @@
 package com.team08.backend.domain.course.dto;
 
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.course.entity.CourseStatus;
 import jakarta.validation.constraints.*;
 
 public record CourseCreateRequest(
@@ -22,14 +21,13 @@ public record CourseCreateRequest(
         String thumbnail
 ) {
     public Course toEntity(Long instructorId) {
-        return Course.builder()
-                .instructorId(instructorId)
-                .categoryId(this.categoryId)
-                .title(this.title)
-                .description(this.description)
-                .thumbnail(this.thumbnail)
-                .price(this.price)
-                .status(CourseStatus.DRAFT)
-                .build();
+        return Course.createDraft(
+                instructorId,
+                this.categoryId,
+                this.title,
+                this.description,
+                this.thumbnail,
+                this.price
+        );
     }
 }

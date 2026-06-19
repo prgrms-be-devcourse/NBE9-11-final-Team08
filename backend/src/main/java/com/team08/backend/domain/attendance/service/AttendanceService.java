@@ -1,6 +1,7 @@
 package com.team08.backend.domain.attendance.service;
 
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
+import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
@@ -17,6 +18,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -28,7 +30,7 @@ public class AttendanceService {
     private final IssuedCouponService issuedCouponService;
     private final Clock clock;
 
-    // [사용자] 출석체크
+    // 출석체크
     @Transactional
     public AttendanceResponse checkIn(Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
@@ -68,5 +70,56 @@ public class AttendanceService {
         } catch (DataIntegrityViolationException e) {
             throw new AttendanceAlreadyExistsException();
         }
+    }
+
+    // 출석 기록 조회
+    @Transactional(readOnly = true)
+    public AttendanceStatusResponse getMyAttendance(Long userId) {
+        LocalDate today = LocalDate.now(clock);
+        LocalDate startOfMonth = YearMonth.from(today).atDay(1);
+        LocalDate endOfMonth = YearMonth.from(today).atEndOfMonth();
+
+        // 사용자 검증
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND); // USER_001
+        }
+
+        // 이번 달 출석 기록 조회
+        List<Attendance> monthlyAttendances =
+                attendanceRepository.findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(
+                        userId,
+                        startOfMonth,
+                        endOfMonth
+                );
+
+        Optional<Attendance> todayAttendance = monthlyAttendances.stream()
+                .filter(attendance -> attendance.getAttendanceDate().isEqual(today))
+                .findFirst();
+
+        Attendance latestAttendance = monthlyAttendances.isEmpty()
+                ? null
+                : monthlyAttendances.get(monthlyAttendances.size() - 1);
+
+        int consecutiveDays = todayAttendance
+                .or(() -> monthlyAttendances.stream()
+                        .filter(attendance -> attendance.getAttendanceDate().isEqual(today.minusDays(1)))
+                        .findFirst())
+                .map(Attendance::getConsecutiveDays)
+                .orElse(0);
+
+        int monthlyTotalDays = latestAttendance == null
+                ? 0
+                : latestAttendance.getMonthlyTotalDays();
+
+        List<Integer> checkedDays = monthlyAttendances.stream()
+                .map(attendance -> attendance.getAttendanceDate().getDayOfMonth())
+                .toList();
+
+        return new AttendanceStatusResponse(
+                todayAttendance.isPresent(),
+                consecutiveDays,
+                monthlyTotalDays,
+                checkedDays
+        );
     }
 }

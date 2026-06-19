@@ -109,6 +109,36 @@ public class CouponPolicy extends BaseTimeEntity {
         }
     }
 
+    // TODO 멘토링 
+    /* 
+    빌더 패턴이 하는 부분이 나중에 갔을 땐 필드값 추가마다 추가해야 됨
+    빌더 말고 별도의 객체로 만들어보면 좋다
+    여러가지의 정책들로 100개 여러가지 생성 정책
+    객체를 생성하는 여러가지 방법을 조건 기준마다 생성 규칙 표ㅕ준화 어디 필수 비필수 생성방법 검증
+    생성 방법이 빌더로 하면 너무 단편적이다
+    다양한 객체 생성 패턴을 익혀라
+    빌더 현업에서 잘 안 씀
+    인터페이스 두고 여러 생성방법 정의 내리기
+    쿠폰에 대한 서비스 == 컴퍼넌트 
+    팩토리
+    빌더는 단순 (MVP만) 
+    코틀린 생성자 역할이 클래스가 함
+    객체 생성에 대한 다양한 방식
+    
+    대량 데이터 서버랑 동일하다
+    선착순 쿠폰 생성
+     */
+
+
+    // 쿠폰 정책 생성
+    public static CouponPolicy createPolicy(
+            String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
+    ) {
+        return new CouponPolicy(
+                name, couponTarget, couponType, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
+        );
+    }
+
     // 연관관계 편의 메서드
     public void addTargetCourse(Long courseId) {
         if (this.targetCourses.stream().noneMatch(tc -> tc.getCourseId().equals(courseId))) {
@@ -130,15 +160,7 @@ public class CouponPolicy extends BaseTimeEntity {
         this.targetCategories.removeIf(tc -> tc.getCategoryId().equals(categoryId));
     }
 
-    // 쿠폰 정책 생성
-    public static CouponPolicy createPolicy(
-            String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
-    ) {
-        return new CouponPolicy(
-                name, couponTarget, couponType, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
-        );
-    }
-
+    // 쿠폰 발급 후 사용기간 
     public LocalDateTime calculateExpirationDate(LocalDateTime now) {
         if (this.validDays == null) {
             return LocalDateTime.of(2099, 1, 1, 23, 59);

@@ -5,11 +5,14 @@ import com.team08.backend.domain.study.entity.StudyStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface StudyRepository extends JpaRepository<Study, Long> {
     boolean existsByCourseId(Long courseId);
+
+    boolean existsByIdAndStatusNotIn(Long studyId, Collection<StudyStatus> statuses);
 
     Optional<Study> findByIdAndStatusNot(Long id, StudyStatus status);
 

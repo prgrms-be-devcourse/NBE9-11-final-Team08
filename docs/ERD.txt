@@ -87,6 +87,9 @@ Enum enrollment_status {
   CANCELED
   EXPIRED
 }
+Enum feed_item_type {
+  STUDY_ACTIVITY
+}
 // =====================================
 // USER DOMAIN
 // =====================================
@@ -405,6 +408,19 @@ Table study_activities {
   updated_at datetime [not null]
   deleted_at datetime
 }
+Table feed_items {
+  id bigint [pk, increment]
+  study_id bigint [not null]
+  actor_id bigint [not null]
+  type feed_item_type [not null]
+  source_id bigint [not null]
+  content varchar [not null]
+  occurred_at datetime [not null]
+  indexes {
+    (type, source_id) [unique]
+    (study_id, occurred_at, id)
+  }
+}
 Table ai_feedbacks {
   id bigint [pk, increment]
   user_id bigint [not null]
@@ -490,6 +506,9 @@ Ref: study_members.study_id > studies.id
 Ref: study_members.user_id > users.id
 Ref: study_activities.study_id > studies.id
 Ref: study_activities.author_id > users.id
+Ref: feed_items.study_id > studies.id
+Ref: feed_items.actor_id > users.id
+Ref: feed_items.source_id > study_activities.id
 Ref: ai_feedbacks.user_id > users.id
 Ref: ai_feedbacks.study_id > studies.id
 Ref: ai_feedbacks.study_activity_id > study_activities.id
