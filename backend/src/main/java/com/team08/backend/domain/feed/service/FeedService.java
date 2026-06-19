@@ -26,6 +26,7 @@ public class FeedService {
     private final StudyMemberRepository studyMemberRepository;
 
     public Page<FeedItemResponse> getPagedFeedItems(Long studyId, Long userId, Pageable pageable) {
+        // TODO: 수강권도 확인이 필요하고 스터디 쪽도 마찬가지, 추후 StudyAccessValidator 와 같은 통합 검증으로 변경 예정
         validateActiveStudy(studyId);
         validateActiveStudyMember(studyId, userId);
 
