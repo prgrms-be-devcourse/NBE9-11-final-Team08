@@ -26,6 +26,7 @@ import type {
   StudyActivityResponse,
   AiFeedbackResponse,
   AttendanceResponse,
+  AttendanceStatusResponse,
   CouponListResponse,
   CourseCreateRequest,
   CourseUpdateRequest,
@@ -67,7 +68,6 @@ const handleUnauthorized = () => {
       pathname.startsWith('/courses') ||
       pathname.startsWith('/study') ||
       pathname === '/events' ||
-      pathname === '/attendance' ||
       pathname === '/login' ||
       pathname === '/signup' ||
       pathname === '/cart'
@@ -722,7 +722,7 @@ export const api = {
     request<AiFeedbackResponse | null>(`/api/studies/${studyId}/activities/${activityId}/ai-feedback`, null),
 
   // Attendance
-  getAttendance: () => request<AttendanceResponse | null>('/api/attendances/me', null),
+  getAttendance: () => request<AttendanceStatusResponse | null>('/api/attendances/me', null),
   checkAttendance: () => mutate<AttendanceResponse>('/api/attendances', 'POST'),
 
   recordLearningEvent: (data: { eventType: string, courseId: number, chapterId?: number, lectureId?: number }) =>

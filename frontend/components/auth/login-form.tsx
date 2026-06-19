@@ -32,7 +32,8 @@ export function LoginForm() {
         document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; samesite=lax`
         
         toast.success('환영합니다! 로그인이 완료되었습니다.')
-        router.push('/')
+        const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+        router.push(redirectTo?.startsWith('/') ? redirectTo : '/')
         router.refresh() // 쿠키 변경 후 서버 컴포넌트들 리렌더링
       }
     } catch (err: any) {

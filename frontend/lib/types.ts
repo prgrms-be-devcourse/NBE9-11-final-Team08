@@ -484,10 +484,15 @@ export interface LearningEventResponse {
 }
 
 export interface AttendanceResponse {
-  userId: number
-  date: string
-  continuousDays: number
-  totalDays: number
+  consecutiveDays: number
+  monthlyTotalDays: number
+}
+
+export interface AttendanceStatusResponse {
+  checkedToday: boolean
+  consecutiveDays: number
+  monthlyTotalDays: number
+  checkedDays: number[]
 }
 
 export interface StudyReport {

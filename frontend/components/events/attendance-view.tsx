@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { CalendarDays, Check, Flame, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 
 export function AttendanceView() {
+  const router = useRouter()
   const [checkedToday, setCheckedToday] = useState(false)
   const [monthTotal, setMonthTotal] = useState(0)
   const [streak, setStreak] = useState(0)
@@ -21,48 +23,43 @@ export function AttendanceView() {
   const [checkedDays, setCheckedDays] = useState<number[]>([])
 
   useEffect(() => {
-    if ('getAttendance' in api) {
-      (api as any).getAttendance()
-        .then((res: any) => {
-          if (res) {
-            setMonthTotal(res.totalDays || 0)
-            setStreak(res.continuousDays || 0)
-            
-            const lastDate = res.date ? new Date(res.date) : null
-            const isTodayChecked = lastDate && lastDate.toDateString() === new Date().toDateString()
-            setCheckedToday(!!isTodayChecked)
-            
-            const mockDays = []
-            if (!!isTodayChecked) mockDays.push(today)
-            setCheckedDays(mockDays)
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false))
-    } else {
-      setLoading(false)
+    const token = localStorage.getItem('accessToken') || document.cookie.match(/(^| )accessToken=([^;]+)/)?.[2]
+    if (!token) {
+      router.replace('/login?redirect=/attendance')
+      return
     }
-  }, [today])
+
+    api.getAttendance()
+      .then((res) => {
+        if (!res) return
+        setMonthTotal(res.monthlyTotalDays)
+        setStreak(res.consecutiveDays)
+        setCheckedToday(res.checkedToday)
+        setCheckedDays(res.checkedDays)
+      })
+      .finally(() => setLoading(false))
+  }, [router])
 
   const handleCheck = async () => {
     setChecking(true)
     try {
-      if ('checkAttendance' in api) {
-        const res: any = await (api as any).checkAttendance()
-        if (res) {
-          setMonthTotal(res.totalDays || monthTotal + 1)
-          setStreak(res.continuousDays || streak + 1)
-        }
-      } else {
-        setMonthTotal((v) => v + 1)
-        setStreak((v) => v + 1)
+      const res = await api.checkAttendance()
+      if (res) {
+        setMonthTotal(res.monthlyTotalDays || monthTotal + 1)
+        setStreak(res.consecutiveDays || streak + 1)
       }
       
       setCheckedToday(true)
-      setCheckedDays(prev => [...prev, today])
+      setCheckedDays(prev => prev.includes(today) ? prev : [...prev, today])
       toast.success('출석 완료! 포인트가 적립되었습니다.')
-    } catch (err) {
-      toast.error('출석 체크에 실패했습니다.')
+    } catch (err: any) {
+      if (String(err.message || '').includes('이미 출석')) {
+        setCheckedToday(true)
+        setCheckedDays(prev => prev.includes(today) ? prev : [...prev, today])
+        toast.info('오늘은 이미 출석하셨습니다.')
+      } else {
+        toast.error('출석 체크에 실패했습니다.')
+      }
     } finally {
       setChecking(false)
     }

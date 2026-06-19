@@ -32,11 +32,22 @@ export function SiteHeader() {
   const router = useRouter()
   const { items } = useCart()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userName, setUserName] = useState('')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    setIsLoggedIn(!!localStorage.getItem('accessToken'))
+    const token = localStorage.getItem('accessToken')
+    setIsLoggedIn(!!token)
+
+    if (!token) {
+      setUserName('')
+      return
+    }
+
+    api.getProfile()
+      .then((profile) => setUserName(profile?.name || '마이'))
+      .catch(() => setUserName('마이'))
   }, [pathname])
 
   const handleLogout = async () => {
@@ -47,6 +58,7 @@ export function SiteHeader() {
     }
     localStorage.removeItem('accessToken')
     setIsLoggedIn(false)
+    setUserName('')
     toast.success('로그아웃되었습니다.')
     router.push('/')
   }
@@ -118,14 +130,16 @@ export function SiteHeader() {
                 <Button variant="ghost" className="gap-2 px-2">
                   <Avatar className="h-7 w-7">
                     <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                      <User className="h-4 w-4" />
+                      {userName ? userName.charAt(0) : <User className="h-4 w-4" />}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden text-sm font-medium sm:inline">마이</span>
+                  <span className="hidden max-w-24 truncate text-sm font-medium sm:inline">
+                    {userName || '마이'}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>회원님</DropdownMenuLabel>
+                <DropdownMenuLabel>{userName || '회원님'}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/mypage">마이페이지</Link>
