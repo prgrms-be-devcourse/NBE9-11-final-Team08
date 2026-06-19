@@ -10,6 +10,7 @@ import type { UserProfile } from '@/lib/types'
 const links = [
   { label: '대시보드', href: '/dashboard' },
   { label: '내 스터디', href: '/mypage' },
+  { label: '스터디 리포트', href: '/mypage/report' },
   { label: '주문 내역', href: '/orders' },
   { label: '작성한 댓글', href: '/mypage/comments' },
   { label: '설정', href: '/mypage/settings' },

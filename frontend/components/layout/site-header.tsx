@@ -34,6 +34,14 @@ export function SiteHeader() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [userName, setUserName] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      setSearchQuery(params.get('query') || '')
+    }
+  }, [])
 
   useEffect(() => {
     setMounted(true)
@@ -106,6 +114,14 @@ export function SiteHeader() {
         <div className="relative ml-auto hidden max-w-xs flex-1 items-center lg:flex">
           <Search className="pointer-events-none absolute left-3 h-4 w-4 text-muted-foreground" />
           <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                router.push(`/?query=${encodeURIComponent(searchQuery)}`)
+                setSearchQuery('')
+              }
+            }}
             placeholder="배우고 싶은 지식을 검색해보세요"
             className="pl-9"
             aria-label="강좌 검색"

@@ -113,8 +113,8 @@ function StudyCalendar({ calendar }: { calendar: CalendarDay[] }) {
 export function ReportView({ report }: { report: StudyReport }) {
   const stats = [
     { icon: Clock, label: '총 학습시간', value: report.totalStudyTime },
-    { icon: MessageSquare, label: '작성 댓글 수', value: String(report.commentCount) },
-    { icon: CalendarDays, label: '수강일 수', value: `${report.studyDays}일` },
+    { icon: MessageSquare, label: '작성 댓글 수', value: report.commentCount === -1 ? '기능 없음' : `${report.commentCount}개` },
+    { icon: CalendarDays, label: '수강일 수', value: report.studyDays === -1 ? '기능 없음' : `${report.studyDays}일` },
   ]
 
   return (
@@ -136,8 +136,14 @@ export function ReportView({ report }: { report: StudyReport }) {
       <div className="rounded-xl border bg-foreground p-6 text-background">
         <p className="text-sm text-background/70">완주를 축하드립니다!</p>
         <p className="mt-1 text-lg font-semibold text-balance">
-          이번 스터디 기간 동안 총 {report.studyDays}일 학습에 참여하고{' '}
-          {report.totalStudyTime} 동안 러닝 스페이스를 이용했어요.
+          {report.studyDays !== -1 ? (
+            <>
+              이번 스터디 기간 동안 총 {report.studyDays}일 학습에 참여하고{' '}
+              {report.totalStudyTime} 동안 러닝 스페이스를 이용했어요.
+            </>
+          ) : (
+            <>이번 스터디에 참여해 주셔서 감사합니다! 앞으로도 열공해 보아요.</>
+          )}
         </p>
       </div>
 
@@ -154,22 +160,28 @@ export function ReportView({ report }: { report: StudyReport }) {
       <section className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold">학습 활동 그래프</h2>
         <p className="text-xs text-muted-foreground">주차별 누적 진도</p>
-        <ChartContainer config={chartConfig} className="mt-4 h-56 w-full">
-          <AreaChart data={report.progressData} margin={{ left: -10, right: 8 }}>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
-            <YAxis tickLine={false} axisLine={false} width={32} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Area
-              dataKey="progress"
-              type="monotone"
-              stroke="var(--color-progress)"
-              fill="var(--color-progress)"
-              fillOpacity={0.15}
-              strokeWidth={2}
-            />
-          </AreaChart>
-        </ChartContainer>
+        {report.progressData && report.progressData.length > 0 ? (
+          <ChartContainer config={chartConfig} className="mt-4 h-56 w-full">
+            <AreaChart data={report.progressData} margin={{ left: -10, right: 8 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis tickLine={false} axisLine={false} width={32} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Area
+                dataKey="progress"
+                type="monotone"
+                stroke="var(--color-progress)"
+                fill="var(--color-progress)"
+                fillOpacity={0.15}
+                strokeWidth={2}
+              />
+            </AreaChart>
+          </ChartContainer>
+        ) : (
+          <div className="mt-6 flex h-40 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground bg-muted/20">
+            기능 없음 (학습 활동 그래프 데이터가 존재하지 않습니다)
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border bg-card p-5">
@@ -177,30 +189,44 @@ export function ReportView({ report }: { report: StudyReport }) {
         <p className="text-xs text-muted-foreground">
           한 열이 한 주, 가로로 최근 1년의 학습 기록이에요. 진한 칸일수록 학습량이 많은 날입니다.
         </p>
-        <StudyCalendar calendar={report.calendar} />
-        <div className="mt-3 flex items-center justify-end gap-1 text-xs text-muted-foreground">
-          <span>적음</span>
-          {CELL_LEVELS.map((cls, i) => (
-            <span key={i} className={cn('h-3 w-3 rounded-[3px]', cls)} />
-          ))}
-          <span>많음</span>
-        </div>
+        {report.calendar && report.calendar.length > 0 ? (
+          <>
+            <StudyCalendar calendar={report.calendar} />
+            <div className="mt-3 flex items-center justify-end gap-1 text-xs text-muted-foreground">
+              <span>적음</span>
+              {CELL_LEVELS.map((cls, i) => (
+                <span key={i} className={cn('h-3 w-3 rounded-[3px]', cls)} />
+              ))}
+              <span>많음</span>
+            </div>
+          </>
+        ) : (
+          <div className="mt-6 flex h-40 items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground bg-muted/20">
+            기능 없음 (학습 캘린더 데이터가 존재하지 않습니다)
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border bg-card p-5">
         <h2 className="font-semibold">가장 많이 학습한 강의</h2>
         <Separator className="my-4" />
-        <ul className="space-y-3">
-          {report.topLectures.map((title, i) => (
-            <li key={title} className="flex items-center gap-3">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
-                {i + 1}
-              </span>
-              <PlayCircle className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{title}</span>
-            </li>
-          ))}
-        </ul>
+        {report.topLectures && report.topLectures.length > 0 ? (
+          <ul className="space-y-3">
+            {report.topLectures.map((title, i) => (
+              <li key={title} className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                  {i + 1}
+                </span>
+                <PlayCircle className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{title}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="flex h-20 items-center justify-center text-sm text-muted-foreground">
+            기능 없음 (강의 학습 데이터가 존재하지 않습니다)
+          </div>
+        )}
       </section>
     </div>
   )

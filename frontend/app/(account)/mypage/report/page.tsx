@@ -7,6 +7,5 @@ export const metadata = {
 
 export default async function ReportPage() {
   const report = await api.getStudyReport('study-1')
-  if (!report) return null
   return <ReportView report={report} />
 }

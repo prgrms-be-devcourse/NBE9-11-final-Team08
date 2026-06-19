@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CourseCard } from '@/components/course/course-card'
+import { useSearchParams } from 'next/navigation'
 import type { Course } from '@/lib/types'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -20,9 +21,16 @@ const sortLabels: Record<string, string> = {
 const filters = ['무료', '할인']
 
 export function CatalogView() {
+  const searchParams = useSearchParams()
+  const urlQuery = searchParams ? searchParams.get('query') || '' : ''
+
   const [category, setCategory] = useState('전체')
   const [sort, setSort] = useState<(typeof sorts)[number]>('VIEW_DESC')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(urlQuery)
+
+  useEffect(() => {
+    setQuery(urlQuery)
+  }, [urlQuery])
   
   const [courses, setCourses] = useState<Course[]>([])
   const [totalElements, setTotalElements] = useState(0)

@@ -903,7 +903,58 @@ export const api = {
 
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
-  getStudyReport: (_studyId: string) => request<StudyReport | null>(`/api/studies/${_studyId}/report`, null),
+  getStudyReport: async (_studyId: string): Promise<StudyReport> => {
+    let studyTitle = '기능 없음'
+    let resolvedStudyId = _studyId
+
+    try {
+      // 1. Fetch user's studies to resolve a valid study ID if it's 'study-1' or similar
+      const myStudies = await request<StudySummaryResponse[]>('/api/studies/me', [])
+      if (myStudies && myStudies.length > 0) {
+        if (_studyId === 'study-1' || isNaN(Number(_studyId))) {
+          resolvedStudyId = String(myStudies[0].studyId)
+          studyTitle = myStudies[0].title
+        } else {
+          const matched = myStudies.find(s => String(s.studyId) === _studyId)
+          if (matched) {
+            studyTitle = matched.title
+          } else {
+            const detail = await request<StudyDetailResponse | undefined>(`/api/studies/${_studyId}`, undefined)
+            if (detail) {
+              studyTitle = detail.title
+            }
+          }
+        }
+      } else {
+        studyTitle = '참여 중인 스터디 없음'
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user studies or study detail:', e)
+    }
+
+    let userName = '사용자'
+    try {
+      // 2. Fetch User Profile to get user name
+      const profile = await api.getProfile()
+      if (profile && profile.name) {
+        userName = profile.name
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user profile:', e)
+    }
+
+    return {
+      studyName: studyTitle,
+      userName: userName,
+      period: '기능 없음',
+      totalStudyTime: '기능 없음',
+      commentCount: -1,
+      studyDays: -1,
+      progressData: [],
+      calendar: [],
+      topLectures: [],
+    }
+  },
 
   // Admin Course APIs
   approveCourseByAdmin: (courseId: number | string) =>
