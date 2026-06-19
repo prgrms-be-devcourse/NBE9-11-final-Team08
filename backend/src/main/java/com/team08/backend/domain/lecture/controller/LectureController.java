@@ -1,10 +1,15 @@
 package com.team08.backend.domain.lecture.controller;
 
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
+import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.service.LectureService;
+import com.team08.backend.domain.lecture.service.VideoAccessService;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -13,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class LectureController {
 
     private final LectureService lectureService;
+    private final VideoAccessService videoAccessService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -23,5 +29,16 @@ public class LectureController {
 
         return lectureService.createLecture(courseId, chapterId, request);
     }
-    // TODO: lecture 단일 입장도 고려
+
+    @GetMapping("/{lectureId}/stream")
+    public ResponseEntity<String> getVideoStreamUrl(
+            @PathVariable Long lectureId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+
+        VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
+
+        return ResponseEntity.ok()
+                .headers(streamResponse.asHttpHeaders())
+                .body(streamResponse.path());
+    }
 }

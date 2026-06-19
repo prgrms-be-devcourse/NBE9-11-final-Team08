@@ -42,6 +42,10 @@ spring:
         instance-profile: false
       s3:
         bucket: test-bucket-name
+      cloudfront:
+        distribution-domain: localhost
+        key-pair-id: dummy-id
+        private-key: -----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----
 
 app:
   ai:
