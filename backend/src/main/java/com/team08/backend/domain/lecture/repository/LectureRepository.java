@@ -20,6 +20,10 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
     @Query("SELECT l.id FROM Lecture l JOIN l.chapter c WHERE c.course.id = :courseId")
     List<Long> findIdsByCourseId(@Param("courseId") Long courseId);
 
+    // 강의 ID 목록으로 ID→제목 조회
+    @Query("SELECT l.id, l.title FROM Lecture l WHERE l.id IN :ids")
+    List<Object[]> findIdAndTitleByIdIn(@Param("ids") List<Long> ids);
+
     @Query("SELECT l FROM Lecture l " +
             "JOIN FETCH l.chapter ch " +
             "JOIN FETCH ch.course c " +

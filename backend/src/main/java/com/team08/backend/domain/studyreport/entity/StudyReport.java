@@ -7,7 +7,6 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "study_reports")
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StudyReport {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,4 +19,36 @@ public class StudyReport {
     private Integer totalQnaCount;
     @Column(precision = 5, scale = 2)
     private BigDecimal progressRate;
+    private Integer studyDays;
+    @Column(columnDefinition = "TEXT")
+    private String topLectures;      // JSON: [{lectureId, title, watchTimeSeconds}]
+    @Column(columnDefinition = "TEXT")
+    private String dailyProgress;    // JSON: [{date, progressRate}]
+    @Column(columnDefinition = "TEXT")
+    private String dailyActivityMap; // JSON: {"2026-06-07": 3, ...}
+
+    public static StudyReport create(Long userId, Long studyId) {
+        StudyReport r = new StudyReport();
+        r.userId = userId;
+        r.studyId = studyId;
+        return r;
+    }
+
+    public void update(
+            Integer totalWatchTime,
+            Integer totalQnaCount,
+            BigDecimal progressRate,
+            Integer studyDays,
+            String topLectures,
+            String dailyProgress,
+            String dailyActivityMap
+    ) {
+        this.totalWatchTime = totalWatchTime;
+        this.totalQnaCount = totalQnaCount;
+        this.progressRate = progressRate;
+        this.studyDays = studyDays;
+        this.topLectures = topLectures;
+        this.dailyProgress = dailyProgress;
+        this.dailyActivityMap = dailyActivityMap;
+    }
 }
