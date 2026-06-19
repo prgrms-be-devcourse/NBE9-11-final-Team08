@@ -1,6 +1,7 @@
 package com.team08.backend.domain.attendance.controller;
 
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
+import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.service.AttendanceService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -8,12 +9,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/attendances")
@@ -23,7 +23,8 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
 
-    // [사용자] 출석 체크 /api/attendance정
+
+    // 출석 체크 /api/attendance
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "출석 체크", description = "당일 출석을 수행하고 연속/누적 출석일수를 반환합니다.")
@@ -31,5 +32,14 @@ public class AttendanceController {
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
         // [사용자] 출석체크
         return attendanceService.checkIn(loginUserPrincipal.user().id());
+    }
+
+    // 출석 기록 조회 /api/attendance/me
+    @GetMapping("/me")
+    @Operation(summary = "내 출석 현황 조회", description = "이번 달 출석 현황과 오늘 출석 여부를 조회합니다.")
+    public AttendanceStatusResponse getMyAttendance(
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        // 출석 기록 조회
+        return attendanceService.getMyAttendance(loginUserPrincipal.user().id());
     }
 }
