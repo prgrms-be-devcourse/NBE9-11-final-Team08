@@ -8,14 +8,14 @@ import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
 import com.team08.backend.domain.study.entity.Study;
+import com.team08.backend.domain.study.exception.StudyNotFoundException;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.DailyProgressEntry;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.dto.TopLectureEntry;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +45,7 @@ public class StudyReportService {
     @Transactional
     public StudyReportResponse generateReport(Long userId, Long studyId) {
         Study study = studyRepository.findById(studyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
+                .orElseThrow(StudyNotFoundException::new);
 
         Long courseId = study.getCourse().getId();
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
@@ -81,7 +81,7 @@ public class StudyReportService {
     @Transactional(readOnly = true)
     public StudyReportResponse getReport(Long userId, Long studyId) {
         StudyReport report = studyReportRepository.findByUserIdAndStudyId(userId, studyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.NOT_STUDY_MEMBER));
+                .orElseThrow(StudyReportNotFoundException::new);
         return StudyReportResponse.from(report);
     }
 

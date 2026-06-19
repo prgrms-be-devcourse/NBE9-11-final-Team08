@@ -9,9 +9,9 @@ import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.study.exception.StudyNotFoundException;
+import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -127,9 +127,7 @@ class StudyReportServiceTest {
         given(studyRepository.findById(99L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> studyReportService.generateReport(1L, 99L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.STUDY_NOT_FOUND);
+                .isInstanceOf(StudyNotFoundException.class);
     }
 
     // ── getReport ─────────────────────────────────────────────────────────
@@ -160,9 +158,7 @@ class StudyReportServiceTest {
         given(studyReportRepository.findByUserIdAndStudyId(1L, 99L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> studyReportService.getReport(1L, 99L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.NOT_STUDY_MEMBER);
+                .isInstanceOf(StudyReportNotFoundException.class);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────
