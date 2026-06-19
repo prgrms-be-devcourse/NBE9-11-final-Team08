@@ -13,6 +13,9 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.entity.Payment;
+import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +62,9 @@ class OrderServiceTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
+    @Mock
+    private PaymentRepository paymentRepository;
+
     private OrderService orderService;
 
     @BeforeEach
@@ -73,6 +79,7 @@ class OrderServiceTest {
                 cartRepository,
                 courseRepository,
                 enrollmentRepository,
+                paymentRepository,
                 fixedClock
         );
     }
@@ -205,6 +212,7 @@ class OrderServiceTest {
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
 
         OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
@@ -212,6 +220,40 @@ class OrderServiceTest {
         assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
         assertThat(response.canceledAt()).isEqualTo(FIXED_NOW);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELED);
+    }
+
+    @Test
+    void pendingPaymentOrderWithFailedPaymentCancelsPaymentTogether() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
+        Payment payment = payment(order, PaymentStatus.FAILED);
+        OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+
+        OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(payment.getCanceledAt()).isEqualTo(FIXED_NOW);
+    }
+
+    @Test
+    void pendingPaymentOrderWithReadyPaymentCancelsPaymentTogether() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
+        Payment payment = payment(order, PaymentStatus.READY);
+        OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+
+        OrderDetailResponse response = orderService.cancelMyOrder(USER_ID, ORDER_ID);
+
+        assertThat(response.status()).isEqualTo(OrderStatus.CANCELED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
+        assertThat(payment.getCanceledAt()).isEqualTo(FIXED_NOW);
     }
 
     @Test
@@ -223,7 +265,7 @@ class OrderServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
 
-        verifyNoInteractions(orderItemRepository);
+        verifyNoInteractions(orderItemRepository, paymentRepository);
     }
 
     private void stubOrderSave() {
@@ -246,6 +288,18 @@ class OrderServiceTest {
         ReflectionTestUtils.setField(order, "finalPrice", 30_000);
         ReflectionTestUtils.setField(order, "status", status);
         return order;
+    }
+
+    private Payment payment(Order order, PaymentStatus status) {
+        Payment payment = Payment.createReady(order, FIXED_NOW.minusDays(1));
+        if (status == PaymentStatus.FAILED) {
+            payment.fail("payment-key", "CARD", "결제 실패", FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.READY) {
+            return payment;
+        } else if (status == PaymentStatus.SUCCESS) {
+            payment.succeed("payment-key", "CARD", FIXED_NOW.minusDays(1));
+        }
+        return payment;
     }
 
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {

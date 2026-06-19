@@ -14,6 +14,7 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final PaymentRepository paymentRepository;
     private final Clock clock;
 
     @Transactional
@@ -60,7 +62,7 @@ public class OrderService {
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
 
-        // 장바구니 주문 성공 후 동일 항목으로 재주문되지 않도록 Cart 도메인 메서드로 비웁니다.
+        // 장바구니 주문 성공 후 동일 항목으로 재주문되지 않도록 Cart 도메인 메서드로 비운다.
         cart.clearItems();
 
         return response;
@@ -93,7 +95,9 @@ public class OrderService {
     public OrderDetailResponse cancelMyOrder(Long userId, Long orderId) {
         Order order = findMyOrder(userId, orderId);
 
-        order.cancel(LocalDateTime.now(clock));
+        LocalDateTime canceledAt = LocalDateTime.now(clock);
+        order.cancel(canceledAt);
+        cancelCancelablePayment(order, canceledAt);
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         return OrderDetailResponse.from(order, orderItems);
@@ -136,7 +140,7 @@ public class OrderService {
     }
 
     private void validateOrderableCourse(Long userId, Course course) {
-        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증합니다.
+        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증한다.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
@@ -153,5 +157,11 @@ public class OrderService {
     private Order findMyOrder(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void cancelCancelablePayment(Order order, LocalDateTime canceledAt) {
+        paymentRepository.findByOrder_Id(order.getId())
+                .filter(payment -> payment.canCancelBeforePaid())
+                .ifPresent(payment -> payment.cancel(canceledAt));
     }
 }
