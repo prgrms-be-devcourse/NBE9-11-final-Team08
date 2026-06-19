@@ -1,0 +1,11 @@
+# Grafana 가 기동 시 자동으로 InfluxDB 를 데이터소스로 연결한다.
+# (없으면 매번 UI 에서 손으로 연결해야 함)
+apiVersion: 1
+
+datasources:
+  - name: k6-influxdb
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8086
+    database: k6
+    isDefault: true
