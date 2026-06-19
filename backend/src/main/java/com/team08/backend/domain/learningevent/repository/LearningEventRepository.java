@@ -1,6 +1,7 @@
 package com.team08.backend.domain.learningevent.repository;
 
 import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
+import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import org.springframework.data.domain.Page;
@@ -26,13 +27,15 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 사용자별 활동 조회 ────────────────────────────────────────────
     Page<LearningEvent> findByUserId(Long userId, Pageable pageable);
 
-    // ── 수강일 수 (이벤트 발생 날짜 기준) ────────────────────────────
+    // ── 총 시청 시간 + 수강일 수 단일 쿼리 ──────────────────────────
     @Query(value = """
-            SELECT COUNT(DISTINCT DATE(event_time))
+            SELECT
+                COALESCE(SUM(CASE WHEN event_type = 'VIDEO_END' THEN position_seconds ELSE 0 END), 0) AS totalWatchTime,
+                COUNT(DISTINCT DATE(event_time)) AS studyDays
             FROM learning_events
             WHERE user_id = :userId AND course_id = :courseId
             """, nativeQuery = true)
-    Integer countStudyDaysByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
+    UserCourseStatsProjection getStatsByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
     // ── 강의별 시청 시간 (TOP3용) ─────────────────────────────────────
     @Query(value = """
@@ -63,14 +66,6 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
             GROUP BY DATE(event_time)
             """, nativeQuery = true)
     List<Object[]> findDailyActivityCounts(@Param("userId") Long userId, @Param("courseId") Long courseId);
-
-    // ── 사용자+강좌 기준 총 시청 시간 ────────────────────────────────
-    @Query(value = """
-            SELECT COALESCE(SUM(position_seconds), 0)
-            FROM learning_events
-            WHERE user_id = :userId AND course_id = :courseId AND event_type = 'VIDEO_END'
-            """, nativeQuery = true)
-    Integer sumWatchTimeByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
     // ── 챕터별 이벤트 타입 카운트 ────────────────────────────────────
     long countByChapterIdAndEventType(Long chapterId, LearningEventType eventType);

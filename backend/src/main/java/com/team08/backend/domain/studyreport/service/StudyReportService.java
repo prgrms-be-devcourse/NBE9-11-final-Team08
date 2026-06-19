@@ -1,5 +1,6 @@
 package com.team08.backend.domain.studyreport.service;
 
+import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -50,8 +51,9 @@ public class StudyReportService {
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         int totalLectureCount = lectureIds.size();
 
-        Integer totalWatchTime = learningEventRepository.sumWatchTimeByUserIdAndCourseId(userId, courseId);
-        Integer studyDays = learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId);
+        UserCourseStatsProjection userStats = learningEventRepository.getStatsByUserIdAndCourseId(userId, courseId);
+        Integer totalWatchTime = userStats.getTotalWatchTime();
+        Integer studyDays = userStats.getStudyDays();
 
         long completedCount = totalLectureCount == 0 ? 0
                 : lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true);

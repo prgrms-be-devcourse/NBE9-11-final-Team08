@@ -10,6 +10,7 @@ import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
 import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
@@ -69,8 +70,8 @@ class StudyReportServiceTest {
         Long courseId = 100L;
         List<Long> lectureIds = List.of(1L, 2L, 3L);
 
-        stubCommon(userId, studyId, courseId, lectureIds);
-        given(learningEventRepository.sumWatchTimeByUserIdAndCourseId(userId, courseId)).willReturn(3600);
+        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, lectureIds);
+        given(userStats.getTotalWatchTime()).willReturn(3600);
         given(lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true)).willReturn(2L);
         given(qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(5L);
         given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.empty());
@@ -96,8 +97,8 @@ class StudyReportServiceTest {
         Long courseId = 100L;
         List<Long> lectureIds = List.of(1L, 2L);
 
-        stubCommon(userId, studyId, courseId, lectureIds);
-        given(learningEventRepository.sumWatchTimeByUserIdAndCourseId(userId, courseId)).willReturn(7200);
+        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, lectureIds);
+        given(userStats.getTotalWatchTime()).willReturn(7200);
         given(lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true)).willReturn(2L);
         given(qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(3L);
 
@@ -120,8 +121,8 @@ class StudyReportServiceTest {
         Long studyId = 10L;
         Long courseId = 100L;
 
-        stubCommon(userId, studyId, courseId, List.of());
-        given(learningEventRepository.sumWatchTimeByUserIdAndCourseId(userId, courseId)).willReturn(0);
+        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, List.of());
+        given(userStats.getTotalWatchTime()).willReturn(0);
         given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.empty());
 
         StudyReport saved = StudyReport.create(userId, studyId);
@@ -175,15 +176,20 @@ class StudyReportServiceTest {
 
     // ── helpers ───────────────────────────────────────────────────────────
 
-    private void stubCommon(Long userId, Long studyId, Long courseId, List<Long> lectureIds) {
+    private UserCourseStatsProjection stubCommon(Long userId, Long studyId, Long courseId, List<Long> lectureIds) {
         Study study = mockStudy(studyId, courseId);
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(lectureIds);
-        given(learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId)).willReturn(5);
+
+        UserCourseStatsProjection userStats = mock(UserCourseStatsProjection.class);
+        given(userStats.getStudyDays()).willReturn(5);
+        given(learningEventRepository.getStatsByUserIdAndCourseId(userId, courseId)).willReturn(userStats);
+
         given(learningEventRepository.findTopLecturesByWatchTime(userId, courseId)).willReturn(List.of());
         given(learningEventRepository.findDailyCompletionCounts(userId, courseId)).willReturn(List.of());
         given(learningEventRepository.findDailyActivityCounts(userId, courseId)).willReturn(List.of());
         given(lectureRepository.findIdAndTitleByIdIn(any())).willReturn(List.of());
+        return userStats;
     }
 
     private Study mockStudy(Long studyId, Long courseId) {
