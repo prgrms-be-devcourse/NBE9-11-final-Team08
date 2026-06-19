@@ -2,6 +2,10 @@ package com.team08.backend.global.auth.util;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseCookie;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -10,14 +14,20 @@ import java.security.KeyPairGenerator;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
 
+@ExtendWith(MockitoExtension.class)
 class CloudFrontCookieSignerTest {
 
     private CloudFrontCookieSigner cloudFrontCookieSigner;
 
+    @Mock
+    private Environment environment;
+
     @BeforeEach
     void setUp() throws Exception {
-        cloudFrontCookieSigner = new CloudFrontCookieSigner();
+        given(environment.getActiveProfiles()).willReturn(new String[]{"test"});
+        cloudFrontCookieSigner = new CloudFrontCookieSigner(environment);
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "distributionDomain", "localhost");
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "real-id");
 

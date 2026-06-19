@@ -3,8 +3,10 @@ package com.team08.backend.global.auth.util;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -15,11 +17,16 @@ import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CloudFrontCookieSigner {
+
+    private final Environment environment;
 
     @Value("${cloud.aws.cloudfront.distribution-domain:localhost}")
     private String distributionDomain;
@@ -34,10 +41,13 @@ public class CloudFrontCookieSigner {
 
     @PostConstruct
     public void init() {
-        if ("dummy-id".equals(keyPairId) || privateKeyPem.contains("MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3")) {
-            return;
-        }
+        List<String> activeProfiles = Arrays.asList(environment.getActiveProfiles());
+        boolean isTestEnvironment = activeProfiles.contains("test") || activeProfiles.contains("local") || "dummy-id".equals(keyPairId);
+
         try {
+            if (isTestEnvironment && privateKeyPem.contains("MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3")) {
+                return;
+            }
             String privateKeyRaw = privateKeyPem
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
@@ -49,7 +59,9 @@ public class CloudFrontCookieSigner {
             this.privateKey = kf.generatePrivate(spec);
         } catch (Exception e) {
             log.error("CloudFront private key initialization failed", e);
-            throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
+            if (!isTestEnvironment) {
+                throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
+            }
         }
     }
 
