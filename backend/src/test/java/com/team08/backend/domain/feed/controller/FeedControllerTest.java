@@ -47,6 +47,7 @@ public class FeedControllerTest {
                 100L,
                 studyId,
                 200L,
+                "테스트유저",
                 FeedItemType.STUDY_ACTIVITY,
                 1L,
                 "스터디 활동 내용",
@@ -67,6 +68,7 @@ public class FeedControllerTest {
                 .andExpect(jsonPath("$.items[0].sourceId").value(1L))
                 .andExpect(jsonPath("$.items[0].studyId").value(studyId))
                 .andExpect(jsonPath("$.items[0].actorId").value(200L))
+                .andExpect(jsonPath("$.items[0].actorNickname").value("테스트유저"))
                 .andExpect(jsonPath("$.items[0].content").value("스터디 활동 내용"))
                 .andExpect(jsonPath("$.nextCursor.id").value(100L))
                 .andExpect(jsonPath("$.hasNext").value(true));

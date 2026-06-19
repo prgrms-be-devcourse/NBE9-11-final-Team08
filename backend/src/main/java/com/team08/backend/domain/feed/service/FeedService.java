@@ -9,6 +9,8 @@ import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +29,7 @@ public class FeedService {
     private final FeedItemRepository feedItemRepository;
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final UserRepository userRepository;
 
     public FeedCursorResponse getFeedItems(
             Long studyId,
@@ -52,8 +57,12 @@ public class FeedService {
                 : feedItems;
 
         FeedCursor nextCursor = resolveNextCursor(pageItems, hasNext);
+        Map<Long, String> actorNicknames = findActorNicknames(pageItems);
         List<FeedItemResponse> responses = pageItems.stream()
-                .map(FeedItemResponse::from)
+                .map(feedItem -> FeedItemResponse.from(
+                        feedItem,
+                        actorNicknames.getOrDefault(feedItem.getActorId(), "알 수 없는 사용자")
+                ))
                 .toList();
 
         return new FeedCursorResponse(responses, nextCursor, hasNext);
@@ -92,5 +101,19 @@ public class FeedService {
 
         FeedItem lastItem = pageItems.get(pageItems.size() - 1);
         return new FeedCursor(lastItem.getOccurredAt(), lastItem.getId());
+    }
+
+    private Map<Long, String> findActorNicknames(List<FeedItem> feedItems) {
+        List<Long> actorIds = feedItems.stream()
+                .map(FeedItem::getActorId)
+                .distinct()
+                .toList();
+
+        return userRepository.findAllById(actorIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        User::getNickname,
+                        (left, right) -> left
+                ));
     }
 }

@@ -9,16 +9,18 @@ public record FeedItemResponse(
         Long id,
         Long studyId,
         Long actorId,
+        String actorNickname,
         FeedItemType type,
         Long sourceId,
         String content,
         LocalDateTime occurredAt
 ) {
-    public static FeedItemResponse from(FeedItem feedItem) {
+    public static FeedItemResponse from(FeedItem feedItem, String actorNickname) {
         return new FeedItemResponse(
                 feedItem.getId(),
                 feedItem.getStudyId(),
                 feedItem.getActorId(),
+                actorNickname,
                 feedItem.getType(),
                 feedItem.getSourceId(),
                 feedItem.getContent(),

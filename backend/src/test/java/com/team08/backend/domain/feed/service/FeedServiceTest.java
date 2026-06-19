@@ -10,6 +10,7 @@ import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,9 @@ public class FeedServiceTest {
 
     @Mock
     FeedItemRepository feedItemRepository;
+
+    @Mock
+    UserRepository userRepository;
 
     @InjectMocks
     FeedService feedService;
@@ -76,6 +80,8 @@ public class FeedServiceTest {
                 null,
                 PageRequest.of(0, size + 1)
         )).willReturn(List.of(feedItem));
+        given(userRepository.findAllById(List.of(userId)))
+                .willReturn(List.of(user));
 
         // when
         FeedCursorResponse result = feedService.getFeedItems(studyId, userId, null, null, size);
@@ -89,6 +95,7 @@ public class FeedServiceTest {
         assertThat(response.sourceId()).isEqualTo(activityId);
         assertThat(response.studyId()).isEqualTo(studyId);
         assertThat(response.actorId()).isEqualTo(userId);
+        assertThat(response.actorNickname()).isEqualTo(user.getNickname());
         assertThat(response.content()).isEqualTo(content);
 
         then(feedItemRepository).should()
@@ -112,6 +119,8 @@ public class FeedServiceTest {
                 .willReturn(true);
         given(feedItemRepository.findByStudyIdWithCursor(studyId, null, null, PageRequest.of(0, size + 1)))
                 .willReturn(List.of(first, second, extra));
+        given(userRepository.findAllById(List.of(userId)))
+                .willReturn(List.of(user(userId, "테스트유저")));
 
         // when
         FeedCursorResponse result = feedService.getFeedItems(studyId, userId, null, null, size);
@@ -144,6 +153,7 @@ public class FeedServiceTest {
                 .hasMessage(ErrorCode.STUDY_ACCESS_DENIED.getMessage());
 
         then(feedItemRepository).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -162,6 +172,7 @@ public class FeedServiceTest {
 
         then(studyMemberRepository).shouldHaveNoInteractions();
         then(feedItemRepository).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
     }
 
     @Test
@@ -187,6 +198,7 @@ public class FeedServiceTest {
                 .hasMessage(ErrorCode.INVALID_INPUT_VALUE.getMessage());
 
         then(feedItemRepository).shouldHaveNoInteractions();
+        then(userRepository).shouldHaveNoInteractions();
     }
 
     private FeedItem feedItem(Long id, Long studyId, Long actorId, Long sourceId, LocalDateTime occurredAt) {
@@ -199,5 +211,11 @@ public class FeedServiceTest {
         );
         ReflectionTestUtils.setField(feedItem, "id", id);
         return feedItem;
+    }
+
+    private User user(Long id, String nickname) {
+        User user = User.createUser("user" + id + "@test.com", "password", nickname, "profileImage");
+        ReflectionTestUtils.setField(user, "id", id);
+        return user;
     }
 }
