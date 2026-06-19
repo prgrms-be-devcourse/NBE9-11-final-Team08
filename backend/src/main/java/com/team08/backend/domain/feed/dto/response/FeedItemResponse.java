@@ -9,7 +9,7 @@ public record FeedItemResponse(
         Long id,
         Long studyId,
         Long actorId,
-        FeedItemType feedItemType,
+        FeedItemType type,
         Long sourceId,
         String content,
         LocalDateTime occurredAt

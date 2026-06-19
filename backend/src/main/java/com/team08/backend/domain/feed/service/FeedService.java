@@ -25,7 +25,7 @@ public class FeedService {
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
 
-    public Page<FeedItemResponse> getFeedList(Long studyId, Long userId, Pageable pageable) {
+    public Page<FeedItemResponse> getPagedFeedItems(Long studyId, Long userId, Pageable pageable) {
         validateActiveStudy(studyId);
         validateActiveStudyMember(studyId, userId);
 

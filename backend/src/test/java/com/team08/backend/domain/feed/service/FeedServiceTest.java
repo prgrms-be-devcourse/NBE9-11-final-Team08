@@ -81,7 +81,7 @@ public class FeedServiceTest {
                 .willReturn(new PageImpl<>(List.of(feedItem), latestFirstPageable, 1));
 
         // when
-        Page<FeedItemResponse> result = feedService.getFeedList(studyId, userId, pageable);
+        Page<FeedItemResponse> result = feedService.getPagedFeedItems(studyId, userId, pageable);
 
         // then
         assertThat(result.getContent()).hasSize(1);
@@ -111,7 +111,7 @@ public class FeedServiceTest {
         )).willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> feedService.getFeedList(studyId, userId, pageable))
+        assertThatThrownBy(() -> feedService.getPagedFeedItems(studyId, userId, pageable))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.STUDY_ACCESS_DENIED.getMessage());
 
@@ -129,7 +129,7 @@ public class FeedServiceTest {
                 .willReturn(false);
 
         // when & then
-        assertThatThrownBy(() -> feedService.getFeedList(studyId, userId, pageable))
+        assertThatThrownBy(() -> feedService.getPagedFeedItems(studyId, userId, pageable))
                 .isInstanceOf(CustomException.class)
                 .hasMessage(ErrorCode.STUDY_ACCESS_DENIED.getMessage());
 
