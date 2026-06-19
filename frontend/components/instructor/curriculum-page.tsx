@@ -2,15 +2,16 @@
 
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { CurriculumBuilder } from "@/components/instructor/curriculum-builder"
 
 export function CurriculumPage({
   backHref,
+  courseId,
   courseTitle,
 }: {
   backHref: string
+  courseId?: string
   courseTitle?: string
 }) {
   return (
@@ -29,14 +30,27 @@ export function CurriculumPage({
         </div>
       </div>
 
-      <CurriculumBuilder />
+      {courseId ? (
+        <>
+          <CurriculumBuilder courseId={courseId} backHref={backHref} />
 
-      <div className="flex justify-end gap-2">
-        <Button asChild variant="outline">
-          <Link href={backHref}>취소</Link>
-        </Button>
-        <Button onClick={() => toast.success("커리큘럼이 저장되었습니다.")}>저장</Button>
-      </div>
+          <div className="flex justify-end">
+            <Button asChild variant="outline">
+              <Link href={backHref}>취소</Link>
+            </Button>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-xl border border-dashed bg-card px-6 py-12 text-center">
+          <p className="text-sm font-medium">강좌 기본 정보를 먼저 저장해주세요.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            커리큘럼은 강좌가 생성된 뒤 등록할 수 있습니다.
+          </p>
+          <Button asChild className="mt-5">
+            <Link href={backHref}>강좌 기본정보로 돌아가기</Link>
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

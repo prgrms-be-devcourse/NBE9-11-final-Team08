@@ -6,6 +6,11 @@ export const metadata = {
 }
 
 export default async function InstructorPage() {
-  const response = await api.getCourses()
-  return <ProductManager courses={response.content} />
+  const [response, profile] = await Promise.all([
+    api.getCourses(0, 100),
+    api.getProfile(),
+  ])
+  const myCourses = response.content.filter((course) => course.instructor.id === profile?.id)
+
+  return <ProductManager courses={myCourses} />
 }

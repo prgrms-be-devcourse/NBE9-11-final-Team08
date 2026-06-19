@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
+import type { Course } from '@/lib/types'
 
 interface LectureDraft {
   id: string
@@ -25,37 +26,58 @@ interface ChapterDraft {
   lectures: LectureDraft[]
 }
 
-export function CurriculumBuilder({ courseId }: { courseId?: string }) {
+export function CurriculumBuilder({
+  courseId,
+  backHref,
+}: {
+  courseId?: string
+  backHref?: string
+}) {
+  const [course, setCourse] = useState<Course | null>(null)
   const [chapters, setChapters] = useState<ChapterDraft[]>([])
   const [activeId, setActiveId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploadingId, setUploadingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (courseId) {
-      api.getCourse(courseId)
-        .then((course) => {
-          if (course && course.chapters) {
-            const mappedChapters = course.chapters.map(ch => ({
-              id: ch.id.toString(),
-              title: ch.title,
-              lectures: ch.lectures.map(lec => ({
-                id: lec.id.toString(),
-                title: lec.title,
-                description: '',
-              }))
-            }))
-            setChapters(mappedChapters)
-            if (mappedChapters.length > 0) {
-              setActiveId(mappedChapters[0].id)
-            }
+  const loadCurriculum = async (shouldShowToastError = true, preferredActiveIndex?: number) => {
+    if (!courseId) {
+      setLoading(false)
+      return
+    }
+    try {
+      const course = await api.getCourse(courseId)
+      setCourse(course ?? null)
+      if (course && course.chapters) {
+        const mappedChapters = course.chapters.map(ch => ({
+          id: ch.id.toString(),
+          title: ch.title,
+          lectures: ch.lectures.map(lec => ({
+            id: lec.id.toString(),
+            title: lec.title,
+            description: '',
+          }))
+        }))
+        setChapters(mappedChapters)
+        if (mappedChapters.length > 0) {
+          if (preferredActiveIndex !== undefined && preferredActiveIndex >= 0 && preferredActiveIndex < mappedChapters.length) {
+            setActiveId(mappedChapters[preferredActiveIndex].id)
+          } else {
+            setActiveId(mappedChapters[0].id)
           }
-        })
-        .catch(() => toast.error('커리큘럼 정보를 불러오는데 실패했습니다.'))
-        .finally(() => setLoading(false))
-    } else {
+        }
+      }
+    } catch (e) {
+      if (shouldShowToastError) {
+        toast.error('커리큘럼 정보를 불러오는데 실패했습니다.')
+      }
+    } finally {
       setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    loadCurriculum()
   }, [courseId])
 
   const active = chapters.find((c) => c.id === activeId) ?? chapters[0]
@@ -116,13 +138,67 @@ export function CurriculumBuilder({ courseId }: { courseId?: string }) {
       ),
     )
 
+  const handleVideoUpload = async (lectureId: string, file: File) => {
+    if (lectureId.startsWith('tmp_')) {
+      toast.warning('커리큘럼을 먼저 저장해 주세요. 저장한 강의에만 영상을 업로드할 수 있습니다.')
+      return
+    }
+    setUploadingId(lectureId)
+    try {
+      await api.uploadLectureVideo(lectureId, file)
+      updateLecture(active.id, lectureId, { videoName: file.name })
+      toast.success(`${file.name} 강의 영상이 업로드 되었습니다. 인코딩이 시작됩니다.`)
+    } catch (e: any) {
+      toast.error(`영상 업로드 실패: ${e.message || e}`)
+    } finally {
+      setUploadingId(null)
+    }
+  }
+
   const handleSave = async () => {
+    if (!courseId || !course) {
+      toast.error('강좌 정보를 먼저 불러와야 커리큘럼을 저장할 수 있습니다.')
+      return
+    }
+
+    const invalidChapter = chapters.find((chapter) => !chapter.title.trim())
+    if (invalidChapter) {
+      toast.error('챕터 제목을 입력해주세요.')
+      return
+    }
+
+    const invalidLecture = chapters
+      .flatMap((chapter) => chapter.lectures)
+      .find((lecture) => !lecture.title.trim())
+    if (invalidLecture) {
+      toast.error('강의 제목을 입력해주세요.')
+      return
+    }
+
+    const activeIndex = chapters.findIndex((c) => c.id === activeId)
     setSaving(true)
     try {
-      if ('saveCurriculum' in api && courseId) {
-        await (api as any).saveCurriculum(courseId, chapters)
-      }
+      await api.updateCourse(courseId, {
+        title: course.title,
+        description: course.description,
+        categoryId: Number(course.category),
+        price: course.price,
+        thumbnail: course.thumbnailUrl,
+        chapters: chapters.map((chapter, chapterIndex) => ({
+          id: chapter.id.startsWith('tmp_') ? null : Number(chapter.id),
+          title: chapter.title.trim(),
+          orderNo: chapterIndex + 1,
+          lectures: chapter.lectures.map((lecture, lectureIndex) => ({
+            id: lecture.id.startsWith('tmp_') ? null : Number(lecture.id),
+            title: lecture.title.trim(),
+            durationSeconds: 0,
+            orderNo: lectureIndex + 1,
+            isFreePreview: false,
+          })),
+        })),
+      })
       toast.success('커리큘럼이 성공적으로 저장되었습니다.')
+      await loadCurriculum(false, activeIndex)
     } catch (error) {
       toast.error('커리큘럼 저장에 실패했습니다.')
     } finally {
@@ -255,19 +331,58 @@ export function CurriculumBuilder({ courseId }: { courseId?: string }) {
 
                     <div className="grid gap-1.5">
                       <Label>강의 영상</Label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toast.info('영상 업로드는 데모에서 비활성화되어 있습니다.')
-                        }
-                        className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary"
-                      >
-                        <span className="flex items-center gap-1.5 text-sm font-medium">
-                          <FileVideo className="size-4" />
-                          {lecture.videoName ?? '영상 파일 업로드'}
-                        </span>
-                        <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB</span>
-                      </button>
+                      {lecture.id.startsWith('tmp_') ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toast.warning('커리큘럼을 먼저 저장해 주세요. 저장한 강의에만 영상을 업로드할 수 있습니다.')
+                          }
+                          className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary opacity-60 cursor-not-allowed"
+                        >
+                          <span className="flex items-center gap-1.5 text-sm font-medium">
+                            <FileVideo className="size-4" />
+                            영상 파일 업로드 (저장 필요)
+                          </span>
+                          <span className="text-[11px]">저장 후 영상을 업로드할 수 있습니다.</span>
+                        </button>
+                      ) : (
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id={`video-input-${lecture.id}`}
+                            accept="video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleVideoUpload(lecture.id, file)
+                            }}
+                            disabled={uploadingId !== null}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.getElementById(`video-input-${lecture.id}`)?.click()
+                            }}
+                            disabled={uploadingId !== null}
+                            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary w-full"
+                          >
+                            {uploadingId === lecture.id ? (
+                              <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                                <Loader2 className="size-4 animate-spin" />
+                                업로드 중...
+                              </span>
+                            ) : (
+                              <>
+                                <span className="flex items-center gap-1.5 text-sm font-medium">
+                                  <FileVideo className="size-4" />
+                                  {lecture.videoName ?? '영상 파일 업로드'}
+                                </span>
+                                <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid gap-1.5">

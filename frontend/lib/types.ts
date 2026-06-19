@@ -37,7 +37,7 @@ export interface Course {
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
-  status?: 'PUBLISHED' | 'DRAFT' | 'REVIEW'
+  status?: 'PUBLISHED' | 'DRAFT' | 'REVIEW' | 'ON_SALE' | 'IN_REVIEW' | 'CLOSED' | 'SUSPENDED' | 'DELETED'
 }
 
 export interface CourseCardResponse {
@@ -74,7 +74,7 @@ export interface CourseDetailResponse {
   description: string
   thumbnail: string
   price: number
-  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+  status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'IN_REVIEW' | 'ON_SALE' | 'SUSPENDED' | 'DELETED'
   viewCount: number
   chapters: ChapterInfoResponse[]
 }

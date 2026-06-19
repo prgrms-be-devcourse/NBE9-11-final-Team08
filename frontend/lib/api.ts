@@ -80,10 +80,15 @@ const handleUnauthorized = () => {
   }
 }
 
-async function request<T>(path: string, defaultData: T): Promise<T> {
+async function request<T>(
+  path: string,
+  defaultData: T,
+  includeAuth = true,
+  handleAuthError = true,
+): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
-    const authHeaders = await getAuthHeaders()
+    const authHeaders = includeAuth ? await getAuthHeaders() : {}
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +99,7 @@ async function request<T>(path: string, defaultData: T): Promise<T> {
     
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
-      if (res.status === 401) {
+      if (res.status === 401 && handleAuthError) {
         handleUnauthorized()
       }
       return defaultData
@@ -124,13 +129,21 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
     options.body = isMultipart ? body : JSON.stringify(body)
   }
   
-  const res = await fetch(`${BASE_URL}${path}`, options)
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, options)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[API 통신 실패] ${path}: ${message}`)
+    throw new Error('API 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.')
+  }
+
   if (!res.ok) {
     if (res.status === 401) {
       handleUnauthorized()
     }
     const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.message || `Error ${res.status}`)
+    throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
   }
   if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
     return {} as T
@@ -182,6 +195,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       completed: false,
     })) || [],
   })) || [],
+  status: detail.status,
 })
 
 const mapStudyDetailToStudy = (
@@ -462,6 +476,9 @@ const saveCourseDraft = (id: string | number, data: any) => {
     document.cookie = `${cookieName}=${encodeURIComponent(jsonStr)}; path=/; max-age=${7 * 24 * 60 * 60}`
     try {
       localStorage.setItem(cookieName, jsonStr)
+      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]')
+      const nextDraftIds = Array.from(new Set([...draftIds, String(id)]))
+      localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
     } catch (e) {}
   }
 }
@@ -501,13 +518,12 @@ export const api = {
 
   // Courses
   getCourses: async (page = 0, size = 10, sort = 'VIEW_DESC'): Promise<PageResponse<Course>> => {
-    const res = await request<PageResponse<CourseCardResponse>>(`/api/courses?page=${page}&size=${size}&sort=${sort}`, {
-      content: [],
-      pageable: { pageNumber: page, pageSize: size },
-      totalElements: 0,
-      totalPages: 0,
-      last: true
-    })
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/courses?page=${page}&size=${size}&sort=${sort}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
+      false,
+      false,
+    )
     return {
       ...res,
       content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
@@ -515,6 +531,14 @@ export const api = {
   },
 
   getCourse: async (id: string | number): Promise<Course | undefined> => {
+    const detail = await request<CourseDetailResponse | undefined>(
+      `/api/courses/${id}`,
+      undefined,
+      true,
+      false,
+    )
+    if (detail && detail.id) return mapCourseDetailToCourse(detail)
+
     let chapters: ChapterInfoResponse[] = []
     try {
       const authHeaders = await getAuthHeaders()
@@ -617,6 +641,18 @@ export const api = {
     return res
   },
 
+  requestCourseReview: (courseId: string | number) =>
+    mutate<void>(`/api/courses/${courseId}/reviews`, 'POST'),
+
+  cancelCourseReview: (courseId: string | number) =>
+    mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE'),
+
+  closeCourse: (courseId: string | number) =>
+    mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
+
+  deleteCourse: (courseId: string | number) =>
+    mutate<void>(`/api/courses/${courseId}`, 'DELETE'),
+
   uploadLectureVideo: (lectureId: string | number, file: File) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -633,7 +669,7 @@ export const api = {
   updateReflection: (lectureId: string | number, reflectionId: number | string, content: string) => mutate<any>(`/api/lectures/${lectureId}/reflections/${reflectionId}`, 'PUT', { content }),
 
   // Cart & Order
-  getCart: () => request<CartResponse>('/api/cart', { items: [], totalPrice: 0 }),
+  getCart: () => request<CartResponse>('/api/cart', { items: [], totalPrice: 0 }, true, false),
   addToCart: (courseId: number) => mutate<CartResponse>('/api/cart/items', 'POST', { courseId }),
   removeFromCart: (cartItemId: number) => mutate<CartResponse>(`/api/cart/items/${cartItemId}`, 'DELETE'),
   clearCart: () => mutate<CartResponse>('/api/cart', 'DELETE'),
@@ -868,4 +904,14 @@ export const api = {
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
   getStudyReport: (_studyId: string) => request<StudyReport | null>(`/api/studies/${_studyId}/report`, null),
+
+  // Admin Course APIs
+  approveCourseByAdmin: (courseId: number | string) =>
+    mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST'),
+  rejectCourseByAdmin: (courseId: number | string, reason: string) =>
+    mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason }),
+  suspendCourseByAdmin: (courseId: number | string, reason: string) =>
+    mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason }),
+  deleteCourseByAdmin: (courseId: number | string) =>
+    mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE'),
 }

@@ -40,6 +40,11 @@ export function CourseForm({ course }: { course?: Course }) {
     course?.category ? [course.category] : [],
   )
 
+  const isInReview = course && (course.status === 'IN_REVIEW' || course.status === 'REVIEW')
+  const isOnSale = course && (course.status === 'ON_SALE' || course.status === 'PUBLISHED')
+  const isDraft = !course || course.status === 'DRAFT'
+  const isReadOnly = isInReview
+
   useEffect(() => {
     let active = true
     api.getCourses(0, 100)
@@ -70,6 +75,48 @@ export function CourseForm({ course }: { course?: Course }) {
     setTagInput('')
   }
 
+  const handleDelete = async () => {
+    if (!course || !confirm('정말 이 강의를 삭제하시겠습니까?')) return
+    setLoading(true)
+    try {
+      await api.deleteCourse(course.id)
+      toast.success('강의가 성공적으로 삭제되었습니다.')
+      router.push('/instructor')
+    } catch (error: any) {
+      toast.error(`강의 삭제 실패: ${error.message || error}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCancelReview = async () => {
+    if (!course || !confirm('심사 요청을 취소하시겠습니까?')) return
+    setLoading(true)
+    try {
+      await api.cancelCourseReview(course.id)
+      toast.success('심사 요청이 취소되었습니다.')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(`심사 취소 실패: ${error.message || error}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCloseCourse = async () => {
+    if (!course || !confirm('정말 이 강의의 판매를 종료하시겠습니까?')) return
+    setLoading(true)
+    try {
+      await api.closeCourse(course.id)
+      toast.success('강의 판매가 종료되었습니다.')
+      router.refresh()
+    } catch (error: any) {
+      toast.error(`판매 종료 실패: ${error.message || error}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = async (status: 'DRAFT' | 'REVIEW') => {
     const categoryId = Number(mainCat)
     if (!title.trim() || !price || !Number.isFinite(categoryId)) {
@@ -84,7 +131,7 @@ export function CourseForm({ course }: { course?: Course }) {
         description,
         categoryId,
         price: Number(price),
-        thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450', // TODO: 파일 업로드 연동 필요
+        thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450',
       }
 
       if (editing && course) {
@@ -103,14 +150,27 @@ export function CourseForm({ course }: { course?: Course }) {
             })),
           })),
         })
-        toast.success('강의가 수정되었습니다.')
+        if (status === 'REVIEW') {
+          await api.requestCourseReview(course.id)
+          toast.success('검수 요청이 접수되었습니다.')
+          router.push('/instructor')
+        } else {
+          toast.success('강의가 수정되었습니다.')
+          router.refresh()
+        }
       } else {
-        await api.createCourse(payload)
-        toast.success(status === 'REVIEW' ? '검수 요청이 접수되었습니다.' : '임시저장되었습니다.')
+        const courseId = await api.createCourse(payload)
+        if (status === 'REVIEW') {
+          toast.success('강의 기본정보가 저장되었습니다. 커리큘럼 등록 후 검수 요청해주세요.')
+          router.push(`/instructor/courses/${courseId}/curriculum`)
+        } else {
+          toast.success('임시저장되었습니다.')
+          router.push(`/instructor/courses/${courseId}`)
+        }
       }
-      router.push('/instructor')
-    } catch (error) {
-      toast.error('강의 저장에 실패했습니다.')
+    } catch (error: any) {
+      console.error('강의 저장 실패:', error)
+      toast.error(`강의 저장에 실패했습니다: ${error.message || error}`)
     } finally {
       setLoading(false)
     }
@@ -139,13 +199,14 @@ export function CourseForm({ course }: { course?: Course }) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="예: 자바 ORM 표준기술 JPA for beginner"
+                disabled={isReadOnly || loading}
               />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label>대분류</Label>
-                <Select value={mainCat} onValueChange={(value) => setMainCat(value ?? '')}>
+                <Select value={mainCat} onValueChange={(value) => setMainCat(value ?? '')} disabled={isReadOnly || loading}>
                   <SelectTrigger>
                     <SelectValue placeholder="대분류 선택" />
                   </SelectTrigger>
@@ -160,7 +221,7 @@ export function CourseForm({ course }: { course?: Course }) {
               </div>
               <div className="grid gap-2">
                 <Label>소분류</Label>
-                <Select value={subCat} onValueChange={(value) => setSubCat(value ?? '')}>
+                <Select value={subCat} onValueChange={(value) => setSubCat(value ?? '')} disabled={isReadOnly || loading}>
                   <SelectTrigger>
                     <SelectValue placeholder="소분류 선택" />
                   </SelectTrigger>
@@ -183,6 +244,7 @@ export function CourseForm({ course }: { course?: Course }) {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0"
+                disabled={isReadOnly || loading}
               />
             </div>
 
@@ -196,6 +258,7 @@ export function CourseForm({ course }: { course?: Course }) {
                       type="button"
                       onClick={() => setTags((p) => p.filter((x) => x !== t))}
                       aria-label={`${t} 삭제`}
+                      disabled={isReadOnly || loading}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -214,8 +277,9 @@ export function CourseForm({ course }: { course?: Course }) {
                     }
                   }}
                   placeholder="태그 입력 후 Enter"
+                  disabled={isReadOnly || loading}
                 />
-                <Button type="button" variant="outline" onClick={addTag}>
+                <Button type="button" variant="outline" onClick={addTag} disabled={isReadOnly || loading}>
                   추가
                 </Button>
               </div>
@@ -231,6 +295,7 @@ export function CourseForm({ course }: { course?: Course }) {
                 size="sm"
                 className="text-xs text-muted-foreground"
                 onClick={() => toast.info('AI 설명 생성 기능은 곧 제공될 예정입니다.')}
+                disabled={isReadOnly || loading}
               >
                 <Sparkles className="mr-1 h-3.5 w-3.5" /> AI로 생성
               </Button>
@@ -241,19 +306,26 @@ export function CourseForm({ course }: { course?: Course }) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="강의 소개, 학습 목표, 수강 대상 등을 작성하세요."
               className="min-h-44"
+              disabled={isReadOnly || loading}
             />
             <Separator />
-            <Button asChild variant="outline" className="w-full">
-              <Link
-                href={
-                  course
-                    ? `/instructor/courses/${course.id}/curriculum`
-                    : '/instructor/courses/new/curriculum'
-                }
+            {course ? (
+              <Button asChild variant="outline" className="w-full" disabled={isReadOnly || loading}>
+                <Link href={`/instructor/courses/${course.id}/curriculum`}>
+                  <ListChecks className="mr-1 h-4 w-4" /> 커리큘럼 등록 / 수정
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => toast.info('강좌 기본 정보를 먼저 임시저장한 뒤 커리큘럼을 등록해주세요.')}
+                disabled={isReadOnly || loading}
               >
                 <ListChecks className="mr-1 h-4 w-4" /> 커리큘럼 등록 / 수정
-              </Link>
-            </Button>
+              </Button>
+            )}
           </section>
         </div>
 
@@ -263,8 +335,12 @@ export function CourseForm({ course }: { course?: Course }) {
             <Label>커버 이미지</Label>
             <button
               type="button"
-              onClick={() => toast.info('이미지 업로드는 데모에서 비활성화되어 있습니다.')}
-              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary"
+              onClick={() => {
+                if (isReadOnly) return
+                toast.info('이미지 업로드는 데모에서 비활성화되어 있습니다.')
+              }}
+              disabled={isReadOnly || loading}
+              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ImagePlus className="h-7 w-7" />
               <span className="text-xs">
@@ -275,22 +351,69 @@ export function CourseForm({ course }: { course?: Course }) {
           </section>
 
           <section className="space-y-2 rounded-xl border bg-card p-5">
-            <Button
-              className="w-full"
-              onClick={() => handleSubmit('REVIEW')}
-              disabled={loading}
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              검수 요청하기
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => handleSubmit('DRAFT')}
-              disabled={loading}
-            >
-              임시저장
-            </Button>
+            {isInReview ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center">
+                  현재 심사 대기 중입니다. 정보를 수정하려면 심사를 취소해 주세요.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-1 border-destructive text-destructive hover:bg-destructive/10"
+                  disabled={loading}
+                  onClick={handleCancelReview}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  심사 취소
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  className="w-full"
+                  onClick={() => handleSubmit('REVIEW')}
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  강의 신청
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleSubmit('DRAFT')}
+                  disabled={loading}
+                >
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editing ? '수정 완료' : '임시저장'}
+                </Button>
+                
+                {isOnSale && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-1 border-amber-600 text-amber-600 hover:bg-amber-500/10"
+                    disabled={loading}
+                    onClick={handleCloseCourse}
+                  >
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    판매 종료
+                  </Button>
+                )}
+                
+                {isDraft && editing && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="w-full gap-1"
+                    disabled={loading}
+                    onClick={handleDelete}
+                  >
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    강의 삭제
+                  </Button>
+                )}
+              </>
+            )}
           </section>
         </div>
       </div>

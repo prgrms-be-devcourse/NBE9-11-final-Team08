@@ -15,6 +15,10 @@ export default async function EditCurriculumPage({
   const course = await api.getCourse(id)
   if (!course) notFound()
   return (
-    <CurriculumPage backHref={`/instructor/courses/${id}`} courseTitle={course.title} />
+    <CurriculumPage
+      backHref={`/instructor/courses/${id}`}
+      courseId={id}
+      courseTitle={course.title}
+    />
   )
 }

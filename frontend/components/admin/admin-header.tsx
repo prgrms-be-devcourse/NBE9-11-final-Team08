@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Store,
   TicketPercent,
+  BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils'
 const links = [
   { href: '/admin', label: '대시보드', icon: LayoutDashboard },
   { href: '/admin/coupons', label: '쿠폰 정책', icon: TicketPercent },
+  { href: '/admin/courses', label: '강좌 심사', icon: BookOpen },
 ]
 
 export function AdminHeader() {
