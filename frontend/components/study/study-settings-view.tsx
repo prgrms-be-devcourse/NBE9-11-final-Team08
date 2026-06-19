@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Check, UserMinus, UserPlus, X } from 'lucide-react'
-import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,39 +18,6 @@ export function StudySettingsView({ study }: { study: Study }) {
     study.applicants,
   )
 
-  const saveInfo = () => {
-    if (!name.trim()) {
-      toast.error('스터디 이름을 입력해주세요.')
-      return
-    }
-    toast.success('스터디룸 정보가 저장되었습니다.')
-  }
-
-  const kick = (id: string, memberName: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id))
-    toast.success(`${memberName} 님을 강퇴했습니다.`)
-  }
-
-  const accept = (applicant: StudyApplicant) => {
-    setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
-    setMembers((prev) => [
-      ...prev,
-      {
-        id: applicant.id,
-        name: applicant.name,
-        progress: 0,
-        role: 'member',
-        joinedAt: new Date().toISOString().slice(0, 10).replace(/-/g, '.'),
-      },
-    ])
-    toast.success(`${applicant.name} 님의 참여를 수락했습니다.`)
-  }
-
-  const reject = (applicant: StudyApplicant) => {
-    setApplicants((prev) => prev.filter((a) => a.id !== applicant.id))
-    toast.success(`${applicant.name} 님의 신청을 거절했습니다.`)
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -67,6 +33,9 @@ export function StudySettingsView({ study }: { study: Study }) {
           <h3 className="text-sm font-semibold">스터디룸 정보</h3>
         </div>
         <div className="space-y-4 p-5">
+          <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+            백엔드 기능 없음
+          </p>
           <div className="space-y-2">
             <Label htmlFor="study-name">이름</Label>
             <Input
@@ -85,7 +54,7 @@ export function StudySettingsView({ study }: { study: Study }) {
             />
           </div>
           <div className="flex justify-end">
-            <Button onClick={saveInfo}>저장</Button>
+            <Button disabled>저장</Button>
           </div>
         </div>
       </section>
@@ -121,10 +90,10 @@ export function StudySettingsView({ study }: { study: Study }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => kick(m.id, m.name)}
+                  disabled
                 >
                   <UserMinus className="mr-1 h-4 w-4" />
-                  강퇴
+                  백엔드 기능 없음
                 </Button>
               )}
             </li>
@@ -162,13 +131,13 @@ export function StudySettingsView({ study }: { study: Study }) {
                     신청 {a.appliedAt}
                   </p>
                 </div>
-                <Button size="sm" onClick={() => accept(a)}>
+                <Button size="sm" disabled>
                   <Check className="mr-1 h-4 w-4" />
-                  수락
+                  백엔드 기능 없음
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => reject(a)}>
+                <Button variant="outline" size="sm" disabled>
                   <X className="mr-1 h-4 w-4" />
-                  거절
+                  백엔드 기능 없음
                 </Button>
               </li>
             ))}
