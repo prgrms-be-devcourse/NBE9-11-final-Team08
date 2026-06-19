@@ -46,6 +46,8 @@ services:
       LOCAL_UPLOAD_DIR: ${LOCAL_UPLOAD_DIR:-/tmp/videos-local} # 도커는 /video-local이 root파일로 보임
       APP_DATA_INIT_MODE: ${APP_DATA_INIT_MODE:-none}
       TZ: Asia/Seoul
+    ports:
+      - "${BACKEND_PORT:-8080}:8080" # pc포트 - 컨테이너 포트 포트포워딩
     depends_on:
       db:
         condition: service_healthy
