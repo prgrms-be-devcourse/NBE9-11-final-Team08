@@ -22,12 +22,12 @@
  * [A] 완전 자동 (Docker 필요, compose-dev / build.gradle 불필요)
  *   make perf          # 프로젝트 루트에서: 인프라(MySQL+앱 dev/bulk) 기동 + 이 스크립트 실행
  *   make perf-down     # 정리
- *     → compose: infra/compose/compose.perf.yml
- *     → 다른 스크립트: make perf PERF_SCRIPT=다른파일.js (같은 디렉토리)
+ *     → compose: perf/compose.single.yml
+ *     → 다른 스크립트: make perf PERF_SCRIPT=다른파일.js (perf/k6 디렉토리)
  *
  * [B] 로컬 k6 바이너리로 직접 실행 (서버가 이미 떠 있을 때)
  *   BASE_URL=http://localhost:8080 \
- *   k6 run src/test/k6/learning-event-perf.js
+ *   k6 run perf/k6/learning-event-perf.js
  *
  * 시나리오 구성
  * ----------------------------------------------------------------------------
