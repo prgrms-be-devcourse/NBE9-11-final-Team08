@@ -43,6 +43,8 @@ services:
       SAME_SITE: ${SAME_SITE:-Lax}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      LOCAL_UPLOAD_DIR: ${LOCAL_UPLOAD_DIR:-/tmp/videos-local} # 도커는 /video-local이 root파일로 보임
+      APP_DATA_INIT_MODE: ${APP_DATA_INIT_MODE:-none}
       TZ: Asia/Seoul
     depends_on:
       db:
