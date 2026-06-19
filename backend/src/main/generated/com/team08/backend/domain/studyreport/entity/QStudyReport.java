@@ -19,11 +19,19 @@ public class QStudyReport extends EntityPathBase<StudyReport> {
 
     public static final QStudyReport studyReport = new QStudyReport("studyReport");
 
+    public final StringPath dailyActivityMap = createString("dailyActivityMap");
+
+    public final StringPath dailyProgress = createString("dailyProgress");
+
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
     public final NumberPath<java.math.BigDecimal> progressRate = createNumber("progressRate", java.math.BigDecimal.class);
 
+    public final NumberPath<Integer> studyDays = createNumber("studyDays", Integer.class);
+
     public final NumberPath<Long> studyId = createNumber("studyId", Long.class);
+
+    public final StringPath topLectures = createString("topLectures");
 
     public final NumberPath<Integer> totalQnaCount = createNumber("totalQnaCount", Integer.class);
 

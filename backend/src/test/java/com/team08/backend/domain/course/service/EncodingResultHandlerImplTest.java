@@ -1,5 +1,6 @@
 package com.team08.backend.domain.course.service;
 
+import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
@@ -58,7 +59,17 @@ class EncodingResultHandlerImplTest {
         String description = "강의 수정 요청";
         Long instructorId = 100L;
 
-        Lecture lecture = Lecture.builder().m3u8Path("old/path").build();
+        // 리팩토링 포인트: 빌더 제거 후 비즈니스 제약조건에 맞춰 정적 팩토리 메서드로 인스턴스 셋업
+        Chapter mockChapter = mock(Chapter.class);
+        Lecture lecture = Lecture.createWithStream(
+                "old/path",
+                "테스트 강의 제목",
+                "요약",
+                600,
+                1,
+                false,
+                mockChapter
+        );
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
 

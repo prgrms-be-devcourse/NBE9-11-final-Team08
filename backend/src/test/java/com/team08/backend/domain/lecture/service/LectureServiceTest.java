@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -51,16 +52,18 @@ class LectureServiceTest {
         );
 
         Course course = TestEntityFactory.course(courseId);
+        ReflectionTestUtils.setField(course, "id", courseId);
+
         Chapter chapter = ChapterFixture.chapter(chapterId, "보안 기본", 1, course);
         Lecture savedLecture = LectureFixture.lecture(50L, request.title(), request.m3u8Path(), request.durationSeconds(), request.orderNo(), chapter);
 
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
+        given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
         given(lectureRepository.save(any(Lecture.class))).willReturn(savedLecture);
 
         Long lectureId = lectureService.createLecture(courseId, chapterId, request);
 
         assertThat(lectureId).isEqualTo(50L);
-        verify(chapterRepository).findById(chapterId);
+        verify(chapterRepository).findByIdWithCourse(chapterId);
         verify(lectureRepository).save(any(Lecture.class));
     }
 
@@ -77,13 +80,13 @@ class LectureServiceTest {
                 false
         );
 
-        given(chapterRepository.findById(invalidChapterId)).willReturn(Optional.empty());
+        given(chapterRepository.findByIdWithCourse(invalidChapterId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> lectureService.createLecture(courseId, invalidChapterId, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.CHAPTER_NOT_FOUND.getMessage());
 
-        verify(chapterRepository).findById(invalidChapterId);
+        verify(chapterRepository).findByIdWithCourse(invalidChapterId);
     }
 
     @Test
@@ -100,14 +103,15 @@ class LectureServiceTest {
         );
 
         Course realCourse = TestEntityFactory.course(10L);
+        ReflectionTestUtils.setField(realCourse, "id", 10L);
         Chapter chapter = ChapterFixture.chapter(chapterId, "보안 기본", 1, realCourse);
 
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
+        given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
 
         assertThatThrownBy(() -> lectureService.createLecture(invalidCourseId, chapterId, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(chapterRepository).findById(chapterId);
+        verify(chapterRepository).findByIdWithCourse(chapterId);
     }
 }
