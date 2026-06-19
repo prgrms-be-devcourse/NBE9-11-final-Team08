@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, ImagePlus, ListChecks, Sparkles, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { categories } from '@/lib/mock-data'
 import { api } from '@/lib/api'
 import type { Course } from '@/lib/types'
 
@@ -37,6 +36,33 @@ export function CourseForm({ course }: { course?: Course }) {
   const [tags, setTags] = useState<string[]>(course?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(
+    course?.category ? [course.category] : [],
+  )
+
+  useEffect(() => {
+    let active = true
+    api.getCourses(0, 100)
+      .then((response) => {
+        if (!active) return
+        const next = Array.from(
+          new Set(
+            response.content
+              .map((item) => item.category)
+              .filter((value): value is string => Boolean(value)),
+          ),
+        )
+        setCategoryOptions(
+          Array.from(new Set([course?.category, ...next].filter(Boolean) as string[])),
+        )
+      })
+      .catch(() => {
+        if (course?.category) setCategoryOptions([course.category])
+      })
+    return () => {
+      active = false
+    }
+  }, [course?.category])
 
   const addTag = () => {
     const v = tagInput.trim()
@@ -45,8 +71,9 @@ export function CourseForm({ course }: { course?: Course }) {
   }
 
   const handleSubmit = async (status: 'DRAFT' | 'REVIEW') => {
-    if (!title.trim() || !price) {
-      toast.error('필수 항목(제목, 가격)을 입력해주세요.')
+    const categoryId = Number(mainCat)
+    if (!title.trim() || !price || !Number.isFinite(categoryId)) {
+      toast.error('필수 항목(제목, 가격, 대분류)을 입력해주세요.')
       return
     }
 
@@ -55,22 +82,30 @@ export function CourseForm({ course }: { course?: Course }) {
       const payload = {
         title,
         description,
-        categoryId: 1, // TODO: 실제 카테고리 ID 매핑 필요
+        categoryId,
         price: Number(price),
         thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450', // TODO: 파일 업로드 연동 필요
       }
 
       if (editing && course) {
-        // [TODO] api.ts에 updateCourse 추가 필요
-        if ('updateCourse' in api) {
-          await (api as any).updateCourse(course.id, payload)
-        }
+        await api.updateCourse(course.id, {
+          ...payload,
+          chapters: course.chapters.map((chapter, chapterIndex) => ({
+            id: Number(chapter.id),
+            title: chapter.title,
+            orderNo: chapterIndex + 1,
+            lectures: chapter.lectures.map((lecture, lectureIndex) => ({
+              id: Number(lecture.id),
+              title: lecture.title,
+              durationSeconds: 0,
+              orderNo: lectureIndex + 1,
+              isFreePreview: false,
+            })),
+          })),
+        })
         toast.success('강의가 수정되었습니다.')
       } else {
-        // [TODO] api.ts에 createCourse 추가 필요
-        if ('createCourse' in api) {
-          await (api as any).createCourse(payload)
-        }
+        await api.createCourse(payload)
         toast.success(status === 'REVIEW' ? '검수 요청이 접수되었습니다.' : '임시저장되었습니다.')
       }
       router.push('/instructor')
@@ -115,11 +150,9 @@ export function CourseForm({ course }: { course?: Course }) {
                     <SelectValue placeholder="대분류 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories
-                      .filter((c) => c !== '전체')
-                      .map((c) => (
+                    {categoryOptions.map((c) => (
                         <SelectItem key={c} value={c}>
-                          {c}
+                          카테고리 {c}
                         </SelectItem>
                       ))}
                   </SelectContent>

@@ -38,7 +38,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { courses } from '@/lib/mock-data'
+import { api } from '@/lib/api'
 import {
   couponDiscountTypeLabel,
   couponTargetLabel,
@@ -51,13 +51,14 @@ import type {
   CouponDiscountType,
   CouponPolicyType,
   CouponUseType,
+  Course,
 } from '@/lib/types'
 
 interface CouponFormSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   coupon?: AdminCoupon | null
-  onSave: (coupon: AdminCoupon) => void
+  onSave: (coupon: AdminCoupon) => Promise<void>
 }
 
 type FormState = {
@@ -118,12 +119,6 @@ function toForm(coupon: AdminCoupon): FormState {
   }
 }
 
-// 실제 강좌 목록에서 선택지를 구성합니다.
-const courseOptions = courses.map((c) => c.title)
-
-// 실제 강좌에서 사용 중인 카테고리만 선택지로 구성합니다.
-const categoryOptions = Array.from(new Set(courses.map((c) => c.category)))
-
 function Section({
   title,
   children,
@@ -166,11 +161,28 @@ export function CouponFormSheet({
 }: CouponFormSheetProps) {
   const [form, setForm] = useState<FormState>(emptyForm)
   const [targetOpen, setTargetOpen] = useState(false)
+  const [courses, setCourses] = useState<Course[]>([])
+  const [saving, setSaving] = useState(false)
   const isEdit = Boolean(coupon)
 
   useEffect(() => {
     if (open) setForm(coupon ? toForm(coupon) : emptyForm)
   }, [open, coupon])
+
+  useEffect(() => {
+    if (!open) return
+    let active = true
+    api.getCourses(0, 100)
+      .then((response) => {
+        if (active) setCourses(response.content)
+      })
+      .catch(() => {
+        if (active) setCourses([])
+      })
+    return () => {
+      active = false
+    }
+  }, [open])
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -183,7 +195,7 @@ export function CouponFormSheet({
         : [...prev.targets, value],
     }))
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) {
       toast.error('쿠폰명을 입력해주세요.')
       return
@@ -214,10 +226,21 @@ export function CouponFormSheet({
       targetCourses: form.target === 'COURSE' ? form.targets : undefined,
     }
 
-    onSave(saved)
-    onOpenChange(false)
-    toast.success(isEdit ? '쿠폰이 수정되었습니다.' : '쿠폰이 생성되었습니다.')
+    setSaving(true)
+    try {
+      await onSave(saved)
+      onOpenChange(false)
+      toast.success(isEdit ? '쿠폰이 수정되었습니다.' : '쿠폰이 생성되었습니다.')
+    } catch (error) {
+      toast.error(isEdit ? '쿠폰 수정에 실패했습니다.' : '쿠폰 생성에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
+
+  const courseOptions = courses.map((c) => ({ label: c.title, value: c.id }))
+  const categoryOptions = Array.from(new Set(courses.map((c) => c.category).filter(Boolean)))
+    .map((category) => ({ label: `카테고리 ${category}`, value: category }))
 
   const targetList =
     form.target === 'CATEGORY'
@@ -357,12 +380,12 @@ export function CouponFormSheet({
                         <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
                         <CommandGroup>
                           {targetList.map((item) => {
-                            const selected = form.targets.includes(item)
+                            const selected = form.targets.includes(item.value)
                             return (
                               <CommandItem
-                                key={item}
-                                value={item}
-                                onSelect={() => toggleTarget(item)}
+                                key={item.value}
+                                value={item.label}
+                                onSelect={() => toggleTarget(item.value)}
                               >
                                 <Check
                                   className={cn(
@@ -370,7 +393,7 @@ export function CouponFormSheet({
                                     selected ? 'opacity-100' : 'opacity-0',
                                   )}
                                 />
-                                {item}
+                                {item.label}
                               </CommandItem>
                             )
                           })}
@@ -388,7 +411,7 @@ export function CouponFormSheet({
                         variant="secondary"
                         className="gap-1 pr-1"
                       >
-                        {item}
+                        {targetList.find((option) => option.value === item)?.label ?? item}
                         <button
                           type="button"
                           onClick={() => toggleTarget(item)}
@@ -494,10 +517,10 @@ export function CouponFormSheet({
         </SheetBody>
 
         <SheetFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             취소
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={saving}>
             {isEdit ? '수정 저장' : '쿠폰 생성'}
           </Button>
         </SheetFooter>

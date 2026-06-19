@@ -95,12 +95,16 @@ export function CouponManager({
     setDetailOpen(true)
   }
 
-  const handleSave = (coupon: AdminCoupon) => {
+  const handleSave = async (coupon: AdminCoupon) => {
+    const saved = editing
+      ? await api.updateAdminCoupon(coupon.id, coupon)
+      : await api.createAdminCoupon(coupon)
+
     setCoupons((prev) => {
-      const exists = prev.some((c) => c.id === coupon.id)
+      const exists = prev.some((c) => c.id === saved.id)
       return exists
-        ? prev.map((c) => (c.id === coupon.id ? coupon : c))
-        : [coupon, ...prev]
+        ? prev.map((c) => (c.id === saved.id ? saved : c))
+        : [saved, ...prev]
     })
   }
 
@@ -109,17 +113,11 @@ export function CouponManager({
     setProcessing(true)
     try {
       if (confirm.type === 'delete') {
-        // [TODO] api.ts에 deleteCouponPolicy 추가 필요
-        if ('deleteCouponPolicy' in api) {
-          await (api as any).deleteCouponPolicy(confirm.coupon.id)
-        }
+        await api.deleteAdminCoupon(confirm.coupon.id)
         setCoupons((prev) => prev.filter((c) => c.id !== confirm.coupon.id))
         toast.success('쿠폰이 삭제되었습니다.')
       } else {
-        // [TODO] api.ts에 updateCouponPolicyStatus 추가 필요
-        if ('updateCouponPolicyStatus' in api) {
-          await (api as any).updateCouponPolicyStatus(confirm.coupon.id, 'ENDED')
-        }
+        await api.terminateAdminCoupon(confirm.coupon.id)
         setCoupons((prev) =>
           prev.map((c) =>
             c.id === confirm.coupon.id ? { ...c, status: 'ENDED' } : c,

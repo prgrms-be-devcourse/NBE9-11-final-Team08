@@ -139,6 +139,18 @@ export interface Coupon {
   condition: string
   category: '진행 중인 이벤트' | '종료된 이벤트'
   type: 'discount' | 'attendance' | 'firstcome'
+  status?: 'SCHEDULED' | 'ACTIVE' | 'ENDED'
+  startDate?: string | null
+  endDate?: string | null
+  validDays?: number | null
+  couponTarget?: string
+  usageType?: string
+  isStackable?: boolean
+  maxDiscountAmount?: number | null
+  minOrderAmount?: number | null
+  categoryIds?: number[]
+  courseIds?: number[]
+  totalQuantity?: number | null
 }
 
 export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
@@ -168,14 +180,52 @@ export interface AdminCoupon {
   targetCourses?: string[]
 }
 
+export interface AdminCouponPolicyResponse {
+  id: number
+  name: string
+  couponTarget: CouponApplyTarget
+  couponType: CouponPolicyType
+  totalQuantity: number | null
+  usageType: CouponUseType
+  isStackable: boolean
+  discountType: CouponDiscountType
+  discountValue: number
+  maxDiscountAmount: number | null
+  minOrderAmount: number | null
+  validDays: number | null
+  issueStartDate: string | null
+  issueEndDate: string | null
+  categoryIds: number[]
+  courseIds: number[]
+}
+
+export interface AdminCouponPolicyRequest {
+  name: string
+  couponTarget?: CouponApplyTarget
+  couponType?: CouponPolicyType
+  totalQuantity: number | null
+  usageType: CouponUseType
+  isStackable: boolean
+  discountType: CouponDiscountType
+  discountValue: number
+  maxDiscountAmount: number | null
+  minOrderAmount: number
+  validDays: number | null
+  issueStartDate: string | null
+  issueEndDate: string | null
+  categoryIds: number[]
+  courseIds: number[]
+}
+
 export interface CouponListResponse {
   issuedCouponId: number
-  policyId: number
-  policyName: string
+  couponName: string
   discountType: string
   discountValue: number
-  validUntil: string
+  expiredAt: string
   status: string
+  usageType: string
+  isStackable: boolean
 }
 
 export interface QnaPost {

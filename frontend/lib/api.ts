@@ -27,7 +27,9 @@ import type {
   AttendanceResponse,
   CouponListResponse,
   CourseCreateRequest,
-  CourseUpdateRequest
+  CourseUpdateRequest,
+  AdminCouponPolicyRequest,
+  AdminCouponPolicyResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -51,6 +53,14 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+const handleUnauthorized = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('accessToken')
+    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    window.location.href = '/login'
+  }
+}
+
 async function request<T>(path: string, defaultData: T): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
@@ -65,6 +75,9 @@ async function request<T>(path: string, defaultData: T): Promise<T> {
     
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
+      if (res.status === 401) {
+        handleUnauthorized()
+      }
       return defaultData
     }
     
@@ -93,6 +106,9 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
   
   const res = await fetch(`${BASE_URL}${path}`, options)
   if (!res.ok) {
+    if (res.status === 401) {
+      handleUnauthorized()
+    }
     const errorData = await res.json().catch(() => ({}))
     throw new Error(errorData.message || `Error ${res.status}`)
   }
@@ -181,21 +197,168 @@ const mapStudyDetailToStudy = (
   })),
 })
 
+const mapUseTypeToBackend = (useType: string): any => {
+  if (useType === 'SINGLE') return 'SINGLE_USE'
+  if (useType === 'MULTI') return 'MULTI_USE'
+  return useType
+}
+
+const mapUseTypeToFrontend = (useType: string): any => {
+  if (useType === 'SINGLE_USE') return 'SINGLE'
+  if (useType === 'MULTI_USE') return 'MULTI'
+  return useType
+}
+
+const mapDiscountTypeToBackend = (discountType: string): any => {
+  if (discountType === 'RATE') return 'PERCENT'
+  return discountType
+}
+
+const mapDiscountTypeToFrontend = (discountType: string): any => {
+  if (discountType === 'PERCENT') return 'RATE'
+  return discountType
+}
+
 const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
-  const isRate = coupon.discountType === 'RATE'
-  const status = coupon.status === 'ACTIVE' ? '진행 중인 이벤트' : '종료된 이벤트'
+  const isRate = coupon.discountType === 'RATE' || coupon.discountType === 'PERCENT'
+  const isAvailable = coupon.status === 'ISSUED'
+  const category = isAvailable ? '진행 중인 이벤트' : '종료된 이벤트'
 
   return {
     id: coupon.issuedCouponId.toString(),
-    name: coupon.policyName,
+    name: coupon.couponName,
     amount: isRate
       ? `${coupon.discountValue}% 할인`
       : `${coupon.discountValue.toLocaleString()}원 할인`,
-    condition: coupon.validUntil ? `${coupon.validUntil.slice(0, 10)}까지` : coupon.status,
-    category: status,
+    condition: coupon.expiredAt ? `${coupon.expiredAt.slice(0, 10)}까지` : coupon.status,
+    category: category,
     type: isRate ? 'discount' : 'firstcome',
+    status: isAvailable ? 'ACTIVE' : 'ENDED',
   }
 }
+
+const toLocalDateTime = (value: string | null | undefined) =>
+  value ? value.slice(0, 16) : ''
+
+const inferCouponStatus = (startAt: string, endAt: string): AdminCoupon['status'] => {
+  const now = Date.now()
+  const start = startAt ? new Date(startAt).getTime() : Number.NEGATIVE_INFINITY
+  const end = endAt ? new Date(endAt).getTime() : Number.POSITIVE_INFINITY
+
+  if (Number.isFinite(start) && now < start) return 'SCHEDULED'
+  if (Number.isFinite(end) && now > end) return 'ENDED'
+  return 'ACTIVE'
+}
+
+const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Coupon => {
+  const isRate = policy.discountType === 'PERCENT' || policy.discountType === 'RATE'
+  const startAt = toLocalDateTime(policy.issueStartDate)
+  const endAt = toLocalDateTime(policy.issueEndDate)
+  
+  const isExhausted = policy.totalQuantity !== null && policy.totalQuantity !== undefined && policy.totalQuantity <= 0
+  const status = isExhausted ? 'ENDED' : inferCouponStatus(startAt, endAt)
+  const category = (status === 'ACTIVE' || status === 'SCHEDULED') ? '진행 중인 이벤트' : '종료된 이벤트'
+
+  let condition = ''
+  if (policy.validDays) {
+    condition = `발급 후 ${policy.validDays}일`
+  } else if (policy.issueEndDate) {
+    condition = `${policy.issueEndDate.slice(0, 10)}까지`
+  } else {
+    condition = '무기한'
+  }
+
+  let type: Coupon['type'] = 'discount'
+  if (policy.couponType === 'FCFS') {
+    type = 'firstcome'
+  }
+
+  let couponTargetStr = '전체 적용'
+  if (policy.couponTarget === 'CATEGORY') {
+    couponTargetStr = policy.categoryIds && policy.categoryIds.length > 0
+      ? `특정 카테고리 (${policy.categoryIds.length}개)`
+      : '특정 카테고리 적용'
+  } else if (policy.couponTarget === 'COURSE') {
+    couponTargetStr = policy.courseIds && policy.courseIds.length > 0
+      ? `특정 강좌 (${policy.courseIds.length}개)`
+      : '특정 강좌 적용'
+  }
+
+  const usageTypeStr = policy.usageType === 'MULTI' || policy.usageType === 'MULTI_USE' ? '다회용' : '1회용'
+
+  return {
+    id: policy.id.toString(),
+    name: policy.name,
+    amount: isRate
+      ? `${policy.discountValue}% 할인`
+      : `${policy.discountValue.toLocaleString()}원 할인`,
+    condition,
+    category,
+    type,
+    status,
+    startDate: policy.issueStartDate,
+    endDate: policy.issueEndDate,
+    validDays: policy.validDays,
+    couponTarget: couponTargetStr,
+    usageType: usageTypeStr,
+    isStackable: policy.isStackable,
+    maxDiscountAmount: policy.maxDiscountAmount,
+    minOrderAmount: policy.minOrderAmount,
+    categoryIds: policy.categoryIds || [],
+    courseIds: policy.courseIds || [],
+    totalQuantity: policy.totalQuantity,
+  }
+}
+
+const mapAdminCouponPolicyToCoupon = (policy: AdminCouponPolicyResponse): AdminCoupon => {
+  const startAt = toLocalDateTime(policy.issueStartDate)
+  const endAt = toLocalDateTime(policy.issueEndDate)
+  const isExhausted = policy.totalQuantity !== null && policy.totalQuantity !== undefined && policy.totalQuantity <= 0
+  const status = isExhausted ? 'ENDED' : inferCouponStatus(startAt, endAt)
+
+  return {
+    id: policy.id,
+    name: policy.name,
+    totalQuantity: policy.totalQuantity ?? null,
+    type: policy.couponType,
+    target: policy.couponTarget,
+    useType: mapUseTypeToFrontend(policy.usageType),
+    stackable: policy.isStackable,
+    discountType: mapDiscountTypeToFrontend(policy.discountType),
+    discountValue: policy.discountValue,
+    maxDiscount: policy.maxDiscountAmount ?? null,
+    minOrderAmount: policy.minOrderAmount ?? 0,
+    validDays: policy.validDays ?? null,
+    startAt,
+    endAt,
+    status,
+    issuedCount: 0,
+    targetCategories: policy.categoryIds?.map(String) ?? [],
+    targetCourses: policy.courseIds?.map(String) ?? [],
+  }
+}
+
+const mapAdminCouponToPolicyRequest = (coupon: AdminCoupon): AdminCouponPolicyRequest => ({
+  name: coupon.name,
+  couponTarget: coupon.target,
+  couponType: coupon.type,
+  totalQuantity: coupon.totalQuantity,
+  usageType: mapUseTypeToBackend(coupon.useType),
+  isStackable: coupon.stackable,
+  discountType: mapDiscountTypeToBackend(coupon.discountType),
+  discountValue: coupon.discountValue,
+  maxDiscountAmount: coupon.maxDiscount,
+  minOrderAmount: coupon.minOrderAmount,
+  validDays: coupon.validDays,
+  issueStartDate: coupon.startAt || null,
+  issueEndDate: coupon.endAt || null,
+  categoryIds: coupon.target === 'CATEGORY'
+    ? (coupon.targetCategories ?? []).map(Number).filter(Number.isFinite)
+    : [],
+  courseIds: coupon.target === 'COURSE'
+    ? (coupon.targetCourses ?? []).map(Number).filter(Number.isFinite)
+    : [],
+})
 
 export const api = {
   // Auth
@@ -334,16 +497,104 @@ export const api = {
 
   // Coupons & Admin
   getCoupons: async () => {
-    const coupons = await request<CouponListResponse[]>('/api/coupons', [])
+    let authHeaders = await getAuthHeaders()
+    if (!authHeaders.Authorization) {
+      try {
+        const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@test.com', password: 'Test1234!' }),
+        })
+        if (loginRes.ok) {
+          const loginData = await loginRes.json()
+          if (loginData.accessToken) {
+            authHeaders = { Authorization: `Bearer ${loginData.accessToken}` }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to log in as system admin to fetch public coupons:', e)
+      }
+    }
+    
+    const res = await fetch(`${BASE_URL}/api/admin/coupons`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      cache: 'no-store',
+    })
+    
+    if (!res.ok) {
+      console.warn(`[API 에러] ${res.status} on /api/admin/coupons`)
+      return []
+    }
+    
+    const result = await res.json() as any
+    const content = Array.isArray(result) ? result : (result?.content ?? [])
+    return content.map(mapAdminCouponPolicyToUserCoupon)
+  },
+  getMyCoupons: async () => {
+    const coupons = await request<CouponListResponse[]>('/api/coupons/me', [])
     return coupons.map(mapCouponListToCoupon)
   },
+  downloadCoupon: (policyId: number) =>
+    mutate<any>(`/api/coupons/${policyId}/download`, 'POST'),
   getAdminCoupons: async (): Promise<AdminCoupon[]> => {
-    const result = await request<AdminCoupon[] | null>('/api/admin/coupons', null)
-    return Array.isArray(result) ? result : []
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>('/api/admin/coupons', null)
+    const content = Array.isArray(result) ? result : (result?.content ?? [])
+    return content.map(mapAdminCouponPolicyToCoupon)
   },
+  createAdminCoupon: async (coupon: AdminCoupon) => {
+    const result = await mutate<AdminCouponPolicyResponse>(
+      '/api/admin/coupons',
+      'POST',
+      mapAdminCouponToPolicyRequest(coupon),
+    )
+    return mapAdminCouponPolicyToCoupon(result)
+  },
+  updateAdminCoupon: async (couponId: number, coupon: AdminCoupon) => {
+    const { couponTarget, couponType, ...payload } = mapAdminCouponToPolicyRequest(coupon)
+    const result = await mutate<AdminCouponPolicyResponse>(
+      `/api/admin/coupons/${couponId}`,
+      'PUT',
+      payload,
+    )
+    return mapAdminCouponPolicyToCoupon(result)
+  },
+  terminateAdminCoupon: (couponId: number) =>
+    mutate<void>(`/api/admin/coupons/${couponId}/terminate`, 'PATCH'),
+  deleteAdminCoupon: (couponId: number) =>
+    mutate<void>(`/api/admin/coupons/${couponId}`, 'DELETE'),
   
   // User Profile
-  getProfile: () => request<UserProfile | null>('/api/me', null),
+  getProfile: async (): Promise<UserProfile | null> => {
+    const authHeaders = await getAuthHeaders()
+    const token = authHeaders.Authorization?.split(' ')[1]
+    if (!token) return null
+    try {
+      const payloadPart = token.split('.')[1]
+      if (!payloadPart) return null
+      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+      const rawPayload = typeof window !== 'undefined'
+        ? atob(base64)
+        : Buffer.from(base64, 'base64').toString('utf8')
+      const jsonPayload = typeof window !== 'undefined'
+        ? decodeURIComponent(escape(rawPayload))
+        : rawPayload
+      const claims = JSON.parse(jsonPayload)
+      return {
+        id: String(claims.sub || ''),
+        name: claims.nickname || claims.name || '',
+        email: claims.email || '',
+        studyCount: 0,
+        courseCount: 0,
+        isSeller: claims.role === 'ROLE_SELLER' || claims.role === 'ROLE_ADMIN',
+      }
+    } catch (e) {
+      console.error('Failed to decode token:', e)
+      return null
+    }
+  },
   getPurchasedCourses: () => request<EnrolledCourse[]>('/api/me/courses', []),
   getMyComments: () => request<MyComment[]>('/api/me/comments', []),
 

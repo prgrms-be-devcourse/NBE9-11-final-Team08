@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CourseCard } from '@/components/course/course-card'
-import { categories } from '@/lib/mock-data'
 import type { Course } from '@/lib/types'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -46,10 +45,15 @@ export function CatalogView() {
     fetchCourses()
   }, [sort])
 
+  const categories = useMemo(
+    () => ['전체', ...Array.from(new Set(courses.map((c) => c.category).filter(Boolean)))],
+    [courses],
+  )
+
   const visible = useMemo(() => {
     let list = courses.filter(
       (c) =>
-        (category === '전체' || c.category === category || c.category === categories.indexOf(category).toString()) &&
+        (category === '전체' || c.category === category) &&
         (query === '' || c.title.toLowerCase().includes(query.toLowerCase())),
     )
     return list
