@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @RequestMapping("/api/studies/{studyId}/feed")
 public class FeedController {
-    
+
     private final FeedService feedService;
 
     @GetMapping

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "feed_items",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"type", "sourceId"}),
+        uniqueConstraints = @UniqueConstraint(columnNames = {"type", "source_id"}),
         indexes = {
                 @Index(
                         name = "idx_study_feed",
