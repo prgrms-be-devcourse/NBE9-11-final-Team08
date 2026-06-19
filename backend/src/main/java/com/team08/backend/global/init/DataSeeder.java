@@ -433,8 +433,12 @@ public class DataSeeder {
             studyMemberRepository.save(StudyMember.owner(seller, study));
             StudyActivity activity = studyActivityRepository.save(
                     StudyActivity.create(study.getId(), seller.getId(), "활동 내용 " + (s + 1)));
-            studyReportRepository.save(new StudyReport(
-                    null, users.get(s % users.size()).getId(), study.getId(), 3600, 5, new BigDecimal("80.00")));
+            StudyReport report = StudyReport.create(users.get(s % users.size()).getId(), study.getId());
+            report.update(3600, 5, new BigDecimal("80.00"), 10,
+                    "[{\"lectureId\":1,\"title\":\"Spring Core\",\"watchTimeSeconds\":1800}]",
+                    "[{\"date\":\"2026-06-07\",\"progressRate\":40.00},{\"date\":\"2026-06-14\",\"progressRate\":80.00}]",
+                    "{\"2026-06-07\":3,\"2026-06-08\":5,\"2026-06-14\":2}");
+            studyReportRepository.save(report);
             aiFeedbackRepository.save(AiFeedback.startProcessing(
                     seller.getId(), study.getId(), activity.getId(), "활동 스냅샷", "claude-opus-4-8", "v1"));
         }
