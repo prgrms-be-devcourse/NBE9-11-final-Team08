@@ -7,8 +7,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChapterRepository extends JpaRepository<Chapter, Long> {
+
+    @Query("SELECT c FROM Chapter c JOIN FETCH c.course WHERE c.id = :chapterId")
+    Optional<Chapter> findByIdWithCourse(@Param("chapterId") Long chapterId);
 
     //코스의 챕터 목록을 순서대로 조회 (강의 목록 fetch join)
     @Query("SELECT DISTINCT c FROM Chapter c LEFT JOIN FETCH c.lectures l WHERE c.course.id = :courseId ORDER BY c.orderNo ASC")
@@ -18,7 +22,6 @@ public interface ChapterRepository extends JpaRepository<Chapter, Long> {
     @Query("UPDATE Chapter c SET c.orderNo = :orderNo WHERE c.id = :id AND c.course.id = :courseId")
     void updateOrderNo(@Param("id") Long id, @Param("orderNo") Integer orderNo, @Param("courseId") Long courseId);
 
-    // 챕터 순서 변경 시 사용 - lectures 불필요
     @Query("SELECT c FROM Chapter c WHERE c.course.id = :courseId ORDER BY c.orderNo ASC")
     List<Chapter> findByCourseIdOrderByOrderNo(@Param("courseId") Long courseId);
 }
