@@ -4,6 +4,7 @@ import com.team08.backend.domain.attendance.entity.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
@@ -12,4 +13,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     // 특정 기간 동안의 출석 횟수 조회
     long countByUserIdAndAttendanceDateBetween(Long userId, LocalDate start, LocalDate end);
+
+    // 특정 기간 동안의 출석 기록 목록 조회
+    List<Attendance> findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(Long userId, LocalDate start, LocalDate end);
 }
