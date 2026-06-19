@@ -88,7 +88,7 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
           <h2 className="mb-4 text-lg font-bold">최근 스터디 활동</h2>
           <ul className="space-y-3">
             {feed.map((item, index) => (
-              <ActivityCard key={item.id?.toString() || `activity-${index}`} item={item} />
+              <ActivityCard key={item.activityId?.toString() || `activity-${index}`} item={item} />
             ))}
           </ul>
         </section>
@@ -102,17 +102,17 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (item.aiFeedbackId) {
-      api.getAiFeedback(item.studyId, item.id)
+    if (item.activityId) {
+      api.getAiFeedback(item.studyId, item.activityId)
          .then(res => setFeedback(res?.feedback ?? null))
          .catch(err => console.error(err))
     }
-  }, [item.aiFeedbackId, item.studyId, item.id])
+  }, [item.studyId, item.activityId])
 
   const requestFeedback = async () => {
     setLoading(true)
     try {
-      const res = await api.generateAiFeedback(item.studyId, item.id)
+      const res = await api.generateAiFeedback(item.studyId, item.activityId)
       if (res.feedback) {
         setFeedback(res.feedback)
         toast.success('AI 피드백이 도착했습니다.')
@@ -131,11 +131,11 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
       <div className="flex items-center gap-2">
         <Avatar className="h-7 w-7">
           <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-            {item.authorName?.charAt(0) || '?'}
+            {String(item.authorId).charAt(0)}
           </AvatarFallback>
         </Avatar>
         <div>
-          <p className="text-xs font-semibold">{item.authorName}</p>
+          <p className="text-xs font-semibold">작성자 {item.authorId}</p>
           <p className="text-[11px] text-muted-foreground">{dateStr}</p>
         </div>
       </div>

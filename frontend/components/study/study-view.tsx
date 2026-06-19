@@ -64,8 +64,14 @@ export function StudyView({ course }: StudyViewProps) {
 
   useEffect(() => {
     if (active?.id) {
-      api.getQna(active.id).then((res) => {
-        setPosts(res as unknown as QnaQuestionResponse[])
+      api.getQna(active.id).then((res: any) => {
+        if (Array.isArray(res)) {
+          setPosts(res)
+        } else if (res && Array.isArray(res.content)) {
+          setPosts(res.content)
+        } else {
+          setPosts([])
+        }
       }).catch(() => setPosts([]))
     }
   }, [active?.id])
@@ -77,23 +83,21 @@ export function StudyView({ course }: StudyViewProps) {
 
   const submitQuestion = async () => {
     if (!question.trim()) return
+    if (!active?.id) {
+      toast.error('강의를 선택해주세요.')
+      return
+    }
     
     try {
-      const newQuestion = {
-        id: Date.now(),
-        lectureId: Number(active.id),
-        authorId: 1,
-        authorName: '현재 사용자',
-        title: question.trim().substring(0, 20),
-        content: question.trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        answers: []
+      const title = question.trim().substring(0, 50)
+      const res = await api.createQuestion(active.id, title, question.trim())
+      if (res && res.id) {
+        setPosts((prev) => [res, ...prev])
+        setQuestion('')
+        toast.success('질문이 게시되었습니다.')
+      } else {
+        throw new Error('Failed to create question')
       }
-      
-      setPosts((prev) => [newQuestion, ...prev])
-      setQuestion('')
-      toast.success('질문이 게시되었습니다.')
     } catch (err) {
       toast.error('질문 게시에 실패했습니다.')
     }
@@ -313,6 +317,7 @@ function isEmptyHtml(html: string) {
 
 function ReflectionSection({ lectureId, lectureTitle }: { lectureId?: string, lectureTitle: string }) {
   const [reflection, setReflection] = useState('')
+  const [reflectionId, setReflectionId] = useState<number | null>(null)
   const [requestAi, setRequestAi] = useState(true)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -324,6 +329,18 @@ function ReflectionSection({ lectureId, lectureTitle }: { lectureId?: string, le
       setReflection('')
       setDraft('')
       setEditing(false)
+      setReflectionId(null)
+      
+      api.getReflection(lectureId)
+        .then((res) => {
+          if (res && res.content) {
+            setReflection(res.content)
+            setReflectionId(res.id)
+          }
+        })
+        .catch(() => {
+          // Ignore error, keep empty
+        })
     }
   }, [lectureId])
 
@@ -337,19 +354,40 @@ function ReflectionSection({ lectureId, lectureTitle }: { lectureId?: string, le
     setDraft('')
   }
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (isEmptyHtml(draft)) {
       toast.error('회고 내용을 입력해주세요.')
       return
     }
-    setReflection(draft)
-    setEditing(false)
-    setDraft('')
-    toast.success(
-      requestAi
-        ? '회고가 저장되었습니다. AI 피드백을 요청했어요.'
-        : '회고가 저장되었습니다.',
-    )
+    if (!lectureId) {
+      toast.error('강의가 지정되지 않았습니다.')
+      return
+    }
+    
+    try {
+      let res
+      if (reflectionId) {
+        res = await api.updateReflection(lectureId, reflectionId, draft)
+      } else {
+        res = await api.createReflection(lectureId, draft)
+      }
+      
+      if (res && res.id) {
+        setReflection(res.content)
+        setReflectionId(res.id)
+        setEditing(false)
+        setDraft('')
+        toast.success(
+          requestAi
+            ? '회고가 저장되었습니다. AI 피드백을 요청했어요.'
+            : '회고가 저장되었습니다.',
+        )
+      } else {
+        throw new Error('Failed to save reflection')
+      }
+    } catch (err) {
+      toast.error('회고 저장에 실패했습니다.')
+    }
   }
 
   return (

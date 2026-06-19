@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { MessageCircle, PenLine, Sparkles } from 'lucide-react'
+import { MessageCircle, PenLine } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { Study, StudyActivityResponse } from '@/lib/types'
 
@@ -12,7 +11,7 @@ export function StudyBoardView({
   study: Study
   posts: StudyActivityResponse[]
 }) {
-  const base = `/study/${study.courseId}`
+  const base = `/study/${study.id}`
 
   return (
     <div className="space-y-5">
@@ -41,23 +40,14 @@ export function StudyBoardView({
       ) : (
         <ul className="overflow-hidden rounded-xl border bg-card">
           {posts.map((post, index) => (
-            <li key={post.id?.toString() || `post-${index}`} className="border-b last:border-b-0">
+            <li key={post.activityId?.toString() || `post-${index}`} className="border-b last:border-b-0">
               <Link
-                href={`${base}/board/${post.id?.toString() || '0'}`}
+                href={`${base}/board/${post.activityId?.toString() || '0'}`}
                 className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/60"
               >
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 truncate font-medium">
                     {post.content.split('\n')[0] || '내용 없음'}
-                    {post.aiFeedbackId && (
-                      <Badge
-                        variant="secondary"
-                        className="h-5 shrink-0 gap-1 px-1.5 text-[10px]"
-                      >
-                        <Sparkles className="h-3 w-3" />
-                        AI 피드백
-                      </Badge>
-                    )}
                   </p>
                   <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                     {post.content}
@@ -70,10 +60,10 @@ export function StudyBoardView({
                 <div className="hidden w-28 shrink-0 items-center gap-2 sm:flex">
                   <Avatar className="h-6 w-6">
                     <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
-                      {post.authorName ? post.authorName.charAt(0) : '?'}
+                      {post.authorId ? String(post.authorId).charAt(0) : '?'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="truncate text-xs">{post.authorName}</span>
+                  <span className="truncate text-xs">작성자 {post.authorId}</span>
                 </div>
                 <span className="hidden shrink-0 text-xs text-muted-foreground md:block">
                   {new Date(post.createdAt).toLocaleDateString()}

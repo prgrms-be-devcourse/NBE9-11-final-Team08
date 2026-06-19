@@ -186,9 +186,9 @@ export interface AdminCouponPolicyResponse {
   couponTarget: CouponApplyTarget
   couponType: CouponPolicyType
   totalQuantity: number | null
-  usageType: CouponUseType
+  usageType: CouponUseType | 'SINGLE_USE' | 'MULTI_USE'
   isStackable: boolean
-  discountType: CouponDiscountType
+  discountType: CouponDiscountType | 'PERCENT'
   discountValue: number
   maxDiscountAmount: number | null
   minOrderAmount: number | null
@@ -449,14 +449,11 @@ export interface StudyDetailResponse {
 }
 
 export interface StudyActivityResponse {
-  id: number
+  activityId: number
   studyId: number
-  memberId: number
-  authorName: string
+  authorId: number
   content: string
   createdAt: string
-  updatedAt: string
-  aiFeedbackId: number | null
 }
 
 export interface StructuredFeedback {

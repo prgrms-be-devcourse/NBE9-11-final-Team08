@@ -1,94 +1,42 @@
-// frontend/components/study/study-post-view.tsx
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import {
-  ArrowLeft,
-  MessageCircle,
-  Send,
-  Sparkles,
-  Trash2,
-} from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, MessageCircle, Send, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { api } from '@/lib/api'
-import type { Study, StudyActivityResponse, StructuredFeedback } from '@/lib/types'
-
-const AI_DAILY_LIMIT = 3
+import type { Study, StudyActivityResponse } from '@/lib/types'
 
 export function StudyPostView({
   study,
   post,
-  currentUser,
+  currentUserId,
 }: {
   study: Study
   post: StudyActivityResponse
-  currentUser: string
+  currentUserId: number | null
 }) {
-  const router = useRouter()
-  const base = `/study/${study.courseId}`
-  const isAuthor = post.authorName === currentUser
+  const base = `/study/${study.id}`
+  const isAuthor = currentUserId !== null && post.authorId === currentUserId
 
-  const [comments, setComments] = useState<any[]>([])
   const [comment, setComment] = useState('')
-  const [feedback, setFeedback] = useState<StructuredFeedback | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [aiUsed, setAiUsed] = useState(0)
 
-  const remaining = AI_DAILY_LIMIT - aiUsed
-
-  useEffect(() => {
-    if (post.aiFeedbackId) {
-      api.getAiFeedback(post.studyId, post.id)
-         .then(res => setFeedback(res?.feedback ?? null))
-         .catch(err => console.error(err))
-    }
-  }, [post.aiFeedbackId, post.studyId, post.id])
+  // 제목: 첫 줄, 본문: 나머지
+  const lines = post.content.split('\n')
+  const title = lines[0] || '제목 없음'
+  const body = lines.slice(2).join('\n') || lines.slice(1).join('\n') || post.content
 
   const submitComment = () => {
-    if (!comment.trim()) return
-    setComments((prev) => [
-      ...prev,
-      {
-        id: `c-${Date.now()}`,
-        author: currentUser,
-        content: comment.trim(),
-        createdAt: new Date().toLocaleString(),
-      },
-    ])
-    setComment('')
-    toast.success('댓글이 등록되었습니다.')
+    toast.info('댓글 백엔드 기능 없음')
   }
 
-  const requestFeedback = async () => {
-    if (remaining <= 0) {
-      toast.error('오늘 AI 코치 이용 횟수를 모두 사용했어요. (1일 3회)')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await api.generateAiFeedback(post.studyId, post.id)
-      if (res.feedback) {
-        setFeedback(res.feedback)
-        setAiUsed((n) => n + 1)
-        toast.success('AI 코치 피드백이 도착했습니다.')
-      }
-    } catch (error) {
-      toast.error('AI 피드백 생성에 실패했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const deletePost = () => {
+  const deletePost = async () => {
     toast.success('학습 활동이 삭제되었습니다.')
-    router.push(`${base}/board`)
+    window.location.href = `${base}/board`
   }
 
   return (
@@ -101,17 +49,20 @@ export function StudyPostView({
       </Button>
 
       <article className="rounded-xl border bg-card">
+        {/* 헤더 */}
         <div className="border-b px-6 py-5">
-          <h1 className="text-xl font-bold text-balance">{post.content.split('\n')[0] || '내용 없음'}</h1>
+          <h1 className="text-xl font-bold text-balance">{title}</h1>
           <div className="mt-3 flex items-center gap-3">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                {post.authorName ? post.authorName.charAt(0) : '?'}
+                {String(post.authorId).charAt(0)}
               </AvatarFallback>
             </Avatar>
             <div className="text-sm">
-              <p className="font-medium">{post.authorName}</p>
-              <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleString()}</p>
+              <p className="font-medium">작성자 {post.authorId}</p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(post.createdAt).toLocaleString()}
+              </p>
             </div>
             {isAuthor && (
               <div className="ml-auto flex items-center gap-2">
@@ -124,80 +75,28 @@ export function StudyPostView({
           </div>
         </div>
 
+        {/* 본문 */}
         <div className="px-6 py-5">
           <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">
-            {post.content}
+            {body}
           </p>
-        </div>
-
-        <div className="border-t px-6 py-5">
-          {feedback ? (
-            <div className="space-y-2 rounded-lg bg-secondary/60 p-4">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                <Sparkles className="h-3.5 w-3.5" /> AI 코치 피드백
-              </p>
-              <p className="text-sm font-medium">{feedback.summary}</p>
-              {feedback.strengths && (
-                <p className="text-xs text-muted-foreground"><strong className="text-foreground">👍 잘한 점:</strong> {feedback.strengths}</p>
-              )}
-              {feedback.improvements && (
-                <p className="text-xs text-muted-foreground"><strong className="text-foreground">💡 보완점:</strong> {feedback.improvements}</p>
-              )}
-            </div>
-          ) : isAuthor ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-dashed p-4">
-              <p className="text-sm font-medium">AI 코치에게 피드백 받기</p>
-              <p className="text-xs text-muted-foreground">
-                학습 기록의 구체성과 보완점을 안내받을 수 있어요. 오늘 남은 횟수{' '}
-                {remaining}/{AI_DAILY_LIMIT}회
-              </p>
-              <Button
-                size="sm"
-                className="mt-1 w-fit"
-                onClick={requestFeedback}
-                disabled={loading}
-              >
-                <Sparkles className="mr-1 h-4 w-4" />
-                {loading ? 'AI 피드백 생성 중…' : 'AI 피드백 요청'}
-              </Button>
-            </div>
-          ) : null}
         </div>
       </article>
 
+      {/* 댓글 */}
       <section className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 border-b px-6 py-3">
           <MessageCircle className="h-4 w-4" />
           <h2 className="text-sm font-semibold">댓글</h2>
           <Badge variant="secondary" className="ml-auto">
-            {comments.length}
+            0
           </Badge>
         </div>
 
         <ul className="divide-y">
-          {comments.map((c) => (
-            <li key={c.id} className="flex gap-3 px-6 py-4">
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
-                  {c.author[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold">
-                  {c.author}
-                  <span className="ml-2 font-normal text-muted-foreground">
-                    {c.createdAt}
-                  </span>
-                </p>
-                <p className="mt-1 text-sm leading-relaxed">{c.content}</p>
-              </div>
-            </li>
-          ))}
-          {comments.length === 0 && (
-            <li className="px-6 py-6 text-center text-sm text-muted-foreground">
-              첫 댓글을 남겨보세요.
-            </li>
-          )}
+          <li className="px-6 py-6 text-center text-sm text-muted-foreground">
+            댓글 백엔드 기능 없음
+          </li>
         </ul>
 
         <Separator />
@@ -205,11 +104,11 @@ export function StudyPostView({
           <Textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="댓글을 입력하세요."
+            placeholder="댓글 백엔드 기능 없음"
             className="min-h-20 resize-none"
           />
           <div className="flex justify-end">
-            <Button onClick={submitComment} size="sm">
+            <Button onClick={submitComment} size="sm" disabled>
               <Send className="mr-1 h-4 w-4" /> 댓글 등록
             </Button>
           </div>

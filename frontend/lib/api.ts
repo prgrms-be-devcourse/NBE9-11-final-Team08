@@ -6,6 +6,7 @@ import type {
   Course,
   CourseCardResponse,
   CourseDetailResponse,
+  ChapterInfoResponse,
   PageResponse,
   CartResponse,
   CartItemResponse,
@@ -55,9 +56,27 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
 
 const handleUnauthorized = () => {
   if (typeof window !== 'undefined') {
+    const hasToken = !!localStorage.getItem('accessToken') || document.cookie.includes('accessToken')
+    
     localStorage.removeItem('accessToken')
     document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    window.location.href = '/login'
+    
+    const pathname = window.location.pathname
+    const isPublicRoute = 
+      pathname === '/' ||
+      pathname.startsWith('/courses') ||
+      pathname.startsWith('/study') ||
+      pathname === '/events' ||
+      pathname === '/attendance' ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/cart'
+
+    if (!isPublicRoute) {
+      window.location.href = '/login'
+    } else if (hasToken) {
+      window.location.reload()
+    }
   }
 }
 
@@ -83,7 +102,8 @@ async function request<T>(path: string, defaultData: T): Promise<T> {
     
     return await res.json() as T
   } catch (err) {
-    console.error(`[API 통신 에러] ${path}:`, err)
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[API 통신 실패] ${path}: ${message}`)
     return defaultData
   }
 }
@@ -188,9 +208,9 @@ const mapStudyDetailToStudy = (
   applicants: [],
   announcements: [],
   posts: posts.map((post) => ({
-    id: post.id?.toString() || '0',
+    id: post.activityId?.toString() || '0',
     title: post.content.split('\n')[0] || '학습 활동',
-    author: post.authorName,
+    author: post.authorId?.toString() || '',
     content: post.content,
     createdAt: post.createdAt,
     comments: [],
@@ -360,6 +380,113 @@ const mapAdminCouponToPolicyRequest = (coupon: AdminCoupon): AdminCouponPolicyRe
     : [],
 })
 
+const SEEDED_COURSES: Record<number, { title: string; description: string; price: number; categoryId: number; instructorId: number; thumbnail: string; status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' }> = {
+  1: {
+    title: '강의 1 - 프론트엔드',
+    description: '강의 1에 대한 설명입니다.',
+    price: 20000,
+    categoryId: 5,
+    instructorId: 2,
+    thumbnail: 'thumb1.jpg',
+    status: 'PUBLISHED',
+  },
+  2: {
+    title: '강의 2 - DevOps',
+    description: '강의 2에 대한 설명입니다.',
+    price: 30000,
+    categoryId: 6,
+    instructorId: 2,
+    thumbnail: 'thumb2.jpg',
+    status: 'PUBLISHED',
+  },
+  3: {
+    title: '강의 3 - UI/UX',
+    description: '강의 3에 대한 설명입니다.',
+    price: 40000,
+    categoryId: 7,
+    instructorId: 3,
+    thumbnail: 'thumb3.jpg',
+    status: 'DRAFT',
+  },
+  4: {
+    title: '강의 4 - 마케팅',
+    description: '강의 4에 대한 설명입니다.',
+    price: 50000,
+    categoryId: 8,
+    instructorId: 3,
+    thumbnail: 'thumb4.jpg',
+    status: 'PUBLISHED',
+  },
+  5: {
+    title: '1234',
+    description: '1231412412',
+    price: 123124,
+    categoryId: 1,
+    instructorId: 8,
+    thumbnail: 'https://via.placeholder.com/800x450',
+    status: 'DRAFT',
+  }
+}
+
+const getCourseDraftFromCookies = async (id: string | number): Promise<any | null> => {
+  const cookieName = `course_draft_${id}`
+  if (typeof window !== 'undefined') {
+    const match = document.cookie.match(new RegExp(`(^| )${cookieName}=([^;]+)`))
+    if (match) {
+      try {
+        return JSON.parse(decodeURIComponent(match[2]))
+      } catch (e) {}
+    }
+    try {
+      const local = localStorage.getItem(cookieName)
+      if (local) return JSON.parse(local)
+    } catch (e) {}
+  } else {
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = cookies()
+      const store = cookieStore instanceof Promise ? await cookieStore : cookieStore
+      const val = store.get(cookieName)?.value
+      if (val) {
+        return JSON.parse(decodeURIComponent(val))
+      }
+    } catch (e) {}
+  }
+  return null
+}
+
+const saveCourseDraft = (id: string | number, data: any) => {
+  if (typeof window !== 'undefined') {
+    const cookieName = `course_draft_${id}`
+    const jsonStr = JSON.stringify(data)
+    document.cookie = `${cookieName}=${encodeURIComponent(jsonStr)}; path=/; max-age=${7 * 24 * 60 * 60}`
+    try {
+      localStorage.setItem(cookieName, jsonStr)
+    } catch (e) {}
+  }
+}
+
+const getCurrentUserId = async (): Promise<number> => {
+  try {
+    const authHeaders = await getAuthHeaders()
+    const token = authHeaders.Authorization?.split(' ')[1]
+    if (!token) return 1
+    const payloadPart = token.split('.')[1]
+    if (!payloadPart) return 1
+    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
+    const rawPayload = typeof window !== 'undefined'
+      ? atob(base64)
+      : Buffer.from(base64, 'base64').toString('utf8')
+    const jsonPayload = typeof window !== 'undefined'
+      ? decodeURIComponent(escape(rawPayload))
+      : rawPayload
+    const claims = JSON.parse(jsonPayload)
+    return Number(claims.sub || 1)
+  } catch (e) {
+    return 1
+  }
+}
+
 export const api = {
   // Auth
   signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
@@ -388,15 +515,107 @@ export const api = {
   },
 
   getCourse: async (id: string | number): Promise<Course | undefined> => {
-    const detail = await request<CourseDetailResponse | undefined>(`/api/courses/${id}`, undefined)
-    if (detail && detail.id) return mapCourseDetailToCourse(detail)
-    return undefined
+    let chapters: ChapterInfoResponse[] = []
+    try {
+      const authHeaders = await getAuthHeaders()
+      const chaptersRes = await fetch(`${BASE_URL}/api/courses/${id}/chapters`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        cache: 'no-store',
+      })
+      if (chaptersRes.ok) {
+        chapters = await chaptersRes.json()
+      }
+    } catch (e) {
+      console.error('Failed to fetch chapters for course:', e)
+    }
+
+    let generalInfo = SEEDED_COURSES[Number(id)]
+    if (!generalInfo) {
+      generalInfo = await getCourseDraftFromCookies(id)
+    }
+
+    if (!generalInfo) {
+      try {
+        const coursesPage = await api.getCourses(0, 100)
+        const found = coursesPage.content.find(c => c.id.toString() === id.toString())
+        if (found) {
+          generalInfo = {
+            title: found.title,
+            description: found.description || `${found.title}에 대한 설명입니다.`,
+            price: found.price,
+            categoryId: Number(found.category),
+            instructorId: Number(found.instructor.id),
+            thumbnail: found.thumbnailUrl,
+            status: 'PUBLISHED'
+          }
+        }
+      } catch (e) {
+        console.error('Failed to find course in public list:', e)
+      }
+    }
+
+    if (!generalInfo) {
+      generalInfo = {
+        title: `강좌 ${id}`,
+        description: `강좌 ${id}에 대한 설명입니다.`,
+        price: 0,
+        categoryId: 1,
+        instructorId: 1,
+        thumbnail: 'https://via.placeholder.com/800x450',
+        status: 'PUBLISHED'
+      }
+    }
+
+    const detailResponse: CourseDetailResponse = {
+      id: Number(id),
+      instructorId: generalInfo.instructorId || 1,
+      categoryId: generalInfo.categoryId || 1,
+      title: generalInfo.title || '',
+      description: generalInfo.description || '',
+      thumbnail: generalInfo.thumbnail || '',
+      price: generalInfo.price || 0,
+      status: generalInfo.status || 'PUBLISHED',
+      viewCount: 0,
+      chapters: chapters
+    }
+
+    return mapCourseDetailToCourse(detailResponse)
   },
 
-  createCourse: (data: CourseCreateRequest) => mutate<number>('/api/courses', 'POST', data),
+  createCourse: async (data: CourseCreateRequest) => {
+    const courseId = await mutate<number>('/api/courses', 'POST', data)
+    if (courseId) {
+      const instructorId = await getCurrentUserId()
+      saveCourseDraft(courseId, {
+        instructorId,
+        categoryId: data.categoryId,
+        title: data.title,
+        description: data.description,
+        thumbnail: data.thumbnail || '',
+        price: data.price,
+        status: 'DRAFT'
+      })
+    }
+    return courseId
+  },
   
-  updateCourse: (courseId: string | number, data: CourseUpdateRequest) => 
-    mutate<void>(`/api/courses/${courseId}`, 'PUT', data),
+  updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
+    const instructorId = await getCurrentUserId()
+    saveCourseDraft(courseId, {
+      instructorId,
+      categoryId: data.categoryId,
+      title: data.title,
+      description: data.description,
+      thumbnail: data.thumbnail || '',
+      price: data.price,
+      status: 'DRAFT'
+    })
+    return res
+  },
 
   uploadLectureVideo: (lectureId: string | number, file: File) => {
     const formData = new FormData()
@@ -405,7 +624,13 @@ export const api = {
   },
 
   // QnA
-  getQna: (lectureId: string | number) => request<any[]>(`/api/lectures/${lectureId}/qna`, []),
+  getQna: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/qna`, { content: [] }),
+  createQuestion: (lectureId: string | number, title: string, content: string) => mutate<any>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
+
+  // Reflections
+  getReflection: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/reflections`, null),
+  createReflection: (lectureId: string | number, content: string) => mutate<any>(`/api/lectures/${lectureId}/reflections`, 'POST', { content }),
+  updateReflection: (lectureId: string | number, reflectionId: number | string, content: string) => mutate<any>(`/api/lectures/${lectureId}/reflections/${reflectionId}`, 'PUT', { content }),
 
   // Cart & Order
   getCart: () => request<CartResponse>('/api/cart', { items: [], totalPrice: 0 }),
@@ -452,6 +677,9 @@ export const api = {
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
     ),
 
+  createStudyActivity: (studyId: number | string, content: string) =>
+    mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
+
   getStudy: async (studyId: string | number): Promise<Study | undefined> => {
     const numericStudyId = Number(studyId)
     let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
@@ -478,8 +706,13 @@ export const api = {
     studyId: string | number,
     postId: string | number,
   ): Promise<StudyActivityResponse | undefined> => {
-    const posts = await api.getBoardPosts(studyId)
-    return posts.find((post) => post.id?.toString() === postId.toString())
+    const numericStudyId = Number(studyId)
+    const numericPostId = Number(postId)
+    if (!Number.isFinite(numericStudyId) || !Number.isFinite(numericPostId)) return undefined
+    return request<StudyActivityResponse | undefined>(
+      `/api/studies/${numericStudyId}/activities/${numericPostId}`,
+      undefined,
+    )
   },
 
   generateAiFeedback: (studyId: number, activityId: number) =>
@@ -595,7 +828,35 @@ export const api = {
       return null
     }
   },
-  getPurchasedCourses: () => request<EnrolledCourse[]>('/api/me/courses', []),
+  getPurchasedCourses: async (): Promise<EnrolledCourse[]> => {
+    try {
+      const res = await request<any>('/api/orders', { content: [] })
+      const orders = Array.isArray(res) ? res : (res?.content || [])
+      const enrolled: EnrolledCourse[] = []
+      orders.forEach((ord: any) => {
+        if (ord.status === 'PAID') {
+          ord.items?.forEach((item: any) => {
+            if (!enrolled.some(e => e.id === item.courseId.toString())) {
+              enrolled.push({
+                id: item.courseId.toString(),
+                title: item.courseTitle || '',
+                instructor: '강사',
+                thumbnailUrl: '/placeholder.svg',
+                progress: 0,
+                totalLectures: 0,
+                completedLectures: 0,
+                status: '진행 중'
+              })
+            }
+          })
+        }
+      })
+      return enrolled
+    } catch (e) {
+      console.error('Failed to get purchased courses from orders:', e)
+      return []
+    }
+  },
   getMyComments: () => request<MyComment[]>('/api/me/comments', []),
 
   // Orders

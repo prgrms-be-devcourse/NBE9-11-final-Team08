@@ -4,7 +4,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CheckCircle2, Clock, PlayCircle, Star, Users, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -27,35 +27,75 @@ export function CourseDetail({ course }: { course: Course }) {
   const { addItem, has } = useCart()
   const [buying, setBuying] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isPurchased, setIsPurchased] = useState(false)
+  const [hasStudyAccess, setHasStudyAccess] = useState(false)
   
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
   const inCart = has(course.id)
 
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+    setIsLoggedIn(!!token)
+    
+    const fetchAccess = async () => {
+      if (!token) return
+      try {
+        let purchased = false
+        if ('getPurchasedCourses' in api) {
+          const list = await api.getPurchasedCourses()
+          purchased = list.some(c => c.id.toString() === course.id.toString())
+          if (purchased) {
+            setIsPurchased(true)
+            setHasStudyAccess(true)
+          }
+        }
+        
+        if (!purchased && 'getStudy' in api) {
+          const study = await api.getStudy(course.id)
+          if (study) {
+            setHasStudyAccess(true)
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch course/study access:', e)
+      }
+    }
+    fetchAccess()
+  }, [])
+
   const handleAdd = async () => {
-    if (inCart) return
+    if (!isLoggedIn) {
+      toast.error('로그인이 필요한 서비스입니다.')
+      router.push('/login')
+      return
+    }
+    if (inCart || isPurchased) return
     setAdding(true)
     try {
-      if ('addToCart' in api) {
-        await (api as any).addToCart(Number(course.id))
-      }
-      addItem(course)
-      toast.success('장바구니에 담았습니다.')
+      await addItem(course)
     } catch (err) {
-      toast.error('장바구니 담기에 실패했습니다.')
+      // handled in addItem
     } finally {
       setAdding(false)
     }
   }
 
   const handleBuy = async () => {
+    if (!isLoggedIn) {
+      toast.error('로그인이 필요한 서비스입니다.')
+      router.push('/login')
+      return
+    }
+    if (isPurchased) return
     setBuying(true)
     try {
       if ('createDirectOrder' in api) {
         const order = await (api as any).createDirectOrder(Number(course.id))
         router.push(`/orders/${order.orderId || order.id}`)
       } else {
-        addItem(course)
+        await addItem(course)
         router.push('/cart')
       }
     } catch (err) {
@@ -210,16 +250,29 @@ export function CourseDetail({ course }: { course: Course }) {
                   </p>
                 ) : null}
 
-                <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
+                <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying || (isLoggedIn && isPurchased)}>
                   {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  코스 구매하기
+                  {isLoggedIn && isPurchased ? '이미 구매한 강좌' : '코스 구매하기'}
                 </Button>
-                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={inCart || adding}>
-                  {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : inCart ? '장바구니에 담김' : '장바구니 담기'}
+                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && (inCart || isPurchased))}>
+                  {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && isPurchased) ? '구매 완료' : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
                 </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={`/study/${course.id}`}>스터디 입장</Link>
-                </Button>
+                {!isLoggedIn ? (
+                  <Button onClick={() => {
+                    toast.error('로그인이 필요한 서비스입니다.')
+                    router.push('/login')
+                  }} variant="outline" className="w-full">
+                    스터디 입장
+                  </Button>
+                ) : hasStudyAccess ? (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={`/study/${course.id}`}>스터디 입장</Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>
+                    스터디 입장
+                  </Button>
+                )}
 
                 <Separator />
                 <ul className="space-y-2 text-sm text-muted-foreground">

@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
@@ -8,27 +7,39 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { api } from '@/lib/api'
 import type { Study } from '@/lib/types'
 
 export function StudyPostComposer({ study }: { study: Study }) {
-  const router = useRouter()
   const base = `/study/${study.id}`
 
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
-  const [requestAi, setRequestAi] = useState(true)
 
-  const submit = () => {
+  const submit = async () => {
     if (!title.trim() || !content.trim()) {
       toast.error('제목과 내용을 모두 입력해주세요.')
       return
     }
-    toast.success(
-      requestAi
-        ? '학습 활동이 등록되었습니다. AI 코치에게 피드백을 요청했어요.'
-        : '학습 활동이 등록되었습니다.',
-    )
-    router.push(`${base}/board`)
+
+    const combinedContent = `${title.trim()}\n\n${content.trim()}`
+    if (combinedContent.length < 20 || combinedContent.length > 2000) {
+      toast.error('스터디 활동 내용은 제목과 본문을 포함하여 20자 이상 2000자 이하로 입력해야 합니다.')
+      return
+    }
+
+    try {
+      const res = await api.createStudyActivity(Number(study.id), combinedContent)
+      if (res && res.activityId) {
+        toast.success('학습 활동이 등록되었습니다.')
+        window.location.href = `${base}/board`
+      } else {
+        throw new Error('Failed to save study activity')
+      }
+    } catch (err: any) {
+      console.error('학습 활동 등록 에러:', err)
+      toast.error(`학습 활동 등록에 실패했습니다: ${err.message || err}`)
+    }
   }
 
   return (
@@ -65,8 +76,7 @@ export function StudyPostComposer({ study }: { study: Study }) {
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={requestAi}
-            onChange={(e) => setRequestAi(e.target.checked)}
+            defaultChecked
             className="h-4 w-4 rounded border-input accent-primary"
           />
           <Sparkles className="h-4 w-4 text-primary" />
@@ -75,7 +85,7 @@ export function StudyPostComposer({ study }: { study: Study }) {
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => router.push(`${base}/board`)}>
+        <Button variant="outline" onClick={() => window.location.href = `${base}/board`}>
           취소
         </Button>
         <Button onClick={submit}>등록</Button>
