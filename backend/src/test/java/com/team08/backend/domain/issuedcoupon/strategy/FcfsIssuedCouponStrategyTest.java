@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,9 +44,9 @@ class FcfsIssuedCouponStrategyTest {
     @BeforeEach
     void setUp() {
         fcfsIssuedCouponStrategy = new FcfsIssuedCouponStrategy(
-                couponPolicyRepository,
                 issuedCouponRepository,
-                clock
+                clock,
+                couponPolicyRepository
         );
     }
 
@@ -68,6 +69,8 @@ class FcfsIssuedCouponStrategyTest {
 
         // then
         assertThat(result).isNotNull();
+        verify(couponPolicyRepository).findByIdWithLock(policyId);
+        verify(couponPolicyRepository, never()).findById(policyId);
         verify(policy).decreaseQuantity();
     }
 
