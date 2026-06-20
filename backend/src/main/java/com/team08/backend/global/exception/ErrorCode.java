@@ -84,6 +84,7 @@ public enum ErrorCode {
     // ── Enrollment ───────────────────────────────────────────────────────
     ENROLLMENT_NOT_FOUND(HttpStatus.NOT_FOUND,  "ENROLLMENT_001", "수강 중인 강의를 찾을 수 없습니다."),
     INVALID_ENROLLMENT_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "ENROLLMENT_002", "잘못된 수강권 상태 전이입니다."),
+    ENROLLMENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ENROLLMENT_003", "해당 강의를 수강할 권한이 없습니다."),
 
     // ── Payment ──────────────────────────────────────────────────────────
     INVALID_PAYMENT_ORDER_STATUS(HttpStatus.CONFLICT,      "PAYMENT_001", "결제할 수 없는 주문 상태입니다."),
