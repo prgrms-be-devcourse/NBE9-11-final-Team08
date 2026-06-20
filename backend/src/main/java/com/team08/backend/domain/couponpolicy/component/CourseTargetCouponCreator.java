@@ -44,7 +44,7 @@ public class CourseTargetCouponCreator extends AbstractCouponPolicyCreator {
                 request.validDays(),
                 request.issueStartDate(),
                 request.issueEndDate(),
-                request.categoryIds(),
+                null,
                 request.courseIds()
         );
     }
