@@ -103,7 +103,9 @@ class CouponPolicyIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.content[0].name").value("쿠폰2")) // ID desc order
-                .andExpect(jsonPath("$.content[1].name").value("쿠폰1"));
+                .andExpect(jsonPath("$.content[1].name").value("쿠폰1"))
+                .andExpect(jsonPath("$.content[0].categoryIds").doesNotExist())
+                .andExpect(jsonPath("$.content[0].courseIds").doesNotExist());
     }
 
     @Test

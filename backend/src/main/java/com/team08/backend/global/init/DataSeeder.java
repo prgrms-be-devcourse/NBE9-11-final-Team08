@@ -295,7 +295,7 @@ public class DataSeeder {
                             DiscountType.PERCENT,
                             10,     // discountValue
                             5000,   // maxDiscountAmount
-                            0,      // minOrderAmount
+                            null,   // minOrderAmount
                             30,     // validDays
 
                             now.minusDays(1),

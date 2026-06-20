@@ -22,6 +22,8 @@ public class CouponPolicyValidator {
                 request.discountType(),
                 request.discountValue(),
                 request.maxDiscountAmount(),
+                request.minOrderAmount(),
+                request.validDays(),
                 request.couponTarget(),
                 request.categoryIds(),
                 request.courseIds(),
@@ -37,6 +39,8 @@ public class CouponPolicyValidator {
                 request.discountType(),
                 request.discountValue(),
                 request.maxDiscountAmount(),
+                request.minOrderAmount(),
+                request.validDays(),
                 existingTarget,
                 request.categoryIds(),
                 request.courseIds(),
@@ -51,12 +55,32 @@ public class CouponPolicyValidator {
             DiscountType discountType,
             Integer discountValue,
             Integer maxDiscountAmount,
+            Integer minOrderAmount,
+            Integer validDays,
             CouponTarget target,
             List<Long> categoryIds,
             List<Long> courseIds,
             LocalDateTime issueStartDate,
             LocalDateTime issueEndDate
     ) {
+
+        // 숫자 범위 검증
+        if (totalQuantity != null && totalQuantity < 1) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (discountValue == null || discountValue < 1) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (maxDiscountAmount != null && maxDiscountAmount < 1) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (minOrderAmount != null && minOrderAmount < 1) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (validDays != null && validDays < 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
         // 쿠폰 타입별 검증
         if (type == CouponType.FCFS) {
             if (totalQuantity == null || totalQuantity < 1) {

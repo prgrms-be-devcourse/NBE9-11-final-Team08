@@ -132,6 +132,33 @@ class CouponPolicyValidatorTest {
     }
 
     @Test
+    @DisplayName("생성 검증 실패: 금액은 1 미만, 유효 기간은 음수이면 예외가 발생한다")
+    void validate_fail_negative_values() {
+        CouponPolicyCreateRequest zeroMaxDiscountAmount = new CouponPolicyCreateRequest(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.PERCENT, 10, 0, null, 7, null, null, null, null
+        );
+        CouponPolicyCreateRequest zeroMinOrderAmount = new CouponPolicyCreateRequest(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, 0, 7, null, null, null, null
+        );
+        CouponPolicyCreateRequest negativeValidDays = new CouponPolicyCreateRequest(
+                "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 5000, null, null, -1, null, null, null, null
+        );
+
+        assertThatThrownBy(() -> validator.validate(zeroMaxDiscountAmount))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> validator.validate(zeroMinOrderAmount))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> validator.validate(negativeValidDays))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
     @DisplayName("생성 검증 실패: 전체(ALL) 대상 쿠폰인데 카테고리나 코스 ID가 있으면 예외가 발생한다")
     void validate_fail_all_target_with_ids() {
         // given
@@ -157,7 +184,7 @@ class CouponPolicyValidatorTest {
         // given
         CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 5000, null, 0, 7, null, null, null, null
+                false, DiscountType.AMOUNT, 5000, null, null, 7, null, null, null, null
         );
 
         // when & then

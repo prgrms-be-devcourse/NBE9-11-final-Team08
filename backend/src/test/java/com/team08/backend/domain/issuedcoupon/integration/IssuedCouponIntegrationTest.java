@@ -143,7 +143,7 @@ class IssuedCouponIntegrationTest {
     private CouponPolicy savePolicy(String name, CouponType type) {
         return couponPolicyRepository.save(CouponPolicy.createPolicy(
                 name, CouponTarget.ALL, type, type == CouponType.FCFS ? 100 : null,
-                CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, null
+                CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, null
         ));
     }
 
