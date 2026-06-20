@@ -200,6 +200,10 @@ export function CouponFormSheet({
       toast.error('쿠폰명을 입력해주세요.')
       return
     }
+    if (form.type === 'FCFS' && !form.totalQuantity) {
+      toast.error('선착순 쿠폰은 총 발급 수량을 입력해야 합니다.')
+      return
+    }
     if (!form.discountValue) {
       toast.error('할인 값을 입력해주세요.')
       return
@@ -208,7 +212,7 @@ export function CouponFormSheet({
     const saved: AdminCoupon = {
       id: coupon?.id ?? Date.now(),
       name: form.name.trim(),
-      totalQuantity: form.totalQuantity ? Number(form.totalQuantity) : null,
+      totalQuantity: form.type === 'FCFS' && form.totalQuantity ? Number(form.totalQuantity) : null,
       type: form.type,
       target: form.target,
       useType: form.useType,
@@ -269,36 +273,46 @@ export function CouponFormSheet({
                 placeholder="예) 신규가입 1만원 할인"
               />
             </Field>
-            <Field label="총 발급 수량" htmlFor="coupon-qty">
-              <Input
-                id="coupon-qty"
-                type="number"
-                value={form.totalQuantity}
-                onChange={(e) => update('totalQuantity', e.target.value)}
-                placeholder="비워두면 무제한"
-              />
-            </Field>
           </Section>
 
           <Section title="적용 규칙">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="쿠폰 타입">
-                <Select
-                  value={form.type}
-                  onValueChange={(v) => update('type', v as CouponPolicyType)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue>
-                      {(v: string) => couponTypeLabel[v as CouponPolicyType]}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUTO">자동</SelectItem>
-                    <SelectItem value="NORMAL">일반</SelectItem>
-                    <SelectItem value="FCFS">선착순</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
+            <div className="space-y-4">
+              <div className="space-y-4">
+                <Field label="쿠폰 타입">
+                  <Select
+                    value={form.type}
+                    onValueChange={(v) => {
+                      update('type', v as CouponPolicyType)
+                      if (v !== 'FCFS') {
+                        update('totalQuantity', '')
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(v: string) => couponTypeLabel[v as CouponPolicyType]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AUTO">자동</SelectItem>
+                      <SelectItem value="NORMAL">일반</SelectItem>
+                      <SelectItem value="FCFS">선착순</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {form.type === 'FCFS' && (
+                  <Field label="총 발급 수량 *" htmlFor="coupon-qty">
+                    <Input
+                      id="coupon-qty"
+                      type="number"
+                      value={form.totalQuantity}
+                      onChange={(e) => update('totalQuantity', e.target.value)}
+                      placeholder="예) 100"
+                    />
+                  </Field>
+                )}
+              </div>
+
               <Field label="쿠폰 적용 대상">
                 <Select
                   value={form.target}
@@ -322,6 +336,94 @@ export function CouponFormSheet({
                   </SelectContent>
                 </Select>
               </Field>
+
+              {form.target !== 'ALL' && (
+                <Field
+                  label={
+                    form.target === 'CATEGORY'
+                      ? '대상 카테고리 선택'
+                      : '대상 코스 선택'
+                  }
+                >
+                  <Popover open={targetOpen} onOpenChange={setTargetOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={targetOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className="text-muted-foreground">
+                          {form.target === 'CATEGORY'
+                            ? '카테고리 검색·선택'
+                            : '코스 검색·선택'}
+                        </span>
+                        <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput
+                          placeholder={
+                            form.target === 'CATEGORY'
+                              ? '카테고리 검색...'
+                              : '코스 검색...'
+                          }
+                        />
+                        <CommandList>
+                          <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                          <CommandGroup>
+                            {targetList.map((item) => {
+                              const selected = form.targets.includes(item.value)
+                              return (
+                                <CommandItem
+                                  key={item.value}
+                                  value={item.label}
+                                  onSelect={() => toggleTarget(item.value)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      'size-4',
+                                      selected ? 'opacity-100' : 'opacity-0',
+                                    )}
+                                  />
+                                  {item.label}
+                                </CommandItem>
+                              )
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+
+                  {form.targets.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {form.targets.map((item) => (
+                        <Badge
+                          key={item}
+                          variant="secondary"
+                          className="gap-1 pr-1"
+                        >
+                          {targetList.find((option) => option.value === item)?.label ?? item}
+                          <button
+                            type="button"
+                            onClick={() => toggleTarget(item)}
+                            className="rounded-full p-0.5 hover:bg-muted-foreground/20"
+                            aria-label={`${item} 제거`}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </Field>
+              )}
+
               <Field label="사용 타입">
                 <Select
                   value={form.useType}
@@ -338,106 +440,19 @@ export function CouponFormSheet({
                   </SelectContent>
                 </Select>
               </Field>
-            </div>
 
-            {form.target !== 'ALL' && (
-              <Field
-                label={
-                  form.target === 'CATEGORY'
-                    ? '대상 카테고리 선택'
-                    : '대상 코스 선택'
-                }
-              >
-                <Popover open={targetOpen} onOpenChange={setTargetOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={targetOpen}
-                      className="w-full justify-between font-normal"
-                    >
-                      <span className="text-muted-foreground">
-                        {form.target === 'CATEGORY'
-                          ? '카테고리 검색·선택'
-                          : '코스 검색·선택'}
-                      </span>
-                      <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput
-                        placeholder={
-                          form.target === 'CATEGORY'
-                            ? '카테고리 검색...'
-                            : '코스 검색...'
-                        }
-                      />
-                      <CommandList>
-                        <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
-                        <CommandGroup>
-                          {targetList.map((item) => {
-                            const selected = form.targets.includes(item.value)
-                            return (
-                              <CommandItem
-                                key={item.value}
-                                value={item.label}
-                                onSelect={() => toggleTarget(item.value)}
-                              >
-                                <Check
-                                  className={cn(
-                                    'size-4',
-                                    selected ? 'opacity-100' : 'opacity-0',
-                                  )}
-                                />
-                                {item.label}
-                              </CommandItem>
-                            )
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-
-                {form.targets.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-2">
-                    {form.targets.map((item) => (
-                      <Badge
-                        key={item}
-                        variant="secondary"
-                        className="gap-1 pr-1"
-                      >
-                        {targetList.find((option) => option.value === item)?.label ?? item}
-                        <button
-                          type="button"
-                          onClick={() => toggleTarget(item)}
-                          className="rounded-full p-0.5 hover:bg-muted-foreground/20"
-                          aria-label={`${item} 제거`}
-                        >
-                          <X className="size-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </Field>
-            )}
-
-            <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium">중복 적용 가능</p>
-                <p className="text-xs text-muted-foreground">
-                  다른 쿠폰과 함께 사용할 수 있습니다.
-                </p>
+              <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">중복 적용 가능</p>
+                  <p className="text-xs text-muted-foreground">
+                    다른 쿠폰과 함께 사용할 수 있습니다.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.stackable}
+                  onCheckedChange={(v) => update('stackable', v)}
+                />
               </div>
-              <Switch
-                checked={form.stackable}
-                onCheckedChange={(v) => update('stackable', v)}
-              />
             </div>
           </Section>
 
