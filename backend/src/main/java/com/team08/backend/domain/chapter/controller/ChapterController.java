@@ -2,7 +2,7 @@ package com.team08.backend.domain.chapter.controller;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.service.ChapterService;
 import jakarta.validation.Valid;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -69,11 +69,15 @@ public class ChapterController {
             @ApiResponse(responseCode = "200", description = "입장 성공"),
             @ApiResponse(responseCode = "404", description = "챕터 또는 강의를 찾을 수 없음")
     })
-    @GetMapping("/api/chapters/{chapterId}/lectures/first")
+    @GetMapping("/api/courses/{courseId}/chapters/{chapterId}/lectures/first")
+    // TODO: 엔드포인트 바꿈 프론트엔드에 적용필요
+    //  전) /api/chapters/{chapterId}/lectures/first
+    //  후) /api/courses/{courseId}/chapters/{chapterId}/lectures/first
     public LectureEnterResponse enterFirstLecture(
+            @Parameter(description = "강좌 ID") @PathVariable Long courseId,
             @Parameter(description = "챕터 ID") @PathVariable Long chapterId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return chapterService.enterFirstLecture(chapterId, principal.user().id());
+        return chapterService.enterFirstLecture(courseId, chapterId, principal.user().id());
     }
 
 }

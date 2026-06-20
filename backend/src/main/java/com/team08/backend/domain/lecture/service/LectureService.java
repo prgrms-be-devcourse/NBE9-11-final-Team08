@@ -2,7 +2,7 @@ package com.team08.backend.domain.lecture.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
-import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
+import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
@@ -25,7 +25,7 @@ public class LectureService {
     private final LectureRepository lectureRepository;
     private final ChapterRepository chapterRepository;
     private final LectureProgressService lectureProgressService;
-    private final EnrollmentQueryService enrollmentQueryService;
+    private final EnrollmentAccessValidator enrollmentAccessValidator;
     /**
      * 특정 강의 러닝 스페이스 입장 — 강의 메타데이터 + 학습 진행 정보를 반환한다.
      * 입장 시 진행 행이 없으면 생성한다(수강권 보유·무료 강의에 한해). 이는 이후 하트비트가
@@ -37,10 +37,7 @@ public class LectureService {
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         //수강권 검사
-        if(!enrollmentQueryService.hasActiveEnrollment(userId,lecture.getChapter().getCourse().getId()))
-        {
-            throw new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED);
-        }
+        enrollmentAccessValidator.validateActiveEnrollment(userId, lecture.getChapter().getCourse().getId());
 
         LectureProgress progress = lectureProgressService.ensureStarted(userId, lecture, LocalDateTime.now());
         return LectureEnterResponse.of(lecture, progress);

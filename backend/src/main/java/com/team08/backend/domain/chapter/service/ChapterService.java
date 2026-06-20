@@ -2,14 +2,15 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
+import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -28,6 +29,9 @@ public class ChapterService {
     private final CourseRepository courseRepository;
     private final LectureRepository lectureRepository;
     private final LectureProgressRepository lectureProgressRepository;
+    private final LectureService lectureService;
+    private final EnrollmentAccessValidator enrollmentAccessValidator;
+
 
     /**
      * 챕터 생성
@@ -60,6 +64,8 @@ public class ChapterService {
      */
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
+        enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
+
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         if (lectureIds.isEmpty()) {
             return null;
@@ -79,22 +85,23 @@ public class ChapterService {
     }
 
     /**
-     * 챕터 첫 강의 입장 — 해당 챕터의 orderNo 가장 낮은 강의 반환
-     * 사용자의 학습 진행 정보도 함께 제공 (없으면 null)
+     * 챕터 첫 강의 입장 — 해당 챕터의 orderNo 가장 낮은 강의로 입장한다.
+     * 실제 입장(진행 행 보장 + 진행 정보 조립)과 수강권 검사는 강의 도메인의
+     * {@link LectureService#enterLecture} 에 위임한다.
      */
-    @Transactional(readOnly = true)
-    public LectureEnterResponse enterFirstLecture(Long chapterId, Long userId) {
-        chapterRepository.findById(chapterId)
+    @Transactional
+    public LectureEnterResponse enterFirstLecture(Long courseId, Long chapterId, Long userId) {
+        Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
+        // URL 정합성: 해당 챕터가 실제로 path 의 강좌 소속인지 확인한다. (수강권 검사는 enterLecture 가 담당)
+        if (!chapter.getCourse().getId().equals(courseId)) {
+            throw new CustomException(ErrorCode.CHAPTER_NOT_FOUND);
+        }
 
         Lecture lecture = lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER));
 
-        LectureProgress progress = lectureProgressRepository
-                .findByUserIdAndLectureId(userId, lecture.getId())
-                .orElse(null);
-
-        return LectureEnterResponse.of(lecture, progress);
+        return lectureService.enterLecture(lecture.getId(), userId);
     }
 
 }
