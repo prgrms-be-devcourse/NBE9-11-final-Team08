@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -16,7 +17,8 @@ public record StudyReportResponse(
         Integer studyDays,
         List<TopLectureEntry> topLectures,
         List<DailyProgressEntry> dailyProgress,
-        Map<String, Integer> dailyActivityMap
+        Map<String, Integer> dailyActivityMap,
+        LocalDateTime updatedAt
 ) {
     public static StudyReportResponse from(StudyReport report, ObjectMapper objectMapper) {
         return new StudyReportResponse(
@@ -27,7 +29,8 @@ public record StudyReportResponse(
                 report.getStudyDays(),
                 parseList(objectMapper, report.getTopLectures(), new TypeReference<>() {}),
                 parseList(objectMapper, report.getDailyProgress(), new TypeReference<>() {}),
-                parseMap(objectMapper, report.getDailyActivityMap())
+                parseMap(objectMapper, report.getDailyActivityMap()),
+                report.getUpdatedAt()
         );
     }
 

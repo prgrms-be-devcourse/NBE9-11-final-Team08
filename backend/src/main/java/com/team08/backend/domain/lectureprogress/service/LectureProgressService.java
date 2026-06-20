@@ -1,6 +1,5 @@
 package com.team08.backend.domain.lectureprogress.service;
 
-import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
 import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
@@ -34,7 +33,7 @@ public class LectureProgressService {
 
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
-    private final EnrollmentAccessValidator enrollmentAccessValidator;
+    private final EnrollmentQueryService enrollmentQueryService;
     /**
      * 재생 중 하트비트로 진행 정보를 갱신한다. (재생 중 주기적으로 호출)
      * watchedSeconds 에 실제 재생 경과초(delta)를 누적하고, 진행률·완료 여부를 재계산한다.
@@ -64,8 +63,9 @@ public class LectureProgressService {
             return existing;
         }
 
-        Long courseId = lecture.getChapter().getCourse().getId();
-        if (!lecture.isFreePreview()) {
+        // 무료 맛보기이거나 활성 수강권이 있을 때만 진행 행을 만든다. 그 외에는 가짜 행을 만들지 않고
+        // null 을 반환한다(입장 자체는 막지 않음 — 메타데이터는 제공).
+        if (!canStartProgress(userId, lecture)) {
             return null;
         }
         return lectureProgressRepository.save(
@@ -98,10 +98,9 @@ public class LectureProgressService {
         LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
 
         // 이전 진행도가 없으면 권한있는 접근인지 확인  (= 강의 영상 첫 시청일 때)
+        // 무료 맛보기이거나 활성 수강권이 있어야 새 행을 만들 수 있다.
         if (progress == null) {
-            Long courseId = lecture.getChapter().getCourse().getId();   //강좌id 추출
-            enrollmentAccessValidator.validateActiveEnrollment(userId,courseId);
-            if (!lecture.isFreePreview()) { //맛보기 강좌거나 권한 인가 검증 됐으면 통과
+            if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
             progress = LectureProgress.start(userId, lectureId, positionSeconds, eventTime);
@@ -122,6 +121,19 @@ public class LectureProgressService {
 
      * 첫 하트비트(신규 행)는 비교 기준점이 없어 절대 상한만 적용한다.
      */
+    /**
+     * 진행 행을 새로 만들 수 있는 접근인지 판단한다.
+     * 무료 맛보기 강의는 수강권 없이도 허용하고, 그 외에는 해당 강좌에 활성 수강권이 있어야 한다.
+     */
+    // TODO: 무료 맛보기 강의 허용 여부 결정및 수정
+    private boolean canStartProgress(Long userId, Lecture lecture) {
+        if (lecture.isFreePreview()) {
+            return true;
+        }
+        Long courseId = lecture.getChapter().getCourse().getId();
+        return enrollmentQueryService.hasActiveEnrollment(userId, courseId);
+    }
+
     private int boundWatchedDelta(int rawDelta, LocalDateTime previousBeatAt, LocalDateTime now) {
         int delta = Math.min(Math.max(rawDelta, 0), MAX_WATCHED_DELTA_SECONDS);
         if (previousBeatAt == null) {
