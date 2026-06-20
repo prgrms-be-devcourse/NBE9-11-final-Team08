@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/lectures/{lectureId}/progress")
-public class lectureProgressController {
+public class LectureProgressController {
 
     private final LectureProgressService lectureProgressService;
 
