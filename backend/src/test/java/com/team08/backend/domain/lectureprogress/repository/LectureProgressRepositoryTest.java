@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -119,7 +118,7 @@ class LectureProgressRepositoryTest {
                 userId,
                 lastPositionSeconds,
                 lastPositionSeconds,
-                BigDecimal.valueOf(50.00),
+                50,
                 completed,
                 completed ? updatedAt : null,
                 updatedAt,
