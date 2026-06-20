@@ -74,13 +74,11 @@ class IssuedCouponServiceTest {
         // given
         Long userId = 1L;
         Long policyId = 1L;
-        CouponPolicy policy = mock(CouponPolicy.class);
         IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
 
         when(userRepository.existsById(userId)).thenReturn(true);
-        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
-        when(policy.getCouponType()).thenReturn(CouponType.NORMAL);
+        when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
 

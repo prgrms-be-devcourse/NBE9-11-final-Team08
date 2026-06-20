@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class IssuedCouponService {
 
+    private static final String ATTENDANCE_REWARD_COUPON_NAME = "연속 출석 보상 쿠폰";
+
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
@@ -51,7 +53,7 @@ public class IssuedCouponService {
     @Transactional
     public void issueAttendanceCoupon(Long userId) {
         // 쿠폰 이름으로 정책 조회 및 발급
-        CouponPolicy policy = couponPolicyRepository.findByName("연속 출석 보상 쿠폰")
+        CouponPolicy policy = couponPolicyRepository.findByName(ATTENDANCE_REWARD_COUPON_NAME)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         issueSystemCoupon(userId, policy);
@@ -79,12 +81,12 @@ public class IssuedCouponService {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
 
-        // 쿠폰 정책 조회
-        CouponPolicy policy = couponPolicyRepository.findById(policyId)
+        // 쿠폰 타입 조회
+        CouponType couponType = couponPolicyRepository.findCouponTypeById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 타입에 맞는 전략 선택
-        IssuedCouponStrategy strategy = strategyFactory.getStrategy(policy.getCouponType());
+        IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
 
         // 쿠폰 발급 로직 실행 및 저장
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
@@ -122,14 +124,8 @@ public class IssuedCouponService {
     // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 (결제 전 화면 용 API)
     @Transactional(readOnly = true)
     public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
-        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
-                .orElseThrow(CouponNotFoundException::new);
-
-        // 사용 가능 여부 검증
-        issuedCoupon.validateUsable(userId, LocalDateTime.now(clock));
-
-        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
-                .orElseThrow(CouponPolicyNotFoundException::new);
+        CouponUsageContext context = getUsableCouponContext(userId, issuedCouponId, LocalDateTime.now(clock));
+        CouponPolicy policy = context.couponPolicy();
 
         // 할인 예상 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
@@ -150,22 +146,37 @@ public class IssuedCouponService {
     // [시스템] 결제 시 쿠폰 사용 처리
     @Transactional
     public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
-        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
-                .orElseThrow(CouponNotFoundException::new);
-
-        // 사용 가능 여부 검증
-        issuedCoupon.validateUsable(userId, LocalDateTime.now(clock));
-
-        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
-                .orElseThrow(CouponPolicyNotFoundException::new);
+        LocalDateTime now = LocalDateTime.now(clock);
+        CouponUsageContext context = getUsableCouponContext(userId, issuedCouponId, now);
+        CouponPolicy policy = context.couponPolicy();
 
         // 할인 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
 
         // 쿠폰 사용 처리
-        issuedCoupon.applyUsage(policy.getUsageType(), LocalDateTime.now(clock));
+        context.issuedCoupon().applyUsage(policy.getUsageType(), now);
 
         // 최종 할인된 금액 반환
         return discountAmount;
+    }
+
+    // 사용 가능한 쿠폰과 정책 조회
+    private CouponUsageContext getUsableCouponContext(Long userId, Long issuedCouponId, LocalDateTime now) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
+                .orElseThrow(CouponNotFoundException::new);
+
+        // 사용 가능 여부 검증
+        issuedCoupon.validateUsable(userId, now);
+
+        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
+                .orElseThrow(CouponPolicyNotFoundException::new);
+
+        return new CouponUsageContext(issuedCoupon, policy);
+    }
+
+    private record CouponUsageContext(
+            IssuedCoupon issuedCoupon,
+            CouponPolicy couponPolicy
+    ) {
     }
 }
