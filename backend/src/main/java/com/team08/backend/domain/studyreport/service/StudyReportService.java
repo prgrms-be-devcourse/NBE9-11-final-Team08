@@ -1,8 +1,8 @@
 package com.team08.backend.domain.studyreport.service;
 
-import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
 import com.team08.backend.domain.study.entity.Study;
@@ -22,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +34,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class StudyReportService {
+
+    /** 리포트 재집계 최소 간격. 마지막 갱신 후 이 시간 이내 요청은 기존 리포트를 그대로 반환한다. */
+    private static final Duration REGENERATION_COOLDOWN = Duration.ofHours(1);
 
     private final StudyReportRepository studyReportRepository;
     private final StudyRepository studyRepository;
@@ -44,16 +49,30 @@ public class StudyReportService {
 
     @Transactional
     public StudyReportResponse generateReport(Long userId, Long studyId) {
+        // 레포트에 들어가는 내용: 총 시청시간 / 질문 개수 / 강좌 진행 률 / 학습한 일 수 / 최고 많이 학습한 강의 / 하루 학습량 맵 / 하루 학습량 맵
+
+        // 집계는 비용이 큰 작업이므로, 마지막 갱신 후 쿨다운 이내면 재집계 없이 기존 리포트를 반환한다.
+        StudyReport existing = studyReportRepository.findByUserIdAndStudyId(userId, studyId).orElse(null);
+        if (existing != null && isWithinCooldown(existing)) {
+            return StudyReportResponse.from(existing, objectMapper);
+        }
+
+        // 스터디 통해 강좌 탐색
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(StudyNotFoundException::new);
 
         Long courseId = study.getCourse().getId();
+
+        //강의 리스트 추출
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         int totalLectureCount = lectureIds.size();
 
-        UserCourseStatsProjection userStats = learningEventRepository.getStatsByUserIdAndCourseId(userId, courseId);
-        Integer totalWatchTime = userStats.getTotalWatchTime();
-        Integer studyDays = userStats.getStudyDays();
+        // 총 시청시간: lecture_progresses 에서 강의당 1행을 단순 합산 (이벤트 중복 합산 없음)
+        int totalWatchTime = lectureIds.isEmpty() ? 0
+                : lectureProgressRepository.sumWatchedSecondsByUserIdAndLectureIdIn(userId, lectureIds);
+
+        // 학습한 일 수: 날짜 이력이 필요하므로 learning_events 에서 집계
+        int studyDays = learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId);
 
         long completedCount = totalLectureCount == 0 ? 0
                 : lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true);
@@ -61,22 +80,27 @@ public class StudyReportService {
                 : BigDecimal.valueOf(completedCount)
                         .divide(BigDecimal.valueOf(totalLectureCount), 4, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(100))
-                        .setScale(2, RoundingMode.HALF_UP);
+                        .setScale(2, RoundingMode.HALF_UP); // 강좌 진행 률 집계
 
-        int totalQnaCount = lectureIds.isEmpty() ? 0
+        int totalQnaCount = lectureIds.isEmpty() ? 0                  //총 질문 수 집계
                 : (int) qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds);
 
-        String topLecturesJson = buildTopLecturesJson(userId, courseId);
-        String dailyProgressJson = buildDailyProgressJson(userId, courseId, totalLectureCount);
-        String dailyActivityMapJson = buildDailyActivityMapJson(userId, courseId);
+        String topLecturesJson = buildTopLecturesJson(userId, lectureIds);    //최고 많이 들었던 강의 집계
+        String dailyProgressJson = buildDailyProgressJson(userId, courseId, totalLectureCount); //하루 학습량
+        String dailyActivityMapJson = buildDailyActivityMapJson(userId, courseId);  //맵 제작
 
-        StudyReport report = studyReportRepository.findByUserIdAndStudyId(userId, studyId)
-                .orElseGet(() -> studyReportRepository.save(StudyReport.create(userId, studyId)));
+        StudyReport report = existing != null ? existing
+                : studyReportRepository.save(StudyReport.create(userId, studyId));
 
         report.update(totalWatchTime, totalQnaCount, progressRate, studyDays,
                 topLecturesJson, dailyProgressJson, dailyActivityMapJson);
 
         return StudyReportResponse.from(report, objectMapper);
+    }
+
+    private boolean isWithinCooldown(StudyReport report) {
+        return report.getUpdatedAt() != null
+                && report.getUpdatedAt().isAfter(LocalDateTime.now().minus(REGENERATION_COOLDOWN));
     }
 
     @Transactional(readOnly = true)
@@ -88,22 +112,25 @@ public class StudyReportService {
 
     // ── 집계 헬퍼 ─────────────────────────────────────────────────────────
 
-    private String buildTopLecturesJson(Long userId, Long courseId) {
-        List<Object[]> rows = learningEventRepository.findTopLecturesByWatchTime(userId, courseId);
+    private String buildTopLecturesJson(Long userId, List<Long> lectureIds) {
+        if (lectureIds.isEmpty()) return studyReportJson.write(List.of());
+
+        List<LectureProgress> rows = lectureProgressRepository
+                .findTop3ByUserIdAndLectureIdInOrderByWatchedSecondsDesc(userId, lectureIds);
         if (rows.isEmpty()) return studyReportJson.write(List.of());
 
-        List<Long> lectureIds = rows.stream()
-                .map(r -> ((Number) r[0]).longValue())
+        List<Long> topLectureIds = rows.stream()
+                .map(LectureProgress::getLectureId)
                 .toList();
 
-        Map<Long, String> titleMap = lectureRepository.findIdAndTitleByIdIn(lectureIds).stream()
+        Map<Long, String> titleMap = lectureRepository.findIdAndTitleByIdIn(topLectureIds).stream()
                 .collect(Collectors.toMap(r -> ((Number) r[0]).longValue(), r -> (String) r[1]));
 
         List<TopLectureEntry> result = rows.stream()
-                .map(r -> new TopLectureEntry(
-                        ((Number) r[0]).longValue(),
-                        titleMap.getOrDefault(((Number) r[0]).longValue(), ""),
-                        ((Number) r[1]).intValue()))
+                .map(p -> new TopLectureEntry(
+                        p.getLectureId(),
+                        titleMap.getOrDefault(p.getLectureId(), ""),
+                        p.getWatchedSeconds()))
                 .toList();
 
         return studyReportJson.write(result);
