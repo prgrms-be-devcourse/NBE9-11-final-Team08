@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lectureprogress.service;
 
+import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
 import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
@@ -33,8 +34,7 @@ public class LectureProgressService {
 
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
-    private final EnrollmentQueryService enrollmentQueryService;
-
+    private final EnrollmentAccessValidator enrollmentAccessValidator;
     /**
      * 재생 중 하트비트로 진행 정보를 갱신한다. (재생 중 주기적으로 호출)
      * watchedSeconds 에 실제 재생 경과초(delta)를 누적하고, 진행률·완료 여부를 재계산한다.
@@ -65,8 +65,7 @@ public class LectureProgressService {
         }
 
         Long courseId = lecture.getChapter().getCourse().getId();
-        // TODO: 부가로직 함수로써 다른 서비스 호출 전이라 수강권 인가 검증 중... 중복 호출시 없앨것
-        if (!lecture.isFreePreview() && !enrollmentQueryService.hasActiveEnrollment(userId, courseId)) {
+        if (!lecture.isFreePreview()) {
             return null;
         }
         return lectureProgressRepository.save(
@@ -101,7 +100,8 @@ public class LectureProgressService {
         // 이전 진행도가 없으면 권한있는 접근인지 확인  (= 강의 영상 첫 시청일 때)
         if (progress == null) {
             Long courseId = lecture.getChapter().getCourse().getId();   //강좌id 추출
-            if (!lecture.isFreePreview() && !enrollmentQueryService.hasActiveEnrollment(userId, courseId)) { //맛보기 강좌거나 권한 인가 검증 됐으면 통과
+            enrollmentAccessValidator.validateActiveEnrollment(userId,courseId);
+            if (!lecture.isFreePreview()) { //맛보기 강좌거나 권한 인가 검증 됐으면 통과
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
             progress = LectureProgress.start(userId, lectureId, positionSeconds, eventTime);
