@@ -5,6 +5,7 @@ import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,9 @@ class FcfsIssuedCouponStrategyTest {
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
 
+    @Mock
+    private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private FcfsIssuedCouponStrategy fcfsIssuedCouponStrategy;
@@ -44,9 +48,9 @@ class FcfsIssuedCouponStrategyTest {
     @BeforeEach
     void setUp() {
         fcfsIssuedCouponStrategy = new FcfsIssuedCouponStrategy(
-                issuedCouponRepository,
                 clock,
-                couponPolicyRepository
+                couponPolicyRepository,
+                fcfsCouponRedisIssuer
         );
     }
 
@@ -60,7 +64,6 @@ class FcfsIssuedCouponStrategyTest {
         LocalDateTime now = LocalDateTime.now(clock);
 
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
-        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
         when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
@@ -71,6 +74,8 @@ class FcfsIssuedCouponStrategyTest {
         assertThat(result).isNotNull();
         verify(couponPolicyRepository).findByIdWithLock(policyId);
         verify(couponPolicyRepository, never()).findById(policyId);
+        verify(issuedCouponRepository, never()).existsByUserIdAndPolicyId(userId, policyId);
+        verify(fcfsCouponRedisIssuer).issue(userId, policy);
         verify(policy).decreaseQuantity();
     }
 
@@ -89,5 +94,19 @@ class FcfsIssuedCouponStrategyTest {
         assertThatThrownBy(() -> fcfsIssuedCouponStrategy.issue(userId, policyId))
                 .isInstanceOf(CouponExhaustedException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_EXHAUSTED);
+    }
+
+    @Test
+    @DisplayName("성공: 선착순 쿠폰 발급 실패 보상 시 Redis 발급 정보를 롤백한다")
+    void rollbackIssue_success() {
+        // given
+        Long userId = 1L;
+        Long policyId = 1L;
+
+        // when
+        fcfsIssuedCouponStrategy.rollbackIssue(userId, policyId);
+
+        // then
+        verify(fcfsCouponRedisIssuer).rollback(userId, policyId);
     }
 }

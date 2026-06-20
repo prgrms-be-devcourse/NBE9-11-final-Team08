@@ -8,6 +8,7 @@ import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponWriter;
 import com.team08.backend.domain.user.dto.LoginUserDto;
@@ -60,6 +61,9 @@ class IssuedCouponIntegrationTest {
 
     @MockitoBean
     private IssuedCouponWriter issuedCouponWriter;
+
+    @MockitoBean
+    private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
 
     @BeforeEach
     void setUp() {

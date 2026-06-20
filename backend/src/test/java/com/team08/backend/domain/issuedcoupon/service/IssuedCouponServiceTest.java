@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -93,6 +94,30 @@ class IssuedCouponServiceTest {
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
+    }
+
+    @Test
+    @DisplayName("실패: 쿠폰 저장 실패 시 전략의 발급 보상을 실행한다")
+    void downloadCoupon_fail_rollback() {
+        // given
+        Long userId = 1L;
+        Long policyId = 1L;
+        IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
+        when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
+        when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
+        when(issuedCouponWriter.saveWithConcurrencyProtection(issuedCoupon))
+                .thenThrow(new DataIntegrityViolationException("duplicate"));
+
+        // when & then
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () -> issuedCouponService.downloadCoupon(userId, policyId)
+                )
+                .isInstanceOf(DataIntegrityViolationException.class);
+        verify(strategy).rollbackIssue(userId, policyId);
     }
 
     @Test

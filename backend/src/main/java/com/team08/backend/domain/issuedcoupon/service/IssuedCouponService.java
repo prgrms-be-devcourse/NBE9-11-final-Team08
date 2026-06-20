@@ -90,8 +90,14 @@ public class IssuedCouponService {
 
         // 쿠폰 발급 로직 실행 및 저장
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
-        IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
-        return IssuedCouponResponse.from(savedCoupon);
+        try {
+            IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
+            return IssuedCouponResponse.from(savedCoupon);
+        } catch (RuntimeException e) {
+            // 쿠폰 발급 실패 보상
+            strategy.rollbackIssue(userId, policyId);
+            throw e;
+        }
     }
 
     // [사용자] 내 쿠폰 목록 조회
