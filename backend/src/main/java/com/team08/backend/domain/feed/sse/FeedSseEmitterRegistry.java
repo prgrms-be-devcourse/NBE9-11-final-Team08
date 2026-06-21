@@ -1,7 +1,10 @@
 package com.team08.backend.domain.feed.sse;
 
 import com.team08.backend.domain.feed.outbox.FeedOutboxEvent;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -9,37 +12,50 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Component
 public class FeedSseEmitterRegistry {
 
     private static final long DEFAULT_TIMEOUT_MILLIS = 30L * 60L * 1000L;
 
-    private final Map<Long, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
+    private final Map<Long, Map<Long, SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-    public SseEmitter add(Long studyId) {
+    public FeedSseEmitterRegistry(MeterRegistry meterRegistry) {
+        Gauge.builder("feed.sse.connections", this, FeedSseEmitterRegistry::connectionCount)
+                .description("Current feed SSE connection count")
+                .register(meterRegistry);
+        Gauge.builder("feed.sse.studies", this, FeedSseEmitterRegistry::studyCount)
+                .description("Current study count with feed SSE connections")
+                .register(meterRegistry);
+    }
+
+    public SseEmitter add(Long studyId, Long userId) {
         SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
-        emitters.computeIfAbsent(studyId, ignored -> new CopyOnWriteArrayList<>()).add(emitter);
+        Map<Long, SseEmitter> studyEmitters =
+                emitters.computeIfAbsent(studyId, ignored -> new ConcurrentHashMap<>());
+        SseEmitter previousEmitter = studyEmitters.put(userId, emitter);
+        if (previousEmitter != null) {
+            previousEmitter.complete();
+        }
 
-        emitter.onCompletion(() -> remove(studyId, emitter));
+        emitter.onCompletion(() -> remove(studyId, userId, emitter));
         emitter.onTimeout(() -> {
-            remove(studyId, emitter);
+            remove(studyId, userId, emitter);
             emitter.complete();
         });
-        emitter.onError(error -> remove(studyId, emitter));
+        emitter.onError(error -> remove(studyId, userId, emitter));
 
-        sendConnectedEvent(emitter);
+        sendConnectedEvent(studyId, userId, emitter);
         return emitter;
     }
 
     public void send(FeedOutboxEvent event) {
-        List<SseEmitter> studyEmitters = emitters.get(event.getStudyId());
+        Map<Long, SseEmitter> studyEmitters = emitters.get(event.getStudyId());
         if (studyEmitters == null || studyEmitters.isEmpty()) {
             return;
         }
 
-        for (SseEmitter emitter : studyEmitters) {
+        for (SseEmitter emitter : List.copyOf(studyEmitters.values())) {
             send(emitter, event);
         }
     }
@@ -55,25 +71,52 @@ public class FeedSseEmitterRegistry {
         }
     }
 
-    private void sendConnectedEvent(SseEmitter emitter) {
+    @Scheduled(fixedDelayString = "${app.feed.sse.heartbeat-delay-ms:25000}")
+    public void sendHeartbeat() {
+        emitters.forEach((studyId, studyEmitters) ->
+                studyEmitters.forEach((userId, emitter) -> sendHeartbeat(studyId, userId, emitter))
+        );
+    }
+
+    public int connectionCount() {
+        return emitters.values().stream()
+                .mapToInt(Map::size)
+                .sum();
+    }
+
+    public int studyCount() {
+        return emitters.size();
+    }
+
+    private void sendConnectedEvent(Long studyId, Long userId, SseEmitter emitter) {
         try {
             emitter.send(SseEmitter.event()
                     .name("connected")
                     .data("connected"));
         } catch (IOException | IllegalStateException e) {
+            remove(studyId, userId, emitter);
             emitter.completeWithError(e);
         }
     }
 
-    private void remove(Long studyId, SseEmitter emitter) {
-        List<SseEmitter> studyEmitters = emitters.get(studyId);
+    private void sendHeartbeat(Long studyId, Long userId, SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().comment("heartbeat"));
+        } catch (IOException | IllegalStateException e) {
+            remove(studyId, userId, emitter);
+            emitter.completeWithError(e);
+        }
+    }
+
+    private void remove(Long studyId, Long userId, SseEmitter emitter) {
+        Map<Long, SseEmitter> studyEmitters = emitters.get(studyId);
         if (studyEmitters == null) {
             return;
         }
 
-        studyEmitters.remove(emitter);
+        studyEmitters.remove(userId, emitter);
         if (studyEmitters.isEmpty()) {
-            emitters.remove(studyId);
+            emitters.remove(studyId, studyEmitters);
         }
     }
 }

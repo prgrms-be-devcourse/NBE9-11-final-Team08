@@ -21,7 +21,7 @@ public class FeedSseService {
     public SseEmitter subscribe(Long studyId, Long userId, Long lastEventId) {
         feedService.validateFeedAccess(studyId, userId);
 
-        SseEmitter emitter = feedSseEmitterRegistry.add(studyId);
+        SseEmitter emitter = feedSseEmitterRegistry.add(studyId, userId);
         replayMissedEvents(studyId, lastEventId, emitter);
         return emitter;
     }
