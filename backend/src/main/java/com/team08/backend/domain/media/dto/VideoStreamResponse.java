@@ -7,7 +7,7 @@ import java.util.List;
 public record VideoStreamResponse(String path, List<ResponseCookie> cookies) {
 
     public VideoStreamResponse {
-        cookies = List.copyOf(cookies);
+        cookies = (cookies == null) ? List.of() : List.copyOf(cookies);
     }
 
     public HttpHeaders asHttpHeaders() {
