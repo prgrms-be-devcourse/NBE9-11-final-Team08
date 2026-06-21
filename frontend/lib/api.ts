@@ -42,6 +42,14 @@ import type {
   LearningEventResponse,
   QnaQuestionResponse,
   StudyReportResponse,
+  AdminOverview,
+  DailySessionPoint,
+  CourseStatRow,
+  LectureStatRow,
+  EnrolleeRow,
+  LearningEventRow,
+  AnomalyResponse,
+  AuditResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -1206,4 +1214,48 @@ export const api = {
     mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason }),
   deleteCourseByAdmin: (courseId: number | string) =>
     mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE'),
+
+  // ── Admin Dashboard APIs ────────────────────────────────────────────
+  getAdminOverview: () =>
+    request<AdminOverview | null>('/api/admin/dashboard/overview', null),
+  getAdminDailySessions: (from?: string, to?: string) => {
+    const qs = new URLSearchParams()
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<DailySessionPoint[]>(`/api/admin/dashboard/sessions/daily${suffix}`, [])
+  },
+  getAdminCourseStats: (page = 0, size = 20, status?: string) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (status) qs.set('status', status)
+    return request<PageResponse<CourseStatRow> | null>(
+      `/api/admin/dashboard/courses?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminLectureStats: (courseId: number) =>
+    request<LectureStatRow[]>(`/api/admin/dashboard/courses/${courseId}/lectures`, []),
+  getAdminEnrollees: (courseId: number, page = 0, size = 20) =>
+    request<PageResponse<EnrolleeRow> | null>(
+      `/api/admin/dashboard/courses/${courseId}/enrollees?page=${page}&size=${size}`,
+      null,
+    ),
+  getAdminUserTimeline: (userId: number, courseId?: number, page = 0, size = 30) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (courseId != null) qs.set('courseId', String(courseId))
+    return request<PageResponse<LearningEventRow> | null>(
+      `/api/admin/dashboard/users/${userId}/timeline?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminAnomalies: (dropoutThreshold?: number, burstThreshold?: number, windowMinutes?: number) => {
+    const qs = new URLSearchParams()
+    if (dropoutThreshold != null) qs.set('dropoutThreshold', String(dropoutThreshold))
+    if (burstThreshold != null) qs.set('burstThreshold', String(burstThreshold))
+    if (windowMinutes != null) qs.set('windowMinutes', String(windowMinutes))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<AnomalyResponse | null>(`/api/admin/dashboard/anomalies${suffix}`, null)
+  },
+  getAdminAudit: () =>
+    request<AuditResponse | null>('/api/admin/dashboard/audit/retention', null),
 }

@@ -8,12 +8,18 @@ import {
   Store,
   TicketPercent,
   BookOpen,
+  Layers,
+  AlertTriangle,
+  FileSearch,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const links = [
-  { href: '/admin', label: '대시보드', icon: LayoutDashboard },
+  { href: '/admin', label: '현황', icon: LayoutDashboard },
+  { href: '/admin/learning', label: '학습 드릴다운', icon: Layers },
+  { href: '/admin/anomalies', label: '이상 탐지', icon: AlertTriangle },
+  { href: '/admin/audit', label: '데이터 감사', icon: FileSearch },
   { href: '/admin/coupons', label: '쿠폰 정책', icon: TicketPercent },
   { href: '/admin/courses', label: '강좌 심사', icon: BookOpen },
 ]
