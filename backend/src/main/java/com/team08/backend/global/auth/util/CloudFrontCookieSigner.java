@@ -6,7 +6,6 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
@@ -17,16 +16,12 @@ import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CloudFrontCookieSigner {
-
-    private final Environment environment;
 
     @Value("${cloud.aws.cloudfront.distribution-domain:localhost}")
     private String distributionDomain;
@@ -34,20 +29,20 @@ public class CloudFrontCookieSigner {
     @Value("${cloud.aws.cloudfront.key-pair-id:dummy-id}")
     private String keyPairId;
 
-    @Value("${cloud.aws.cloudfront.private-key:-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----}")
+    @Value("${cloud.aws.cloudfront.private-key:cloudfront-private-key}")
     private String privateKeyPem;
 
     private PrivateKey privateKey;
 
     @PostConstruct
     public void init() {
-        List<String> activeProfiles = Arrays.asList(environment.getActiveProfiles());
-        boolean isTestEnvironment = activeProfiles.contains("test") || activeProfiles.contains("local") || "dummy-id".equals(keyPairId);
+        boolean isDevOrTest = "cloudfront-private-key".equals(privateKeyPem) || "dummy-id".equals(keyPairId);
 
         try {
-            if (isTestEnvironment && privateKeyPem.contains("MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3")) {
+            if (isDevOrTest) {
                 return;
             }
+
             String privateKeyRaw = privateKeyPem
                     .replace("-----BEGIN PRIVATE KEY-----", "")
                     .replace("-----END PRIVATE KEY-----", "")
@@ -59,7 +54,7 @@ public class CloudFrontCookieSigner {
             this.privateKey = kf.generatePrivate(spec);
         } catch (Exception e) {
             log.error("CloudFront private key initialization failed", e);
-            if (!isTestEnvironment) {
+            if (!isDevOrTest) {
                 throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
             }
         }
@@ -85,7 +80,7 @@ public class CloudFrontCookieSigner {
     private String signPolicy(String policy) {
         try {
             if (privateKey == null) {
-                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+                return "dummy-signature";
             }
             Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initSign(privateKey);

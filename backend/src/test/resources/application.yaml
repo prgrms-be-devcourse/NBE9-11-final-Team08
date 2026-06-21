@@ -43,9 +43,9 @@ spring:
       s3:
         bucket: test-bucket-name
       cloudfront:
-        distribution-domain: localhost
+        distribution-domain: cloudfront-domain
         key-pair-id: dummy-id
-        private-key: -----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----
+        private-key: -----BEGIN PRIVATE KEY-----\ncloudfront-private-key\n-----END PRIVATE KEY-----
 
 app:
   feed:
