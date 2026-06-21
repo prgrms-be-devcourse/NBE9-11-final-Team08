@@ -47,6 +47,9 @@ app:
       name: refreshToken
       secure: ${IS_COOKIE_SECURE:true}
       same-site: ${SAME_SITE:Lax}
+  feed:
+    outbox:
+      scheduler-enabled: ${FEED_OUTBOX_SCHEDULER_ENABLED:true}
 
 cloud:
   aws:
