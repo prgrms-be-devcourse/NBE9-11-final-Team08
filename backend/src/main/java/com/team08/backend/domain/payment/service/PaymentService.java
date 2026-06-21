@@ -133,14 +133,17 @@ public class PaymentService {
     }
 
     private void validateDuplicateEnrollment(Long userId, List<OrderItem> orderItems) {
-        boolean hasActiveEnrollment = orderItems.stream()
-                .anyMatch(orderItem -> enrollmentRepository.existsByUserIdAndCourseIdAndStatus(
-                        userId,
-                        orderItem.getCourseId(),
-                        EnrollmentStatus.ACTIVE
-                ));
+        List<Long> courseIds = orderItems.stream()
+                .map(OrderItem::getCourseId)
+                .distinct()
+                .toList();
 
-        if (hasActiveEnrollment) {
+        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                userId,
+                EnrollmentStatus.ACTIVE,
+                courseIds
+        );
+        if (!activeCourseIds.isEmpty()) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
     }
