@@ -48,6 +48,9 @@ spring:
         private-key: -----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----
 
 app:
+  feed:
+    outbox:
+      scheduler-enabled: false
   ai:
     model: stub
     prompt-version: v1

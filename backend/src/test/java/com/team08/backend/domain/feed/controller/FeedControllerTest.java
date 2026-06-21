@@ -5,6 +5,7 @@ import com.team08.backend.domain.feed.dto.response.FeedCursorResponse;
 import com.team08.backend.domain.feed.dto.response.FeedItemResponse;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.service.FeedService;
+import com.team08.backend.domain.feed.sse.FeedSseService;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.security.WithMockLoginUser;
@@ -15,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +27,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(FeedController.class)
@@ -36,6 +39,9 @@ public class FeedControllerTest {
 
     @MockitoBean
     private FeedService feedService;
+
+    @MockitoBean
+    private FeedSseService feedSseService;
 
     @Test
     @WithMockLoginUser
@@ -132,5 +138,23 @@ public class FeedControllerTest {
 
         then(feedService).should()
                 .getFeedItems(eq(studyId), eq(1L), eq(null), eq(null), eq(10));
+    }
+
+    @Test
+    @WithMockLoginUser
+    void 스터디_피드_SSE를_구독한다() throws Exception {
+        Long studyId = 10L;
+        SseEmitter emitter = new SseEmitter();
+
+        given(feedSseService.subscribe(eq(studyId), eq(1L), eq(100L)))
+                .willReturn(emitter);
+
+        mockMvc.perform(get("/api/studies/{studyId}/feed/stream", studyId)
+                        .header("Last-Event-ID", "100"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        then(feedSseService).should()
+                .subscribe(eq(studyId), eq(1L), eq(100L));
     }
 }
