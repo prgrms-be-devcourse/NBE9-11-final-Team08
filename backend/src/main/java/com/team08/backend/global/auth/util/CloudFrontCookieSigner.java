@@ -23,7 +23,7 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class CloudFrontCookieSigner {
 
-    @Value("${cloud.aws.cloudfront.distribution-domain:localhost}")
+    @Value("${cloud.aws.cloudfront.distribution-domain:cloudfront-domain}")
     private String distributionDomain;
 
     @Value("${cloud.aws.cloudfront.key-pair-id:dummy-id}")
@@ -36,7 +36,7 @@ public class CloudFrontCookieSigner {
 
     @PostConstruct
     public void init() {
-        boolean isDevOrTest = "cloudfront-private-key".equals(privateKeyPem) || "dummy-id".equals(keyPairId);
+        boolean isDevOrTest = isDevelopmentOrTestEnvironment();
 
         try {
             if (isDevOrTest) {
@@ -56,6 +56,7 @@ public class CloudFrontCookieSigner {
             log.error("CloudFront private key initialization failed", e);
             throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
         }
+        // Todo: 비디오 관련 기능만 별도의 가벼운 독립 서버로 분리하면, 전체 서비스가 터지지 않으면서 다른 기능들은 정상적으로 동작할 수 있음. 현재는 CloudFront 키 초기화 실패 시 전체 서비스가 터짐.
     }
 
     public ResponseCookie[] createSignedCookies(String resourcePath, String cookiePath) {
@@ -78,8 +79,7 @@ public class CloudFrontCookieSigner {
     private String signPolicy(String policy) {
         try {
             if (privateKey == null) {
-                boolean isDevOrTest = "cloudfront-private-key".equals(privateKeyPem) || "dummy-id".equals(keyPairId);
-                if (isDevOrTest) {
+                if (isDevelopmentOrTestEnvironment()) {
                     return "dummy-signature";
                 }
                 throw new IllegalStateException("CloudFront 서명 키가 설정되지 않았습니다.");
@@ -95,6 +95,12 @@ public class CloudFrontCookieSigner {
             log.error("CloudFront signature generation failed", e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private boolean isDevelopmentOrTestEnvironment() {
+        return "cloudfront-private-key".equals(privateKeyPem) ||
+                "dummy-id".equals(keyPairId) ||
+                privateKeyPem.contains("cloudfront-private-key");
     }
 
     private ResponseCookie buildCookie(String name, String value, String path) {
