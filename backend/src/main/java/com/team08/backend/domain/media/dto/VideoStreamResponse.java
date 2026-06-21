@@ -1,4 +1,4 @@
-package com.team08.backend.domain.lecture.dto;
+package com.team08.backend.domain.media.dto;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
