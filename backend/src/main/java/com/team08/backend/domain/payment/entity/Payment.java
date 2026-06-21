@@ -87,7 +87,13 @@ public class Payment {
     }
 
     public void fail(String failedReason, LocalDateTime failedAt) {
+        fail(null, null, failedReason, failedAt);
+    }
+
+    public void fail(String paymentKey, String method, String failedReason, LocalDateTime failedAt) {
         validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
+        this.paymentKey = paymentKey;
+        this.method = method;
         this.status = PaymentStatus.FAILED;
         this.failedReason = failedReason;
         this.updatedAt = failedAt;
@@ -105,6 +111,22 @@ public class Payment {
         this.status = PaymentStatus.REFUNDED;
         this.refundedAt = refundedAt;
         this.updatedAt = refundedAt;
+    }
+
+    public boolean isCompleted() {
+        return this.status == PaymentStatus.SUCCESS;
+    }
+
+    public boolean canBeConfirmed() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+    }
+
+    public boolean canCancelBeforePaid() {
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+    }
+
+    public boolean canRefund() {
+        return this.status == PaymentStatus.SUCCESS;
     }
 
     private void validateStatus(PaymentStatus... expectedStatuses) {

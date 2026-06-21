@@ -2,49 +2,36 @@ package com.team08.backend.domain.issuedcoupon.strategy;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
-import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
+import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
-import java.time.LocalDateTime;
 
 @Component
-@RequiredArgsConstructor
-public class NormalIssuedCouponStrategy implements IssuedCouponStrategy {
+public class NormalIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
 
     private final CouponPolicyRepository couponPolicyRepository;
-    private final IssuedCouponRepository issuedCouponRepository;
-    private final Clock clock;
+
+    public NormalIssuedCouponStrategy(
+            IssuedCouponRepository issuedCouponRepository,
+            Clock clock,
+            CouponPolicyRepository couponPolicyRepository
+    ) {
+        super(issuedCouponRepository, clock);
+        this.couponPolicyRepository = couponPolicyRepository;
+    }
 
     @Override
     public CouponType getSupportedType() {
         return CouponType.NORMAL;
     }
 
-    // [사용자] 일반 쿠폰 발급 로직
+    // 일반 쿠폰 정책 조회
     @Override
-    @Transactional
-    public IssuedCoupon issue(Long userId, Long policyId) {
-        CouponPolicy policy = couponPolicyRepository.findById(policyId)
+    protected CouponPolicy findPolicy(Long policyId) {
+        return couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
-
-        LocalDateTime now = LocalDateTime.now(clock);
-
-        // 중복 발급 체크
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
-            throw new CouponAlreadyIssuedException();
-        }
-
-        // 쿠폰 발급 기간 검증
-        policy.validateIssuePeriod(now);
-
-        // 쿠폰 발급 기록 생성
-        return IssuedCoupon.create(policy, userId, now);
     }
 }

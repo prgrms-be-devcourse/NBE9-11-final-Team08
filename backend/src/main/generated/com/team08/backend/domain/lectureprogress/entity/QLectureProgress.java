@@ -31,7 +31,7 @@ public class QLectureProgress extends EntityPathBase<LectureProgress> {
 
     public final NumberPath<Long> lectureId = createNumber("lectureId", Long.class);
 
-    public final NumberPath<java.math.BigDecimal> progressRate = createNumber("progressRate", java.math.BigDecimal.class);
+    public final NumberPath<Integer> progressRate = createNumber("progressRate", Integer.class);
 
     public final DateTimePath<java.time.LocalDateTime> updatedAt = createDateTime("updatedAt", java.time.LocalDateTime.class);
 

@@ -10,7 +10,6 @@ import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
 import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
@@ -27,6 +26,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,8 +70,8 @@ class StudyReportServiceTest {
         Long courseId = 100L;
         List<Long> lectureIds = List.of(1L, 2L, 3L);
 
-        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, lectureIds);
-        given(userStats.getTotalWatchTime()).willReturn(3600);
+        stubCommon(userId, studyId, courseId, lectureIds);
+        given(lectureProgressRepository.sumWatchedSecondsByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(3600);
         given(lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true)).willReturn(2L);
         given(qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(5L);
         given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.empty());
@@ -97,8 +97,8 @@ class StudyReportServiceTest {
         Long courseId = 100L;
         List<Long> lectureIds = List.of(1L, 2L);
 
-        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, lectureIds);
-        given(userStats.getTotalWatchTime()).willReturn(7200);
+        stubCommon(userId, studyId, courseId, lectureIds);
+        given(lectureProgressRepository.sumWatchedSecondsByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(7200);
         given(lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true)).willReturn(2L);
         given(qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds)).willReturn(3L);
 
@@ -115,14 +115,33 @@ class StudyReportServiceTest {
     }
 
     @Test
+    @DisplayName("마지막 갱신 후 1시간 이내면 재집계 없이 기존 리포트를 반환한다")
+    void generateReport_withinCooldown_returnsExistingWithoutRecompute() {
+        Long userId = 1L;
+        Long studyId = 10L;
+
+        StudyReport recent = StudyReport.create(userId, studyId);
+        recent.update(1234, 5, BigDecimal.valueOf(50.00), 3, "[]", "[]", "{}");
+        ReflectionTestUtils.setField(recent, "id", 7L);
+        ReflectionTestUtils.setField(recent, "updatedAt", LocalDateTime.now().minusMinutes(10));
+        given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.of(recent));
+
+        StudyReportResponse response = studyReportService.generateReport(userId, studyId);
+
+        assertThat(response.totalWatchTime()).isEqualTo(1234);
+        // 쿨다운: 비싼 집계 경로(스터디/강의 조회·저장)를 타지 않아야 한다
+        verify(studyRepository, never()).findById(any());
+        verify(studyReportRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("강좌에 강의가 없으면 progressRate는 0이다")
     void generateReport_noLectures_progressRateZero() {
         Long userId = 1L;
         Long studyId = 10L;
         Long courseId = 100L;
 
-        UserCourseStatsProjection userStats = stubCommon(userId, studyId, courseId, List.of());
-        given(userStats.getTotalWatchTime()).willReturn(0);
+        stubCommon(userId, studyId, courseId, List.of());
         given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.empty());
 
         StudyReport saved = StudyReport.create(userId, studyId);
@@ -176,20 +195,18 @@ class StudyReportServiceTest {
 
     // ── helpers ───────────────────────────────────────────────────────────
 
-    private UserCourseStatsProjection stubCommon(Long userId, Long studyId, Long courseId, List<Long> lectureIds) {
+    private void stubCommon(Long userId, Long studyId, Long courseId, List<Long> lectureIds) {
         Study study = mockStudy(studyId, courseId);
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(lectureIds);
 
-        UserCourseStatsProjection userStats = mock(UserCourseStatsProjection.class);
-        given(userStats.getStudyDays()).willReturn(5);
-        given(learningEventRepository.getStatsByUserIdAndCourseId(userId, courseId)).willReturn(userStats);
+        given(learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId)).willReturn(5);
 
-        given(learningEventRepository.findTopLecturesByWatchTime(userId, courseId)).willReturn(List.of());
+        given(lectureProgressRepository.findTop3ByUserIdAndLectureIdInOrderByWatchedSecondsDesc(userId, lectureIds))
+                .willReturn(List.of());
         given(learningEventRepository.findDailyCompletionCounts(userId, courseId)).willReturn(List.of());
         given(learningEventRepository.findDailyActivityCounts(userId, courseId)).willReturn(List.of());
         given(lectureRepository.findIdAndTitleByIdIn(any())).willReturn(List.of());
-        return userStats;
     }
 
     private Study mockStudy(Long studyId, Long courseId) {

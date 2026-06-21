@@ -4,6 +4,7 @@ import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyDetailResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicySummaryResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
 import com.team08.backend.domain.couponpolicy.service.CouponPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,7 +49,7 @@ public class CouponPolicyController {
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     @Operation(summary = "쿠폰 정책 목록 조회", description = "쿠폰명, 타입, 상태별 필터링과 페이징을 지원합니다.")
-    public Page<CouponPolicyResponse> getCoupons(
+    public Page<CouponPolicySummaryResponse> getCoupons(
             @ModelAttribute CouponPolicySearchRequest condition,
             @PageableDefault(size = 10) Pageable pageable
     ) {

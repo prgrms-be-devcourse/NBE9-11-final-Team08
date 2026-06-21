@@ -1,5 +1,6 @@
 package com.team08.backend.domain.studyreport.entity;
 
+import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -8,7 +9,7 @@ import java.math.BigDecimal;
 @Table(name = "study_reports")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StudyReport {
+public class StudyReport extends BaseTimeEntity {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false)

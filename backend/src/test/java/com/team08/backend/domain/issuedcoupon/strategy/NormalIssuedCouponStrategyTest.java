@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,9 +43,9 @@ class NormalIssuedCouponStrategyTest {
     @BeforeEach
     void setUp() {
         normalIssuedCouponStrategy = new NormalIssuedCouponStrategy(
-                couponPolicyRepository,
                 issuedCouponRepository,
-                clock
+                clock,
+                couponPolicyRepository
         );
     }
 
@@ -68,6 +69,8 @@ class NormalIssuedCouponStrategyTest {
         // then
         assertThat(result).isNotNull();
         assertThat(result.getPolicyId()).isEqualTo(policyId);
+        verify(couponPolicyRepository).findById(policyId);
+        verify(couponPolicyRepository, never()).findByIdWithLock(policyId);
         verify(policy).validateIssuePeriod(any(LocalDateTime.class));
     }
 

@@ -21,7 +21,7 @@ class CouponPolicyTest {
         List<Long> targetCourseIds = List.of(100L, 200L);
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "특정 코스 할인", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, targetCourseIds
+                false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, targetCourseIds
         );
 
         // when & then
@@ -36,7 +36,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "카테고리 할인", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, List.of(50L, 51L), null
+                false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, List.of(50L, 51L), null
         );
 
         // when & then
@@ -51,7 +51,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "전체 할인", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, null
+                false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, null
         );
 
         // when & then
@@ -65,7 +65,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.PERCENT, 10, 10000, 0, 30, null, null, null, null
+                false, DiscountType.PERCENT, 10, 10000, null, 30, null, null, null, null
         );
         int originalPrice = 10555; // 10% 면 1055.5원 -> 1055원 기대
 
@@ -83,7 +83,7 @@ class CouponPolicyTest {
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.minusDays(1), now.plusDays(1), null, null
+                false, DiscountType.AMOUNT, 1000, null, null, 30, now.minusDays(1), now.plusDays(1), null, null
         );
 
         // when & then
@@ -97,7 +97,7 @@ class CouponPolicyTest {
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.plusDays(1), now.plusDays(2), null, null
+                false, DiscountType.AMOUNT, 1000, null, null, 30, now.plusDays(1), now.plusDays(2), null, null
         );
 
         // when & then
@@ -112,7 +112,7 @@ class CouponPolicyTest {
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 30, now.minusDays(2), now.minusDays(1), null, null
+                false, DiscountType.AMOUNT, 1000, null, null, 30, now.minusDays(2), now.minusDays(1), null, null
         );
 
         // when & then
@@ -125,9 +125,10 @@ class CouponPolicyTest {
     void decreaseQuantity_fail_exhausted() {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
-                "테스트", CouponTarget.ALL, CouponType.FCFS, 0, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 30, null, null, null, null
+                "테스트", CouponTarget.ALL, CouponType.FCFS, 1, CouponUsageType.SINGLE_USE,
+                false, DiscountType.AMOUNT, 1000, null, null, 30, null, null, null, null
         );
+        policy.decreaseQuantity();
 
         // when & then
         assertThatThrownBy(policy::decreaseQuantity)
@@ -140,7 +141,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.PERCENT, 10, 2000, 0, 30, null, null, null, null
+                false, DiscountType.PERCENT, 10, 2000, null, 30, null, null, null, null
         );
         int originalPrice = 50000; // 10% 면 5000원이지만, 최대 2000원 제한
 
@@ -157,7 +158,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 5000, null, 0, 30, null, null, null, null
+                false, DiscountType.AMOUNT, 5000, null, null, 30, null, null, null, null
         );
         int originalPrice = 3000; // 5000원 할인 쿠폰이지만 상품이 3000원
 
@@ -174,7 +175,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "코스 할인", CouponTarget.COURSE, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, null, List.of(100L)
+                false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, List.of(100L)
         );
 
         // when & then
@@ -187,7 +188,7 @@ class CouponPolicyTest {
         // given
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "카테고리 할인", CouponTarget.CATEGORY, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 7, null, null, List.of(50L), null
+                false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, List.of(50L), null
         );
 
         // when & then
@@ -201,7 +202,7 @@ class CouponPolicyTest {
         LocalDateTime now = LocalDateTime.of(2026, 6, 14, 12, 0);
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "테스트", CouponTarget.ALL, CouponType.NORMAL, null, CouponUsageType.SINGLE_USE,
-                false, DiscountType.AMOUNT, 1000, null, 0, 30, null, null, null, null
+                false, DiscountType.AMOUNT, 1000, null, null, 30, null, null, null, null
         );
 
         // when

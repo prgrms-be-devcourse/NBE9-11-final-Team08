@@ -295,7 +295,7 @@ public class DataSeeder {
                             DiscountType.PERCENT,
                             10,     // discountValue
                             5000,   // maxDiscountAmount
-                            0,      // minOrderAmount
+                            null,   // minOrderAmount
                             30,     // validDays
 
                             now.minusDays(1),
@@ -369,7 +369,7 @@ public class DataSeeder {
             Long userId = users.get(i).getId();
 
             progresses.add(new LectureProgress(
-                    null, lecture.getId(), userId, 300, 300, new BigDecimal("50.00"), false, null, now, now));
+                    null, lecture.getId(), userId, 300, 300, 50, false, null, now, now));
             events.add(LearningEvent.create(
                     userId, course.getId(), lecture.getChapter().getId(), lecture.getId(),
                     LearningEventType.LECTURE_ENTER, 0, now, "evt-seed-" + i));

@@ -21,6 +21,7 @@ public record CouponPolicyCreateRequest(
         @NotNull(message = "쿠폰 발급 타입은 필수입니다.")
         CouponType couponType,
 
+        @Min(value = 1, message = "쿠폰 수량은 1 이상이어야 합니다.")
         Integer totalQuantity, // null이면 무제한
 
         @NotNull(message = "쿠폰 사용 타입은 필수입니다.")
@@ -36,10 +37,13 @@ public record CouponPolicyCreateRequest(
         @Min(value = 1, message = "할인 값은 1 이상이어야 합니다.")
         Integer discountValue,
 
+        @Min(value = 1, message = "최대 할인 금액은 1 이상이어야 합니다.")
         Integer maxDiscountAmount,
 
+        @Min(value = 1, message = "최소 주문 금액은 1 이상이어야 합니다.")
         Integer minOrderAmount,
 
+        @Min(value = 0, message = "쿠폰 유효 기간은 0 이상이어야 합니다.")
         Integer validDays, // null이면 무기한
 
         LocalDateTime issueStartDate,

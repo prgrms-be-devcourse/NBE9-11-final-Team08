@@ -7,6 +7,7 @@ import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyDetailResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicySummaryResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
@@ -45,9 +46,9 @@ public class CouponPolicyService {
 
     // 쿠폰 정책 목록 조회
     @Transactional(readOnly = true)
-    public Page<CouponPolicyResponse> getCouponPolicies(CouponPolicySearchRequest condition, Pageable pageable) {
+    public Page<CouponPolicySummaryResponse> getCouponPolicies(CouponPolicySearchRequest condition, Pageable pageable) {
         return couponPolicyRepository.findAllByCondition(condition, LocalDateTime.now(clock), pageable)
-                .map(CouponPolicyResponse::from);
+                .map(CouponPolicySummaryResponse::from);
     }
 
     // 쿠폰 정책 상세 조회

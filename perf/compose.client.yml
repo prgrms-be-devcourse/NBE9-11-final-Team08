@@ -1,0 +1,48 @@
+# ============================================================================
+# 부하 테스트 - 분리 모드 [부하 stack] (부하 발생 + 관측)
+# ----------------------------------------------------------------------------
+# k6 + influxdb + grafana 만 정의한다. 측정 대상(app/db)은 compose.server.yml.
+# k6 는 docker 내부망의 app 이 아니라 호스트 밖 서버를 때린다:
+#     BASE_URL: http://host.docker.internal:8080   ← 분리의 핵심 한 줄
+# 관측 도구(influxdb/grafana)를 서버가 아닌 부하 쪽에 두어 측정 오염을 막는다.
+#
+#   make perf-client PERF_SCRIPT=last-watched-baseline.js
+#   make perf-split-down
+# ============================================================================
+
+name: team08-perf-client
+
+services:
+  influxdb:
+    image: influxdb:1.8
+    environment:
+      INFLUXDB_DB: k6
+    networks: [client]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on: [influxdb]
+    networks: [client]
+
+  k6:
+    image: grafana/k6:0.49.0
+    profiles: ["k6"]
+    depends_on: [influxdb]
+    environment:
+      BASE_URL: http://host.docker.internal:8080    # '서버 머신'을 호스트 경유로 호출
+    extra_hosts:
+      - "host.docker.internal:host-gateway"          # Linux 호환용 (Mac 은 기본 지원)
+    volumes:
+      - ./k6:/scripts:ro
+    networks: [client]
+
+networks:
+  client:

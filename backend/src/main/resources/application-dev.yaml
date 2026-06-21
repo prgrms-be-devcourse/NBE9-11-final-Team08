@@ -22,7 +22,7 @@ app:
     model: stub
     prompt-version: v1
   data-init:
-    mode: none  # none:더미데이터 필요 x | simple: 더미데이터 소량생성 | bulk : 더미데이터 대량생성
+    mode: ${APP_DATA_INIT_MODE:none}  # none:더미데이터 필요 x | simple: 더미데이터 소량생성 | bulk : 더미데이터 대량생성
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
     refresh-cookie:

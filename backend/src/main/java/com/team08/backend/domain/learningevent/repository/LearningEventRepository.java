@@ -1,7 +1,6 @@
 package com.team08.backend.domain.learningevent.repository;
 
 import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
-import com.team08.backend.domain.learningevent.dto.UserCourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import org.springframework.data.domain.Page;
@@ -16,6 +15,7 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 중복 이벤트 방지 ──────────────────────────────────────────────
     boolean existsByUniqueEventKey(String uniqueEventKey);
 
+    //TODO: FQCN QueryDSL로 변환하기
     // ── 강의별 통계 단일 쿼리 ─────────────────────────────────────────
     @Query("SELECT new com.team08.backend.domain.learningevent.dto.CourseStatsProjection(" +
            "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.LECTURE_ENTER THEN 1 ELSE 0 END), " +
@@ -27,26 +27,14 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 사용자별 활동 조회 ────────────────────────────────────────────
     Page<LearningEvent> findByUserId(Long userId, Pageable pageable);
 
-    // ── 총 시청 시간 + 수강일 수 단일 쿼리 ──────────────────────────
+    // ── 수강일 수 (서로 다른 학습 날짜 수) ──────────────────────────
+    // 총 시청 시간 / TOP3 강의는 lecture_progresses 에서 집계한다(이벤트 중복 합산 방지).
     @Query(value = """
-            SELECT
-                COALESCE(SUM(CASE WHEN event_type = 'VIDEO_END' THEN position_seconds ELSE 0 END), 0) AS totalWatchTime,
-                COUNT(DISTINCT DATE(event_time)) AS studyDays
+            SELECT COUNT(DISTINCT DATE(event_time))
             FROM learning_events
             WHERE user_id = :userId AND course_id = :courseId
             """, nativeQuery = true)
-    UserCourseStatsProjection getStatsByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
-
-    // ── 강의별 시청 시간 (TOP3용) ─────────────────────────────────────
-    @Query(value = """
-            SELECT lecture_id, SUM(position_seconds) AS total
-            FROM learning_events
-            WHERE user_id = :userId AND course_id = :courseId AND event_type = 'VIDEO_END'
-            GROUP BY lecture_id
-            ORDER BY total DESC
-            LIMIT 3
-            """, nativeQuery = true)
-    List<Object[]> findTopLecturesByWatchTime(@Param("userId") Long userId, @Param("courseId") Long courseId);
+    int countStudyDaysByUserIdAndCourseId(@Param("userId") Long userId, @Param("courseId") Long courseId);
 
     // ── 날짜별 LECTURE_COMPLETE 누적 (진도 그래프용) ──────────────────
     @Query(value = """
