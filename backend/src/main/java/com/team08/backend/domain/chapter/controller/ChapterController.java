@@ -73,6 +73,7 @@ public class ChapterController {
     // TODO: 엔드포인트 바꿈 프론트엔드에 적용필요
     //  전) /api/chapters/{chapterId}/lectures/first
     //  후) /api/courses/{courseId}/chapters/{chapterId}/lectures/first
+
     public LectureEnterResponse enterFirstLecture(
             @Parameter(description = "강좌 ID") @PathVariable Long courseId,
             @Parameter(description = "챕터 ID") @PathVariable Long chapterId,

@@ -32,10 +32,6 @@ public class ChapterService {
     private final LectureService lectureService;
     private final EnrollmentAccessValidator enrollmentAccessValidator;
 
-
-    /**
-     * 챕터 생성
-     */
     @Transactional
     public Long createChapter(Long courseId, ChapterCreateRequest request) {
         Course course = courseRepository.findById(courseId)
@@ -47,9 +43,6 @@ public class ChapterService {
         return chapterRepository.save(chapter).getId();
     }
 
-    /**
-     * 챕터 리스트 조회 — 코스 기준, 각 챕터에 속한 강의 목록 포함
-     */
     @Transactional(readOnly = true)
     public List<ChapterWithLecturesResponse> getChaptersWithLectures(Long courseId) {
         List<Chapter> chapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
@@ -58,10 +51,6 @@ public class ChapterService {
                 .toList();
     }
 
-    /**
-     * 강좌 내 가장 최근 수강 강의 조회
-     * 수강 이력이 없으면 null 반환
-     */
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
         enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
@@ -84,15 +73,11 @@ public class ChapterService {
                 .orElse(null);
     }
 
-    /**
-     * 챕터 첫 강의 입장 — 해당 챕터의 orderNo 가장 낮은 강의로 입장한다.
-     * 실제 입장(진행 행 보장 + 진행 정보 조립)과 수강권 검사는 강의 도메인의
-     * {@link LectureService#enterLecture} 에 위임한다.
-     */
     @Transactional
     public LectureEnterResponse enterFirstLecture(Long courseId, Long chapterId, Long userId) {
         Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
+
         // URL 정합성: 해당 챕터가 실제로 path 의 강좌 소속인지 확인한다. (수강권 검사는 enterLecture 가 담당)
         if (!chapter.getCourse().getId().equals(courseId)) {
             throw new CustomException(ErrorCode.CHAPTER_NOT_FOUND);
