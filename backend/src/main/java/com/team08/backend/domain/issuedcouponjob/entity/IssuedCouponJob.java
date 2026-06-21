@@ -67,4 +67,8 @@ public class IssuedCouponJob {
         this.failureReason = failureReason;
         this.completedAt = completedAt;
     }
+
+    public boolean isRequested() {
+        return this.status == IssuedCouponJobStatus.REQUESTED;
+    }
 }

@@ -4,15 +4,16 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
-import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -39,6 +40,7 @@ public class IssuedCouponService {
     private final IssuedCouponStrategyFactory strategyFactory;
     private final IssuedCouponWriter issuedCouponWriter;
     private final IssuedCouponJobWriter issuedCouponJobWriter;
+    private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
     private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
@@ -78,7 +80,7 @@ public class IssuedCouponService {
 
     // [사용자] 쿠폰 다운로드
     @Transactional
-    public IssuedCouponResponse downloadCoupon(Long userId, Long policyId) {
+    public CouponDownloadResponse downloadCoupon(Long userId, Long policyId) {
         // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
@@ -91,17 +93,30 @@ public class IssuedCouponService {
         // 타입에 맞는 전략 선택
         IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
 
-        // 쿠폰 발급 로직 실행 및 저장
+        // 쿠폰 발급 로직 실행
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
         IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
                 userId,
                 policyId,
                 LocalDateTime.now(clock)
         );
+
+        if (couponType == CouponType.FCFS) {
+            try {
+                issuedCouponJobStreamPublisher.publish(issuedCouponJob.getId(), userId, policyId);
+                return CouponDownloadResponse.requested(userId, policyId, issuedCouponJob);
+            } catch (RuntimeException e) {
+                issuedCouponJobWriter.markFailed(issuedCouponJob.getId(), e.getClass().getSimpleName(), LocalDateTime.now(clock));
+                // 쿠폰 발급 실패 보상
+                strategy.rollbackIssue(userId, policyId);
+                throw e;
+            }
+        }
+
         try {
             IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
             issuedCouponJobWriter.markIssued(issuedCouponJob.getId(), LocalDateTime.now(clock));
-            return IssuedCouponResponse.from(savedCoupon);
+            return CouponDownloadResponse.issued(savedCoupon, issuedCouponJob);
         } catch (RuntimeException e) {
             issuedCouponJobWriter.markFailed(issuedCouponJob.getId(), e.getClass().getSimpleName(), LocalDateTime.now(clock));
             // 쿠폰 발급 실패 보상

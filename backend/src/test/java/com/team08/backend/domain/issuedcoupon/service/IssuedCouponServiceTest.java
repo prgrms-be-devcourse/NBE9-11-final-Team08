@@ -5,13 +5,14 @@ import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
+import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
-import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +59,9 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponJobWriter issuedCouponJobWriter;
 
+    @Mock
+    private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
@@ -71,6 +75,7 @@ class IssuedCouponServiceTest {
                 strategyFactory,
                 issuedCouponWriter,
                 issuedCouponJobWriter,
+                issuedCouponJobStreamPublisher,
                 clock
         );
     }
@@ -96,7 +101,7 @@ class IssuedCouponServiceTest {
         when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
 
         // when
-        IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
+        CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
 
         // then
         assertThat(response).isNotNull();
@@ -107,8 +112,8 @@ class IssuedCouponServiceTest {
     }
 
     @Test
-    @DisplayName("실패: 쿠폰 저장 실패 시 전략의 발급 보상을 실행한다")
-    void downloadCoupon_fail_rollback() {
+    @DisplayName("실패: 선착순 쿠폰 Stream 적재 실패 시 전략의 발급 보상을 실행한다")
+    void downloadFcfsCoupon_fail_rollback() {
         // given
         Long userId = 1L;
         Long policyId = 1L;
@@ -122,8 +127,8 @@ class IssuedCouponServiceTest {
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
         when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
         when(issuedCouponJob.getId()).thenReturn(1L);
-        when(issuedCouponWriter.saveWithConcurrencyProtection(issuedCoupon))
-                .thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(issuedCouponJobStreamPublisher.publish(1L, userId, policyId))
+                .thenThrow(new DataIntegrityViolationException("stream"));
 
         // when & then
         org.assertj.core.api.Assertions.assertThatThrownBy(

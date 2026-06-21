@@ -48,9 +48,6 @@ public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
     protected void beforeIssue(Long userId, Long policyId, CouponPolicy policy) {
         // Redis 선착순 발급 확정
         fcfsCouponRedisIssuer.issue(userId, policy);
-
-        // 쿠폰 수량 차감 및 재고 소진 체크
-        policy.decreaseQuantity();
     }
 
     // 선착순 쿠폰 발급 실패 보상

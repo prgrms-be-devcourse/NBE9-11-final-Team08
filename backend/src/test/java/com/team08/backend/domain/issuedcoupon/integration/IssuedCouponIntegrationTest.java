@@ -11,6 +11,8 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponWriter;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamWorker;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
@@ -65,6 +67,12 @@ class IssuedCouponIntegrationTest {
     @MockitoBean
     private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
 
+    @MockitoBean
+    private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
+
+    @MockitoBean
+    private IssuedCouponJobStreamWorker issuedCouponJobStreamWorker;
+
     @BeforeEach
     void setUp() {
         // IssuedCouponWriter가 받은 객체를 그대로 Repository에 저장하고 반환하도록 설정 (테스트 트랜잭션 유지를 위해)
@@ -84,7 +92,7 @@ class IssuedCouponIntegrationTest {
         mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
-                .andExpect(jsonPath("$.status").value("ISSUED"));
+                .andExpect(jsonPath("$.jobStatus").value("ISSUED"));
 
         // then
         assertThat(issuedCouponRepository.findAll()).hasSize(1);
@@ -102,10 +110,10 @@ class IssuedCouponIntegrationTest {
         mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
-                .andExpect(jsonPath("$.status").value("ISSUED"));
+                .andExpect(jsonPath("$.jobStatus").value("REQUESTED"));
 
         // then
-        assertThat(issuedCouponRepository.findAll()).hasSize(1);
+        assertThat(issuedCouponRepository.findAll()).isEmpty();
     }
 
     @Test

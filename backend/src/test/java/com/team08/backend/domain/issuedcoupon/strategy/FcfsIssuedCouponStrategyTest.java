@@ -76,7 +76,7 @@ class FcfsIssuedCouponStrategyTest {
         verify(couponPolicyRepository, never()).findById(policyId);
         verify(issuedCouponRepository, never()).existsByUserIdAndPolicyId(userId, policyId);
         verify(fcfsCouponRedisIssuer).issue(userId, policy);
-        verify(policy).decreaseQuantity();
+        verify(policy, never()).decreaseQuantity();
     }
 
     @Test
@@ -88,7 +88,7 @@ class FcfsIssuedCouponStrategyTest {
         CouponPolicy policy = mock(CouponPolicy.class);
 
         when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
-        doThrow(new CouponExhaustedException()).when(policy).decreaseQuantity();
+        doThrow(new CouponExhaustedException()).when(fcfsCouponRedisIssuer).issue(userId, policy);
 
         // when & then
         assertThatThrownBy(() -> fcfsIssuedCouponStrategy.issue(userId, policyId))
