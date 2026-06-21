@@ -12,6 +12,8 @@ import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -36,6 +38,7 @@ public class IssuedCouponService {
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
     private final IssuedCouponWriter issuedCouponWriter;
+    private final IssuedCouponJobWriter issuedCouponJobWriter;
     private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
@@ -90,10 +93,17 @@ public class IssuedCouponService {
 
         // 쿠폰 발급 로직 실행 및 저장
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
+        IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
+                userId,
+                policyId,
+                LocalDateTime.now(clock)
+        );
         try {
             IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
+            issuedCouponJobWriter.markIssued(issuedCouponJob.getId(), LocalDateTime.now(clock));
             return IssuedCouponResponse.from(savedCoupon);
         } catch (RuntimeException e) {
+            issuedCouponJobWriter.markFailed(issuedCouponJob.getId(), e.getClass().getSimpleName(), LocalDateTime.now(clock));
             // 쿠폰 발급 실패 보상
             strategy.rollbackIssue(userId, policyId);
             throw e;

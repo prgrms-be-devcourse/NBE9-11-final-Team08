@@ -11,6 +11,8 @@ import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -53,6 +55,9 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponWriter issuedCouponWriter;
 
+    @Mock
+    private IssuedCouponJobWriter issuedCouponJobWriter;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
@@ -65,6 +70,7 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
+                issuedCouponJobWriter,
                 clock
         );
     }
@@ -77,11 +83,14 @@ class IssuedCouponServiceTest {
         Long policyId = 1L;
         IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        IssuedCouponJob issuedCouponJob = mock(IssuedCouponJob.class);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
+        when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
+        when(issuedCouponJob.getId()).thenReturn(1L);
 
         // writer 모킹
         when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
@@ -94,6 +103,7 @@ class IssuedCouponServiceTest {
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
+        verify(issuedCouponJobWriter).markIssued(any(), any());
     }
 
     @Test
@@ -104,11 +114,14 @@ class IssuedCouponServiceTest {
         Long policyId = 1L;
         IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        IssuedCouponJob issuedCouponJob = mock(IssuedCouponJob.class);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
         when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
+        when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
+        when(issuedCouponJob.getId()).thenReturn(1L);
         when(issuedCouponWriter.saveWithConcurrencyProtection(issuedCoupon))
                 .thenThrow(new DataIntegrityViolationException("duplicate"));
 
@@ -117,6 +130,7 @@ class IssuedCouponServiceTest {
                         () -> issuedCouponService.downloadCoupon(userId, policyId)
                 )
                 .isInstanceOf(DataIntegrityViolationException.class);
+        verify(issuedCouponJobWriter).markFailed(any(), any(), any());
         verify(strategy).rollbackIssue(userId, policyId);
     }
 
