@@ -54,9 +54,7 @@ public class CloudFrontCookieSigner {
             this.privateKey = kf.generatePrivate(spec);
         } catch (Exception e) {
             log.error("CloudFront private key initialization failed", e);
-            if (!isDevOrTest) {
-                throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
-            }
+            throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
         }
     }
 
@@ -80,13 +78,19 @@ public class CloudFrontCookieSigner {
     private String signPolicy(String policy) {
         try {
             if (privateKey == null) {
-                return "dummy-signature";
+                boolean isDevOrTest = "cloudfront-private-key".equals(privateKeyPem) || "dummy-id".equals(keyPairId);
+                if (isDevOrTest) {
+                    return "dummy-signature";
+                }
+                throw new IllegalStateException("CloudFront 서명 키가 설정되지 않았습니다.");
             }
             Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initSign(privateKey);
             sig.update(policy.getBytes(StandardCharsets.UTF_8));
 
             return encodeBase64(sig.sign());
+        } catch (CustomException | IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("CloudFront signature generation failed", e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
