@@ -22,8 +22,13 @@ public class Payment {
     @Column(nullable = false)
     private Integer amount;
     @Enumerated(EnumType.STRING) @Column(nullable = false)
+    private PaymentProviderType provider;
+    private String idempotencyKey;
+    @Enumerated(EnumType.STRING) @Column(nullable = false)
     private PaymentStatus status;
     private LocalDateTime paidAt;
+    private String failureCode;
+    private String failureMessage;
     private String failedReason;
     private LocalDateTime canceledAt;
     private LocalDateTime refundedAt;
@@ -37,8 +42,12 @@ public class Payment {
             String paymentKey,
             String method,
             Integer amount,
+            PaymentProviderType provider,
+            String idempotencyKey,
             PaymentStatus status,
             LocalDateTime paidAt,
+            String failureCode,
+            String failureMessage,
             String failedReason,
             LocalDateTime canceledAt,
             LocalDateTime refundedAt,
@@ -50,8 +59,12 @@ public class Payment {
         this.paymentKey = paymentKey;
         this.method = method;
         this.amount = amount;
+        this.provider = provider;
+        this.idempotencyKey = idempotencyKey;
         this.status = status;
         this.paidAt = paidAt;
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
         this.failedReason = failedReason;
         this.canceledAt = canceledAt;
         this.refundedAt = refundedAt;
@@ -66,7 +79,11 @@ public class Payment {
                 null,
                 null,
                 order.getFinalPrice(),
+                PaymentProviderType.MOCK,
+                null,
                 PaymentStatus.READY,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -82,6 +99,8 @@ public class Payment {
         this.method = method;
         this.status = PaymentStatus.SUCCESS;
         this.paidAt = paidAt;
+        this.failureCode = null;
+        this.failureMessage = null;
         this.failedReason = null;
         this.updatedAt = paidAt;
     }
@@ -95,6 +114,8 @@ public class Payment {
         this.paymentKey = paymentKey;
         this.method = method;
         this.status = PaymentStatus.FAILED;
+        this.failureCode = null;
+        this.failureMessage = failedReason;
         this.failedReason = failedReason;
         this.updatedAt = failedAt;
     }
