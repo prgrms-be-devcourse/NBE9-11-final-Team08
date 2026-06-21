@@ -7,6 +7,7 @@ import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
+import com.team08.backend.domain.feed.sse.FeedSseEmitterRegistry;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -31,6 +32,7 @@ public class FeedOutboxPublisher {
     private final FeedItemRepository feedItemRepository;
     private final StudyActivityRepository studyActivityRepository;
     private final FeedContentSummarizer feedContentSummarizer;
+    private final FeedSseEmitterRegistry feedSseEmitterRegistry;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -50,6 +52,7 @@ public class FeedOutboxPublisher {
     private void publish(FeedOutboxEvent event) {
         try {
             prepareFeedItemCreatedPayload(event);
+            feedSseEmitterRegistry.send(event);
         } catch (RuntimeException e) {
             event.markFailed(e.getMessage());
         }

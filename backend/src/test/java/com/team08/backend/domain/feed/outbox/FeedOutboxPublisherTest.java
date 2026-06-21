@@ -5,6 +5,7 @@ import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
+import com.team08.backend.domain.feed.sse.FeedSseEmitterRegistry;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -45,6 +46,9 @@ class FeedOutboxPublisherTest {
     private FeedContentSummarizer feedContentSummarizer;
 
     @Mock
+    private FeedSseEmitterRegistry feedSseEmitterRegistry;
+
+    @Mock
     private UserRepository userRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -62,6 +66,7 @@ class FeedOutboxPublisherTest {
                 feedItemRepository,
                 studyActivityRepository,
                 feedContentSummarizer,
+                feedSseEmitterRegistry,
                 userRepository,
                 objectMapper,
                 clock
@@ -124,5 +129,7 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getPublishedAt()).isEqualTo(LocalDateTime.now(clock));
         assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
         assertThat(objectMapper.writeValueAsString(sourceEvent)).doesNotContain("긴 활동 내용");
+
+        verify(feedSseEmitterRegistry).send(outboxEvent);
     }
 }
