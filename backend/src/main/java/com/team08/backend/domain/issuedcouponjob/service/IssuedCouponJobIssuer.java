@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
-public class IssuedCouponJobIssueExecutor {
+public class IssuedCouponJobIssuer {
 
     private final IssuedCouponJobRepository issuedCouponJobRepository;
     private final CouponPolicyRepository couponPolicyRepository;
@@ -25,7 +25,8 @@ public class IssuedCouponJobIssueExecutor {
 
     // 쿠폰 발급 작업 DB 반영
     @Transactional
-    public void issue(Long jobId) {
+    public void issueCoupon(Long jobId) {
+        LocalDateTime now = LocalDateTime.now(clock);
         IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
                 .orElseThrow();
         if (!job.isProcessable()) {
@@ -36,13 +37,13 @@ public class IssuedCouponJobIssueExecutor {
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
         if (issuedCouponRepository.existsByUserIdAndPolicyId(job.getUserId(), job.getPolicyId())) {
-            job.markIssued(LocalDateTime.now(clock));
+            job.markIssued(now);
             return;
         }
 
         policy.decreaseQuantity();
-        IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, job.getUserId(), LocalDateTime.now(clock));
+        IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, job.getUserId(), now);
         issuedCouponRepository.saveAndFlush(issuedCoupon);
-        job.markIssued(LocalDateTime.now(clock));
+        job.markIssued(now);
     }
 }

@@ -33,8 +33,7 @@ public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
     // 선착순 쿠폰 정책 조회
     @Override
     protected CouponPolicy findPolicy(Long policyId) {
-        // 비관적 락을 적용한 쿠폰 정책 조회
-        return couponPolicyRepository.findByIdWithLock(policyId)
+        return couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
     }
 

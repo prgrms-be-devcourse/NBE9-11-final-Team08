@@ -63,7 +63,7 @@ class FcfsIssuedCouponStrategyTest {
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now(clock);
 
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getId()).thenReturn(policyId);
         when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
@@ -72,8 +72,8 @@ class FcfsIssuedCouponStrategyTest {
 
         // then
         assertThat(result).isNotNull();
-        verify(couponPolicyRepository).findByIdWithLock(policyId);
-        verify(couponPolicyRepository, never()).findById(policyId);
+        verify(couponPolicyRepository).findById(policyId);
+        verify(couponPolicyRepository, never()).findByIdWithLock(policyId);
         verify(issuedCouponRepository, never()).existsByUserIdAndPolicyId(userId, policyId);
         verify(fcfsCouponRedisIssuer).issue(userId, policy);
         verify(policy, never()).decreaseQuantity();
@@ -87,7 +87,7 @@ class FcfsIssuedCouponStrategyTest {
         Long policyId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
 
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         doThrow(new CouponExhaustedException()).when(fcfsCouponRedisIssuer).issue(userId, policy);
 
         // when & then

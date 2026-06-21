@@ -11,13 +11,13 @@ import java.time.LocalDateTime;
 public class IssuedCouponJobProcessor {
 
     private final IssuedCouponJobWriter issuedCouponJobWriter;
-    private final IssuedCouponJobIssueExecutor issuedCouponJobIssueExecutor;
+    private final IssuedCouponJobIssuer issuedCouponJobIssuer;
     private final Clock clock;
 
     // 쿠폰 발급 작업 처리
     public void process(Long jobId) {
         try {
-            issuedCouponJobIssueExecutor.issue(jobId);
+            issuedCouponJobIssuer.issueCoupon(jobId);
         } catch (RuntimeException e) {
             issuedCouponJobWriter.markRetrying(jobId, e.getClass().getSimpleName(), LocalDateTime.now(clock));
         }
