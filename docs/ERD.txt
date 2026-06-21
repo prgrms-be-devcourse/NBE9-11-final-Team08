@@ -70,8 +70,9 @@ Enum coupon_usage_type {
 }
 Enum issued_coupon_job_status {
   REQUESTED
+  RETRYING
   ISSUED
-  FAILED
+  DEAD
 }
 Enum ai_feedback_status { 
   PENDING
@@ -337,7 +338,9 @@ Table issued_coupon_jobs {
   user_id bigint [not null]
   status issued_coupon_job_status [not null]
   failure_reason varchar(500)
+  retry_count int [not null, default: 0]
   requested_at datetime [not null]
+  last_tried_at datetime
   completed_at datetime
   indexes {
     (policy_id, user_id)

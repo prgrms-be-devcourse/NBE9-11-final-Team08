@@ -1,13 +1,5 @@
 package com.team08.backend.domain.issuedcouponjob.service;
 
-import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
-import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponWriter;
-import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisCallback;
@@ -20,8 +12,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -33,12 +23,7 @@ public class IssuedCouponJobStreamWorker {
     private static final String CONSUMER_NAME = "coupon-issue-worker-1";
 
     private final StringRedisTemplate redisTemplate;
-    private final IssuedCouponJobRepository issuedCouponJobRepository;
-    private final CouponPolicyRepository couponPolicyRepository;
-    private final IssuedCouponWriter issuedCouponWriter;
-    private final IssuedCouponJobWriter issuedCouponJobWriter;
-    private final FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
-    private final Clock clock;
+    private final IssuedCouponJobProcessor issuedCouponJobProcessor;
 
     @PostConstruct
     public void createConsumerGroup() {
@@ -80,24 +65,6 @@ public class IssuedCouponJobStreamWorker {
     private void process(MapRecord<String, Object, Object> record) {
         Map<Object, Object> value = record.getValue();
         Long jobId = Long.valueOf(String.valueOf(value.get("jobId")));
-        Long userId = Long.valueOf(String.valueOf(value.get("userId")));
-        Long policyId = Long.valueOf(String.valueOf(value.get("policyId")));
-
-        try {
-            IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
-                    .orElseThrow();
-            if (!job.isRequested()) {
-                return;
-            }
-
-            CouponPolicy policy = couponPolicyRepository.findById(policyId)
-                    .orElseThrow(CouponPolicyNotFoundException::new);
-            IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, userId, LocalDateTime.now(clock));
-            issuedCouponWriter.saveWithConcurrencyProtection(issuedCoupon);
-            issuedCouponJobWriter.markIssued(jobId, LocalDateTime.now(clock));
-        } catch (RuntimeException e) {
-            issuedCouponJobWriter.markFailed(jobId, e.getClass().getSimpleName(), LocalDateTime.now(clock));
-            fcfsCouponRedisIssuer.rollback(userId, policyId);
-        }
+        issuedCouponJobProcessor.process(jobId);
     }
 }

@@ -37,6 +37,16 @@ public class IssuedCouponController {
         return issuedCouponService.downloadCoupon(loginUserPrincipal.user().id(), policyId);
     }
 
+    // [사용자] 선착순 쿠폰 발급 작업 즉시 반영 /api/coupons/jobs/{jobId}/complete
+    @PostMapping("/jobs/{jobId}/complete")
+    @Operation(summary = "선착순 쿠폰 발급 작업 즉시 반영", description = "비동기 발급 작업이 아직 반영되지 않은 경우 즉시 DB 저장을 시도합니다.")
+    public CouponDownloadResponse completeCouponIssueJob(
+            @Parameter(description = "발급 작업 ID")
+            @PathVariable Long jobId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        return issuedCouponService.completeCouponIssueJob(loginUserPrincipal.user().id(), jobId);
+    }
+
     // [사용자] 내 쿠폰 목록 조회 /api/coupons/me
     @GetMapping("/me")
     @Operation(summary = "내 쿠폰 목록 조회", description = "현재 로그인한 사용자가 보유한 모든 쿠폰 목록을 조회합니다.")

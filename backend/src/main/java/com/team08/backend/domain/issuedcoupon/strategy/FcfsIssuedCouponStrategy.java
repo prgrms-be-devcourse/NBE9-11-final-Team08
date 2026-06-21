@@ -50,9 +50,4 @@ public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
         fcfsCouponRedisIssuer.issue(userId, policy);
     }
 
-    // 선착순 쿠폰 발급 실패 보상
-    @Override
-    public void rollbackIssue(Long userId, Long policyId) {
-        fcfsCouponRedisIssuer.rollback(userId, policyId);
-    }
 }

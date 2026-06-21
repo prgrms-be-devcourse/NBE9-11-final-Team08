@@ -12,6 +12,8 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobProcessor;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -57,6 +59,12 @@ class IssuedCouponServiceTest {
     private IssuedCouponWriter issuedCouponWriter;
 
     @Mock
+    private IssuedCouponJobRepository issuedCouponJobRepository;
+
+    @Mock
+    private IssuedCouponJobProcessor issuedCouponJobProcessor;
+
+    @Mock
     private IssuedCouponJobWriter issuedCouponJobWriter;
 
     @Mock
@@ -74,6 +82,8 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
+                issuedCouponJobRepository,
+                issuedCouponJobProcessor,
                 issuedCouponJobWriter,
                 issuedCouponJobStreamPublisher,
                 clock
@@ -112,8 +122,8 @@ class IssuedCouponServiceTest {
     }
 
     @Test
-    @DisplayName("실패: 선착순 쿠폰 Stream 적재 실패 시 전략의 발급 보상을 실행한다")
-    void downloadFcfsCoupon_fail_rollback() {
+    @DisplayName("성공: 선착순 쿠폰 Stream 적재 실패 시 재시도 상태로 남기고 요청 응답을 반환한다")
+    void downloadFcfsCoupon_streamPublishFail_retrying() {
         // given
         Long userId = 1L;
         Long policyId = 1L;
@@ -130,13 +140,12 @@ class IssuedCouponServiceTest {
         when(issuedCouponJobStreamPublisher.publish(1L, userId, policyId))
                 .thenThrow(new DataIntegrityViolationException("stream"));
 
-        // when & then
-        org.assertj.core.api.Assertions.assertThatThrownBy(
-                        () -> issuedCouponService.downloadCoupon(userId, policyId)
-                )
-                .isInstanceOf(DataIntegrityViolationException.class);
-        verify(issuedCouponJobWriter).markFailed(any(), any(), any());
-        verify(strategy).rollbackIssue(userId, policyId);
+        // when
+        CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
+
+        // then
+        assertThat(response).isNotNull();
+        verify(issuedCouponJobWriter).markRetrying(any(), any(), any());
     }
 
     @Test

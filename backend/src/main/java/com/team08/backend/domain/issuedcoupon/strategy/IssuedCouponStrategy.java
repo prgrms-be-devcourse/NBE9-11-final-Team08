@@ -9,8 +9,4 @@ public interface IssuedCouponStrategy {
 
     // 쿠폰 발급 로직 실행
     IssuedCoupon issue(Long userId, Long policyId);
-
-    // 쿠폰 발급 실패 보상
-    default void rollbackIssue(Long userId, Long policyId) {
-    }
 }

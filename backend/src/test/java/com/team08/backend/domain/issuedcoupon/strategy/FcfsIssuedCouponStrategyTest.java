@@ -96,17 +96,4 @@ class FcfsIssuedCouponStrategyTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_EXHAUSTED);
     }
 
-    @Test
-    @DisplayName("성공: 선착순 쿠폰 발급 실패 보상 시 Redis 발급 정보를 롤백한다")
-    void rollbackIssue_success() {
-        // given
-        Long userId = 1L;
-        Long policyId = 1L;
-
-        // when
-        fcfsIssuedCouponStrategy.rollbackIssue(userId, policyId);
-
-        // then
-        verify(fcfsCouponRedisIssuer).rollback(userId, policyId);
-    }
 }
