@@ -4,6 +4,7 @@ import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.issued-coupon-job.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class IssuedCouponJobRetryScheduler {
 
     private final IssuedCouponJobRepository issuedCouponJobRepository;

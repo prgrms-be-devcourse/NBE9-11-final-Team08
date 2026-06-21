@@ -125,7 +125,6 @@ public class IssuedCouponService {
     }
 
     // [사용자] 선착순 쿠폰 발급 작업 즉시 반영
-    @Transactional
     public CouponDownloadResponse completeCouponIssueJob(Long userId, Long jobId) {
         IssuedCouponJob job = issuedCouponJobRepository.findByIdAndUserId(jobId, userId)
                 .orElseThrow(CouponNotFoundException::new);

@@ -4,14 +4,15 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
-import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
+import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobProcessor;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
@@ -70,7 +71,7 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
 
-    private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
+    private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
 
@@ -227,5 +228,38 @@ class IssuedCouponServiceTest {
         assertThat(discountAmount).isEqualTo(1000);
         verify(issuedCoupon).validateUsable(userId, now);
         verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE, now);
+    }
+
+    @Test
+    @DisplayName("성공: 발급 작업 즉시 반영 시 처리 가능한 Job이면 DB 저장을 시도하고 발급 완료 응답을 반환한다")
+    void completeCouponIssueJob_processable_success() {
+        // given
+        Long userId = 1L;
+        Long jobId = 10L;
+        Long policyId = 100L;
+        IssuedCouponJob job = mock(IssuedCouponJob.class);
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+
+        when(issuedCouponJobRepository.findByIdAndUserId(jobId, userId))
+                .thenReturn(Optional.of(job))
+                .thenReturn(Optional.of(job));
+        when(job.isProcessable()).thenReturn(true);
+        when(job.getPolicyId()).thenReturn(policyId);
+        when(job.getId()).thenReturn(jobId);
+        when(issuedCouponRepository.findByUserIdAndPolicyId(userId, policyId)).thenReturn(Optional.of(issuedCoupon));
+        when(issuedCoupon.getId()).thenReturn(1L);
+        when(issuedCoupon.getPolicyId()).thenReturn(policyId);
+        when(issuedCoupon.getUserId()).thenReturn(userId);
+        when(issuedCoupon.getStatus()).thenReturn(com.team08.backend.domain.issuedcoupon.entity.CouponStatus.ISSUED);
+        when(issuedCoupon.getIssuedAt()).thenReturn(LocalDateTime.now(clock));
+        when(issuedCoupon.getExpiredAt()).thenReturn(LocalDateTime.now(clock).plusDays(7));
+
+        // when
+        CouponDownloadResponse response = issuedCouponService.completeCouponIssueJob(userId, jobId);
+
+        // then
+        assertThat(response.jobStatus()).isEqualTo(IssuedCouponJobStatus.ISSUED);
+        assertThat(response.issuedCouponId()).isEqualTo(1L);
+        verify(issuedCouponJobProcessor).process(jobId);
     }
 }
