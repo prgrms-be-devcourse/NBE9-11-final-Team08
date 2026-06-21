@@ -20,6 +20,7 @@ class PaymentTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
         assertThat(payment.getAmount()).isEqualTo(30_000);
         assertThat(payment.getCreatedAt()).isEqualTo(requestedAt);
+        assertThat(payment.getUpdatedAt()).isEqualTo(requestedAt);
     }
 
     @Test

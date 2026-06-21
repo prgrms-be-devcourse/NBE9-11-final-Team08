@@ -89,7 +89,7 @@ public class Payment {
                 null,
                 null,
                 requestedAt,
-                null
+                requestedAt
         );
     }
 

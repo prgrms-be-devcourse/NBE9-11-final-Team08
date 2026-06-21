@@ -1,5 +1,5 @@
 ALTER TABLE payments
-    ADD COLUMN provider ENUM ('MOCK', 'MOCK_PRIMARY', 'MOCK_SECONDARY', 'TOSS') NOT NULL DEFAULT 'MOCK',
+    ADD COLUMN provider ENUM ('MOCK', 'TOSS', 'NICEPAY', 'KCP') NOT NULL DEFAULT 'MOCK',
     ADD COLUMN idempotency_key VARCHAR(255),
     ADD COLUMN failure_code VARCHAR(255),
     ADD COLUMN failure_message VARCHAR(255);
@@ -7,7 +7,7 @@ ALTER TABLE payments
 CREATE TABLE payment_attempts (
     id BIGINT NOT NULL AUTO_INCREMENT,
     payment_id BIGINT NOT NULL,
-    provider ENUM ('MOCK', 'MOCK_PRIMARY', 'MOCK_SECONDARY', 'TOSS') NOT NULL,
+    provider ENUM ('MOCK', 'TOSS', 'NICEPAY', 'KCP') NOT NULL,
     status ENUM ('REQUESTED', 'SUCCESS', 'FAILED') NOT NULL,
     amount INT NOT NULL,
     payment_key VARCHAR(255),

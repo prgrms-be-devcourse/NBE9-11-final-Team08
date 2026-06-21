@@ -16,14 +16,14 @@ class PaymentAttemptTest {
         LocalDateTime completedAt = requestedAt.plusSeconds(3);
         PaymentAttempt attempt = PaymentAttempt.requested(
                 payment(),
-                PaymentProviderType.MOCK_PRIMARY,
+                PaymentProviderType.TOSS,
                 30_000,
                 requestedAt
         );
 
         attempt.succeed("payment-key", completedAt);
 
-        assertThat(attempt.getProvider()).isEqualTo(PaymentProviderType.MOCK_PRIMARY);
+        assertThat(attempt.getProvider()).isEqualTo(PaymentProviderType.TOSS);
         assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
         assertThat(attempt.getAmount()).isEqualTo(30_000);
         assertThat(attempt.getPaymentKey()).isEqualTo("payment-key");
@@ -41,15 +41,15 @@ class PaymentAttemptTest {
         LocalDateTime completedAt = requestedAt.plusSeconds(3);
         PaymentAttempt attempt = PaymentAttempt.requested(
                 payment(),
-                PaymentProviderType.MOCK_SECONDARY,
+                PaymentProviderType.NICEPAY,
                 30_000,
                 requestedAt
         );
 
-        attempt.fail("MOCK_ERROR", "승인 실패", completedAt);
+        attempt.fail("NICEPAY_ERROR", "승인 실패", completedAt);
 
         assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.FAILED);
-        assertThat(attempt.getFailureCode()).isEqualTo("MOCK_ERROR");
+        assertThat(attempt.getFailureCode()).isEqualTo("NICEPAY_ERROR");
         assertThat(attempt.getFailureMessage()).isEqualTo("승인 실패");
         assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
         assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
