@@ -1,10 +1,12 @@
 package com.team08.backend.domain.course.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.chapter.dto.ChapterInfoResponse;
 import com.team08.backend.domain.course.dto.*;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
+import com.team08.backend.domain.lecture.dto.LectureInfoResponse;
 import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

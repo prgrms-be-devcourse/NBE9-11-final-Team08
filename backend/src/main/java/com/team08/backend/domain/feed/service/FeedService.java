@@ -39,8 +39,7 @@ public class FeedService {
             int size
     ) {
         // TODO: 수강권도 확인이 필요하고 스터디 쪽도 마찬가지, 추후 StudyAccessValidator 와 같은 통합 검증으로 변경 예정
-        validateActiveStudy(studyId);
-        validateActiveStudyMember(studyId, userId);
+        validateFeedAccess(studyId, userId);
         validateCursor(cursorOccurredAt, cursorId);
 
         int normalizedSize = normalizeSize(size);
@@ -66,6 +65,11 @@ public class FeedService {
                 .toList();
 
         return new FeedCursorResponse(responses, nextCursor, hasNext);
+    }
+
+    public void validateFeedAccess(Long studyId, Long userId) {
+        validateActiveStudy(studyId);
+        validateActiveStudyMember(studyId, userId);
     }
 
     private void validateActiveStudy(Long studyId) {

@@ -86,6 +86,7 @@ Enum learning_event_type {
   VIDEO_START
   VIDEO_END
   POSITION_SAVE
+  LECTURE_EXIT
   LECTURE_COMPLETE
 }
 Enum enrollment_status {
@@ -215,13 +216,24 @@ Table lecture_progresses {
   user_id bigint [not null]
   last_position_seconds int [not null, default: 0]
   watched_seconds int [not null, default: 0]
-  progress_rate decimal(5,2)
+  progress_rate int [not null, default: 0]   // watchedSeconds/duration 기준 0~100 정수 퍼센트
   completed boolean [not null, default: false]
   completed_at datetime
   created_at datetime [not null]
   updated_at datetime [not null]
   indexes {
     (user_id, lecture_id) [unique]
+  }
+}
+Table last_watched_lectures {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  course_id bigint [not null]
+  lecture_id bigint [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    (user_id, course_id) [unique]   // uk_last_watched_user_course
   }
 }
 Table lecture_reflections {
@@ -476,6 +488,12 @@ Table study_reports {
   total_watch_time int
   total_qna_count int
   progress_rate decimal(5,2)
+  study_days int
+  top_lectures text         // JSON: [{lectureId, title, watchTimeSeconds}]
+  daily_progress text       // JSON: [{date, progressRate}]
+  daily_activity_map text   // JSON: {"2026-06-07": 3, ...}
+  created_at datetime [not null]
+  updated_at datetime [not null]   // 재집계 쿨다운(1시간) 판정 기준
 }
 // =====================================
 // RELATIONS
@@ -495,6 +513,9 @@ Ref: enrollments.user_id > users.id
 Ref: enrollments.course_id > courses.id
 Ref: lecture_progresses.lecture_id > lectures.id
 Ref: lecture_progresses.user_id > users.id
+Ref: last_watched_lectures.user_id > users.id
+Ref: last_watched_lectures.course_id > courses.id
+Ref: last_watched_lectures.lecture_id > lectures.id
 Ref: lecture_reflections.lecture_id > lectures.id
 Ref: lecture_reflections.user_id > users.id
 Ref: qna_questions.lecture_id > lectures.id

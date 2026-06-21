@@ -32,8 +32,7 @@ public class QnaAnswerService {
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         //TODO: 답변자가 강사이고 다른 강의에 답변을 남겨버리는 상황 추가 점검
-        // course<-chapter<-lecture<-Question<-Answer
-        // answer에서 course.instructor를 참조하려면 쿼리를 여러번 타야하는 상황 개선
+        // course<-chapter<-lecture<-Question<-Answer // 단건조회라 그렇게 비싸지 않은 작업일지도
 
         //요청자=강사 인지 검사
         if (!course.getInstructorId().equals(requesterId)) {

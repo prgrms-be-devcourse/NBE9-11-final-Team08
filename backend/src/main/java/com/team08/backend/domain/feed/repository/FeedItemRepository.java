@@ -1,6 +1,7 @@
 package com.team08.backend.domain.feed.repository;
 
 import com.team08.backend.domain.feed.entity.FeedItem;
+import com.team08.backend.domain.feed.entity.FeedItemType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -8,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface FeedItemRepository extends JpaRepository<FeedItem, Long> {
 
@@ -29,4 +31,6 @@ public interface FeedItemRepository extends JpaRepository<FeedItem, Long> {
             @Param("cursorId") Long cursorId,
             Pageable pageable
     );
+
+    Optional<FeedItem> findByTypeAndSourceId(FeedItemType type, Long sourceId);
 }

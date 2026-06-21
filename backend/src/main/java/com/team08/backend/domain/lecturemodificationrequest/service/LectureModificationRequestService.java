@@ -2,7 +2,7 @@ package com.team08.backend.domain.lecturemodificationrequest.service;
 
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.course.service.MediaEncodingService;
+import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.lecturemodificationrequest.dto.LectureModificationRequestCreateDto;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;

@@ -21,6 +21,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,7 +35,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
@@ -92,10 +96,11 @@ class OrderServiceTest {
 
         given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID + 1, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID, COURSE_ID + 1)
+        )).willReturn(List.of());
         stubOrderSave();
 
         OrderDetailResponse response = orderService.createOrderFromCart(USER_ID);
@@ -110,6 +115,8 @@ class OrderServiceTest {
         assertThat(response.items()).extracting("courseTitle").containsExactly("Spring", "JPA");
         assertThat(response.items()).extracting("price").containsExactly(30_000, 20_000);
         assertThat(cart.getItems()).isEmpty();
+        verify(enrollmentRepository, never())
+                .existsByUserIdAndCourseIdAndStatus(any(), any(), any());
     }
 
     @Test
@@ -146,8 +153,11 @@ class OrderServiceTest {
 
         given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(course));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(true);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of(COURSE_ID));
 
         assertThatThrownBy(() -> orderService.createOrderFromCart(USER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -161,8 +171,11 @@ class OrderServiceTest {
         Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
         stubOrderSave();
 
         OrderDetailResponse response = orderService.createDirectOrder(USER_ID, COURSE_ID);
@@ -178,6 +191,34 @@ class OrderServiceTest {
                     assertThat(item.courseTitle()).isEqualTo("Spring");
                     assertThat(item.price()).isEqualTo(30_000);
                 });
+    }
+
+    @Test
+    void cartOrderChecksActiveEnrollmentsWithSingleCourseIdLookup() {
+        Cart cart = cart(CART_ID, USER_ID, COURSE_ID, COURSE_ID + 1);
+        Course firstCourse = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Course secondCourse = course(COURSE_ID + 1, "JPA", 20_000, CourseStatus.ON_SALE);
+
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
+        given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID, COURSE_ID + 1)
+        )).willReturn(List.of());
+        stubOrderSave();
+
+        orderService.createOrderFromCart(USER_ID);
+
+        ArgumentCaptor<List<Long>> courseIdsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(enrollmentRepository).findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                eq(USER_ID),
+                eq(EnrollmentStatus.ACTIVE),
+                courseIdsCaptor.capture()
+        );
+        assertThat(courseIdsCaptor.getValue()).containsExactly(COURSE_ID, COURSE_ID + 1);
+        verify(enrollmentRepository, never())
+                .existsByUserIdAndCourseIdAndStatus(any(), any(), any());
     }
 
     @Test

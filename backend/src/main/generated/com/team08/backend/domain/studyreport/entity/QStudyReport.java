@@ -19,6 +19,11 @@ public class QStudyReport extends EntityPathBase<StudyReport> {
 
     public static final QStudyReport studyReport = new QStudyReport("studyReport");
 
+    public final com.team08.backend.global.common.QBaseTimeEntity _super = new com.team08.backend.global.common.QBaseTimeEntity(this);
+
+    //inherited
+    public final DateTimePath<java.time.LocalDateTime> createdAt = _super.createdAt;
+
     public final StringPath dailyActivityMap = createString("dailyActivityMap");
 
     public final StringPath dailyProgress = createString("dailyProgress");
@@ -36,6 +41,9 @@ public class QStudyReport extends EntityPathBase<StudyReport> {
     public final NumberPath<Integer> totalQnaCount = createNumber("totalQnaCount", Integer.class);
 
     public final NumberPath<Integer> totalWatchTime = createNumber("totalWatchTime", Integer.class);
+
+    //inherited
+    public final DateTimePath<java.time.LocalDateTime> updatedAt = _super.updatedAt;
 
     public final NumberPath<Long> userId = createNumber("userId", Long.class);
 

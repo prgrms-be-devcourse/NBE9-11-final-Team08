@@ -53,6 +53,9 @@ app:
       enabled: false
     stream-worker:
       enabled: false
+  feed:
+    outbox:
+      scheduler-enabled: false
   ai:
     model: stub
     prompt-version: v1

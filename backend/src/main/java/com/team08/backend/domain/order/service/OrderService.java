@@ -104,7 +104,8 @@ public class OrderService {
     }
 
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
-        courses.forEach(course -> validateOrderableCourse(userId, course));
+        courses.forEach(this::validateOrderableCourse);
+        validateNotAlreadyEnrolled(userId, courses);
 
         LocalDateTime orderedAt = LocalDateTime.now(clock);
         Order order = Order.createPendingPayment(
@@ -139,13 +140,25 @@ public class OrderService {
         return course;
     }
 
-    private void validateOrderableCourse(Long userId, Course course) {
+    private void validateOrderableCourse(Course course) {
         // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증한다.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
+    }
 
-        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, course.getId(), EnrollmentStatus.ACTIVE)) {
+    private void validateNotAlreadyEnrolled(Long userId, List<Course> courses) {
+        List<Long> courseIds = courses.stream()
+                .map(Course::getId)
+                .distinct()
+                .toList();
+
+        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                userId,
+                EnrollmentStatus.ACTIVE,
+                courseIds
+        );
+        if (!activeCourseIds.isEmpty()) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
     }

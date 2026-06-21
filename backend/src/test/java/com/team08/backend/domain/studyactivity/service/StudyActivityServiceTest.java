@@ -1,6 +1,7 @@
 package com.team08.backend.domain.studyactivity.service;
 
 import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
+import com.team08.backend.domain.feed.outbox.FeedOutboxService;
 import com.team08.backend.domain.fixture.UserFixture;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
@@ -8,7 +9,6 @@ import com.team08.backend.domain.study.fixture.StudyFixture;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
-import com.team08.backend.domain.studyactivity.event.StudyActivityCreatedEvent;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
@@ -21,7 +21,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -51,7 +50,7 @@ class StudyActivityServiceTest {
     private AiFeedbackInvalidator aiFeedbackInvalidator;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private FeedOutboxService feedOutboxService;
 
     @InjectMocks
     private StudyActivityService studyActivityService;
@@ -652,7 +651,7 @@ class StudyActivityServiceTest {
     }
 
     @Test
-    void createActivity_성공하면_StudyActivityCreatedEvent를_발행한다() {
+    void createActivity_성공하면_feed_outbox를_저장한다() {
         // given
         Study study = StudyFixture.activeStudy();
         User user = UserFixture.builder().build();
@@ -673,17 +672,7 @@ class StudyActivityServiceTest {
         studyActivityService.createActivity(studyId, userId, activity.getContent());
 
         // then
-        ArgumentCaptor<StudyActivityCreatedEvent> captor =
-                ArgumentCaptor.forClass(StudyActivityCreatedEvent.class);
-
-        verify(eventPublisher).publishEvent(captor.capture());
-
-        StudyActivityCreatedEvent event = captor.getValue();
-
-        assertThat(event.studyActivityId()).isEqualTo(activity.getId());
-        assertThat(event.studyId()).isEqualTo(studyId);
-        assertThat(event.authorId()).isEqualTo(userId);
-        assertThat(event.content()).isEqualTo(activity.getContent());
+        verify(feedOutboxService).createStudyActivityCreatedEvent(activity);
     }
 
     private void assertInactiveStudyCannotCreate(Study study) {

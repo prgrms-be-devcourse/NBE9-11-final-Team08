@@ -46,7 +46,8 @@ class StudyReportControllerTest {
                 studyId, 3600, 5, BigDecimal.valueOf(66.67), 10,
                 List.of(new TopLectureEntry(1L, "Spring Core", 1800)),
                 List.of(new DailyProgressEntry(LocalDate.of(2026, 6, 7), BigDecimal.valueOf(33.33))),
-                Map.of("2026-06-07", 3));
+                Map.of("2026-06-07", 3),
+                null);
 
         given(studyReportService.generateReport(userId, studyId)).willReturn(response);
 
@@ -84,7 +85,8 @@ class StudyReportControllerTest {
                 studyId, 5000, 4, BigDecimal.valueOf(75.00), 15,
                 List.of(new TopLectureEntry(2L, "JPA 기초", 2400)),
                 List.of(new DailyProgressEntry(LocalDate.of(2026, 6, 10), BigDecimal.valueOf(75.00))),
-                Map.of("2026-06-10", 5));
+                Map.of("2026-06-10", 5),
+                null);
 
         given(studyReportService.getReport(userId, studyId)).willReturn(response);
 
