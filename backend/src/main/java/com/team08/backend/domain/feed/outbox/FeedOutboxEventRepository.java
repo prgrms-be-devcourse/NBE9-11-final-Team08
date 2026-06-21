@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface FeedOutboxEventRepository extends JpaRepository<FeedOutboxEvent, Long> {
 
-    List<FeedOutboxEvent> findByStatusOrderByIdAsc(FeedOutboxEventStatus status, Pageable pageable);
+    List<FeedOutboxEvent> findByStatusInOrderByIdAsc(List<FeedOutboxEventStatus> statuses, Pageable pageable);
 
     List<FeedOutboxEvent> findByStudyIdAndStatusAndIdGreaterThanOrderByIdAsc(
             Long studyId,

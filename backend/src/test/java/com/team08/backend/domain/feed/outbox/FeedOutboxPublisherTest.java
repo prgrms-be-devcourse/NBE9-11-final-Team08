@@ -1,6 +1,7 @@
 package com.team08.backend.domain.feed.outbox;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.feed.dto.response.FeedItemResponse;
 import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
@@ -28,6 +29,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,8 +95,8 @@ class FeedOutboxPublisherTest {
         User user = User.createUser("user@test.com", "password", "테스터", null);
         ReflectionTestUtils.setField(user, "id", authorId);
 
-        given(feedOutboxEventRepository.findByStatusOrderByIdAsc(
-                FeedOutboxEventStatus.PENDING,
+        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
+                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
                 PageRequest.of(0, 100)
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
@@ -130,6 +132,55 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
         assertThat(objectMapper.writeValueAsString(sourceEvent)).doesNotContain("긴 활동 내용");
 
+        verify(feedSseEmitterRegistry).send(outboxEvent);
+    }
+
+    @Test
+    void failed_outbox도_재시도하고_이미_feedItem_payload면_다시_생성하지_않는다() throws Exception {
+        Long studyId = 1L;
+        Long activityId = 10L;
+        Long feedItemId = 200L;
+        Long authorId = 3L;
+        LocalDateTime occurredAt = LocalDateTime.of(2026, 6, 21, 13, 0);
+
+        FeedItem feedItem = FeedItem.createStudyActivity(
+                studyId,
+                authorId,
+                activityId,
+                "요약된 활동 내용",
+                occurredAt
+        );
+        ReflectionTestUtils.setField(feedItem, "id", feedItemId);
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                studyId,
+                activityId,
+                objectMapper.writeValueAsString(new FeedItemResponse(
+                        feedItemId,
+                        studyId,
+                        authorId,
+                        "테스터",
+                        FeedItemType.STUDY_ACTIVITY,
+                        activityId,
+                        "요약된 활동 내용",
+                        occurredAt
+                ))
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+        outboxEvent.markPublished(feedItemId, outboxEvent.getPayload(), occurredAt);
+        outboxEvent.markFailed("temporary failure");
+
+        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
+                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
+                PageRequest.of(0, 100)
+        )).willReturn(List.of(outboxEvent));
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.PUBLISHED);
+        assertThat(outboxEvent.getPublishedAt()).isEqualTo(LocalDateTime.now(clock));
+        assertThat(outboxEvent.getLastError()).isNull();
+        verify(feedItemRepository, never()).save(org.mockito.ArgumentMatchers.any(FeedItem.class));
+        verify(studyActivityRepository, never()).findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId);
         verify(feedSseEmitterRegistry).send(outboxEvent);
     }
 }

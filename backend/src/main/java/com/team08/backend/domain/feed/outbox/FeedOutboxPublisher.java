@@ -27,6 +27,10 @@ import java.util.List;
 public class FeedOutboxPublisher {
 
     private static final int PUBLISH_BATCH_SIZE = 100;
+    private static final List<FeedOutboxEventStatus> RETRYABLE_STATUSES = List.of(
+            FeedOutboxEventStatus.PENDING,
+            FeedOutboxEventStatus.FAILED
+    );
 
     private final FeedOutboxEventRepository feedOutboxEventRepository;
     private final FeedItemRepository feedItemRepository;
@@ -39,8 +43,8 @@ public class FeedOutboxPublisher {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void publishPending() {
-        List<FeedOutboxEvent> events = feedOutboxEventRepository.findByStatusOrderByIdAsc(
-                FeedOutboxEventStatus.PENDING,
+        List<FeedOutboxEvent> events = feedOutboxEventRepository.findByStatusInOrderByIdAsc(
+                RETRYABLE_STATUSES,
                 PageRequest.of(0, PUBLISH_BATCH_SIZE)
         );
 
@@ -59,6 +63,11 @@ public class FeedOutboxPublisher {
     }
 
     private void prepareFeedItemCreatedPayload(FeedOutboxEvent event) {
+        if (event.getFeedItemId() != null) {
+            event.markPublished(LocalDateTime.now(clock));
+            return;
+        }
+
         if (!FeedOutboxEvent.STUDY_ACTIVITY_CREATED_EVENT.equals(event.getEventType())) {
             return;
         }

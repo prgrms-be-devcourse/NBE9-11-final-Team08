@@ -79,6 +79,12 @@ public class FeedOutboxEvent extends BaseTimeEntity {
         this.lastError = null;
     }
 
+    public void markPublished(LocalDateTime publishedAt) {
+        this.status = FeedOutboxEventStatus.PUBLISHED;
+        this.publishedAt = publishedAt;
+        this.lastError = null;
+    }
+
     public String sseEventName() {
         if (feedItemId != null) {
             return FEED_ITEM_CREATED_EVENT;
