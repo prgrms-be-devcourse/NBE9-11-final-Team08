@@ -15,13 +15,14 @@ public class LastWatchedLectureService {
 
     private final LastWatchedLectureRepository lastWatchedLectureRepository;
 
+    //최근 시청내역 갱신
     @Transactional
     public void record(Long userId, Long courseId, Long lectureId) {
         lastWatchedLectureRepository.findByUserIdAndCourseId(userId, courseId)
                 .ifPresentOrElse(
-                        entry -> entry.changeLecture(lectureId),
+                        entry -> entry.changeLecture(lectureId),    //이전내역있으면 갱신
                         () -> lastWatchedLectureRepository.save(
-                                LastWatchedLecture.of(userId, courseId, lectureId))
+                                LastWatchedLecture.of(userId, courseId, lectureId))     //없으면 생성
                 );
     }
 

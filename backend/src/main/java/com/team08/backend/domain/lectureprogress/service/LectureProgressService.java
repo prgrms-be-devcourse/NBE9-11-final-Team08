@@ -35,6 +35,7 @@ public class LectureProgressService {
 
     @Transactional
     public LectureProgress ensureStarted(Long userId, Lecture lecture, LocalDateTime now) {
+        // 무료 맛보기이거나 활성 수강권이 있을 때만 진행 행을 만든다.
         LectureProgress existing = lectureProgressRepository
                 .findByUserIdAndLectureId(userId, lecture.getId())
                 .orElse(null);
@@ -42,7 +43,6 @@ public class LectureProgressService {
             return existing;
         }
 
-        // 무료 맛보기이거나 활성 수강권이 있을 때만 진행 행을 만든다. 그 외에는 가짜 행을 만들지 않고
         // null 을 반환한다(입장 자체는 막지 않음 — 메타데이터는 제공).
         if (!canStartProgress(userId, lecture)) {
             return null;
@@ -79,12 +79,12 @@ public class LectureProgressService {
         return lectureProgressRepository.save(progress);
     }
 
-
-    // TODO: 무료 맛보기 강의 허용 여부 결정및 수정
     private boolean canStartProgress(Long userId, Lecture lecture) {
+        //맛보기 강의인지 검사
         if (lecture.isFreePreview()) {
             return true;
         }
+        //수강권 확인
         Long courseId = lecture.getChapter().getCourse().getId();
         return enrollmentQueryService.hasActiveEnrollment(userId, courseId);
     }

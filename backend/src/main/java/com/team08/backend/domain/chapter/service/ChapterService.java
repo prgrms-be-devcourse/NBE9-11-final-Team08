@@ -2,7 +2,6 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
@@ -58,25 +57,19 @@ public class ChapterService {
     }
 
     // TODO: (멘토님:강은혜) JPA 메소드가 병목 포인트,따로 벌크 처리같은게 필요함. 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
-    //  반영 후 : 백필로 repository 순회 및 정렬 중단
+    //반영 전 : 일일이 테이블 순회 및 정렬
+    //반영 후 : 백필로 repository 순회 및 정렬 중단
 
     //강좌 내 가장 최근 수강강의 조회
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
         enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
 
-        // 1) 강좌별 마지막 시청 강의를 사전 계산해 둔 조회용 테이블(last_watched_lectures)에서 단건으로 가져온다.
-        //    강의 입장 시 갱신되므로, 한 번이라도 강좌를 시청한 적이 있으면 여기서 끝난다(강좌 강의 수와 무관).
         return lastWatchedLectureService
                 .findLectureId(userId, courseId)
                 .map(lectureId -> buildResponse(userId, lectureId))
-                // 2) 조회용 테이블에 아직 행이 없는 과거 데이터는 진행도 집계로 폴백한다.
                 .orElseGet(() -> getLastWatchedByProgress(courseId, userId));
     }
-
-
-    // TODO: (멘토님:강은혜) JPA 메소드가 병목 포인트,따로 벌크 처리같은게 필요함. 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
-    //  반영 전 : 일일이 테이블 순회 및 정렬
 
     private LectureEnterResponse getLastWatchedByProgress(Long courseId, Long userId) {
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
