@@ -1,8 +1,8 @@
 package com.team08.backend.domain.course.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team08.backend.domain.course.dto.ChapterReorderRequest;
-import com.team08.backend.domain.course.dto.LectureReorderRequest;
+import com.team08.backend.domain.chapter.dto.ChapterReorderRequest;
+import com.team08.backend.domain.lecture.dto.LectureReorderRequest;
 import com.team08.backend.domain.course.service.CurriculumService;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;

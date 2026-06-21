@@ -1,5 +1,6 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.lecture.service.LectureDbService;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

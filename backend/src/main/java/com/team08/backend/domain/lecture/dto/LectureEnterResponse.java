@@ -1,4 +1,4 @@
-package com.team08.backend.domain.chapter.dto;
+package com.team08.backend.domain.lecture.dto;
 
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;

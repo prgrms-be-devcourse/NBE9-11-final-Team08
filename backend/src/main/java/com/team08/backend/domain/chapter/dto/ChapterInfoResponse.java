@@ -1,6 +1,8 @@
-package com.team08.backend.domain.course.dto;
+package com.team08.backend.domain.chapter.dto;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.lecture.dto.LectureInfoResponse;
+
 import java.util.List;
 
 public record ChapterInfoResponse(

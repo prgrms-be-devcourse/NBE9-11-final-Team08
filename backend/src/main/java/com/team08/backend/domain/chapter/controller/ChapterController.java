@@ -2,7 +2,7 @@ package com.team08.backend.domain.chapter.controller;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.service.ChapterService;
 import jakarta.validation.Valid;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;

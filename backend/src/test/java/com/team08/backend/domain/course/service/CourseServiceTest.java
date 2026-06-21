@@ -22,6 +22,7 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;

@@ -2,7 +2,7 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;

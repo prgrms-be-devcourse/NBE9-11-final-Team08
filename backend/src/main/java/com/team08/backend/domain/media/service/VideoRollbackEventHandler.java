@@ -1,5 +1,6 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;

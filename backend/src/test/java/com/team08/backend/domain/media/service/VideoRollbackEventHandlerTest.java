@@ -1,5 +1,6 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.util.S3FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
