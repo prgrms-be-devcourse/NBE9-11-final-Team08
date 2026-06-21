@@ -36,6 +36,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -86,8 +87,11 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
         stubPaymentSave();
         stubEnrollmentSaveAll();
 
@@ -187,8 +191,11 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(true);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of(COURSE_ID));
 
         assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
                 .isInstanceOfSatisfying(CustomException.class,
@@ -209,10 +216,11 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID + 1, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID, COURSE_ID + 1)
+        )).willReturn(List.of());
         stubPaymentSave();
         stubEnrollmentSaveAll();
 
@@ -226,6 +234,8 @@ class PaymentServiceTest {
         assertThat(enrollments).hasSize(2);
         assertThat(enrollments).extracting(Enrollment::getCourseId)
                 .containsExactly(COURSE_ID, COURSE_ID + 1);
+        verify(enrollmentRepository, never())
+                .existsByUserIdAndCourseIdAndStatus(any(), any(), any());
     }
 
     @Test
@@ -261,8 +271,11 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(failedPayment));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
-                .willReturn(false);
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
         stubPaymentSave();
         stubEnrollmentSaveAll();
 
@@ -274,6 +287,36 @@ class PaymentServiceTest {
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
         verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void confirmChecksActiveEnrollmentsWithSingleCourseIdLookup() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem firstItem = orderItem(1L, COURSE_ID, 30_000);
+        OrderItem secondItem = orderItem(2L, COURSE_ID + 1, 20_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID, COURSE_ID + 1)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubEnrollmentSaveAll();
+
+        paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<List<Long>> courseIdsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(enrollmentRepository).findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                eq(USER_ID),
+                eq(EnrollmentStatus.ACTIVE),
+                courseIdsCaptor.capture()
+        );
+        assertThat(courseIdsCaptor.getValue()).containsExactly(COURSE_ID, COURSE_ID + 1);
+        verify(enrollmentRepository, never())
+                .existsByUserIdAndCourseIdAndStatus(any(), any(), any());
     }
 
     @Test
