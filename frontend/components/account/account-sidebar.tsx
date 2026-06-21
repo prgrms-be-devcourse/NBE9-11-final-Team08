@@ -12,6 +12,7 @@ const links = [
   { label: '내 스터디', href: '/mypage' },
   { label: '스터디 리포트', href: '/mypage/report' },
   { label: '주문 내역', href: '/orders' },
+  { label: '내 쿠폰', href: '/mypage/coupons' },
   { label: '작성한 댓글', href: '/mypage/comments' },
   { label: '설정', href: '/mypage/settings' },
 ]
