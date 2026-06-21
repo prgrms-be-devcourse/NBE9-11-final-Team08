@@ -219,6 +219,17 @@ Table lecture_progresses {
     (user_id, lecture_id) [unique]
   }
 }
+Table last_watched_lectures {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  course_id bigint [not null]
+  lecture_id bigint [not null]
+  created_at datetime [not null]
+  updated_at datetime [not null]
+  indexes {
+    (user_id, course_id) [unique]   // uk_last_watched_user_course
+  }
+}
 Table lecture_reflections {
   id bigint [pk, increment]
   lecture_id bigint [not null]
@@ -481,6 +492,9 @@ Ref: enrollments.user_id > users.id
 Ref: enrollments.course_id > courses.id
 Ref: lecture_progresses.lecture_id > lectures.id
 Ref: lecture_progresses.user_id > users.id
+Ref: last_watched_lectures.user_id > users.id
+Ref: last_watched_lectures.course_id > courses.id
+Ref: last_watched_lectures.lecture_id > lectures.id
 Ref: lecture_reflections.lecture_id > lectures.id
 Ref: lecture_reflections.user_id > users.id
 Ref: qna_questions.lecture_id > lectures.id

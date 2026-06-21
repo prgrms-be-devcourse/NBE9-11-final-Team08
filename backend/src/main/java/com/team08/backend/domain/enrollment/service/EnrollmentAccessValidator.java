@@ -13,9 +13,7 @@ public class EnrollmentAccessValidator {
 
     private final EnrollmentQueryService enrollmentQueryService;
 
-    public void validateActiveEnrollment(Long userId, Long courseId) {
-        if (!enrollmentQueryService.hasActiveEnrollment(userId, courseId)) {
-            throw new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED);
-        }
+    public boolean validateActiveEnrollment(Long userId, Long courseId) {
+        return enrollmentQueryService.hasActiveEnrollment(userId, courseId);
     }
 }

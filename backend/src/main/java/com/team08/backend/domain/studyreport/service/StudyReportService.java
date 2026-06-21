@@ -110,7 +110,6 @@ public class StudyReportService {
 
     // ── 집계 헬퍼 ─────────────────────────────────────────────────────────
 
-    // TODO: build~ 함수는 비싼함수이기 때문에 최적화가 시급
     private String buildTopLecturesJson(Long userId, List<Long> lectureIds) {
         if (lectureIds.isEmpty()) return studyReportJson.write(List.of());
 
@@ -135,6 +134,7 @@ public class StudyReportService {
         return studyReportJson.write(result);
     }
 
+    // TODO: 이 아래 함수들은 비싼함수이기 때문에 최적화가 시급
     private String buildDailyProgressJson(Long userId, Long courseId, int totalLectureCount) {
         if (totalLectureCount == 0) return studyReportJson.write(List.of());
 
