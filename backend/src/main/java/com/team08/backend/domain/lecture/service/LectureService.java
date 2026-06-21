@@ -6,6 +6,7 @@ import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
@@ -25,6 +26,7 @@ public class LectureService {
     private final LectureRepository lectureRepository;
     private final ChapterRepository chapterRepository;
     private final LectureProgressService lectureProgressService;
+    private final LastWatchedLectureService lastWatchedLectureService;
     private final EnrollmentAccessValidator enrollmentAccessValidator;
     /**
      * 특정 강의 러닝 스페이스 입장 — 강의 메타데이터 + 학습 진행 정보를 반환한다.
@@ -36,9 +38,16 @@ public class LectureService {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
-        enrollmentAccessValidator.validateActiveEnrollment(userId, lecture.getChapter().getCourse().getId());
+        Long courseId = lecture.getChapter().getCourse().getId();
+
+        //수강권 검사
+        enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
 
         LectureProgress progress = lectureProgressService.ensureStarted(userId, lecture, LocalDateTime.now());
+
+        // 강좌별 "마지막 시청 강의" 캐시 갱신 — 이후 조회를 단건 조회로 끝내기 위함
+        lastWatchedLectureService.record(userId, courseId, lecture.getId());
+
         return LectureEnterResponse.of(lecture, progress);
     }
 

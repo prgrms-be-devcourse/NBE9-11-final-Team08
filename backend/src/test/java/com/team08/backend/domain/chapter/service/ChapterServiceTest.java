@@ -11,6 +11,7 @@ import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -52,6 +53,8 @@ class ChapterServiceTest {
     private LectureRepository lectureRepository;
     @Mock
     private LectureProgressRepository lectureProgressRepository;
+    @Mock
+    private LastWatchedLectureService lastWatchedLectureService;
     @Mock
     private LectureService lectureService;
     @Mock
@@ -130,8 +133,31 @@ class ChapterServiceTest {
     // ── 강좌 내 최근 수강 강의 조회 ─────────────────────────────────────────
 
     @Test
-    @DisplayName("최근 수강 강의 조회 성공")
-    void getLastWatchedLecture_success() {
+    @DisplayName("최근 수강 강의 조회 성공 - last_watched 행 존재 (단건 조회)")
+    void getLastWatchedLecture_fromLastWatchedTable() {
+        Long courseId = 1L;
+        Long userId = 1L;
+        Long lectureId = 100L;
+
+        given(lastWatchedLectureService.findLectureId(userId, courseId))
+                .willReturn(Optional.of(lectureId));
+
+        Lecture lecture = mockLecture(lectureId, 10L, "강의1", 1);
+        LectureProgress progress = mockProgress(userId, lectureId, 300, false);
+        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId))
+                .willReturn(Optional.of(progress));
+
+        LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.lectureId()).isEqualTo(lectureId);
+        assertThat(response.progress().lastPositionSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    @DisplayName("최근 수강 강의 조회 성공 - last_watched 행이 없으면 진행도 집계로 폴백")
+    void getLastWatchedLecture_fallbackToProgress() {
         Long courseId = 1L;
         Long userId = 1L;
         Long lectureId = 100L;
@@ -139,6 +165,7 @@ class ChapterServiceTest {
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(List.of(lectureId));
 
         LectureProgress progress = mockProgress(userId, lectureId, 300, false);
+        given(progress.getLectureId()).willReturn(lectureId);
         given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, List.of(lectureId)))
                 .willReturn(Optional.of(progress));
 

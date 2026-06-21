@@ -8,9 +8,12 @@ import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecture.service.LectureService;
+import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -29,12 +32,11 @@ public class ChapterService {
     private final CourseRepository courseRepository;
     private final LectureRepository lectureRepository;
     private final LectureProgressRepository lectureProgressRepository;
+    private final LastWatchedLectureService lastWatchedLectureService;
     private final LectureService lectureService;
     private final EnrollmentAccessValidator enrollmentAccessValidator;
 
-    /**
-     * 챕터 생성
-     */
+    //챕터생성
     @Transactional
     public Long createChapter(Long courseId, ChapterCreateRequest request) {
         Course course = courseRepository.findById(courseId)
@@ -46,9 +48,7 @@ public class ChapterService {
         return chapterRepository.save(chapter).getId();
     }
 
-    /**
-     * 챕터 리스트 조회 — 코스 기준, 각 챕터에 속한 강의 목록 포함
-     */
+    //챕터&강의 리스트 조회
     @Transactional(readOnly = true)
     public List<ChapterWithLecturesResponse> getChaptersWithLectures(Long courseId) {
         List<Chapter> chapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
@@ -57,22 +57,32 @@ public class ChapterService {
                 .toList();
     }
 
-    /**
-     * 강좌 내 가장 최근 수강 강의 조회
-     * 수강 이력이 없으면 null 반환
-     */
+    // TODO: (멘토님:강은혜) JPA 메소드가 병목 포인트,따로 벌크 처리같은게 필요함. 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
+    //  반영 후 : 백필로 repository 순회 및 정렬 중단
+
+    //강좌 내 가장 최근 수강강의 조회
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
         enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
 
+        // 1) 강좌별 마지막 시청 강의를 사전 계산해 둔 조회용 테이블(last_watched_lectures)에서 단건으로 가져온다.
+        //    강의 입장 시 갱신되므로, 한 번이라도 강좌를 시청한 적이 있으면 여기서 끝난다(강좌 강의 수와 무관).
+        return lastWatchedLectureService
+                .findLectureId(userId, courseId)
+                .map(lectureId -> buildResponse(userId, lectureId))
+                // 2) 조회용 테이블에 아직 행이 없는 과거 데이터는 진행도 집계로 폴백한다.
+                .orElseGet(() -> getLastWatchedByProgress(courseId, userId));
+    }
+
+
+    // TODO: (멘토님:강은혜) JPA 메소드가 병목 포인트,따로 벌크 처리같은게 필요함. 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
+    //  반영 전 : 일일이 테이블 순회 및 정렬
+
+    private LectureEnterResponse getLastWatchedByProgress(Long courseId, Long userId) {
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         if (lectureIds.isEmpty()) {
             return null;
         }
-        // TODO: (멘토님:강은혜) JPA 메소드가 병목 포인트,따로 벌크 처리같은게 필요함. 트랜잭션하나에 여러 쿼리가 함께쓰임-> 어떤 트랜잭션 전략으로 갈지 고민
-        // get이라 무난해도 좋을거라 생각할 수 있지만 주요한 메타 데이터가 많이 관리 되는 곳이니 좀더 고민해서 구현
-        // - 생각의 흐름 정리하는 법: 실시간으로 강좌/챕터/강의 별 시청중인 유저 수를 대시보드로 만들어 달라는 요구를 top down 으로 생각해보길 추천해주심
-        // - 강좌수는 인프런같은 애들을 참고
         return lectureProgressRepository
                 .findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, lectureIds)
                 .map(progress -> {
@@ -81,6 +91,16 @@ public class ChapterService {
                     return LectureEnterResponse.of(lecture, progress);
                 })
                 .orElse(null);
+    }
+
+    // last_watched_lectures 에 행이 있을 때 강의 메타 + 진행도를 조립한다.
+    private LectureEnterResponse buildResponse(Long userId, Long lectureId) {
+        Lecture lecture = lectureRepository.findById(lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER));
+        LectureProgress progress = lectureProgressRepository
+                .findByUserIdAndLectureId(userId, lectureId)
+                .orElse(null);
+        return LectureEnterResponse.of(lecture, progress);
     }
 
     @Transactional
@@ -98,4 +118,5 @@ public class ChapterService {
 
         return lectureService.enterLecture(lecture.getId(), userId);
     }
+
 }

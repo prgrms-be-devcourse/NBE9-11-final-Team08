@@ -9,6 +9,7 @@ import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
 import com.team08.backend.global.exception.CustomException;
@@ -43,6 +44,9 @@ class LectureServiceTest {
 
     @Mock
     private LectureProgressService lectureProgressService;
+
+    @Mock
+    private LastWatchedLectureService lastWatchedLectureService;
 
     @Mock
     private EnrollmentAccessValidator enrollmentAccessValidator;
@@ -143,6 +147,7 @@ class LectureServiceTest {
         assertThat(response.lectureId()).isEqualTo(lectureId);
         verify(enrollmentAccessValidator).validateActiveEnrollment(userId, courseId);
         verify(lectureProgressService).ensureStarted(eq(userId), eq(lecture), any());
+        verify(lastWatchedLectureService).record(userId, courseId, lectureId);
     }
 
     @Test
