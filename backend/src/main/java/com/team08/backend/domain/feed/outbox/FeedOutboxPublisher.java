@@ -56,9 +56,14 @@ public class FeedOutboxPublisher {
     private void publish(FeedOutboxEvent event) {
         try {
             prepareFeedItemCreatedPayload(event);
-            feedSseEmitterRegistry.send(event);
         } catch (RuntimeException e) {
             event.markFailed(e.getMessage());
+            return;
+        }
+
+        try {
+            feedSseEmitterRegistry.send(event);
+        } catch (RuntimeException ignored) {
         }
     }
 

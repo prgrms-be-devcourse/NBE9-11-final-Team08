@@ -29,6 +29,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -182,5 +183,53 @@ class FeedOutboxPublisherTest {
         verify(feedItemRepository, never()).save(org.mockito.ArgumentMatchers.any(FeedItem.class));
         verify(studyActivityRepository, never()).findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId);
         verify(feedSseEmitterRegistry).send(outboxEvent);
+    }
+
+    @Test
+    void SSE_전송이_실패해도_outbox는_published로_유지한다() throws Exception {
+        Long studyId = 1L;
+        Long activityId = 10L;
+        Long authorId = 3L;
+        LocalDateTime createdAt = LocalDateTime.of(2026, 6, 21, 13, 0);
+        StudyActivity activity = StudyActivity.create(studyId, authorId, "긴 활동 내용");
+        ReflectionTestUtils.setField(activity, "id", activityId);
+        ReflectionTestUtils.setField(activity, "createdAt", createdAt);
+        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(activity);
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                studyId,
+                activityId,
+                objectMapper.writeValueAsString(sourceEvent)
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+
+        User user = User.createUser("user@test.com", "password", "테스터", null);
+        ReflectionTestUtils.setField(user, "id", authorId);
+
+        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
+                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
+                PageRequest.of(0, 100)
+        )).willReturn(List.of(outboxEvent));
+        given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
+                .willReturn(Optional.empty());
+        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId))
+                .willReturn(Optional.of(activity));
+        given(feedContentSummarizer.summarize("긴 활동 내용"))
+                .willReturn("요약된 활동 내용");
+        given(feedItemRepository.save(org.mockito.ArgumentMatchers.any(FeedItem.class)))
+                .willAnswer(invocation -> {
+                    FeedItem feedItem = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(feedItem, "id", 200L);
+                    return feedItem;
+                });
+        given(userRepository.findById(authorId)).willReturn(Optional.of(user));
+        willThrow(new RuntimeException("sse failed"))
+                .given(feedSseEmitterRegistry)
+                .send(outboxEvent);
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.PUBLISHED);
+        assertThat(outboxEvent.getLastError()).isNull();
+        assertThat(outboxEvent.getFeedItemId()).isEqualTo(200L);
     }
 }
