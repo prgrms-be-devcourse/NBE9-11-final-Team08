@@ -7,6 +7,7 @@ import com.querydsl.core.types.dsl.*;
 import com.querydsl.core.types.PathMetadata;
 import javax.annotation.processing.Generated;
 import com.querydsl.core.types.Path;
+import com.querydsl.core.types.dsl.PathInits;
 
 
 /**
@@ -16,6 +17,8 @@ import com.querydsl.core.types.Path;
 public class QPayment extends EntityPathBase<Payment> {
 
     private static final long serialVersionUID = 713913239L;
+
+    private static final PathInits INITS = PathInits.DIRECT2;
 
     public static final QPayment payment = new QPayment("payment");
 
@@ -31,7 +34,7 @@ public class QPayment extends EntityPathBase<Payment> {
 
     public final StringPath method = createString("method");
 
-    public final NumberPath<Long> orderId = createNumber("orderId", Long.class);
+    public final com.team08.backend.domain.order.entity.QOrder order;
 
     public final DateTimePath<java.time.LocalDateTime> paidAt = createDateTime("paidAt", java.time.LocalDateTime.class);
 
@@ -44,15 +47,24 @@ public class QPayment extends EntityPathBase<Payment> {
     public final DateTimePath<java.time.LocalDateTime> updatedAt = createDateTime("updatedAt", java.time.LocalDateTime.class);
 
     public QPayment(String variable) {
-        super(Payment.class, forVariable(variable));
+        this(Payment.class, forVariable(variable), INITS);
     }
 
     public QPayment(Path<? extends Payment> path) {
-        super(path.getType(), path.getMetadata());
+        this(path.getType(), path.getMetadata(), PathInits.getFor(path.getMetadata(), INITS));
     }
 
     public QPayment(PathMetadata metadata) {
-        super(Payment.class, metadata);
+        this(metadata, PathInits.getFor(metadata, INITS));
+    }
+
+    public QPayment(PathMetadata metadata, PathInits inits) {
+        this(Payment.class, metadata, inits);
+    }
+
+    public QPayment(Class<? extends Payment> type, PathMetadata metadata, PathInits inits) {
+        super(type, metadata, inits);
+        this.order = inits.isInitialized("order") ? new com.team08.backend.domain.order.entity.QOrder(forProperty("order")) : null;
     }
 
 }

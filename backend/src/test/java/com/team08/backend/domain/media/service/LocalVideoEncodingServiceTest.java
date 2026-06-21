@@ -1,4 +1,4 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;

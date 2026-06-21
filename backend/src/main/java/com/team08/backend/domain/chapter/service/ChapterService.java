@@ -2,12 +2,12 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
-import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecture.service.LectureService;
@@ -32,6 +32,9 @@ public class ChapterService {
     private final LectureService lectureService;
     private final EnrollmentAccessValidator enrollmentAccessValidator;
 
+    /**
+     * 챕터 생성
+     */
     @Transactional
     public Long createChapter(Long courseId, ChapterCreateRequest request) {
         Course course = courseRepository.findById(courseId)
@@ -43,6 +46,9 @@ public class ChapterService {
         return chapterRepository.save(chapter).getId();
     }
 
+    /**
+     * 챕터 리스트 조회 — 코스 기준, 각 챕터에 속한 강의 목록 포함
+     */
     @Transactional(readOnly = true)
     public List<ChapterWithLecturesResponse> getChaptersWithLectures(Long courseId) {
         List<Chapter> chapters = chapterRepository.findByCourseIdWithLecturesOrderByOrderNo(courseId);
@@ -51,6 +57,10 @@ public class ChapterService {
                 .toList();
     }
 
+    /**
+     * 강좌 내 가장 최근 수강 강의 조회
+     * 수강 이력이 없으면 null 반환
+     */
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
         enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
@@ -88,5 +98,4 @@ public class ChapterService {
 
         return lectureService.enterLecture(lecture.getId(), userId);
     }
-
 }

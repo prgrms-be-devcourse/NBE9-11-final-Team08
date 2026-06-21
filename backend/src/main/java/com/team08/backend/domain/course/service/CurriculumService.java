@@ -2,8 +2,8 @@ package com.team08.backend.domain.course.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
-import com.team08.backend.domain.course.dto.ChapterReorderRequest;
-import com.team08.backend.domain.course.dto.LectureReorderRequest;
+import com.team08.backend.domain.chapter.dto.ChapterReorderRequest;
+import com.team08.backend.domain.lecture.dto.LectureReorderRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;

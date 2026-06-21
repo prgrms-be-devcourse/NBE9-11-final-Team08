@@ -1,4 +1,4 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
 import org.springframework.web.multipart.MultipartFile;
 

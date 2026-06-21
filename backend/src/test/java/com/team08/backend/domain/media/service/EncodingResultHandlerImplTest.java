@@ -1,10 +1,12 @@
-package com.team08.backend.domain.course.service;
+package com.team08.backend.domain.media.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.lecture.service.LectureDbService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.team08.backend.domain.course.dto;
+package com.team08.backend.domain.chapter.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;

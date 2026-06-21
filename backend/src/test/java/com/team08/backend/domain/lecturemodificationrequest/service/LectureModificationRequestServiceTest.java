@@ -4,7 +4,7 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.course.service.MediaEncodingService;
+import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.lecturemodificationrequest.dto.LectureModificationRequestCreateDto;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;

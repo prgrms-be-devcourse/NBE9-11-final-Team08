@@ -22,8 +22,6 @@ public class QCouponPolicy extends EntityPathBase<CouponPolicy> {
 
     public final com.team08.backend.global.common.QBaseTimeEntity _super = new com.team08.backend.global.common.QBaseTimeEntity(this);
 
-    public final NumberPath<Long> categoryId = createNumber("categoryId", Long.class);
-
     public final EnumPath<CouponTarget> couponTarget = createEnum("couponTarget", CouponTarget.class);
 
     public final EnumPath<CouponType> couponType = createEnum("couponType", CouponType.class);
@@ -50,6 +48,8 @@ public class QCouponPolicy extends EntityPathBase<CouponPolicy> {
     public final NumberPath<Integer> minOrderAmount = createNumber("minOrderAmount", Integer.class);
 
     public final StringPath name = createString("name");
+
+    public final ListPath<com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory, com.team08.backend.domain.couponpolicycategory.entity.QCouponPolicyCategory> targetCategories = this.<com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory, com.team08.backend.domain.couponpolicycategory.entity.QCouponPolicyCategory>createList("targetCategories", com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory.class, com.team08.backend.domain.couponpolicycategory.entity.QCouponPolicyCategory.class, PathInits.DIRECT2);
 
     public final ListPath<com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse, com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyCourse> targetCourses = this.<com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse, com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyCourse>createList("targetCourses", com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse.class, com.team08.backend.domain.couponpolicycourse.entity.QCouponPolicyCourse.class, PathInits.DIRECT2);
 

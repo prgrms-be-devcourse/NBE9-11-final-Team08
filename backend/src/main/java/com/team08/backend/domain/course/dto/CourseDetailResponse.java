@@ -1,5 +1,6 @@
 package com.team08.backend.domain.course.dto;
 
+import com.team08.backend.domain.chapter.dto.ChapterInfoResponse;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import java.util.List;
