@@ -36,7 +36,6 @@ public class LectureService {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
-        //수강권 검사
         enrollmentAccessValidator.validateActiveEnrollment(userId, lecture.getChapter().getCourse().getId());
 
         LectureProgress progress = lectureProgressService.ensureStarted(userId, lecture, LocalDateTime.now());

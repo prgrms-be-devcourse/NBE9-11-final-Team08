@@ -57,13 +57,11 @@ public class StudyReportService {
             return StudyReportResponse.from(existing, objectMapper);
         }
 
-        // 스터디 통해 강좌 탐색
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(StudyNotFoundException::new);
 
         Long courseId = study.getCourse().getId();
 
-        //강의 리스트 추출
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         int totalLectureCount = lectureIds.size();
 
@@ -112,6 +110,7 @@ public class StudyReportService {
 
     // ── 집계 헬퍼 ─────────────────────────────────────────────────────────
 
+    // TODO: build~ 함수는 비싼함수이기 때문에 최적화가 시급
     private String buildTopLecturesJson(Long userId, List<Long> lectureIds) {
         if (lectureIds.isEmpty()) return studyReportJson.write(List.of());
 
