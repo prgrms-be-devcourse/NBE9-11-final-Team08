@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +27,18 @@ public class IssuedCouponJobWriter {
         return issuedCouponJobRepository.save(
                 IssuedCouponJob.request(userId, policyId, requestedAt)
         );
+    }
+
+    // 처리 가능한 작업을 PROCESSING 상태로 선점
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean markProcessing(Long jobId, LocalDateTime startedAt) {
+        int updatedCount = issuedCouponJobRepository.markProcessing(
+                jobId,
+                IssuedCouponJobStatus.PROCESSING,
+                List.of(IssuedCouponJobStatus.REQUESTED, IssuedCouponJobStatus.RETRYING),
+                startedAt
+        );
+        return updatedCount == 1;
     }
 
     // 쿠폰 발급 성공 처리

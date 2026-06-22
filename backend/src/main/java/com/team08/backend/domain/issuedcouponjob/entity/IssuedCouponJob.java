@@ -96,4 +96,8 @@ public class IssuedCouponJob {
         return this.status == IssuedCouponJobStatus.REQUESTED
                 || this.status == IssuedCouponJobStatus.RETRYING;
     }
+
+    public boolean isProcessing() {
+        return this.status == IssuedCouponJobStatus.PROCESSING;
+    }
 }

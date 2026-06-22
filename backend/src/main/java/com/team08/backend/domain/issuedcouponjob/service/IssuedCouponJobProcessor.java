@@ -17,6 +17,11 @@ public class IssuedCouponJobProcessor {
 
     // 쿠폰 발급 작업 처리
     public void process(Long jobId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!issuedCouponJobWriter.markProcessing(jobId, now)) {
+            return;
+        }
+
         try {
             issuedCouponJobIssuer.issueCoupon(jobId);
         } catch (CouponPolicyException e) {

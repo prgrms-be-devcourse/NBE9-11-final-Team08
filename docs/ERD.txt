@@ -70,6 +70,7 @@ Enum coupon_usage_type {
 }
 Enum issued_coupon_job_status {
   REQUESTED
+  PROCESSING
   RETRYING
   ISSUED
   DEAD

@@ -15,6 +15,7 @@ import java.time.ZoneId;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IssuedCouponJobProcessorTest {
@@ -43,6 +44,7 @@ class IssuedCouponJobProcessorTest {
     void process_fail_markRetrying() {
         // given
         Long jobId = 1L;
+        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(true);
         doThrow(new IllegalStateException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
 
         // when
@@ -57,6 +59,7 @@ class IssuedCouponJobProcessorTest {
     void process_couponPolicyException_markDead() {
         // given
         Long jobId = 1L;
+        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(true);
         doThrow(new CouponExhaustedException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
 
         // when
@@ -65,5 +68,19 @@ class IssuedCouponJobProcessorTest {
         // then
         verify(issuedCouponJobWriter).markDead(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
         verify(issuedCouponJobWriter, never()).markRetrying(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
+    }
+
+    @Test
+    @DisplayName("성공: 다른 처리자가 이미 선점한 작업이면 발급을 실행하지 않는다")
+    void process_alreadyProcessing_skip() {
+        // given
+        Long jobId = 1L;
+        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(false);
+
+        // when
+        issuedCouponJobProcessor.process(jobId);
+
+        // then
+        verify(issuedCouponJobIssuer, never()).issueCoupon(jobId);
     }
 }

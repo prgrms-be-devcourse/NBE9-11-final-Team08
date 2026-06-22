@@ -29,7 +29,7 @@ public class IssuedCouponJobIssuer {
         LocalDateTime now = LocalDateTime.now(clock);
         IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
                 .orElseThrow();
-        if (!job.isProcessable()) {
+        if (!job.isProcessing()) {
             return;
         }
 

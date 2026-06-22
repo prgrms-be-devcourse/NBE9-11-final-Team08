@@ -110,6 +110,7 @@ class IssuedCouponJobIssuerTest {
     private IssuedCouponJob requestedJob(Long jobId, Long userId, Long policyId) {
         IssuedCouponJob job = IssuedCouponJob.request(userId, policyId, LocalDateTime.now(clock));
         ReflectionTestUtils.setField(job, "id", jobId);
+        ReflectionTestUtils.setField(job, "status", IssuedCouponJobStatus.PROCESSING);
         return job;
     }
 
