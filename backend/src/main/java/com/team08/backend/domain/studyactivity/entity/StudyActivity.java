@@ -22,7 +22,7 @@ public class StudyActivity extends BaseTimeEntity {
     @Column(nullable = false)
     private Long authorId;
 
-    @Lob @Column(nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     private LocalDateTime deletedAt;

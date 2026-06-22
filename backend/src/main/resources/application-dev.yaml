@@ -1,6 +1,4 @@
 spring:
-  flyway:
-    enabled: false
   ai:
     model:
       chat: none
@@ -10,9 +8,6 @@ spring:
       audio:
         speech: none
         transcription: none
-  jpa:
-    hibernate:
-      ddl-auto: update
 springdoc:
   api-docs:
     enabled: true
