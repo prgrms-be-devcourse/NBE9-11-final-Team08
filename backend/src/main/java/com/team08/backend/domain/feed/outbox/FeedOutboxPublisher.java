@@ -26,10 +26,6 @@ import java.util.List;
 public class FeedOutboxPublisher {
 
     private static final int PUBLISH_BATCH_SIZE = 100;
-    private static final List<FeedOutboxEventStatus> RETRYABLE_STATUSES = List.of(
-            FeedOutboxEventStatus.PENDING,
-            FeedOutboxEventStatus.FAILED
-    );
 
     private final FeedOutboxEventRepository feedOutboxEventRepository;
     private final FeedItemRepository feedItemRepository;
@@ -39,13 +35,15 @@ public class FeedOutboxPublisher {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final FeedOutboxProperties feedOutboxProperties;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void publishPending() {
+        LocalDateTime now = LocalDateTime.now(clock);
         List<FeedOutboxEvent> events = feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
-                RETRYABLE_STATUSES.stream()
-                        .map(Enum::name)
-                        .toList(),
+                FeedOutboxEventStatus.PENDING.name(),
+                FeedOutboxEventStatus.FAILED.name(),
+                now,
                 PUBLISH_BATCH_SIZE
         );
 
@@ -58,7 +56,13 @@ public class FeedOutboxPublisher {
         try {
             prepareFeedItemCreatedPayload(event);
         } catch (RuntimeException e) {
-            event.markFailed(e.getMessage());
+            LocalDateTime now = LocalDateTime.now(clock);
+            event.markFailed(
+                    e.getMessage(),
+                    now,
+                    feedOutboxProperties.maxRetries(),
+                    retryDelaySeconds(event.getRetryCount())
+            );
             return;
         }
 
@@ -125,5 +129,11 @@ public class FeedOutboxPublisher {
                 event.createdAt()
         );
         return feedItemRepository.save(feedItem);
+    }
+
+    private long retryDelaySeconds(int retryCount) {
+        long multiplier = 1L << Math.min(retryCount, 30);
+        long delay = feedOutboxProperties.retryBaseDelaySeconds() * multiplier;
+        return Math.min(delay, feedOutboxProperties.retryMaxDelaySeconds());
     }
 }

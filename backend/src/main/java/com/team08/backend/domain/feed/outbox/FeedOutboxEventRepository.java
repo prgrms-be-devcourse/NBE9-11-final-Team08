@@ -12,7 +12,11 @@ public interface FeedOutboxEventRepository extends JpaRepository<FeedOutboxEvent
             value = """
                     SELECT *
                     FROM feed_item_outbox_events
-                    WHERE status IN (:statuses)
+                    WHERE status = :pendingStatus
+                       OR (
+                            status = :failedStatus
+                            AND (next_retry_at IS NULL OR next_retry_at <= :now)
+                       )
                     ORDER BY id ASC
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
@@ -20,7 +24,9 @@ public interface FeedOutboxEventRepository extends JpaRepository<FeedOutboxEvent
             nativeQuery = true
     )
     List<FeedOutboxEvent> findRetryableForUpdateSkipLocked(
-            @Param("statuses") List<String> statuses,
+            @Param("pendingStatus") String pendingStatus,
+            @Param("failedStatus") String failedStatus,
+            @Param("now") java.time.LocalDateTime now,
             @Param("limit") int limit
     );
 

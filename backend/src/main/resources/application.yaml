@@ -50,6 +50,9 @@ app:
   feed:
     outbox:
       scheduler-enabled: ${FEED_OUTBOX_SCHEDULER_ENABLED:true}
+      max-retries: ${FEED_OUTBOX_MAX_RETRIES:5}
+      retry-base-delay-seconds: ${FEED_OUTBOX_RETRY_BASE_DELAY_SECONDS:10}
+      retry-max-delay-seconds: ${FEED_OUTBOX_RETRY_MAX_DELAY_SECONDS:600}
 
 cloud:
   aws:

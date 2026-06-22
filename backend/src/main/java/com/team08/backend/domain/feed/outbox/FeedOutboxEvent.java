@@ -58,6 +58,8 @@ public class FeedOutboxEvent extends BaseTimeEntity {
 
     private LocalDateTime publishedAt;
 
+    private LocalDateTime nextRetryAt;
+
     private FeedOutboxEvent(Long studyId, Long sourceId, String eventType, String payload) {
         this.studyId = studyId;
         this.sourceId = sourceId;
@@ -77,12 +79,14 @@ public class FeedOutboxEvent extends BaseTimeEntity {
         this.status = FeedOutboxEventStatus.PUBLISHED;
         this.publishedAt = publishedAt;
         this.lastError = null;
+        this.nextRetryAt = null;
     }
 
     public void markPublished(LocalDateTime publishedAt) {
         this.status = FeedOutboxEventStatus.PUBLISHED;
         this.publishedAt = publishedAt;
         this.lastError = null;
+        this.nextRetryAt = null;
     }
 
     public String sseEventName() {
@@ -93,9 +97,17 @@ public class FeedOutboxEvent extends BaseTimeEntity {
         return eventType;
     }
 
-    public void markFailed(String message) {
-        this.status = FeedOutboxEventStatus.FAILED;
+    public void markFailed(String message, LocalDateTime now, int maxRetries, long retryDelaySeconds) {
         this.retryCount++;
         this.lastError = message;
+
+        if (this.retryCount >= maxRetries) {
+            this.status = FeedOutboxEventStatus.DEAD;
+            this.nextRetryAt = null;
+            return;
+        }
+
+        this.status = FeedOutboxEventStatus.FAILED;
+        this.nextRetryAt = now.plusSeconds(retryDelaySeconds);
     }
 }

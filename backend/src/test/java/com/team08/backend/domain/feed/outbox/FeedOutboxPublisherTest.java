@@ -58,6 +58,7 @@ class FeedOutboxPublisherTest {
             Instant.parse("2026-06-21T04:00:00Z"),
             ZoneId.of("Asia/Seoul")
     );
+    private final FeedOutboxProperties feedOutboxProperties = new FeedOutboxProperties(5, 10, 600);
 
     private FeedOutboxPublisher feedOutboxPublisher;
 
@@ -71,7 +72,8 @@ class FeedOutboxPublisherTest {
                 feedSseEmitterRegistry,
                 userRepository,
                 objectMapper,
-                clock
+                clock,
+                feedOutboxProperties
         );
     }
 
@@ -96,7 +98,9 @@ class FeedOutboxPublisherTest {
         ReflectionTestUtils.setField(user, "id", authorId);
 
         given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
-                List.of("PENDING", "FAILED"),
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
                 100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
@@ -167,10 +171,12 @@ class FeedOutboxPublisherTest {
         );
         ReflectionTestUtils.setField(outboxEvent, "id", 100L);
         outboxEvent.markPublished(feedItemId, outboxEvent.getPayload(), occurredAt);
-        outboxEvent.markFailed("temporary failure");
+        outboxEvent.markFailed("temporary failure", occurredAt, 5, 10);
 
         given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
-                List.of("PENDING", "FAILED"),
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
                 100
         )).willReturn(List.of(outboxEvent));
 
@@ -205,7 +211,9 @@ class FeedOutboxPublisherTest {
         ReflectionTestUtils.setField(user, "id", authorId);
 
         given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
-                List.of("PENDING", "FAILED"),
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
                 100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
@@ -230,5 +238,54 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.PUBLISHED);
         assertThat(outboxEvent.getLastError()).isNull();
         assertThat(outboxEvent.getFeedItemId()).isEqualTo(200L);
+    }
+
+    @Test
+    void 처리_실패시_nextRetryAt을_설정하고_retryCount를_증가시킨다() throws Exception {
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                1L,
+                10L,
+                "{ invalid json"
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
+        )).willReturn(List.of(outboxEvent));
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.FAILED);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(1);
+        assertThat(outboxEvent.getNextRetryAt()).isEqualTo(LocalDateTime.now(clock).plusSeconds(10));
+        assertThat(outboxEvent.getLastError()).isNotBlank();
+    }
+
+    @Test
+    void 최대_재시도_횟수에_도달하면_dead로_전환한다() throws Exception {
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                1L,
+                10L,
+                "{ invalid json"
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+        ReflectionTestUtils.setField(outboxEvent, "retryCount", 4);
+
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
+        )).willReturn(List.of(outboxEvent));
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.DEAD);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(5);
+        assertThat(outboxEvent.getNextRetryAt()).isNull();
+        assertThat(outboxEvent.getLastError()).isNotBlank();
     }
 }
