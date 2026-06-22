@@ -21,10 +21,14 @@ public class VideoRollbackEventHandler {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void cleanUpLeftoverVideos(VideoRollbackEvent event) {
         for (MediaEncodingService service : mediaEncodingServices) {
-            if (service instanceof S3VideoEncodingService s3Service) {
-                s3Service.deleteEncodedFolder(event.targetDirName(), event.lectureId());
-            } else if (service instanceof LocalVideoEncodingService localService) {
-                localService.deleteEncodedFolder(event.targetDirName());
+            try {
+                if (service instanceof S3VideoEncodingService s3Service) {
+                    s3Service.deleteEncodedFolder(event.targetDirName(), event.lectureId());
+                } else if (service instanceof LocalVideoEncodingService localService) {
+                    localService.deleteEncodedFolder(event.targetDirName());
+                }
+            } catch (Exception e) {
+                log.error("Failed to clean up leftover video folder for service: {}", service.getClass().getSimpleName(), e);
             }
         }
     }
