@@ -16,7 +16,7 @@ public class LectureReflection extends BaseTimeEntity {
     private Long lectureId;
     @Column(nullable = false)
     private Long userId;
-    @Lob @Column(nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     private LectureReflection(Long userId, Long lectureId, String content) {

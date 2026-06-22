@@ -131,7 +131,6 @@ class CourseServiceTest {
         Course course = TestEntityFactory.course(courseId);
         Chapter chapter = ChapterFixture.chapter(1L, "첫 번째 챕터", 1, course);
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Lecture paidLecture = Lecture.createWithStream(
                 "videos/paid.m3u8",
                 "유료 본 강의",
@@ -226,7 +225,6 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_강좌_수정_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(
                 1L,
                 2L,
@@ -252,7 +250,6 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long instructorId = 1L;
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(
                 instructorId,
                 2L,
@@ -262,13 +259,11 @@ class CourseServiceTest {
                 10000
         );
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Chapter chapter = Chapter.create("원래 챕터", 1, course);
         Field chapterIdField = findField(Chapter.class, "id");
         makeAccessible(chapterIdField);
         setField(chapterIdField, chapter, 10L);
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Lecture lecture = Lecture.createWithStream("vid.m3u8", "원래 강의", "", 300, 1, false, chapter);
         Field lectureIdField = findField(Lecture.class, "id");
         makeAccessible(lectureIdField);
@@ -324,7 +319,6 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_심사_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
@@ -338,7 +332,6 @@ class CourseServiceTest {
     void DRAFT_상태가_아닌_강좌_심사_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -355,7 +348,6 @@ class CourseServiceTest {
     void 커리큘럼_조건_미달_시_심사_요청하면_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
@@ -369,10 +361,11 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_요청_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Chapter chapter = Chapter.create("챕터", 1, course);
         Lecture lecture = Lecture.createWithStream("path.m3u8", "강의", "", 300, 1, false, chapter);
         chapter.addLecture(lecture);
@@ -402,7 +395,6 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_심사_취소_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -419,7 +411,6 @@ class CourseServiceTest {
     void IN_REVIEW_상태가_아닌_강좌_심사_취소_시_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체 (최초 상태 DRAFT 유지)
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
@@ -433,8 +424,11 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_취소_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.IN_REVIEW);
@@ -451,7 +445,6 @@ class CourseServiceTest {
     void 심사_중이_아닌_강좌를_승인_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체 (최초 상태 DRAFT 유지)
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
@@ -465,8 +458,11 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_승인_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(1L, 0L, "테스트 제목", "테스트 설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.IN_REVIEW);
@@ -486,7 +482,6 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체 (최초 상태 DRAFT 유지)
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
@@ -500,7 +495,6 @@ class CourseServiceTest {
     void 강좌_심사_반려_시_사유가_누락되면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -518,8 +512,11 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.IN_REVIEW);
@@ -549,7 +546,6 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_강좌_판매_중지_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -566,8 +562,11 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_강좌가_판매_중지_상태로_전이되고_강좌_폐쇄_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
@@ -598,7 +597,6 @@ class CourseServiceTest {
     void 관리자가_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -616,8 +614,11 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 1L;
         String reason = "운영 정책 위반";
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
@@ -635,7 +636,6 @@ class CourseServiceTest {
     void 관리자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -656,8 +656,11 @@ class CourseServiceTest {
     void admin이_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
@@ -676,7 +679,6 @@ class CourseServiceTest {
     void 판매자가_삭제_요청_시_소유자가_아니면_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -695,7 +697,6 @@ class CourseServiceTest {
     void 판매자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 10L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
@@ -716,8 +717,11 @@ class CourseServiceTest {
     void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 10L;
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 및 이중 셋업 제어
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
@@ -773,7 +777,6 @@ class CourseServiceTest {
                 "file", "video.mp4", "video/mp4", "video data".getBytes()
         );
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
@@ -793,7 +796,6 @@ class CourseServiceTest {
                 "file", "video.mp4", "video/mp4", "video data".getBytes()
         );
 
-        // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드 교체
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));

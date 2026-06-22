@@ -146,7 +146,7 @@ public class FeedControllerTest {
         Long studyId = 10L;
         SseEmitter emitter = new SseEmitter();
 
-        given(feedSseService.subscribe(eq(studyId), eq(1L), eq(100L)))
+        given(feedSseService.subscribe(eq(studyId), eq(1L), eq("100")))
                 .willReturn(emitter);
 
         mockMvc.perform(get("/api/studies/{studyId}/feed/stream", studyId)
@@ -155,6 +155,24 @@ public class FeedControllerTest {
                 .andExpect(request().asyncStarted());
 
         then(feedSseService).should()
-                .subscribe(eq(studyId), eq(1L), eq(100L));
+                .subscribe(eq(studyId), eq(1L), eq("100"));
+    }
+
+    @Test
+    @WithMockLoginUser
+    void 숫자가_아닌_LastEventId도_SSE_구독을_막지_않는다() throws Exception {
+        Long studyId = 10L;
+        SseEmitter emitter = new SseEmitter();
+
+        given(feedSseService.subscribe(eq(studyId), eq(1L), eq("feed-100")))
+                .willReturn(emitter);
+
+        mockMvc.perform(get("/api/studies/{studyId}/feed/stream", studyId)
+                        .header("Last-Event-ID", "feed-100"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        then(feedSseService).should()
+                .subscribe(eq(studyId), eq(1L), eq("feed-100"));
     }
 }

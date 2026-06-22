@@ -6,7 +6,7 @@ import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
-import com.team08.backend.domain.feed.sse.FeedSseEmitterRegistry;
+import com.team08.backend.domain.feed.sse.FeedSseConnectionManager;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -17,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -49,7 +48,7 @@ class FeedOutboxPublisherTest {
     private FeedContentSummarizer feedContentSummarizer;
 
     @Mock
-    private FeedSseEmitterRegistry feedSseEmitterRegistry;
+    private FeedSseConnectionManager feedSseConnectionManager;
 
     @Mock
     private UserRepository userRepository;
@@ -59,6 +58,7 @@ class FeedOutboxPublisherTest {
             Instant.parse("2026-06-21T04:00:00Z"),
             ZoneId.of("Asia/Seoul")
     );
+    private final FeedOutboxProperties feedOutboxProperties = new FeedOutboxProperties(5, 10, 600);
 
     private FeedOutboxPublisher feedOutboxPublisher;
 
@@ -69,10 +69,11 @@ class FeedOutboxPublisherTest {
                 feedItemRepository,
                 studyActivityRepository,
                 feedContentSummarizer,
-                feedSseEmitterRegistry,
+                feedSseConnectionManager,
                 userRepository,
                 objectMapper,
-                clock
+                clock,
+                feedOutboxProperties
         );
     }
 
@@ -96,9 +97,11 @@ class FeedOutboxPublisherTest {
         User user = User.createUser("user@test.com", "password", "테스터", null);
         ReflectionTestUtils.setField(user, "id", authorId);
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
                 .willReturn(Optional.empty());
@@ -133,7 +136,7 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
         assertThat(objectMapper.writeValueAsString(sourceEvent)).doesNotContain("긴 활동 내용");
 
-        verify(feedSseEmitterRegistry).send(outboxEvent);
+        verify(feedSseConnectionManager).send(outboxEvent);
     }
 
     @Test
@@ -168,11 +171,13 @@ class FeedOutboxPublisherTest {
         );
         ReflectionTestUtils.setField(outboxEvent, "id", 100L);
         outboxEvent.markPublished(feedItemId, outboxEvent.getPayload(), occurredAt);
-        outboxEvent.markFailed("temporary failure");
+        outboxEvent.markFailed("temporary failure", occurredAt, 5, 10);
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
         )).willReturn(List.of(outboxEvent));
 
         feedOutboxPublisher.publishPending();
@@ -182,7 +187,7 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getLastError()).isNull();
         verify(feedItemRepository, never()).save(org.mockito.ArgumentMatchers.any(FeedItem.class));
         verify(studyActivityRepository, never()).findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId);
-        verify(feedSseEmitterRegistry).send(outboxEvent);
+        verify(feedSseConnectionManager).send(outboxEvent);
     }
 
     @Test
@@ -205,9 +210,11 @@ class FeedOutboxPublisherTest {
         User user = User.createUser("user@test.com", "password", "테스터", null);
         ReflectionTestUtils.setField(user, "id", authorId);
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
                 .willReturn(Optional.empty());
@@ -223,7 +230,7 @@ class FeedOutboxPublisherTest {
                 });
         given(userRepository.findById(authorId)).willReturn(Optional.of(user));
         willThrow(new RuntimeException("sse failed"))
-                .given(feedSseEmitterRegistry)
+                .given(feedSseConnectionManager)
                 .send(outboxEvent);
 
         feedOutboxPublisher.publishPending();
@@ -231,5 +238,54 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.PUBLISHED);
         assertThat(outboxEvent.getLastError()).isNull();
         assertThat(outboxEvent.getFeedItemId()).isEqualTo(200L);
+    }
+
+    @Test
+    void 처리_실패시_nextRetryAt을_설정하고_retryCount를_증가시킨다() throws Exception {
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                1L,
+                10L,
+                "{ invalid json"
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
+        )).willReturn(List.of(outboxEvent));
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.FAILED);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(1);
+        assertThat(outboxEvent.getNextRetryAt()).isEqualTo(LocalDateTime.now(clock).plusSeconds(10));
+        assertThat(outboxEvent.getLastError()).isNotBlank();
+    }
+
+    @Test
+    void 최대_재시도_횟수에_도달하면_dead로_전환한다() throws Exception {
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
+                1L,
+                10L,
+                "{ invalid json"
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 100L);
+        ReflectionTestUtils.setField(outboxEvent, "retryCount", 4);
+
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
+        )).willReturn(List.of(outboxEvent));
+
+        feedOutboxPublisher.publishPending();
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.DEAD);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(5);
+        assertThat(outboxEvent.getNextRetryAt()).isNull();
+        assertThat(outboxEvent.getLastError()).isNotBlank();
     }
 }

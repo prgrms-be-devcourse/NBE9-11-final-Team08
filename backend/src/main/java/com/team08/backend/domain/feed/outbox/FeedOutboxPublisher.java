@@ -7,13 +7,12 @@ import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
-import com.team08.backend.domain.feed.sse.FeedSseEmitterRegistry;
+import com.team08.backend.domain.feed.sse.FeedSseConnectionManager;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,25 +26,25 @@ import java.util.List;
 public class FeedOutboxPublisher {
 
     private static final int PUBLISH_BATCH_SIZE = 100;
-    private static final List<FeedOutboxEventStatus> RETRYABLE_STATUSES = List.of(
-            FeedOutboxEventStatus.PENDING,
-            FeedOutboxEventStatus.FAILED
-    );
 
     private final FeedOutboxEventRepository feedOutboxEventRepository;
     private final FeedItemRepository feedItemRepository;
     private final StudyActivityRepository studyActivityRepository;
     private final FeedContentSummarizer feedContentSummarizer;
-    private final FeedSseEmitterRegistry feedSseEmitterRegistry;
+    private final FeedSseConnectionManager feedSseConnectionManager;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final FeedOutboxProperties feedOutboxProperties;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void publishPending() {
-        List<FeedOutboxEvent> events = feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                RETRYABLE_STATUSES,
-                PageRequest.of(0, PUBLISH_BATCH_SIZE)
+        LocalDateTime now = LocalDateTime.now(clock);
+        List<FeedOutboxEvent> events = feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                FeedOutboxEventStatus.PENDING.name(),
+                FeedOutboxEventStatus.FAILED.name(),
+                now,
+                PUBLISH_BATCH_SIZE
         );
 
         for (FeedOutboxEvent event : events) {
@@ -57,12 +56,18 @@ public class FeedOutboxPublisher {
         try {
             prepareFeedItemCreatedPayload(event);
         } catch (RuntimeException e) {
-            event.markFailed(e.getMessage());
+            LocalDateTime now = LocalDateTime.now(clock);
+            event.markFailed(
+                    e.getMessage(),
+                    now,
+                    feedOutboxProperties.maxRetries(),
+                    retryDelaySeconds(event.getRetryCount())
+            );
             return;
         }
 
         try {
-            feedSseEmitterRegistry.send(event);
+            feedSseConnectionManager.send(event);
         } catch (RuntimeException ignored) {
         }
     }
@@ -124,5 +129,11 @@ public class FeedOutboxPublisher {
                 event.createdAt()
         );
         return feedItemRepository.save(feedItem);
+    }
+
+    private long retryDelaySeconds(int retryCount) {
+        long multiplier = 1L << Math.min(retryCount, 30);
+        long delay = feedOutboxProperties.retryBaseDelaySeconds() * multiplier;
+        return Math.min(delay, feedOutboxProperties.retryMaxDelaySeconds());
     }
 }

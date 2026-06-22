@@ -43,9 +43,9 @@ spring:
       s3:
         bucket: test-bucket-name
       cloudfront:
-        distribution-domain: localhost
+        distribution-domain: cloudfront-domain
         key-pair-id: dummy-id
-        private-key: -----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3\n-----END PRIVATE KEY-----
+        private-key: -----BEGIN PRIVATE KEY-----\ncloudfront-private-key\n-----END PRIVATE KEY-----
 
 app:
   issued-coupon-job:
@@ -56,6 +56,9 @@ app:
   feed:
     outbox:
       scheduler-enabled: false
+      max-retries: 5
+      retry-base-delay-seconds: 10
+      retry-max-delay-seconds: 600
   ai:
     model: stub
     prompt-version: v1

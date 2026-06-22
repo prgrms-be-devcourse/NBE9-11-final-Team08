@@ -19,7 +19,7 @@ public class QnaQuestion extends BaseTimeEntity {
     private Long userId;
     @Column(nullable = false, length = 255)
     private String title;
-    @Lob @Column(nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     private LocalDateTime deletedAt;
