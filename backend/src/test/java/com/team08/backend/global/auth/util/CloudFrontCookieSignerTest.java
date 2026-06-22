@@ -5,6 +5,7 @@ import org.springframework.http.ResponseCookie;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.time.Clock;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,7 +30,8 @@ class CloudFrontCookieSignerTest {
                 "cloudfront-domain",
                 "real-id",
                 generatedPem,
-                true
+                true,
+                Clock.systemDefaultZone()
         );
 
         ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(
@@ -58,38 +60,51 @@ class CloudFrontCookieSignerTest {
                 "cloudfront-domain",
                 "real-id",
                 "invalid-key-format",
-                true
+                true,
+                Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.");
     }
 
     @Test
-    void 프라이빗_키_주입이_누락되면_객체_생성_시점에_예외가_발생한다() {
+    void 설정_정보가_하나라도_누락되면_객체_생성_시점에_예외가_발생한다() {
         assertThatThrownBy(() -> new CloudFrontCookieSignerImpl(
-                "cloudfront-domain",
-                "real-id",
                 "",
-                true
+                "real-id",
+                "valid-key",
+                true,
+                Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("CloudFront 프라이빗 키 주입이 누락되었습니다.");
+                .hasMessageContaining("CloudFront 설정 정보가 누락되었습니다.");
+
+        assertThatThrownBy(() -> new CloudFrontCookieSignerImpl(
+                "cloudfront-domain",
+                null,
+                "valid-key",
+                true,
+                Clock.systemDefaultZone()
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("CloudFront 설정 정보가 누락되었습니다.");
     }
 
     @Test
-    void 비활성화_설정이어도_프라이빗_키가_누락되면_객체_생성_시점에_예외가_발생한다() {
+    void 비활성화_설정이어도_기본_정보가_누락되면_객체_생성_시점에_예외가_발생한다() {
         assertThatThrownBy(() -> new CloudFrontCookieSignerImpl(
                 "cloudfront-domain",
                 "real-id",
                 null,
-                false
+                false,
+                Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("CloudFront 프라이빗 키 주입이 누락되었습니다.");
+                .hasMessageContaining("CloudFront 설정 정보가 누락되었습니다.");
     }
 
     @Test
-    void 비활성화_환경이면서_키가_유효하면_객체_생성_후_쿠키를_Lax_속성으로_생성한다() throws Exception {
+    void 비활성화_환경이면서_설정이_유효하면_객체_생성_후_쿠키를_Lax_속성으로_생성한다() throws Exception {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
@@ -103,7 +118,8 @@ class CloudFrontCookieSignerTest {
                 "cloudfront-domain",
                 "real-id",
                 generatedPem,
-                false
+                false,
+                Clock.systemDefaultZone()
         );
 
         ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(

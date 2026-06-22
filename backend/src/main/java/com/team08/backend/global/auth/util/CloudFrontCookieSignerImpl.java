@@ -13,6 +13,7 @@ import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -25,21 +26,26 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     private final String distributionDomain;
     private final String keyPairId;
     private final PrivateKey privateKey;
+    private final Clock clock;
     private final boolean enabled;
 
     public CloudFrontCookieSignerImpl(
             @Value("${cloud.aws.cloudfront.distribution-domain}") String distributionDomain,
             @Value("${cloud.aws.cloudfront.key-pair-id}") String keyPairId,
             @Value("${cloud.aws.cloudfront.private-key}") String privateKeyPem,
-            @Value("${cloud.aws.cloudfront.enabled:true}") boolean enabled) {
+            @Value("${cloud.aws.cloudfront.enabled:true}") boolean enabled,
+            Clock clock) {
 
-        if (privateKeyPem == null || privateKeyPem.isBlank()) {
-            throw new IllegalStateException("CloudFront 프라이빗 키 주입이 누락되었습니다.");
+        if (distributionDomain == null || distributionDomain.isBlank() ||
+                keyPairId == null || keyPairId.isBlank() ||
+                privateKeyPem == null || privateKeyPem.isBlank()) {
+            throw new IllegalStateException("CloudFront 설정 정보가 누락되었습니다.");
         }
 
         this.distributionDomain = distributionDomain;
         this.keyPairId = keyPairId;
         this.enabled = enabled;
+        this.clock = clock;
         this.privateKey = parsePrivateKey(privateKeyPem);
     }
 
@@ -63,7 +69,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     @Override
     public ResponseCookie[] createSignedCookies(String resourcePath, String cookiePath) {
         String fullResourceUrl = "https://" + distributionDomain + resourcePath;
-        long expires = Instant.now().plus(Duration.ofHours(1)).getEpochSecond();
+        long expires = Instant.now(clock).getEpochSecond() + Duration.ofHours(1).toSeconds();
 
         String policy = "{\"Statement\":[{\"Resource\":\"" + fullResourceUrl +
                 "\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":" + expires + "}}}]}";
