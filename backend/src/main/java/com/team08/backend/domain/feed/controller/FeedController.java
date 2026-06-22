@@ -49,7 +49,7 @@ public class FeedController {
     public SseEmitter streamFeed(
             @PathVariable Long studyId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
-            @RequestHeader(name = "Last-Event-ID", required = false) Long lastEventId
+            @RequestHeader(name = "Last-Event-ID", required = false) String lastEventId
     ) {
         return feedSseService.subscribe(
                 studyId,

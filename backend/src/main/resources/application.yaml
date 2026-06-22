@@ -1,4 +1,6 @@
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true&useSSL=false
     username: ${DB_USERNAME}
@@ -36,6 +38,7 @@ management:
       show-details: never
 
 server:
+  shutdown: graceful
   forward-headers-strategy: framework
 
 app:
@@ -50,6 +53,9 @@ app:
   feed:
     outbox:
       scheduler-enabled: ${FEED_OUTBOX_SCHEDULER_ENABLED:true}
+      max-retries: ${FEED_OUTBOX_MAX_RETRIES:5}
+      retry-base-delay-seconds: ${FEED_OUTBOX_RETRY_BASE_DELAY_SECONDS:10}
+      retry-max-delay-seconds: ${FEED_OUTBOX_RETRY_MAX_DELAY_SECONDS:600}
 
 cloud:
   aws:

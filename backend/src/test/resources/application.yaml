@@ -51,6 +51,9 @@ app:
   feed:
     outbox:
       scheduler-enabled: false
+      max-retries: 5
+      retry-base-delay-seconds: 10
+      retry-max-delay-seconds: 600
   ai:
     model: stub
     prompt-version: v1

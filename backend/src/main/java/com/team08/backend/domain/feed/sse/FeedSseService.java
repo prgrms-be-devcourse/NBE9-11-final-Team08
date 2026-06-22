@@ -15,14 +15,14 @@ import java.util.List;
 public class FeedSseService {
 
     private final FeedService feedService;
-    private final FeedSseEmitterRegistry feedSseEmitterRegistry;
+    private final FeedSseConnectionManager feedSseConnectionManager;
     private final FeedOutboxEventRepository feedOutboxEventRepository;
 
-    public SseEmitter subscribe(Long studyId, Long userId, Long lastEventId) {
+    public SseEmitter subscribe(Long studyId, Long userId, String lastEventId) {
         feedService.validateFeedAccess(studyId, userId);
 
-        SseEmitter emitter = feedSseEmitterRegistry.add(studyId, userId);
-        replayMissedEvents(studyId, lastEventId, emitter);
+        SseEmitter emitter = feedSseConnectionManager.add(studyId, userId);
+        replayMissedEvents(studyId, parseLastEventId(lastEventId), emitter);
         return emitter;
     }
 
@@ -37,6 +37,18 @@ public class FeedSseService {
                         FeedOutboxEventStatus.PUBLISHED,
                         lastEventId
                 );
-        missedEvents.forEach(event -> feedSseEmitterRegistry.send(emitter, event));
+        missedEvents.forEach(event -> feedSseConnectionManager.send(emitter, event));
+    }
+
+    private Long parseLastEventId(String lastEventId) {
+        if (lastEventId == null || lastEventId.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(lastEventId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
