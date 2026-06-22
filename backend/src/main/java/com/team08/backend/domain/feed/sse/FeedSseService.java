@@ -18,11 +18,11 @@ public class FeedSseService {
     private final FeedSseConnectionManager feedSseConnectionManager;
     private final FeedOutboxEventRepository feedOutboxEventRepository;
 
-    public SseEmitter subscribe(Long studyId, Long userId, Long lastEventId) {
+    public SseEmitter subscribe(Long studyId, Long userId, String lastEventId) {
         feedService.validateFeedAccess(studyId, userId);
 
         SseEmitter emitter = feedSseConnectionManager.add(studyId, userId);
-        replayMissedEvents(studyId, lastEventId, emitter);
+        replayMissedEvents(studyId, parseLastEventId(lastEventId), emitter);
         return emitter;
     }
 
@@ -38,5 +38,17 @@ public class FeedSseService {
                         lastEventId
                 );
         missedEvents.forEach(event -> feedSseConnectionManager.send(emitter, event));
+    }
+
+    private Long parseLastEventId(String lastEventId) {
+        if (lastEventId == null || lastEventId.isBlank()) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(lastEventId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
