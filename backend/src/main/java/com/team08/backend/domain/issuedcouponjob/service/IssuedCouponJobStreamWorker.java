@@ -3,11 +3,11 @@ package com.team08.backend.domain.issuedcouponjob.service;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -22,7 +23,7 @@ import java.util.Map;
 public class IssuedCouponJobStreamWorker {
 
     private static final String GROUP_NAME = "coupon-issue-workers";
-    private static final String CONSUMER_NAME = "coupon-issue-worker-1";
+    private final String consumerName = "coupon-issue-worker-" + UUID.randomUUID();
 
     private final StringRedisTemplate redisTemplate;
     private final IssuedCouponJobProcessor issuedCouponJobProcessor;
@@ -46,7 +47,7 @@ public class IssuedCouponJobStreamWorker {
     @Scheduled(fixedDelay = 1000)
     public void processJobs() {
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
-                Consumer.from(GROUP_NAME, CONSUMER_NAME),
+                Consumer.from(GROUP_NAME, consumerName),
                 StreamOffset.create(IssuedCouponJobStreamPublisher.STREAM_KEY, ReadOffset.lastConsumed())
         );
 

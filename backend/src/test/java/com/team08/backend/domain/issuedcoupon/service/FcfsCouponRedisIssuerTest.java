@@ -23,8 +23,8 @@ import static org.mockito.Mockito.when;
 @Testcontainers
 class FcfsCouponRedisIssuerTest {
 
-    private static final String STOCK_KEY = "coupon:fcfs:stock:1";
-    private static final String ISSUED_KEY = "coupon:fcfs:issued:1";
+    private static final String STOCK_KEY = "coupon:fcfs:{1}:stock";
+    private static final String ISSUED_KEY = "coupon:fcfs:{1}:issued";
 
     @Container
     private static final GenericContainer<?> redis = new GenericContainer<>(DockerImageName.parse("redis:7-alpine"))

@@ -19,8 +19,7 @@ public class FcfsCouponRedisIssuer {
     private static final Long ISSUE_SUCCESS = 1L;
     private static final Long ALREADY_ISSUED = -1L;
     private static final Long SOLD_OUT = -2L;
-    private static final String STOCK_KEY_PREFIX = "coupon:fcfs:stock:";
-    private static final String ISSUED_KEY_PREFIX = "coupon:fcfs:issued:";
+    private static final String KEY_PREFIX = "coupon:fcfs:";
 
     private static final DefaultRedisScript<Long> ISSUE_SCRIPT = createIssueScript();
 
@@ -65,10 +64,10 @@ public class FcfsCouponRedisIssuer {
     }
 
     private String stockKey(Long policyId) {
-        return STOCK_KEY_PREFIX + policyId;
+        return KEY_PREFIX + "{" + policyId + "}:stock";
     }
 
     private String issuedKey(Long policyId) {
-        return ISSUED_KEY_PREFIX + policyId;
+        return KEY_PREFIX + "{" + policyId + "}:issued";
     }
 }

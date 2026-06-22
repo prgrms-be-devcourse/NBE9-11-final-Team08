@@ -90,6 +90,7 @@ public class IssuedCouponJobWriter {
         job.markDead(failureReason, failedAt);
         issuedCouponJobRepository.flush();
 
+        // TODO 나중에 쿠폰 자동 발급 고도화 후 이벤트 보내기 
         log.warn("선착순 쿠폰 발급 작업 복구 불가. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
                 job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
     }
