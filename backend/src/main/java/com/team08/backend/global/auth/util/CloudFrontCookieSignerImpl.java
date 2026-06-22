@@ -40,7 +40,10 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         this.distributionDomain = distributionDomain;
         this.keyPairId = keyPairId;
         this.enabled = enabled;
+        this.privateKey = parsePrivateKey(privateKeyPem);
+    }
 
+    private PrivateKey parsePrivateKey(String privateKeyPem) {
         try {
             String privateKeyRaw = privateKeyPem
                     .replace("-----BEGIN PRIVATE KEY-----", "")
@@ -50,9 +53,9 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
             byte[] keyBytes = Base64.getDecoder().decode(privateKeyRaw);
             PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
             KeyFactory kf = KeyFactory.getInstance("RSA");
-            this.privateKey = kf.generatePrivate(spec);
+            return kf.generatePrivate(spec);
         } catch (Exception e) {
-            log.error("CloudFront private key initialization failed. KeyPem length: {}", privateKeyPem.length(), e);
+            log.error("CloudFront private key initialization failed", e);
             throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
         }
     }
@@ -62,10 +65,8 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         String fullResourceUrl = "https://" + distributionDomain + resourcePath;
         long expires = Instant.now().plus(Duration.ofHours(1)).getEpochSecond();
 
-        String policy = String.format(
-                "{\"Statement\":[{\"Resource\":\"%s\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":%d}}}]}",
-                fullResourceUrl, expires
-        );
+        String policy = "{\"Statement\":[{\"Resource\":\"" + fullResourceUrl +
+                "\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":" + expires + "}}}]}";
 
         String base64Policy = encodeBase64(policy.getBytes(StandardCharsets.UTF_8));
         String signature = signPolicy(policy);
