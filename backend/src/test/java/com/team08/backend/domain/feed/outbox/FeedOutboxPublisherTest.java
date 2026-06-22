@@ -17,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -96,9 +95,9 @@ class FeedOutboxPublisherTest {
         User user = User.createUser("user@test.com", "password", "테스터", null);
         ReflectionTestUtils.setField(user, "id", authorId);
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                List.of("PENDING", "FAILED"),
+                100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
                 .willReturn(Optional.empty());
@@ -170,9 +169,9 @@ class FeedOutboxPublisherTest {
         outboxEvent.markPublished(feedItemId, outboxEvent.getPayload(), occurredAt);
         outboxEvent.markFailed("temporary failure");
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                List.of("PENDING", "FAILED"),
+                100
         )).willReturn(List.of(outboxEvent));
 
         feedOutboxPublisher.publishPending();
@@ -205,9 +204,9 @@ class FeedOutboxPublisherTest {
         User user = User.createUser("user@test.com", "password", "테스터", null);
         ReflectionTestUtils.setField(user, "id", authorId);
 
-        given(feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                List.of(FeedOutboxEventStatus.PENDING, FeedOutboxEventStatus.FAILED),
-                PageRequest.of(0, 100)
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                List.of("PENDING", "FAILED"),
+                100
         )).willReturn(List.of(outboxEvent));
         given(feedItemRepository.findByTypeAndSourceId(FeedItemType.STUDY_ACTIVITY, activityId))
                 .willReturn(Optional.empty());

@@ -13,7 +13,6 @@ import com.team08.backend.domain.studyactivity.repository.StudyActivityRepositor
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,9 +42,11 @@ public class FeedOutboxPublisher {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void publishPending() {
-        List<FeedOutboxEvent> events = feedOutboxEventRepository.findByStatusInOrderByIdAsc(
-                RETRYABLE_STATUSES,
-                PageRequest.of(0, PUBLISH_BATCH_SIZE)
+        List<FeedOutboxEvent> events = feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                RETRYABLE_STATUSES.stream()
+                        .map(Enum::name)
+                        .toList(),
+                PUBLISH_BATCH_SIZE
         );
 
         for (FeedOutboxEvent event : events) {
