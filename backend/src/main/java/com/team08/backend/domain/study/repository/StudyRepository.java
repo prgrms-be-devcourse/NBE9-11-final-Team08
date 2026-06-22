@@ -4,6 +4,7 @@ import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -17,6 +18,26 @@ public interface StudyRepository extends JpaRepository<Study, Long> {
     Optional<Study> findByIdAndStatusNot(Long id, StudyStatus status);
 
     Optional<Study> findByCourseIdAndStatusNot(Long courseId, StudyStatus status);
+
+    @Query("""
+        SELECT s
+        FROM Study s
+        JOIN FETCH s.course
+        WHERE s.id = :studyId
+    """)
+    Optional<Study> findByIdWithCourse(@Param("studyId") Long studyId);
+
+    @Query("""
+        SELECT s
+        FROM Study s
+        JOIN FETCH s.course c
+        WHERE c.id = :courseId
+            AND s.status <> :status
+    """)
+    Optional<Study> findByCourseIdAndStatusNotWithCourse(
+            @Param("courseId") Long courseId,
+            @Param("status") StudyStatus status
+    );
 
     @Query("""
         SELECT s

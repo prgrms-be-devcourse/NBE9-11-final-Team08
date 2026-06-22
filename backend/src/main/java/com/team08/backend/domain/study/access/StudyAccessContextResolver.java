@@ -27,14 +27,14 @@ public class StudyAccessContextResolver {
     private final EnrollmentQueryService enrollmentQueryService;
 
     public StudyAccessContext fromStudyId(Long studyId, Long userId) {
-        Study study = studyRepository.findById(studyId)
+        Study study = studyRepository.findByIdWithCourse(studyId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
 
         return build(study, userId);
     }
 
     public StudyAccessContext fromCourseId(Long courseId, Long userId) {
-        Study study = studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.INACTIVE)
+        Study study = studyRepository.findByCourseIdAndStatusNotWithCourse(courseId, StudyStatus.INACTIVE)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
 
         return build(study, userId);

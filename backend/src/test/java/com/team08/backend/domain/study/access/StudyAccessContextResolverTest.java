@@ -63,7 +63,7 @@ class StudyAccessContextResolverTest {
     void studyId로_권한_context를_생성한다() {
         Study study = study(StudyStatus.ACTIVE);
         StudyMember member = studyMember(study, StudyMemberRole.MEMBER);
-        given(studyRepository.findById(STUDY_ID)).willReturn(Optional.of(study));
+        given(studyRepository.findByIdWithCourse(STUDY_ID)).willReturn(Optional.of(study));
         givenActiveMember(member);
         given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(true);
 
@@ -76,7 +76,7 @@ class StudyAccessContextResolverTest {
     void courseId로_권한_context를_생성한다() {
         Study study = study(StudyStatus.ACTIVE);
         StudyMember member = studyMember(study, StudyMemberRole.OWNER);
-        given(studyRepository.findByCourseIdAndStatusNot(COURSE_ID, StudyStatus.INACTIVE))
+        given(studyRepository.findByCourseIdAndStatusNotWithCourse(COURSE_ID, StudyStatus.INACTIVE))
                 .willReturn(Optional.of(study));
         givenActiveMember(member);
         given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(true);
@@ -91,7 +91,7 @@ class StudyAccessContextResolverTest {
         Study study = study(StudyStatus.READONLY);
         Chapter chapter = chapter();
         given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
-        given(studyRepository.findByCourseIdAndStatusNot(COURSE_ID, StudyStatus.INACTIVE))
+        given(studyRepository.findByCourseIdAndStatusNotWithCourse(COURSE_ID, StudyStatus.INACTIVE))
                 .willReturn(Optional.of(study));
         given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(
                 STUDY_ID,
@@ -112,7 +112,7 @@ class StudyAccessContextResolverTest {
         Lecture lecture = lecture();
         given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID))
                 .willReturn(Optional.of(lecture));
-        given(studyRepository.findByCourseIdAndStatusNot(COURSE_ID, StudyStatus.INACTIVE))
+        given(studyRepository.findByCourseIdAndStatusNotWithCourse(COURSE_ID, StudyStatus.INACTIVE))
                 .willReturn(Optional.of(study));
         givenActiveMember(owner);
         given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(false);
@@ -124,7 +124,7 @@ class StudyAccessContextResolverTest {
 
     @Test
     void 스터디가_없으면_STUDY_NOT_FOUND를_던진다() {
-        given(studyRepository.findById(STUDY_ID)).willReturn(Optional.empty());
+        given(studyRepository.findByIdWithCourse(STUDY_ID)).willReturn(Optional.empty());
 
         assertErrorCode(
                 () -> resolver.fromStudyId(STUDY_ID, USER_ID),
