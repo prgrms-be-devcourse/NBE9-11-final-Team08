@@ -1,5 +1,6 @@
 package com.team08.backend.domain.issuedcouponjob.service;
 
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,5 +50,20 @@ class IssuedCouponJobProcessorTest {
 
         // then
         verify(issuedCouponJobWriter).markRetrying(jobId, "IllegalStateException", java.time.LocalDateTime.now(clock));
+    }
+
+    @Test
+    @DisplayName("성공: 재시도 불가능한 쿠폰 정책 예외가 발생하면 실패 상태로 변경한다")
+    void process_couponPolicyException_markDead() {
+        // given
+        Long jobId = 1L;
+        doThrow(new CouponExhaustedException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
+
+        // when
+        issuedCouponJobProcessor.process(jobId);
+
+        // then
+        verify(issuedCouponJobWriter).markDead(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
+        verify(issuedCouponJobWriter, never()).markRetrying(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
     }
 }

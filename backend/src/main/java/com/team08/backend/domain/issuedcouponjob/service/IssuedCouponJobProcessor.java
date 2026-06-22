@@ -1,5 +1,6 @@
 package com.team08.backend.domain.issuedcouponjob.service;
 
+import com.team08.backend.domain.couponpolicy.exception.CouponPolicyException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,8 @@ public class IssuedCouponJobProcessor {
     public void process(Long jobId) {
         try {
             issuedCouponJobIssuer.issueCoupon(jobId);
+        } catch (CouponPolicyException e) {
+            issuedCouponJobWriter.markDead(jobId, e.getClass().getSimpleName(), LocalDateTime.now(clock));
         } catch (RuntimeException e) {
             issuedCouponJobWriter.markRetrying(jobId, e.getClass().getSimpleName(), LocalDateTime.now(clock));
         }

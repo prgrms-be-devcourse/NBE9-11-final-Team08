@@ -34,6 +34,7 @@ public class IssuedCouponJobWriter {
         IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
                 .orElseThrow();
         job.markIssued(completedAt);
+        issuedCouponJobRepository.flush();
     }
 
     // 쿠폰 발급 재시도 처리
@@ -42,6 +43,7 @@ public class IssuedCouponJobWriter {
         IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
                 .orElseThrow();
         job.markRetrying(failureReason, failedAt, MAX_RETRY_COUNT);
+        issuedCouponJobRepository.flush();
 
         if (job.getStatus() == IssuedCouponJobStatus.DEAD) {
             log.error("선착순 쿠폰 발급 작업 자동 복구 실패. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
@@ -50,6 +52,18 @@ public class IssuedCouponJobWriter {
         }
 
         log.warn("선착순 쿠폰 발급 작업 재시도 대기. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
+                job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
+    }
+
+    // 쿠폰 소진 등 재시도해도 복구할 수 없는 실패 처리
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markDead(Long jobId, String failureReason, LocalDateTime failedAt) {
+        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
+                .orElseThrow();
+        job.markDead(failureReason, failedAt);
+        issuedCouponJobRepository.flush();
+
+        log.warn("선착순 쿠폰 발급 작업 복구 불가. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
                 job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
     }
 }

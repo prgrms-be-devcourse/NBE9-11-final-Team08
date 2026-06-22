@@ -84,6 +84,14 @@ public class IssuedCouponJob {
         this.completedAt = null;
     }
 
+    // 재시도해도 복구할 수 없는 실패 처리
+    public void markDead(String failureReason, LocalDateTime failedAt) {
+        this.failureReason = failureReason;
+        this.lastTriedAt = failedAt;
+        this.completedAt = failedAt;
+        this.status = IssuedCouponJobStatus.DEAD;
+    }
+
     public boolean isProcessable() {
         return this.status == IssuedCouponJobStatus.REQUESTED
                 || this.status == IssuedCouponJobStatus.RETRYING;
