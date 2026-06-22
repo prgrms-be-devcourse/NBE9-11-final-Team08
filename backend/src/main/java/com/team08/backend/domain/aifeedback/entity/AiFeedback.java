@@ -38,10 +38,11 @@ public class AiFeedback extends BaseTimeEntity {
     private AiFeedbackStatus status;
 
     @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String feedback;
 
     @Lob
-    @Column(nullable = false)
+    @Column(columnDefinition = "LONGTEXT", nullable = false)
     private String activityContentSnapshot;
 
     @Column(nullable = false)
