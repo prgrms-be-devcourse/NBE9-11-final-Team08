@@ -6,7 +6,7 @@ import com.team08.backend.domain.feed.entity.FeedItem;
 import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
-import com.team08.backend.domain.feed.sse.FeedSseEmitterRegistry;
+import com.team08.backend.domain.feed.sse.FeedSseConnectionManager;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -48,7 +48,7 @@ class FeedOutboxPublisherTest {
     private FeedContentSummarizer feedContentSummarizer;
 
     @Mock
-    private FeedSseEmitterRegistry feedSseEmitterRegistry;
+    private FeedSseConnectionManager feedSseConnectionManager;
 
     @Mock
     private UserRepository userRepository;
@@ -69,7 +69,7 @@ class FeedOutboxPublisherTest {
                 feedItemRepository,
                 studyActivityRepository,
                 feedContentSummarizer,
-                feedSseEmitterRegistry,
+                feedSseConnectionManager,
                 userRepository,
                 objectMapper,
                 clock,
@@ -136,7 +136,7 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
         assertThat(objectMapper.writeValueAsString(sourceEvent)).doesNotContain("긴 활동 내용");
 
-        verify(feedSseEmitterRegistry).send(outboxEvent);
+        verify(feedSseConnectionManager).send(outboxEvent);
     }
 
     @Test
@@ -187,7 +187,7 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getLastError()).isNull();
         verify(feedItemRepository, never()).save(org.mockito.ArgumentMatchers.any(FeedItem.class));
         verify(studyActivityRepository, never()).findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId);
-        verify(feedSseEmitterRegistry).send(outboxEvent);
+        verify(feedSseConnectionManager).send(outboxEvent);
     }
 
     @Test
@@ -230,7 +230,7 @@ class FeedOutboxPublisherTest {
                 });
         given(userRepository.findById(authorId)).willReturn(Optional.of(user));
         willThrow(new RuntimeException("sse failed"))
-                .given(feedSseEmitterRegistry)
+                .given(feedSseConnectionManager)
                 .send(outboxEvent);
 
         feedOutboxPublisher.publishPending();

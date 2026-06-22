@@ -15,13 +15,13 @@ import java.util.List;
 public class FeedSseService {
 
     private final FeedService feedService;
-    private final FeedSseEmitterRegistry feedSseEmitterRegistry;
+    private final FeedSseConnectionManager feedSseConnectionManager;
     private final FeedOutboxEventRepository feedOutboxEventRepository;
 
     public SseEmitter subscribe(Long studyId, Long userId, Long lastEventId) {
         feedService.validateFeedAccess(studyId, userId);
 
-        SseEmitter emitter = feedSseEmitterRegistry.add(studyId, userId);
+        SseEmitter emitter = feedSseConnectionManager.add(studyId, userId);
         replayMissedEvents(studyId, lastEventId, emitter);
         return emitter;
     }
@@ -37,6 +37,6 @@ public class FeedSseService {
                         FeedOutboxEventStatus.PUBLISHED,
                         lastEventId
                 );
-        missedEvents.forEach(event -> feedSseEmitterRegistry.send(emitter, event));
+        missedEvents.forEach(event -> feedSseConnectionManager.send(emitter, event));
     }
 }

@@ -34,4 +34,21 @@ class FeedSseEmitterRegistryTest {
         assertThat(registry.studyCount()).isEqualTo(1);
     }
 
+    @Test
+    void drainAll은_모든_연결을_닫고_metric을_증가시킨다() {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        FeedSseEmitterRegistry registry = new FeedSseEmitterRegistry(meterRegistry);
+
+        registry.add(1L, 10L);
+        registry.add(2L, 20L);
+
+        int drainedCount = registry.drainAll("server-draining");
+
+        assertThat(drainedCount).isEqualTo(2);
+        assertThat(registry.connectionCount()).isZero();
+        assertThat(registry.studyCount()).isZero();
+        assertThat(meterRegistry.get("feed.sse.drain.count").counter().count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get("feed.sse.drained.connections").counter().count()).isEqualTo(2.0);
+    }
+
 }
