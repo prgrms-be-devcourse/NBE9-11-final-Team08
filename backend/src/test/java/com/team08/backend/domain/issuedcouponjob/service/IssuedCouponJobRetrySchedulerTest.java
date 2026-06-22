@@ -11,7 +11,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.mockito.Mockito.verify;
@@ -26,13 +29,20 @@ class IssuedCouponJobRetrySchedulerTest {
     @Mock
     private IssuedCouponJobProcessor issuedCouponJobProcessor;
 
+    @Mock
+    private IssuedCouponJobWriter issuedCouponJobWriter;
+
+    private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
+
     private IssuedCouponJobRetryScheduler issuedCouponJobRetryScheduler;
 
     @BeforeEach
     void setUp() {
         issuedCouponJobRetryScheduler = new IssuedCouponJobRetryScheduler(
                 issuedCouponJobRepository,
-                issuedCouponJobProcessor
+                issuedCouponJobProcessor,
+                issuedCouponJobWriter,
+                clock
         );
     }
 
@@ -49,6 +59,7 @@ class IssuedCouponJobRetrySchedulerTest {
         issuedCouponJobRetryScheduler.retryJobs();
 
         // then
+        verify(issuedCouponJobWriter).recoverStuckProcessingJobs(LocalDateTime.now(clock).minusMinutes(5));
         verify(issuedCouponJobProcessor).process(100L);
     }
 }

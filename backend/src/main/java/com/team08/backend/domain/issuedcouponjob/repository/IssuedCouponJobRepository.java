@@ -34,4 +34,21 @@ public interface IssuedCouponJobRepository extends JpaRepository<IssuedCouponJob
             @Param("processableStatuses") Collection<IssuedCouponJobStatus> processableStatuses,
             @Param("startedAt") LocalDateTime startedAt
     );
+
+    // 오래된 PROCESSING 작업을 재시도 대상으로 복구
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE IssuedCouponJob j
+            SET j.status = :retryingStatus,
+                j.failureReason = :failureReason,
+                j.completedAt = null
+            WHERE j.status = :processingStatus
+              AND j.lastTriedAt < :threshold
+            """)
+    int recoverStuckProcessingJobs(
+            @Param("processingStatus") IssuedCouponJobStatus processingStatus,
+            @Param("retryingStatus") IssuedCouponJobStatus retryingStatus,
+            @Param("failureReason") String failureReason,
+            @Param("threshold") LocalDateTime threshold
+    );
 }

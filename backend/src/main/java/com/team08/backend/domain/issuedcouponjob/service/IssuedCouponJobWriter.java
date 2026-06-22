@@ -41,6 +41,20 @@ public class IssuedCouponJobWriter {
         return updatedCount == 1;
     }
 
+    // 오래된 PROCESSING 작업을 RETRYING으로 되돌림
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recoverStuckProcessingJobs(LocalDateTime threshold) {
+        int recoveredCount = issuedCouponJobRepository.recoverStuckProcessingJobs(
+                IssuedCouponJobStatus.PROCESSING,
+                IssuedCouponJobStatus.RETRYING,
+                "PROCESSING_TIMEOUT",
+                threshold
+        );
+        if (recoveredCount > 0) {
+            log.warn("PROCESSING 상태 쿠폰 발급 작업 복구. count={}, threshold={}", recoveredCount, threshold);
+        }
+    }
+
     // 쿠폰 발급 성공 처리
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markIssued(Long jobId, LocalDateTime completedAt) {
