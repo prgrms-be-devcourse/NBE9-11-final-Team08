@@ -54,6 +54,7 @@ public class FeedOutboxEvent extends BaseTimeEntity {
     private int retryCount;
 
     @Lob
+    @Column(columnDefinition = "LONGTEXT")
     private String lastError;
 
     private LocalDateTime publishedAt;
