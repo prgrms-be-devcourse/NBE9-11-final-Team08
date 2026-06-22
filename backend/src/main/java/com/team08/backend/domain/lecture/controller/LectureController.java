@@ -1,9 +1,9 @@
 package com.team08.backend.domain.lecture.controller;
 
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
-import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
+import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.service.LectureService;
-import com.team08.backend.domain.lecture.service.VideoAccessService;
+import com.team08.backend.domain.media.service.VideoAccessService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

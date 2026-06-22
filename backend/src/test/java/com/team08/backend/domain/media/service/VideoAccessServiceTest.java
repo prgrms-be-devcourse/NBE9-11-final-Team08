@@ -1,10 +1,10 @@
-package com.team08.backend.domain.lecture.service;
+package com.team08.backend.domain.media.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
-import com.team08.backend.domain.lecture.dto.VideoStreamResponse;
+import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;

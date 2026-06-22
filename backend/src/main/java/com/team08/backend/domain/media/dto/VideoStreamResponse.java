@@ -1,4 +1,4 @@
-package com.team08.backend.domain.lecture.dto;
+package com.team08.backend.domain.media.dto;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -7,7 +7,7 @@ import java.util.List;
 public record VideoStreamResponse(String path, List<ResponseCookie> cookies) {
 
     public VideoStreamResponse {
-        cookies = List.copyOf(cookies);
+        cookies = (cookies == null) ? List.of() : List.copyOf(cookies);
     }
 
     public HttpHeaders asHttpHeaders() {

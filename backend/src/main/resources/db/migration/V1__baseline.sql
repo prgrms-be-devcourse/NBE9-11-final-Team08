@@ -123,6 +123,12 @@ CREATE TABLE enrollments (
     UNIQUE KEY uk_enrollment_user_course (user_id, course_id)
 ) ENGINE=InnoDB;
 
+CREATE INDEX idx_enrollment_user_status_course
+    ON enrollments (user_id, status, course_id);
+
+CREATE INDEX idx_enrollment_order_status
+    ON enrollments (order_id, status);
+
 CREATE TABLE issued_coupons (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
