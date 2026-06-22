@@ -104,7 +104,7 @@ class CloudFrontCookieSignerTest {
     }
 
     @Test
-    void 비활성화_환경이면서_설정이_유효하면_객체_생성_후_쿠키를_Lax_속성으로_생성한다() throws Exception {
+    void 비활성화_환경이면서_진짜_PEM_키가_주입되면_정상_생성_후_쿠키를_Lax_속성으로_생성한다() throws Exception {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
         keyPairGenerator.initialize(2048);
         KeyPair keyPair = keyPairGenerator.generateKeyPair();
@@ -128,6 +128,31 @@ class CloudFrontCookieSignerTest {
         );
 
         assertThat(cookies).hasSize(3);
+        for (ResponseCookie cookie : cookies) {
+            assertThat(cookie.isSecure()).isFalse();
+            assertThat(cookie.getSameSite()).isEqualTo("Lax");
+        }
+    }
+
+    @Test
+    void 비활성화_환경이면서_더미_키가_들어오면_파싱을_우회하고_가짜_서명을_반환한다() {
+        cloudFrontCookieSigner = new CloudFrontCookieSignerImpl(
+                "cloudfront-domain",
+                "real-id",
+                "cloudfront-private-key",
+                false,
+                Clock.systemDefaultZone()
+        );
+
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(
+                "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*",
+                "/lectures/1/"
+        );
+
+        assertThat(cookies).hasSize(3);
+        assertThat(cookies[1].getName()).isEqualTo("CloudFront-Signature");
+        assertThat(cookies[1].getValue()).isEqualTo("dummy-signature");
+
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.isSecure()).isFalse();
             assertThat(cookie.getSameSite()).isEqualTo("Lax");

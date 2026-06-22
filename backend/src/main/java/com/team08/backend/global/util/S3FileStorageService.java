@@ -22,7 +22,6 @@ public class S3FileStorageService {
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
-
     private final S3Template s3Template;
 
     public String uploadFile(File file, String s3Key) {

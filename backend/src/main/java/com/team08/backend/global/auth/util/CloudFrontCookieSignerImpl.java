@@ -23,6 +23,8 @@ import java.util.Base64;
 @Profile("!test")
 public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
 
+    private static final String DUMMY_SIGNATURE = "dummy-signature";
+
     private final String distributionDomain;
     private final String keyPairId;
     private final PrivateKey privateKey;
@@ -79,7 +81,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         String policy = "{\"Statement\":[{\"Resource\":\"" + fullResourceUrl +
                 "\",\"Condition\":{\"DateLessThan\":{\"AWS:EpochTime\":" + expires + "}}}]}";
 
-        String base64Policy = encodeBase64(policy.getBytes(StandardCharsets.UTF_8));
+        String base64Policy = encodeCloudFrontBase64(policy.getBytes(StandardCharsets.UTF_8));
         String signature = signPolicy(policy);
 
         return new ResponseCookie[]{
@@ -90,11 +92,15 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     }
 
     private String signPolicy(String policy) {
+        if (!enabled) {
+            return DUMMY_SIGNATURE;
+        }
+
         try {
             Signature sig = Signature.getInstance("SHA256withRSA");
             sig.initSign(privateKey);
             sig.update(policy.getBytes(StandardCharsets.UTF_8));
-            return encodeBase64(sig.sign());
+            return encodeCloudFrontBase64(sig.sign());
         } catch (Exception e) {
             log.error("CloudFront signature generation failed", e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
@@ -113,7 +119,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
                 .build();
     }
 
-    private String encodeBase64(byte[] bytes) {
+    private String encodeCloudFrontBase64(byte[] bytes) {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
                 .replace('_', '~');
     }
