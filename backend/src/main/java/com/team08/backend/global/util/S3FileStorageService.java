@@ -34,7 +34,7 @@ public class S3FileStorageService {
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }
-
+    
     public File downloadFile(String s3Key, File destinationFile) {
         try (InputStream inputStream = s3Template.download(bucket, s3Key).getInputStream()) {
             Files.copy(inputStream, destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING);

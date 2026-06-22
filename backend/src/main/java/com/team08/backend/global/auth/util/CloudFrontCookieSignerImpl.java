@@ -61,6 +61,11 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
             KeyFactory kf = KeyFactory.getInstance("RSA");
             return kf.generatePrivate(spec);
         } catch (Exception e) {
+            // 로컬 비활성화 모드(enabled=false)이고, 더미 키가 들어와서 파싱이 터진 거라면 예외를 뿜지 않고 null을 반환하여 부팅을 허용합니다.
+            if (!enabled) {
+                log.warn("CloudFront가 비활성화 상태이며, 더미 프라이빗 키를 사용합니다.");
+                return null;
+            }
             log.error("CloudFront private key initialization failed", e);
             throw new IllegalStateException("CloudFront 키 초기화 실패로 애플리케이션을 시작할 수 없습니다.", e);
         }
