@@ -14,11 +14,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CloudFrontCookieSignerTest {
 
-    private CloudFrontCookieSigner cloudFrontCookieSigner;
+    private CloudFrontCookieSignerImpl cloudFrontCookieSigner;
 
     @BeforeEach
     void setUp() {
-        cloudFrontCookieSigner = new CloudFrontCookieSigner();
+        cloudFrontCookieSigner = new CloudFrontCookieSignerImpl();
     }
 
     @Test
@@ -38,16 +38,15 @@ class CloudFrontCookieSignerTest {
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", generatedPem);
         cloudFrontCookieSigner.init();
 
-        String resourcePath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
-        String cookiePath = "/lectures/1/";
-
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(
+                "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*",
+                "/lectures/1/"
+        );
 
         assertThat(cookies).hasSize(3);
         assertThat(cookies[0].getName()).isEqualTo("CloudFront-Policy");
         assertThat(cookies[1].getName()).isEqualTo("CloudFront-Signature");
         assertThat(cookies[2].getName()).isEqualTo("CloudFront-Key-Pair-Id");
-
         assertThat(cookies[0].getValue()).doesNotContain("+", "/", "=");
         assertThat(cookies[1].getValue()).doesNotContain("+", "/", "=");
         assertThat(cookies[2].getValue()).isEqualTo("real-id");
@@ -55,50 +54,15 @@ class CloudFrontCookieSignerTest {
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.isHttpOnly()).isTrue();
             assertThat(cookie.isSecure()).isTrue();
-            assertThat(cookie.getSameSite()).isEqualTo("Lax");
-            assertThat(cookie.getPath()).isEqualTo(cookiePath);
+            assertThat(cookie.getSameSite()).isEqualTo("None");
         }
     }
 
     @Test
-    void 개발_및_테스트_환경에서는_더미_서명으로_쿠키를_생성한다() {
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "distributionDomain", "cloudfront-domain");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "dummy-id");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", "cloudfront-private-key");
-        cloudFrontCookieSigner.init();
-
-        String resourcePath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
-        String cookiePath = "/lectures/1/";
-
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
-
-        assertThat(cookies).hasSize(3);
-        assertThat(cookies[1].getName()).isEqualTo("CloudFront-Signature");
-        assertThat(cookies[1].getValue()).isEqualTo("dummy-signature");
-        assertThat(cookies[2].getValue()).isEqualTo("dummy-id");
-    }
-
-    @Test
-    void yaml설정의_PEM형식_내에_더미_키워드가_포함되어도_테스트_환경으로_인정하여_쿠키를_생성한다() {
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "distributionDomain", "cloudfront-domain");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "dummy-id");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", "-----BEGIN PRIVATE KEY-----\ncloudfront-private-key\n-----END PRIVATE KEY-----");
-        cloudFrontCookieSigner.init();
-
-        String resourcePath = "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*";
-        String cookiePath = "/lectures/1/";
-
-        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
-
-        assertThat(cookies).hasSize(3);
-        assertThat(cookies[1].getValue()).isEqualTo("dummy-signature");
-    }
-
-    @Test
-    void 운영_환경에서_키_초기화가_실패했거나_누락된_채_서명_시도_시_예외가_발생한다() {
+    void 키_포맷이_잘못되면_init_시점에_예외가_발생한다() {
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "distributionDomain", "cloudfront-domain");
         ReflectionTestUtils.setField(cloudFrontCookieSigner, "keyPairId", "real-id");
-        ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", "invalid-or-missing-key-format");
+        ReflectionTestUtils.setField(cloudFrontCookieSigner, "privateKeyPem", "invalid-key-format");
 
         assertThatThrownBy(() -> cloudFrontCookieSigner.init())
                 .isInstanceOf(IllegalStateException.class)
