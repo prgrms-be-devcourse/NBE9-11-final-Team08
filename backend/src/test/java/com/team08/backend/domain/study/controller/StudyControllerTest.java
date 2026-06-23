@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -50,8 +49,7 @@ public class StudyControllerTest {
         given(studyService.getMyStudies(userId)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/api/studies/me")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
+        mockMvc.perform(get("/api/studies/me"))
                 .andExpect(status().isOk())
                 .andExpect(content().json(
                         objectMapper.writeValueAsString(response)
@@ -77,8 +75,7 @@ public class StudyControllerTest {
 
         given(studyService.getStudyDetail(studyId, userId)).willReturn(response);
 
-        mockMvc.perform(get("/api/studies/{studyId}", studyId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
+        mockMvc.perform(get("/api/studies/{studyId}", studyId))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(response)));
 
@@ -102,8 +99,7 @@ public class StudyControllerTest {
 
         given(studyService.getStudyDetailByCourseId(courseId, userId)).willReturn(response);
 
-        mockMvc.perform(get("/api/studies/by-course/{courseId}", courseId)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token"))
+        mockMvc.perform(get("/api/studies/by-course/{courseId}", courseId))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(response)));
 
