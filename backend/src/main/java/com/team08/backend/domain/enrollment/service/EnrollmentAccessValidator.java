@@ -13,7 +13,10 @@ public class EnrollmentAccessValidator {
 
     private final EnrollmentQueryService enrollmentQueryService;
 
-    public boolean validateActiveEnrollment(Long userId, Long courseId) {
-        return enrollmentQueryService.hasActiveEnrollment(userId, courseId);
+    //활성 수강권이 없으면 예외를 던진다(이름값대로 차단하는 게이트).
+    public void validateActiveEnrollment(Long userId, Long courseId) {
+        if (!enrollmentQueryService.hasActiveEnrollment(userId, courseId)) {
+            throw new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED);
+        }
     }
 }
