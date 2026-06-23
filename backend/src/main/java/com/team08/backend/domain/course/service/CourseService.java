@@ -79,8 +79,8 @@ public class CourseService {
                 .map(CourseCardResponse::from);
     }
 
-    public Page<CourseCardResponse> getCoursesByInstructor(Long instructorId, Pageable pageable) {
-        return courseRepository.findAllByInstructorId(instructorId, pageable)
+    public Page<CourseCardResponse> getCoursesByInstructor(Long instructorId, CourseStatus status, Pageable pageable) {
+        return courseRepository.findAllByInstructorIdAndStatus(instructorId, status, pageable)
                 .map(CourseCardResponse::from);
     }
 

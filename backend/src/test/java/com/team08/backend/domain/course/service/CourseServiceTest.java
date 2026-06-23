@@ -193,12 +193,28 @@ class CourseServiceTest {
         Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
 
         Pageable pageable = PageRequest.of(0, 10);
-        given(courseRepository.findAllByInstructorId(instructorId, pageable)).willReturn(pagedCourses);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, null, pageable)).willReturn(pagedCourses);
 
-        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, pageable);
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, null, pageable);
 
         assertThat(response.getContent()).hasSize(2);
-        verify(courseRepository).findAllByInstructorId(instructorId, pageable);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, null, pageable);
+    }
+
+    @Test
+    void 강사_ID와_특정_상태_조건으로_강좌_목록을_조회하면_필터링된_강좌_목록만_반환한다() {
+        Long instructorId = 1L;
+        CourseStatus statusCondition = CourseStatus.DRAFT;
+        Course draftCourse = TestEntityFactory.course(1L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(draftCourse));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, statusCondition, pageable);
+
+        assertThat(response.getContent()).hasSize(1);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable);
     }
 
     @Test
