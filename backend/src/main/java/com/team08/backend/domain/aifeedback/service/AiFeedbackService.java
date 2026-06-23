@@ -6,13 +6,10 @@ import com.team08.backend.domain.aifeedback.entity.AiFeedback;
 import com.team08.backend.domain.aifeedback.entity.AiFeedbackStatus;
 import com.team08.backend.domain.aifeedback.generator.AiFeedbackGenerator;
 import com.team08.backend.domain.aifeedback.repository.AiFeedbackRepository;
-import com.team08.backend.domain.study.entity.Study;
-import com.team08.backend.domain.study.entity.StudyStatus;
-import com.team08.backend.domain.study.repository.StudyRepository;
+import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
+import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
-import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
-import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -25,23 +22,20 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AiFeedbackService {
 
-    private final StudyRepository studyRepository;
-    private final StudyMemberRepository studyMemberRepository;
     private final StudyActivityRepository studyActivityRepository;
     private final AiFeedbackRepository aiFeedbackRepository;
     private final AiFeedbackGenerator aiFeedbackGenerator;
+    private final StudyAccessAuthorizer studyAccessAuthorizer;
 
     public AiFeedbackResponse generate(
             Long studyId,
             Long activityId,
             Long userId
     ) {
-        Study study = findStudy(studyId);
-        validateActiveStudy(study);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.WRITE_STUDY_CONTENT);
 
         StudyActivity activity = findActivity(studyId, activityId);
-        validateAuthor(activity, userId);
+        activity.validateAuthor(userId);
 
         String contentSnapshot = activity.getContent();
         Optional<AiFeedback> existingFeedback =
@@ -83,9 +77,7 @@ public class AiFeedbackService {
             Long activityId,
             Long userId
     ) {
-        validateVisibleStudy(studyId);
-        validateActiveMember(studyId, userId);
-        findActivity(studyId, activityId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.VIEW_STUDY_CONTENT);
 
         AiFeedback feedback = aiFeedbackRepository.findByStudyActivityId(activityId)
                 .orElseThrow(() ->
@@ -138,46 +130,11 @@ public class AiFeedbackService {
         );
     }
 
-    private Study findStudy(Long studyId) {
-        return studyRepository.findById(studyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-    }
-
-    private void validateVisibleStudy(Long studyId) {
-        studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-    }
-
-    private void validateActiveStudy(Study study) {
-        if (study.getStatus() != StudyStatus.ACTIVE) {
-            throw new CustomException(ErrorCode.STUDY_NOT_ACTIVE);
-        }
-    }
-
-    private void validateActiveMember(Long studyId, Long userId) {
-        boolean isActiveMember =
-                studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                        studyId,
-                        userId,
-                        StudyMemberStatus.ACTIVE
-                );
-
-        if (!isActiveMember) {
-            throw new CustomException(ErrorCode.STUDY_ACCESS_DENIED);
-        }
-    }
-
     private StudyActivity findActivity(Long studyId, Long activityId) {
         return studyActivityRepository
                 .findByIdAndStudyIdAndDeletedAtIsNull(activityId, studyId)
                 .orElseThrow(() ->
                         new CustomException(ErrorCode.STUDY_ACTIVITY_NOT_FOUND)
                 );
-    }
-
-    private void validateAuthor(StudyActivity activity, Long userId) {
-        if (!activity.getAuthorId().equals(userId)) {
-            throw new CustomException(ErrorCode.AI_FEEDBACK_REQUEST_DENIED);
-        }
     }
 }
