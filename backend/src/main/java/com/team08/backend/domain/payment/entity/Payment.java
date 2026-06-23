@@ -73,13 +73,17 @@ public class Payment {
     }
 
     public static Payment createReady(Order order, LocalDateTime requestedAt) {
+        return createReady(order, PaymentProviderType.MOCK, requestedAt);
+    }
+
+    public static Payment createReady(Order order, PaymentProviderType provider, LocalDateTime requestedAt) {
         return new Payment(
                 null,
                 order,
                 null,
                 null,
                 order.getFinalPrice(),
-                PaymentProviderType.MOCK,
+                provider,
                 null,
                 PaymentStatus.READY,
                 null,
@@ -106,7 +110,12 @@ public class Payment {
     }
 
     public void markProcessing(LocalDateTime processingStartedAt) {
+        markProcessing(this.provider, processingStartedAt);
+    }
+
+    public void markProcessing(PaymentProviderType provider, LocalDateTime processingStartedAt) {
         validateStatus(PaymentStatus.READY, PaymentStatus.DECLINED);
+        this.provider = provider;
         this.status = PaymentStatus.PROCESSING;
         this.failureCode = null;
         this.failureMessage = null;
@@ -119,13 +128,23 @@ public class Payment {
     }
 
     public void decline(String paymentKey, String method, String failedReason, LocalDateTime declinedAt) {
+        decline(paymentKey, method, null, failedReason, declinedAt);
+    }
+
+    public void decline(
+            String paymentKey,
+            String method,
+            String failureCode,
+            String failureMessage,
+            LocalDateTime declinedAt
+    ) {
         validateStatus(PaymentStatus.PROCESSING);
         this.paymentKey = paymentKey;
         this.method = method;
         this.status = PaymentStatus.DECLINED;
-        this.failureCode = null;
-        this.failureMessage = failedReason;
-        this.failedReason = failedReason;
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+        this.failedReason = failureMessage;
         this.updatedAt = declinedAt;
     }
 

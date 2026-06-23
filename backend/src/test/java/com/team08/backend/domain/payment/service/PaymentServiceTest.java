@@ -8,12 +8,20 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.client.TossPaymentClient;
+import com.team08.backend.domain.payment.client.TossPaymentException;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
+import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
+import com.team08.backend.domain.payment.entity.PaymentAttempt;
+import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -28,6 +36,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +67,9 @@ class PaymentServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
+    private PaymentAttemptRepository paymentAttemptRepository;
+
+    @Mock
     private OrderRepository orderRepository;
 
     @Mock
@@ -66,15 +78,20 @@ class PaymentServiceTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
+    @Mock
+    private TossPaymentClient tossPaymentClient;
+
     private PaymentService paymentService;
 
     @BeforeEach
     void setUp() {
         paymentService = new PaymentService(
                 paymentRepository,
+                paymentAttemptRepository,
                 orderRepository,
                 orderItemRepository,
                 enrollmentRepository,
+                tossPaymentClient,
                 FIXED_CLOCK
         );
     }
@@ -290,6 +307,205 @@ class PaymentServiceTest {
     }
 
     @Test
+    void tossConfirmSuccessPaysOrderAndIssuesEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        stubEnrollmentSaveAll();
+        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class)))
+                .willReturn(tossResponse(order.getOrderNumber(), "DONE", 30_000));
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<TossConfirmPaymentRequest> tossRequestCaptor = ArgumentCaptor.forClass(TossConfirmPaymentRequest.class);
+        verify(tossPaymentClient).confirm(tossRequestCaptor.capture());
+        assertThat(tossRequestCaptor.getValue().paymentKey()).isEqualTo("payment-key");
+        assertThat(tossRequestCaptor.getValue().orderId()).isEqualTo(order.getOrderNumber());
+        assertThat(tossRequestCaptor.getValue().amount()).isEqualTo(30_000);
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+        assertThat(payment.getProvider()).isEqualTo(PaymentProviderType.TOSS);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(payment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(payment.getMethod()).isEqualTo("CARD");
+
+        ArgumentCaptor<PaymentAttempt> attemptCaptor = ArgumentCaptor.forClass(PaymentAttempt.class);
+        verify(paymentAttemptRepository).save(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getProvider()).isEqualTo(PaymentProviderType.TOSS);
+        assertThat(attemptCaptor.getValue().getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
+        verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void tossConfirmOrderIdMismatchMarksUnknownAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class)))
+                .willReturn(tossResponse("ORD-MISMATCH", "DONE", 30_000));
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(payment.getFailureCode()).isEqualTo("TOSS_PAYMENT_MISMATCH");
+
+        ArgumentCaptor<PaymentAttempt> attemptCaptor = ArgumentCaptor.forClass(PaymentAttempt.class);
+        verify(paymentAttemptRepository).save(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(attemptCaptor.getValue().getFailureCode()).isEqualTo("TOSS_PAYMENT_MISMATCH");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void tossConfirmAmountMismatchMarksUnknownAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class)))
+                .willReturn(tossResponse(order.getOrderNumber(), "DONE", 29_000));
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(payment.getFailureCode()).isEqualTo("TOSS_PAYMENT_MISMATCH");
+
+        ArgumentCaptor<PaymentAttempt> attemptCaptor = ArgumentCaptor.forClass(PaymentAttempt.class);
+        verify(paymentAttemptRepository).save(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(attemptCaptor.getValue().getFailureCode()).isEqualTo("TOSS_PAYMENT_MISMATCH");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void tossConfirmDeclinedKeepsOrderPendingAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class)))
+                .willThrow(TossPaymentException.declined("REJECT_CARD_COMPANY", "카드사에서 결제를 거절했습니다."));
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(payment.getFailureCode()).isEqualTo("REJECT_CARD_COMPANY");
+
+        ArgumentCaptor<PaymentAttempt> attemptCaptor = ArgumentCaptor.forClass(PaymentAttempt.class);
+        verify(paymentAttemptRepository).save(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getStatus()).isEqualTo(PaymentAttemptStatus.DECLINED);
+        assertThat(attemptCaptor.getValue().getFailureCode()).isEqualTo("REJECT_CARD_COMPANY");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void tossConfirmTimeoutMarksUnknownAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class)))
+                .willThrow(TossPaymentException.timeout("TOSS_TIMEOUT", "Toss Payments 승인 응답 시간이 초과되었습니다."));
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, org.mockito.Mockito.atLeastOnce()).save(paymentCaptor.capture());
+        Payment payment = paymentCaptor.getValue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(payment.getFailureCode()).isEqualTo("TOSS_TIMEOUT");
+
+        ArgumentCaptor<PaymentAttempt> attemptCaptor = ArgumentCaptor.forClass(PaymentAttempt.class);
+        verify(paymentAttemptRepository).save(attemptCaptor.capture());
+        assertThat(attemptCaptor.getValue().getStatus()).isEqualTo(PaymentAttemptStatus.TIMEOUT);
+        assertThat(attemptCaptor.getValue().getFailureCode()).isEqualTo("TOSS_TIMEOUT");
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
     void unknownPaymentCannotBeConfirmedAndDoesNotIssueEnrollment() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment unknownPayment = payment(order, PaymentStatus.UNKNOWN);
@@ -395,6 +611,10 @@ class PaymentServiceTest {
         });
     }
 
+    private void stubPaymentAttemptSave() {
+        given(paymentAttemptRepository.save(any(PaymentAttempt.class))).willAnswer(invocation -> invocation.getArgument(0));
+    }
+
     private void stubEnrollmentSaveAll() {
         given(enrollmentRepository.saveAll(any())).willAnswer(invocation -> {
             Iterable<Enrollment> enrollments = invocation.getArgument(0);
@@ -450,6 +670,17 @@ class PaymentServiceTest {
 
     private ConfirmPaymentRequest confirmRequest(int amount) {
         return new ConfirmPaymentRequest("payment-key", "CARD", amount);
+    }
+
+    private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
+        return new TossPaymentResponse(
+                "payment-key",
+                orderNumber,
+                status,
+                "CARD",
+                amount,
+                OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+        );
     }
 
     private FailPaymentRequest failRequest(int amount) {
