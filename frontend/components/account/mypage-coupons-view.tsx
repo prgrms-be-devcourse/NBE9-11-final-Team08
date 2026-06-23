@@ -127,7 +127,6 @@ function CouponCard({
             >
               <Ticket className="h-4 w-4" />
             </span>
-            <span className="text-xs font-semibold text-muted-foreground">ID #{coupon.id}</span>
           </div>
           <div className="flex gap-1.5">
             {coupon.isStackable && (
