@@ -36,6 +36,17 @@ public class PaymentController {
         return paymentService.confirmPayment(principal.user().id(), orderId, request);
     }
 
+    @PostMapping("/{orderId}/toss/confirm")
+    @Operation(summary = "Toss Payments 결제 승인", description = "Toss 결제창 완료 후 Toss 승인 API 결과가 성공일 때만 결제를 완료 처리합니다.")
+    public ConfirmPaymentResponse confirmTossPayment(
+            @AuthenticationPrincipal LoginUserPrincipal principal,
+            @Parameter(description = "二쇰Ц ID", example = "1")
+            @PathVariable Long orderId,
+            @RequestBody ConfirmPaymentRequest request
+    ) {
+        return paymentService.confirmTossPayment(principal.user().id(), orderId, request);
+    }
+
     @PostMapping("/{orderId}/fail")
     @Operation(summary = "Mock 결제 실패 처리", description = "결제 실패 결과를 기록하고 주문은 결제 대기 상태로 유지합니다.")
     public PaymentResponse failPayment(

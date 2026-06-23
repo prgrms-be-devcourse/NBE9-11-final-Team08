@@ -8,11 +8,18 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.client.TossPaymentClient;
+import com.team08.backend.domain.payment.client.TossPaymentException;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
+import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
+import com.team08.backend.domain.payment.entity.PaymentAttempt;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
+import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -22,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,9 +38,11 @@ import java.util.Optional;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentAttemptRepository paymentAttemptRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final TossPaymentClient tossPaymentClient;
     private final Clock clock;
 
     @Transactional
@@ -57,6 +67,39 @@ public class PaymentService {
         List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, paidAt);
 
         return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
+    }
+
+    @Transactional
+    public ConfirmPaymentResponse confirmTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
+        Order order = findMyPaymentOrder(userId, orderId);
+
+        validateConfirmableOrder(order);
+        Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
+        validateConfirmablePayment(existingPayment);
+        validatePaymentAmount(order, request.amount());
+
+        List<OrderItem> orderItems = findOrderItems(order);
+        validateDuplicateEnrollment(userId, orderItems);
+
+        LocalDateTime requestedAt = LocalDateTime.now(clock);
+        Payment payment = processTossPaymentRequested(order, existingPayment, requestedAt);
+        PaymentAttempt attempt = paymentAttemptRepository.save(PaymentAttempt.requested(
+                payment,
+                PaymentProviderType.TOSS,
+                request.amount(),
+                requestedAt
+        ));
+
+        try {
+            TossPaymentResponse tossResponse = tossPaymentClient.confirm(new TossConfirmPaymentRequest(
+                    request.paymentKey(),
+                    order.getOrderNumber(),
+                    request.amount()
+            ));
+            return completeTossPayment(userId, order, orderItems, payment, attempt, tossResponse);
+        } catch (TossPaymentException e) {
+            return failTossPayment(order, payment, attempt, request, e);
+        }
     }
 
     @Transactional
@@ -166,6 +209,92 @@ public class PaymentService {
         payment.markProcessing(declinedAt);
         payment.decline(request.paymentKey(), request.method(), request.failedReason(), declinedAt);
         return paymentRepository.save(payment);
+    }
+
+    private Payment processTossPaymentRequested(
+            Order order,
+            Optional<Payment> existingPayment,
+            LocalDateTime requestedAt
+    ) {
+        Payment payment = existingPayment.orElseGet(() -> Payment.createReady(order, PaymentProviderType.TOSS, requestedAt));
+        payment.markProcessing(PaymentProviderType.TOSS, requestedAt);
+        return paymentRepository.save(payment);
+    }
+
+    private ConfirmPaymentResponse completeTossPayment(
+            Long userId,
+            Order order,
+            List<OrderItem> orderItems,
+            Payment payment,
+            PaymentAttempt attempt,
+            TossPaymentResponse tossResponse
+    ) {
+        LocalDateTime completedAt = approvedAtOrNow(tossResponse.approvedAt());
+        if (!isDoneTossPayment(tossResponse, order)) {
+            attempt.decline("TOSS_NOT_DONE", "Toss Payments 승인 결과가 완료 상태가 아닙니다.", completedAt);
+            payment.decline(
+                    tossResponse.paymentKey(),
+                    tossResponse.method(),
+                    "TOSS_NOT_DONE",
+                    "Toss Payments 승인 결과가 완료 상태가 아닙니다.",
+                    completedAt
+            );
+            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+        }
+
+        attempt.succeed(tossResponse.paymentKey(), completedAt);
+        payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
+        Payment savedPayment = paymentRepository.save(payment);
+
+        markOrderPaid(order, completedAt);
+        List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, completedAt);
+
+        return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
+    }
+
+    private ConfirmPaymentResponse failTossPayment(
+            Order order,
+            Payment payment,
+            PaymentAttempt attempt,
+            ConfirmPaymentRequest request,
+            TossPaymentException exception
+    ) {
+        LocalDateTime completedAt = LocalDateTime.now(clock);
+        switch (exception.getFailureType()) {
+            case DECLINED -> {
+                attempt.decline(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+                payment.decline(
+                        request.paymentKey(),
+                        null,
+                        exception.getFailureCode(),
+                        exception.getFailureMessage(),
+                        completedAt
+                );
+            }
+            case TIMEOUT -> {
+                attempt.markTimeout(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+            }
+            case UNKNOWN -> {
+                attempt.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+            }
+        }
+
+        return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+    }
+
+    private boolean isDoneTossPayment(TossPaymentResponse response, Order order) {
+        return ("DONE".equals(response.status()) || "SUCCESS".equals(response.status()))
+                && order.getOrderNumber().equals(response.orderId())
+                && order.getFinalPrice() == response.totalAmount();
+    }
+
+    private LocalDateTime approvedAtOrNow(OffsetDateTime approvedAt) {
+        if (approvedAt == null) {
+            return LocalDateTime.now(clock);
+        }
+        return approvedAt.atZoneSameInstant(clock.getZone()).toLocalDateTime();
     }
 
     private void markOrderPaid(Order order, LocalDateTime paidAt) {
