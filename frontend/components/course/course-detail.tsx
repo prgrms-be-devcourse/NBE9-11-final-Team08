@@ -91,13 +91,8 @@ export function CourseDetail({ course }: { course: Course }) {
     if (isPurchased) return
     setBuying(true)
     try {
-      if ('createDirectOrder' in api) {
-        const order = await (api as any).createDirectOrder(Number(course.id))
-        router.push(`/orders/${order.orderId || order.id}`)
-      } else {
-        await addItem(course)
-        router.push('/cart')
-      }
+      const order = await api.createDirectOrder(Number(course.id))
+      router.push(`/checkout?orderId=${order.orderId}`)
     } catch (err) {
       toast.error('주문 생성에 실패했습니다.')
     } finally {
