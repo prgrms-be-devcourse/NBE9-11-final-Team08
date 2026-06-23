@@ -338,6 +338,7 @@ public class DataSeeder {
             int discount = savedPolicies.get(i % policyCount).calculateDiscountAmount(course.getPrice());
 
             Payment payment = Payment.createReady(order, now);
+            payment.markProcessing(LocalDateTime.now());
             payment.succeed("PAY-SEED-" + (i + 1), "CARD", now);
             payments.add(payment);
 
