@@ -1,5 +1,6 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.S3FileStorageService;
@@ -30,13 +31,13 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
     @Override
     @Async("videoEncodingExecutor")
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
-        executePipeline(file, targetDirName, lectureId, null, null);
+        executePipeline(file, targetDirName, lectureId, EncodingPurpose.CREATE, null, null);
     }
 
     @Override
     @Async("videoEncodingExecutor")
     public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
-        executePipeline(file, targetDirName, lectureId, description, instructorId);
+        executePipeline(file, targetDirName, lectureId, EncodingPurpose.MODIFY, description, instructorId);
     }
 
     @Override
@@ -92,6 +93,7 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
         return "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";
     }
 
+    @Override
     public void deleteEncodedFolder(String targetDirName, Long lectureId) {
         String s3FolderPath = "lectures/" + lectureId + "/" + targetDirName + "/";
         try {

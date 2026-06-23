@@ -1,5 +1,6 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
@@ -44,13 +45,13 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     @Override
     @Async("videoEncodingExecutor")
     public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
-        executePipeline(file, targetDirName, lectureId, null, null);
+        executePipeline(file, targetDirName, lectureId, EncodingPurpose.CREATE, null, null);
     }
 
     @Override
     @Async("videoEncodingExecutor")
     public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
-        executePipeline(file, targetDirName, lectureId, description, instructorId);
+        executePipeline(file, targetDirName, lectureId, EncodingPurpose.MODIFY, description, instructorId);
     }
 
     @Override
@@ -107,7 +108,8 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
         return targetDirName + "/output.m3u8";
     }
 
-    public void deleteEncodedFolder(String targetDirName) {
+    @Override
+    public void deleteEncodedFolder(String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
         if (Files.exists(targetPath)) {
             try (var stream = Files.walk(targetPath)) {

@@ -1,5 +1,7 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.dto.EncodingContext;
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +23,8 @@ public abstract class VideoEncodingTemplate {
 
     private final EncodingResultHandler resultHandler;
 
-    protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
+    protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId,
+                                   EncodingPurpose purpose, String description, Long instructorId) {
         File sourceFile = prepareSourceFile(file, targetDirName, lectureId);
         Path localWorkspacePath = null;
         Process process = null;
@@ -38,7 +41,12 @@ public abstract class VideoEncodingTemplate {
             handleGeneratedFiles(localWorkspacePath, targetDirName, lectureId);
 
             String dbSavePath = getDbSavePath(targetDirName, lectureId);
-            resultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, description, instructorId);
+
+            EncodingContext encodingContext = new EncodingContext(
+                    lectureId, dbSavePath, targetDirName, purpose, description, instructorId
+            );
+
+            resultHandler.handleSuccess(encodingContext);
 
         } catch (Exception e) {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);

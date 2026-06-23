@@ -6,6 +6,8 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.dto.EncodingContext;
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -43,26 +45,28 @@ class EncodingResultHandlerImplTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Test
-    void 설명문이_없으면_일반_강의_영상_경로만_업데이트하고_이벤트를_발행하지_않는다() {
+    void 신규_생성_목적인_경우_일반_강의_영상_경로만_업데이트하고_수정_요청_로직을_수행하지_않는다() {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
         String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
 
-        encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, null, null);
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.CREATE, null, null);
 
+        encodingResultHandler.handleSuccess(context);
+
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureDbService).updateLectureM3u8(lectureId, dbSavePath, targetDirName);
-        verifyNoInteractions(lectureRepository, requestRepository, eventPublisher);
+        verifyNoInteractions(lectureRepository, requestRepository);
     }
 
     @Test
-    void 설명문이_존재하면_수정_신청_요청을_저장하고_롤백_이벤트를_발행한다() {
+    void 영상_수정_목적인_경우_수정_신청_요청을_저장하고_롤백_이벤트를_발행한다() {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
         String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
         String description = "강의 수정 요청";
         Long instructorId = 100L;
 
-        // 리팩토링 포인트: 빌더 제거 후 비즈니스 제약조건에 맞춰 정적 팩토리 메서드로 인스턴스 셋업
         Chapter mockChapter = mock(Chapter.class);
         Lecture lecture = Lecture.createWithStream(
                 "old/path",
@@ -77,16 +81,18 @@ class EncodingResultHandlerImplTest {
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
 
-        encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, description, instructorId);
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId);
 
+        encodingResultHandler.handleSuccess(context);
+
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureRepository).findById(lectureId);
         verify(requestRepository).save(any(LectureModificationRequest.class));
-        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verifyNoInteractions(lectureDbService);
     }
 
     @Test
-    void 설명문이_존재하지만_강의를_찾을_수_없으면_예외를_던지고_저장_및_이벤트_발행을_수행하지_않는다() {
+    void 영상_수정_목적이지만_강의를_찾을_수_없으면_예외를_던지고_저장_및_이벤트_발행을_수행하지_않는다() {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
         String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
@@ -95,11 +101,14 @@ class EncodingResultHandlerImplTest {
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, description, instructorId))
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId);
+
+        assertThatThrownBy(() -> encodingResultHandler.handleSuccess(context))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.LECTURE_NOT_FOUND.getMessage());
 
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureRepository).findById(lectureId);
-        verifyNoInteractions(requestRepository, eventPublisher, lectureDbService);
+        verifyNoInteractions(requestRepository, lectureDbService);
     }
 }

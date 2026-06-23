@@ -5,6 +5,8 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.dto.EncodingContext;
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -24,24 +26,30 @@ public class EncodingResultHandlerImpl implements EncodingResultHandler {
 
     @Override
     @Transactional
-    public void handleSuccess(Long lectureId, String dbSavePath, String targetDirName, String description, Long instructorId) {
-        if (description == null) {
-            lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
+    public void handleSuccess(EncodingContext context) {
+
+        eventPublisher.publishEvent(new VideoRollbackEvent(context.lectureId(), context.targetDirName()));
+
+        if (context.purpose() == EncodingPurpose.CREATE) {
+            lectureDbService.updateLectureM3u8(context.lectureId(), context.dbSavePath(), context.targetDirName());
             return;
         }
 
-        Lecture lecture = lectureRepository.findById(lectureId)
-                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+        if (context.purpose() == EncodingPurpose.MODIFY) {
+            Lecture lecture = lectureRepository.findById(context.lectureId())
+                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
-        LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
-                lecture,
-                instructorId,
-                description,
-                dbSavePath,
-                targetDirName
-        );
-        requestRepository.save(modificationRequest);
+            String requestDescription = (context.description() == null || context.description().isBlank())
+                    ? "영상 수정 요청" : context.description();
 
-        eventPublisher.publishEvent(new VideoRollbackEvent(lectureId, targetDirName));
+            LectureModificationRequest modificationRequest = LectureModificationRequest.createPending(
+                    lecture,
+                    context.instructorId(),
+                    requestDescription,
+                    context.dbSavePath(),
+                    context.targetDirName()
+            );
+            requestRepository.save(modificationRequest);
+        }
     }
 }

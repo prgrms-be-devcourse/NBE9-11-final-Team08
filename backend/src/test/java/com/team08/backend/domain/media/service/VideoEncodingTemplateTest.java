@@ -1,6 +1,7 @@
 package com.team08.backend.domain.media.service;
 
 import com.team08.backend.domain.lecture.service.LectureDbService;
+import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class VideoEncodingTemplateTest {
         isCompleteCalled = false;
         shouldThrowInPrepare = false;
 
-        EncodingResultHandler mockHandler = (id, path, dir, desc, instId) -> isCompleteCalled = true;
+        EncodingResultHandler mockHandler = context -> isCompleteCalled = true;
 
         videoEncodingTemplate = new VideoEncodingTemplate(mockHandler) {
             @Override
@@ -81,7 +82,7 @@ class VideoEncodingTemplateTest {
     @Test
     void 파이프라인_실행_시_정해진_추상_메서드_생명주기가_순서대로_호출된다() {
         assertThrows(CustomException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
         );
 
         assertThat(isPrepareCalled).isTrue();
@@ -92,7 +93,7 @@ class VideoEncodingTemplateTest {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, null, instructorId)
+                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
         );
 
         assertThat(isHandleCalled).isFalse();
