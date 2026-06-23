@@ -1,6 +1,8 @@
 package com.team08.backend.domain.studyactivity.entity;
 
 import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -43,5 +45,11 @@ public class StudyActivity extends BaseTimeEntity {
 
     public void delete() {
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void validateAuthor(Long authorId) {
+        if (!authorId.equals(this.authorId)) {
+            throw new CustomException(ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED);
+        }
     }
 }
