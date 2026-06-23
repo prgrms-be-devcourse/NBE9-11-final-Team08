@@ -7,7 +7,7 @@ public record TossPaymentResponse(
         String orderId,
         String status,
         String method,
-        int totalAmount,
+        long totalAmount,
         OffsetDateTime approvedAt
 ) {
 }

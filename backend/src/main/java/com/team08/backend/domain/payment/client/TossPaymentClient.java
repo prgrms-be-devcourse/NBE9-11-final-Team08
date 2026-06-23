@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.util.Set;
 
 @Component
 public class TossPaymentClient {
@@ -22,6 +23,17 @@ public class TossPaymentClient {
     private static final String CONFIRM_PATH = "/v1/payments/confirm";
     private static final String UNKNOWN_ERROR_CODE = "TOSS_UNKNOWN";
     private static final String TIMEOUT_ERROR_CODE = "TOSS_TIMEOUT";
+    private static final Set<String> DECLINED_ERROR_CODES = Set.of(
+            "PAY_PROCESS_CANCELED",
+            "PAY_PROCESS_ABORTED",
+            "REJECT_CARD_COMPANY",
+            "REJECT_ACCOUNT_PAYMENT",
+            "NOT_ENOUGH_BALANCE",
+            "EXCEED_MAX_PAYMENT_AMOUNT",
+            "EXCEED_MAX_DAILY_PAYMENT_COUNT",
+            "EXCEED_MAX_ONE_DAY_WITHDRAW_AMOUNT",
+            "EXCEED_MAX_ONE_TIME_WITHDRAW_AMOUNT"
+    );
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -62,7 +74,7 @@ public class TossPaymentClient {
             throw TossPaymentException.timeout(TIMEOUT_ERROR_CODE, "Toss Payments 승인 응답 시간이 초과되었습니다.");
         } catch (RestClientResponseException e) {
             TossPaymentErrorResponse errorResponse = parseErrorResponse(e);
-            if (e.getStatusCode().is4xxClientError()) {
+            if (e.getStatusCode().is4xxClientError() && isPaymentDeclinedError(errorResponse.code())) {
                 throw TossPaymentException.declined(errorResponse.code(), errorResponse.message());
             }
             throw TossPaymentException.unknown(errorResponse.code(), errorResponse.message());
@@ -77,5 +89,9 @@ public class TossPaymentClient {
         } catch (JsonProcessingException e) {
             return new TossPaymentErrorResponse(UNKNOWN_ERROR_CODE, "Toss Payments 오류 응답을 해석할 수 없습니다.");
         }
+    }
+
+    private boolean isPaymentDeclinedError(String code) {
+        return DECLINED_ERROR_CODES.contains(code);
     }
 }

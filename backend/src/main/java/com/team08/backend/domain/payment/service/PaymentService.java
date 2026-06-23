@@ -91,6 +91,7 @@ public class PaymentService {
         ));
 
         try {
+            // TODO: 후속 PR에서 PROCESSING 저장 트랜잭션, PG 외부 호출, 결과 반영 트랜잭션을 분리한다.
             TossPaymentResponse tossResponse = tossPaymentClient.confirm(new TossConfirmPaymentRequest(
                     request.paymentKey(),
                     order.getOrderNumber(),
@@ -230,7 +231,13 @@ public class PaymentService {
             TossPaymentResponse tossResponse
     ) {
         LocalDateTime completedAt = approvedAtOrNow(tossResponse.approvedAt());
-        if (!isDoneTossPayment(tossResponse, order)) {
+        if (!isValidTossPaymentResult(tossResponse, order)) {
+            attempt.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
+            payment.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
+            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+        }
+
+        if (!isDoneTossPayment(tossResponse)) {
             attempt.decline("TOSS_NOT_DONE", "Toss Payments 승인 결과가 완료 상태가 아닙니다.", completedAt);
             payment.decline(
                     tossResponse.paymentKey(),
@@ -284,9 +291,12 @@ public class PaymentService {
         return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
     }
 
-    private boolean isDoneTossPayment(TossPaymentResponse response, Order order) {
-        return ("DONE".equals(response.status()) || "SUCCESS".equals(response.status()))
-                && order.getOrderNumber().equals(response.orderId())
+    private boolean isDoneTossPayment(TossPaymentResponse response) {
+        return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
+    }
+
+    private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order) {
+        return order.getOrderNumber().equals(response.orderId())
                 && order.getFinalPrice() == response.totalAmount();
     }
 
