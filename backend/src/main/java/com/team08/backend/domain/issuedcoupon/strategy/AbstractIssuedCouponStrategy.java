@@ -2,7 +2,6 @@ package com.team08.backend.domain.issuedcoupon.strategy;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -17,7 +16,6 @@ public abstract class AbstractIssuedCouponStrategy implements IssuedCouponStrate
 
     // 쿠폰 발급 공통 로직
     @Override
-    @Transactional
     public IssuedCoupon issue(Long userId, Long policyId) {
         CouponPolicy policy = findPolicy(policyId);
         LocalDateTime now = LocalDateTime.now(clock);

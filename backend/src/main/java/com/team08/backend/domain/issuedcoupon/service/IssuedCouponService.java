@@ -21,6 +21,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ public class IssuedCouponService {
     private final IssuedCouponWriter issuedCouponWriter;
     private final IssuedCouponJobWriter issuedCouponJobWriter;
     private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
+    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
@@ -89,13 +91,13 @@ public class IssuedCouponService {
         CouponType couponType = couponPolicyRepository.findCouponTypeById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        // 타입에 맞는 전략 선택
-        IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
-
-        // 쿠폰 발급 로직 실행
-        IssuedCoupon newCoupon = strategy.issue(userId, policyId);
-
         if (couponType == CouponType.FCFS) {
+            // 타입에 맞는 전략 선택
+            IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
+
+            // 쿠폰 발급 로직 실행
+            strategy.issue(userId, policyId);
+
             IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
                     userId,
                     policyId,
@@ -105,8 +107,12 @@ public class IssuedCouponService {
             return CouponDownloadResponse.requested(userId, policyId, issuedCouponJob);
         }
 
-        IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
-        return CouponDownloadResponse.issued(savedCoupon);
+        return transactionTemplate.execute(status -> {
+            IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
+            IssuedCoupon newCoupon = strategy.issue(userId, policyId);
+            IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
+            return CouponDownloadResponse.issued(savedCoupon);
+        });
     }
 
     // [사용자] 내 쿠폰 목록 조회

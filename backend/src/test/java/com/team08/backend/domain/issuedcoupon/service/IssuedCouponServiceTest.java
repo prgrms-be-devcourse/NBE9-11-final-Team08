@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -63,6 +65,9 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
 
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
@@ -77,6 +82,7 @@ class IssuedCouponServiceTest {
                 issuedCouponWriter,
                 issuedCouponJobWriter,
                 issuedCouponJobStreamPublisher,
+                transactionTemplate,
                 clock
         );
     }
@@ -92,10 +98,12 @@ class IssuedCouponServiceTest {
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-
-        // writer 모킹
         when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
 
         // when
@@ -103,6 +111,7 @@ class IssuedCouponServiceTest {
 
         // then
         assertThat(response).isNotNull();
+        verify(transactionTemplate, times(1)).execute(any());
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
