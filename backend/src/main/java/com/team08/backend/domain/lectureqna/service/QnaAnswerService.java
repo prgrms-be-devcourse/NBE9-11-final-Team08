@@ -24,12 +24,12 @@ public class QnaAnswerService {
     @Transactional
     public QnaAnswerResponse createAnswer(Long questionId, Long requesterId, String content) {
 
-        // TODO: validateHierarchy 와 authorizeByLectureId 의 성능을 비교해보고 싶어 남겨두었습니다.
-        //  enterlecture와 다르게 authorizeByLectureId 를 활용했습니다
         //질문 존재 검사
         QnaQuestion question = qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.QNA_QUESTION_NOT_FOUND));
 
+        // TODO: validateHierarchy 와 authorizeByLectureId 의 성능을 비교해보고 싶어 따로 courseId나 ChapterId를 받지 않고...byLectureID 남겨두었습니다.
+        //  enterlecture와 다르게 authorizeByLectureId 를 활용했습니다
         studyAccessAuthorizer.authorizeByLectureId(question.getLectureId(), requesterId, StudyAction.MANAGE_ANSWER);
 
         //답변 이미 있는지 검사
