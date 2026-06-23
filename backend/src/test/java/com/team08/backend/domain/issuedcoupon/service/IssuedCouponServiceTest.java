@@ -211,7 +211,7 @@ class IssuedCouponServiceTest {
         when(policy.getUsageType()).thenReturn(CouponUsageType.SINGLE_USE);
         when(policy.calculateDiscountAmount(originalPrice)).thenReturn(1000);
 
-        when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
+        when(issuedCouponRepository.findByIdWithLock(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
         when(couponPolicyRepository.findById(1L)).thenReturn(Optional.of(policy));
 
         // when
