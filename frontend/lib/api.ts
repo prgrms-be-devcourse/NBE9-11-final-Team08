@@ -253,10 +253,45 @@ const mapDiscountTypeToFrontend = (discountType: string): any => {
   return discountType
 }
 
+const parseDateToString = (value: any): string => {
+  if (!value) return ''
+  if (Array.isArray(value)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0] = value
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}`
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value instanceof Date) {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`
+  }
+  return String(value)
+}
+
+const toLocalDateTime = (value: any) => {
+  const str = parseDateToString(value)
+  return str ? str.slice(0, 16) : ''
+}
+
 const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
   const isRate = coupon.discountType === 'RATE' || coupon.discountType === 'PERCENT'
   const isAvailable = coupon.status === 'ISSUED'
   const category = isAvailable ? '진행 중인 이벤트' : '종료된 이벤트'
+  const expiredAtStr = parseDateToString(coupon.expiredAt)
+  const usageTypeStr = coupon.usageType === 'MULTI' || coupon.usageType === 'MULTI_USE' ? '다회용' : '1회용'
+
+  let couponTargetStr = '전체 적용'
+  if (coupon.couponTarget === 'CATEGORY') {
+    couponTargetStr = coupon.categoryIds && coupon.categoryIds.length > 0
+      ? `특정 카테고리 (${coupon.categoryIds.length}개)`
+      : '특정 카테고리 적용'
+  } else if (coupon.couponTarget === 'COURSE') {
+    couponTargetStr = coupon.courseIds && coupon.courseIds.length > 0
+      ? `특정 강좌 (${coupon.courseIds.length}개)`
+      : '특정 강좌 적용'
+  }
 
   return {
     id: coupon.issuedCouponId.toString(),
@@ -264,15 +299,19 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
     amount: isRate
       ? `${coupon.discountValue}% 할인`
       : `${coupon.discountValue.toLocaleString()}원 할인`,
-    condition: coupon.expiredAt ? `${coupon.expiredAt.slice(0, 10)}까지` : coupon.status,
+    condition: expiredAtStr ? `${expiredAtStr.slice(0, 10).replace(/-/g, '.')}까지` : coupon.status,
     category: category,
     type: isRate ? 'discount' : 'firstcome',
     status: isAvailable ? 'ACTIVE' : 'ENDED',
+    usageType: usageTypeStr,
+    isStackable: coupon.isStackable,
+    maxDiscountAmount: coupon.maxDiscountAmount,
+    minOrderAmount: coupon.minOrderAmount,
+    couponTarget: couponTargetStr,
+    categoryIds: coupon.categoryIds || [],
+    courseIds: coupon.courseIds || [],
   }
 }
-
-const toLocalDateTime = (value: string | null | undefined) =>
-  value ? value.slice(0, 16) : ''
 
 const inferCouponStatus = (startAt: string, endAt: string): AdminCoupon['status'] => {
   const now = Date.now()
@@ -296,8 +335,8 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
   let condition = ''
   if (policy.validDays) {
     condition = `발급 후 ${policy.validDays}일`
-  } else if (policy.issueEndDate) {
-    condition = `${policy.issueEndDate.slice(0, 10)}까지`
+  } else if (endAt) {
+    condition = `${endAt.slice(0, 10).replace(/-/g, '.')}까지`
   } else {
     condition = '무기한'
   }
@@ -330,8 +369,8 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
     category,
     type,
     status,
-    startDate: policy.issueStartDate,
-    endDate: policy.issueEndDate,
+    startDate: startAt,
+    endDate: endAt,
     validDays: policy.validDays,
     couponTarget: couponTargetStr,
     usageType: usageTypeStr,
@@ -361,7 +400,7 @@ const mapAdminCouponPolicyToCoupon = (policy: AdminCouponPolicyResponse): AdminC
     discountType: mapDiscountTypeToFrontend(policy.discountType),
     discountValue: policy.discountValue,
     maxDiscount: policy.maxDiscountAmount ?? null,
-    minOrderAmount: policy.minOrderAmount ?? 0,
+    minOrderAmount: policy.minOrderAmount ?? null,
     validDays: policy.validDays ?? null,
     startAt,
     endAt,

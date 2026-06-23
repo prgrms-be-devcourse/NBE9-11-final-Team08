@@ -90,7 +90,7 @@ export function CouponDetailDialog({
             label="최대 할인 금액"
             value={coupon.maxDiscount ? formatKRW(coupon.maxDiscount) : '제한 없음'}
           />
-          <Row label="최소 주문 금액" value={formatKRW(coupon.minOrderAmount)} />
+          <Row label="최소 주문 금액" value={coupon.minOrderAmount ? formatKRW(coupon.minOrderAmount) : '제한 없음'} />
           <Row
             label="총 발급 수량"
             value={

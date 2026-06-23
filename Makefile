@@ -3,7 +3,7 @@
 # 사용법:  make <target>
 # 도움말:  make help
 #
-# 개발: DB만 Docker로 띄우고 Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행.
+# 개발: DB/Redis만 Docker로 띄우고 Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행.
 
 COMPOSE_DIR := infra/compose
 ENV_FILE    := --env-file .env.dev
@@ -33,22 +33,33 @@ endef
 .DEFAULT_GOAL := help
 .PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
 
-## ─────────────── 개발 (DB만) ───────────────
+## ─────────────── 개발 (DB/Redis만) ───────────────
 
-dev: ## [개발] DB만 기동 (IntelliJ에서 백엔드 직접 실행)
-	$(call run,$(DEV) up -d db --wait)
-	@echo "✅ DB 기동 완료 → localhost:3306. IntelliJ에서 dev 프로파일로 BackendApplication 실행하세요."
+dev: ## [개발] DB/Redis 기동 (IntelliJ에서 백엔드 직접 실행)
+	@if nc -z localhost 6379 >/dev/null 2>&1; then \
+		$(call run,$(DEV) up -d db --wait); \
+		echo "✅ DB 기동 완료, Redis는 기존 localhost:6379를 사용합니다. IntelliJ에서 dev 프로파일로 BackendApplication 실행하세요."; \
+	else \
+		$(call run,$(DEV) up -d db redis --wait); \
+		echo "✅ DB/Redis 기동 완료 → MySQL localhost:3306, Redis localhost:6379. IntelliJ에서 dev 프로파일로 BackendApplication 실행하세요."; \
+	fi
 
-dev-down: ## [개발] DB 컨테이너 내리기 (데이터 유지)
+dev-down: ## [개발] DB/Redis 컨테이너 내리기 (DB 데이터 유지)
 	$(call run,$(DEV) down)
 
-dev-logs: ## [개발] DB 로그 실시간 보기
-	$(call run,$(DEV) logs -f db)
+dev-logs: ## [개발] DB/Redis 로그 실시간 보기
+	$(call run,$(DEV) logs -f db redis)
 
-dev-reset: ## [개발] DB 완전 초기화 (볼륨 삭제 후 재기동) ⚠️ 데이터 전부 삭제
+dev-reset: ## [개발] DB/Redis 완전 초기화 (DB 볼륨 삭제 + Redis FLUSHDB) ⚠️ 데이터 전부 삭제
 	$(call run,$(DEV) down -v)
-	$(call run,$(DEV) up -d db)
-	@echo "✅ DB 초기화 완료. Flyway 마이그레이션 + dev 더미데이터가 백엔드 기동 시 다시 생성됩니다."
+	@if nc -z localhost 6379 >/dev/null 2>&1; then \
+		redis-cli -h localhost -p 6379 FLUSHDB; \
+		$(call run,$(DEV) up -d db --wait); \
+		echo "✅ DB/Redis 초기화 완료. Redis는 기존 localhost:6379를 사용합니다. Flyway 마이그레이션 + dev 더미데이터가 백엔드 기동 시 다시 생성됩니다."; \
+	else \
+		$(call run,$(DEV) up -d db redis --wait); \
+		echo "✅ DB 초기화 및 Redis 재기동 완료. Flyway 마이그레이션 + dev 더미데이터가 백엔드 기동 시 다시 생성됩니다."; \
+	fi
 
 ## ─────────────── 부하 테스트 (k6) ───────────────
 # 측정 대상 서버는 별도로 띄운다:

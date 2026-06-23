@@ -5,7 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatKRW(value: number) {
+export function formatKRW(value?: number | null) {
+  if (value === null || value === undefined) return '0원'
   return `${value.toLocaleString('ko-KR')}원`
 }
 
