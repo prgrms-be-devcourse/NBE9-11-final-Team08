@@ -10,7 +10,7 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
@@ -58,7 +58,7 @@ class ChapterServiceTest {
     @Mock
     private LectureService lectureService;
     @Mock
-    private EnrollmentAccessValidator enrollmentAccessValidator;
+    private LectureAccessValidator lectureAccessValidator;
 
     // ── 챕터 생성 ──────────────────────────────────────────────────
 
@@ -208,18 +208,18 @@ class ChapterServiceTest {
     }
 
     @Test
-    @DisplayName("최근 수강 강의 조회 실패 - 수강권 없음")
-    void getLastWatchedLecture_noEnrollment() {
+    @DisplayName("최근 수강 강의 조회 실패 - 접근 권한 없음")
+    void getLastWatchedLecture_accessDenied() {
         Long courseId = 1L;
         Long userId = 1L;
 
-        willThrow(new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED))
-                .given(enrollmentAccessValidator).validateActiveEnrollment(userId, courseId);
+        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+                .given(lectureAccessValidator).validateCourseAccess(courseId, userId);
 
         assertThatThrownBy(() -> chapterService.getLastWatchedLecture(courseId, userId))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.ENROLLMENT_ACCESS_DENIED);
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
     }
 
     // ── 챕터 첫 강의 입장 ──────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
@@ -33,7 +33,7 @@ public class ChapterService {
     private final LectureProgressRepository lectureProgressRepository;
     private final LastWatchedLectureService lastWatchedLectureService;
     private final LectureService lectureService;
-    private final EnrollmentAccessValidator enrollmentAccessValidator;
+    private final LectureAccessValidator lectureAccessValidator;
 
     //챕터생성
     @Transactional
@@ -63,7 +63,7 @@ public class ChapterService {
     //강좌 내 가장 최근 수강강의 조회
     @Transactional(readOnly = true)
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
-        enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
+        lectureAccessValidator.validateCourseAccess(courseId, userId);
 
         return lastWatchedLectureService
                 .findLectureId(userId, courseId)
