@@ -4,6 +4,7 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
@@ -49,6 +50,9 @@ class LectureServiceTest {
 
     @Mock
     private LastWatchedLectureService lastWatchedLectureService;
+
+    @Mock
+    private LectureAccessValidator lectureAccessValidator;
 
     @InjectMocks
     private LectureService lectureService;
@@ -134,16 +138,18 @@ class LectureServiceTest {
     }
 
     // ── 강의 입장 (enterLecture) ──────────────────────────────────────────
+    // URL 정합성·시청 권한 검증은 LectureAccessValidator 책임이므로 여기선 목으로 대체하고,
+    // enterLecture 의 고유 책임(progress 생성 여부에 따른 last_watched 기록)만 검증한다.
 
     @Test
-    void 진행행이_생기는_정상_시청자는_입장하고_마지막시청을_기록한다() {
+    void 진행행이_생기면_입장하고_마지막시청을_기록한다() {
         Long courseId = 10L;
         Long lectureId = 50L;
         Long userId = 1L;
         Lecture lecture = lectureWithCourse(lectureId, courseId);
 
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
-        // 수강권/무료맛보기면 ensureStarted 가 progress 행을 반환한다.
+        given(lectureAccessValidator.validateForEnter(courseId, CHAPTER_ID, lectureId, userId))
+                .willReturn(lecture);
         given(lectureProgressService.ensureStarted(eq(userId), eq(lecture), any()))
                 .willReturn(LectureProgress.start(userId, lectureId, 0, LocalDateTime.now()));
 
@@ -154,64 +160,19 @@ class LectureServiceTest {
     }
 
     @Test
-    void 미등록자는_입장은_되지만_마지막시청을_기록하지_않는다() {
+    void 진행행이_없으면_마지막시청을_기록하지_않는다() {
         Long courseId = 10L;
         Long lectureId = 50L;
         Long userId = 1L;
         Lecture lecture = lectureWithCourse(lectureId, courseId);
 
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
-        // 미등록·비무료면 ensureStarted 가 null 을 반환한다(입장 자체는 막지 않음 — 메타데이터 제공).
+        given(lectureAccessValidator.validateForEnter(courseId, CHAPTER_ID, lectureId, userId))
+                .willReturn(lecture);
         given(lectureProgressService.ensureStarted(eq(userId), eq(lecture), any())).willReturn(null);
 
         LectureEnterResponse response = lectureService.enterLecture(courseId, CHAPTER_ID, lectureId, userId);
 
         assertThat(response.lectureId()).isEqualTo(lectureId);
-        // progress 없는 미등록자에게는 last_watched 행을 만들지 않는다(오염 방지).
-        verify(lastWatchedLectureService, never()).record(any(), any(), any());
-    }
-
-    @Test
-    void 존재하지_않는_강의_입장_시_예외가_발생한다() {
-        given(lectureRepository.findByIdWithChapterAndCourse(any())).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> lectureService.enterLecture(10L, CHAPTER_ID, 999L, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.LECTURE_NOT_FOUND);
-    }
-
-    @Test
-    void path_챕터ID가_강의의_챕터와_다르면_CHAPTER_NOT_FOUND() {
-        Long courseId = 10L;
-        Long lectureId = 50L;
-        Lecture lecture = lectureWithCourse(lectureId, courseId);
-
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
-
-        // 같은 강좌의 다른 챕터(999) 로 입장 시도
-        assertThatThrownBy(() -> lectureService.enterLecture(courseId, 999L, lectureId, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.CHAPTER_NOT_FOUND);
-
-        verify(lastWatchedLectureService, never()).record(any(), any(), any());
-    }
-
-    @Test
-    void path_코스ID가_강의의_코스와_다르면_COURSE_NOT_FOUND() {
-        Long courseId = 10L;
-        Long lectureId = 50L;
-        Lecture lecture = lectureWithCourse(lectureId, courseId);
-
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
-
-        // 챕터는 맞지만 다른 강좌(999) 로 입장 시도
-        assertThatThrownBy(() -> lectureService.enterLecture(999L, CHAPTER_ID, lectureId, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
-
         verify(lastWatchedLectureService, never()).record(any(), any(), any());
     }
 
