@@ -5,17 +5,20 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Trash2 } from 'lucide-react'
+import { Loader2, ShoppingCart, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { useCart } from '@/components/providers/cart-provider'
+import { api } from '@/lib/api'
 import { formatKRW } from '@/lib/utils'
 
 export function CartView() {
   const router = useRouter()
-  const { items, total: providerTotal, removeItem, removeItems, loading } = useCart()
+  const { items, total: providerTotal, removeItem, removeItems, clear, loading, refreshCart } = useCart()
   const [selected, setSelected] = useState<number[]>([])
+  const [ordering, setOrdering] = useState(false)
 
   useEffect(() => {
     if (!loading && selected.length === 0 && items.length > 0) {
@@ -32,9 +35,19 @@ export function CartView() {
   const toggleAll = () =>
     setSelected(allChecked ? [] : items.map((i) => i.cartItemId))
 
-  const selectedItems = items.filter((i) => validSelected.includes(i.cartItemId))
-  
-  const total = allChecked ? providerTotal : selectedItems.reduce((s, i) => s + i.price, 0)
+  const handleCreateCartOrder = async () => {
+    setOrdering(true)
+    try {
+      const order = await api.createOrderFromCart()
+      await refreshCart()
+      router.push(`/checkout?orderId=${order.orderId}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '장바구니 주문 생성에 실패했습니다.'
+      toast.error(message)
+    } finally {
+      setOrdering(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -68,6 +81,7 @@ export function CartView() {
             variant="ghost"
             size="sm"
             className="text-muted-foreground"
+            disabled={validSelected.length === 0}
             onClick={() => removeItems(validSelected)}
           >
             <Trash2 className="mr-1 h-4 w-4" /> 선택삭제
@@ -112,21 +126,33 @@ export function CartView() {
           <h2 className="font-semibold">주문 요약</h2>
           <Separator className="my-4" />
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">선택 상품 ({selectedItems.length})</span>
-            <span>{formatKRW(total)}</span>
+            <span className="text-muted-foreground">장바구니 강의 ({items.length})</span>
+            <span>{formatKRW(providerTotal)}</span>
           </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            체크박스는 삭제할 강의 선택에만 사용됩니다. 주문은 현재 장바구니 전체로 생성됩니다.
+          </p>
           <Separator className="my-4" />
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-medium">총 상품 금액</span>
-            <span className="text-xl font-bold">{formatKRW(total)}</span>
+            <span className="text-xl font-bold">{formatKRW(providerTotal)}</span>
           </div>
           <Button
             className="mt-5 w-full"
             size="lg"
-            disabled={selectedItems.length === 0}
-            onClick={() => router.push('/checkout')}
+            disabled={items.length === 0 || ordering}
+            onClick={handleCreateCartOrder}
           >
-            주문하기
+            {ordering ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            장바구니 전체 주문하기
+          </Button>
+          <Button
+            className="mt-2 w-full"
+            variant="outline"
+            disabled={items.length === 0}
+            onClick={() => clear()}
+          >
+            장바구니 비우기
           </Button>
         </div>
       </div>

@@ -137,6 +137,24 @@ export interface OrderSummaryResponse {
   finalPrice: number
 }
 
+export interface ConfirmPaymentResponse {
+  paymentId: number
+  orderId: number
+  orderNumber: string
+  amount: number
+  paymentStatus: string
+  orderStatus: string
+  paidAt?: string | null
+  enrolledCourseIds?: number[]
+}
+
+export interface ConfirmTossPaymentRequest {
+  paymentKey: string
+  method: string
+  amount: number
+  issuedCouponId?: number | null
+}
+
 export interface Coupon {
   id: string
   name: string

@@ -11,6 +11,8 @@ import type {
   CartResponse,
   CartItemResponse,
   OrderDetailResponse,
+  ConfirmPaymentResponse,
+  ConfirmTossPaymentRequest,
   EnrolledCourse,
   MyComment,
   Order,
@@ -807,8 +809,17 @@ export const api = {
 
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
+  confirmMockPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
+    mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
+      paymentKey,
+      method,
+      amount,
+      issuedCouponId,
+    }),
+  confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
+    mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
   confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) => 
-    mutate<any>(`/api/payments/${orderId}/confirm`, 'POST', { paymentKey, method, amount, issuedCouponId }),
+    api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId),
 
   // Studies
   getMyStudies: async (): Promise<EnrolledCourse[]> => {
