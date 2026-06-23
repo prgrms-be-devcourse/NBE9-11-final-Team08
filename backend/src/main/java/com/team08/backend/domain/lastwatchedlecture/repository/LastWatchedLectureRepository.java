@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -16,6 +17,7 @@ public interface LastWatchedLectureRepository extends JpaRepository<LastWatchedL
     // 강좌별 마지막 시청 강의 원자적 UPSERT.
     // 강의 입장 동시 호출 시 (user_id, course_id) 유니크 충돌(Duplicate entry)을 피하기 위해
     // find-or-save 대신 INSERT ... ON DUPLICATE KEY UPDATE 로 한 번에 처리한다.
+    @Transactional
     @Modifying
     @Query(value = "INSERT INTO last_watched_lectures (user_id, course_id, lecture_id, created_at, updated_at) "
             + "VALUES (:userId, :courseId, :lectureId, NOW(), NOW()) AS new "
