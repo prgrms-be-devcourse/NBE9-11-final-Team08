@@ -33,7 +33,8 @@ public class LearningEventController {
     public LearningEventResponse recordEvent(
             @Valid @RequestBody RecordLearningEventRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal
-            // TODO: 이벤트 기반 lectureProgress 업데이트 작업 추가
+            // LECTURE_EXIT 시 진행상황 마지막 위치 flush 는 이벤트 커밋 후
+            // LectureExitedEventListener 가 best-effort 로 처리한다.
     ) {
         return learningEventService.recordEvent(principal.user().id(), request);
     }
