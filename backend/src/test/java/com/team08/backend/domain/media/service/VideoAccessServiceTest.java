@@ -92,6 +92,7 @@ class VideoAccessServiceTest {
         Long userId = 100L;
         Long courseId = 50L;
         String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
+        String videoUuid = "c0a80101-1234-5678-90ab-cdef12345678";
 
         Lecture lecture = mock(Lecture.class);
         Chapter chapter = mock(Chapter.class);
@@ -103,6 +104,7 @@ class VideoAccessServiceTest {
         given(chapter.getCourse()).willReturn(course);
         given(course.getId()).willReturn(courseId);
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
+        given(lecture.getVideoUuid()).willReturn(videoUuid);
 
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
                 .willReturn(true);
@@ -123,7 +125,7 @@ class VideoAccessServiceTest {
     }
 
     @Test
-    void m3u8경로가_null인_경우_잘못된_파라미터_예외를_던진다() {
+    void videoUuid가_null인_경우_잘못된_파라미터_예외를_던진다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
@@ -137,7 +139,7 @@ class VideoAccessServiceTest {
         given(lecture.getChapter()).willReturn(chapter);
         given(chapter.getCourse()).willReturn(course);
         given(course.getId()).willReturn(courseId);
-        given(lecture.getM3u8Path()).willReturn(null);
+        given(lecture.getVideoUuid()).willReturn(null);
 
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
                 .willReturn(true);
@@ -150,11 +152,10 @@ class VideoAccessServiceTest {
     }
 
     @Test
-    void m3u8경로에_유효한_UUID가_없는_경우_잘못된_파라미터_예외를_던진다() {
+    void videoUuid가_공백인_경우_잘못된_파라미터_예외를_던진다() {
         Long lectureId = 1L;
         Long userId = 100L;
         Long courseId = 50L;
-        String invalidM3u8Path = "https://cdn.com/lectures/1/invalid-format-path/index.m3u8";
 
         Lecture lecture = mock(Lecture.class);
         Chapter chapter = mock(Chapter.class);
@@ -165,7 +166,7 @@ class VideoAccessServiceTest {
         given(lecture.getChapter()).willReturn(chapter);
         given(chapter.getCourse()).willReturn(course);
         given(course.getId()).willReturn(courseId);
-        given(lecture.getM3u8Path()).willReturn(invalidM3u8Path);
+        given(lecture.getVideoUuid()).willReturn("   ");
 
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, courseId, EnrollmentStatus.ACTIVE))
                 .willReturn(true);

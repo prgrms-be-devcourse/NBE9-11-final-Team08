@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,7 +50,7 @@ class LectureModificationRequestServiceTest {
         // 리팩토링 포인트: 빌더 제거 후 비즈니스 규칙에 호환되는 정적 팩토리 메서드 흐름으로 조립
         Course course = Course.createDraft(instructorId, 1L, "가상 코스", "설명", "thumb.jpg", 0);
         Chapter chapter = Chapter.create("가상 챕터", 1, course);
-        Lecture lecture = Lecture.createWithStream("old/path.m3u8", "가상 강의", "요약", 600, 1, false, chapter);
+        Lecture lecture = Lecture.createWithStream("old/path.m3u8", UUID.randomUUID().toString(), "가상 강의", "요약", 600, 1, false, chapter);
 
         given(lectureRepository.findById(dto.lectureId())).willReturn(Optional.of(lecture));
 
@@ -77,7 +78,7 @@ class LectureModificationRequestServiceTest {
         // 리팩토링 포인트: 빌더 제거 후 비즈니스 규칙에 호환되는 정적 팩토리 메서드 흐름으로 조립
         Course course = Course.createDraft(targetInstructorId, 1L, "타인 코스", "설명", "thumb.jpg", 0);
         Chapter chapter = Chapter.create("타인 챕터", 1, course);
-        Lecture lecture = Lecture.createWithStream("old/path.m3u8", "타인 강의", "요약", 600, 1, false, chapter);
+        Lecture lecture = Lecture.createWithStream("old/path.m3u8", UUID.randomUUID().toString(), "타인 강의", "요약", 600, 1, false, chapter);
 
         given(lectureRepository.findById(dto.lectureId())).willReturn(Optional.of(lecture));
 

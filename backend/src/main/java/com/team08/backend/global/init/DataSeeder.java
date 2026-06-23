@@ -243,8 +243,10 @@ public class DataSeeder {
     private void addLectures(SeedConfig cfg, List<Chapter> chapters, List<Lecture> buffer) {
         for (Chapter chapter : chapters) {
             for (int j = 1; j <= cfg.lecturesPerChapter(); j++) {
+                String mockUuid = UUID.randomUUID().toString();
                 buffer.add(Lecture.createWithStream(
-                        "/hls/" + chapter.getId() + "/" + j + "/index.m3u8",
+                        "/hls/" + chapter.getId() + "/" + mockUuid + "/index.m3u8",
+                        mockUuid,
                         chapter.getTitle() + " - " + j + "강",
                         "강의 요약",
                         600 * j,
@@ -395,11 +397,12 @@ public class DataSeeder {
         for (int i = 0; i < count; i++) {
             Course course = courses.get(i);
             Lecture lecture = sample.get(course.getId());
+            String mockUuid = UUID.randomUUID().toString();
 
             questions.add(QnaQuestion.create(users.get(i).getId(), lecture.getId(), "질문 " + (i + 1), "질문 내용 " + (i + 1)));
             modRequests.add(new LectureModificationRequest(
                     null, lecture, course.getInstructorId(), "영상 교체 요청 " + (i + 1),
-                    lecture.getM3u8Path(), "/hls/new/" + i + "/index.m3u8", RequestStatus.PENDING, null, null));
+                    lecture.getM3u8Path(), "/hls/new/" + mockUuid + "/index.m3u8", mockUuid, RequestStatus.PENDING, null, null));
         }
         List<QnaQuestion> savedQuestions = qnaQuestionRepository.saveAll(questions);
 
