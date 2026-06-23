@@ -807,6 +807,8 @@ export const api = {
 
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
+  confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) => 
+    mutate<any>(`/api/payments/${orderId}/confirm`, 'POST', { paymentKey, method, amount, issuedCouponId }),
 
   // Studies
   getMyStudies: async (): Promise<EnrolledCourse[]> => {

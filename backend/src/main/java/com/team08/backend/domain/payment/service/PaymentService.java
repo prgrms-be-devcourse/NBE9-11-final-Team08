@@ -21,6 +21,9 @@ import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
+import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +46,8 @@ public class PaymentService {
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final TossPaymentClient tossPaymentClient;
+    private final IssuedCouponService issuedCouponService;
+    private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final Clock clock;
 
     @Transactional
@@ -53,7 +58,19 @@ public class PaymentService {
         validateConfirmableOrder(order);
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
         validateConfirmablePayment(existingPayment);
-        validatePaymentAmount(order, request.amount());
+
+        int expectedDiscount = 0;
+        if (request.issuedCouponId() != null) {
+            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
+        }
+
+        validatePaymentAmount(order, request.amount(), expectedDiscount);
+
+        if (request.issuedCouponId() != null) {
+            int actualDiscount = issuedCouponService.useCouponForOrder(userId, request.issuedCouponId(), order.getTotalPrice());
+            order.applyDiscount(actualDiscount);
+            orderCouponUsageRepository.save(new OrderCouponUsage(order.getId(), request.issuedCouponId(), actualDiscount));
+        }
 
         List<OrderItem> orderItems = findOrderItems(order);
         validateDuplicateEnrollment(userId, orderItems);
@@ -76,7 +93,13 @@ public class PaymentService {
         validateConfirmableOrder(order);
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
         validateConfirmablePayment(existingPayment);
-        validatePaymentAmount(order, request.amount());
+
+        int expectedDiscount = 0;
+        if (request.issuedCouponId() != null) {
+            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
+        }
+
+        validatePaymentAmount(order, request.amount(), expectedDiscount);
 
         List<OrderItem> orderItems = findOrderItems(order);
         validateDuplicateEnrollment(userId, orderItems);
@@ -97,7 +120,7 @@ public class PaymentService {
                     order.getOrderNumber(),
                     request.amount()
             ));
-            return completeTossPayment(userId, order, orderItems, payment, attempt, tossResponse);
+            return completeTossPayment(userId, order, orderItems, payment, attempt, tossResponse, request.issuedCouponId());
         } catch (TossPaymentException e) {
             return failTossPayment(order, payment, attempt, request, e);
         }
@@ -107,7 +130,13 @@ public class PaymentService {
     public PaymentResponse failPayment(Long userId, Long orderId, FailPaymentRequest request) {
         Order order = findMyPaymentOrder(userId, orderId);
         validateFailableOrder(order);
-        validatePaymentAmount(order, request.amount());
+
+        int expectedDiscount = 0;
+        if (request.issuedCouponId() != null) {
+            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
+        }
+
+        validatePaymentAmount(order, request.amount(), expectedDiscount);
 
         LocalDateTime declinedAt = LocalDateTime.now(clock);
         Payment savedPayment = processDeclinedPayment(order, request, declinedAt);
@@ -170,8 +199,8 @@ public class PaymentService {
         }
     }
 
-    private void validatePaymentAmount(Order order, int requestAmount) {
-        if (order.getFinalPrice() != requestAmount) {
+    private void validatePaymentAmount(Order order, int requestAmount, int expectedDiscount) {
+        if (order.getFinalPrice() - expectedDiscount != requestAmount) {
             throw new CustomException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
         }
     }
@@ -228,10 +257,17 @@ public class PaymentService {
             List<OrderItem> orderItems,
             Payment payment,
             PaymentAttempt attempt,
-            TossPaymentResponse tossResponse
+            TossPaymentResponse tossResponse,
+            Long issuedCouponId
     ) {
         LocalDateTime completedAt = approvedAtOrNow(tossResponse.approvedAt());
-        if (!isValidTossPaymentResult(tossResponse, order)) {
+        
+        int expectedDiscount = 0;
+        if (issuedCouponId != null) {
+            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, order.getTotalPrice()).discountAmount();
+        }
+
+        if (!isValidTossPaymentResult(tossResponse, order, expectedDiscount)) {
             attempt.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
             payment.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
@@ -252,6 +288,12 @@ public class PaymentService {
         attempt.succeed(tossResponse.paymentKey(), completedAt);
         payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
         Payment savedPayment = paymentRepository.save(payment);
+
+        if (issuedCouponId != null) {
+            int actualDiscount = issuedCouponService.useCouponForOrder(userId, issuedCouponId, order.getTotalPrice());
+            order.applyDiscount(actualDiscount);
+            orderCouponUsageRepository.save(new OrderCouponUsage(order.getId(), issuedCouponId, actualDiscount));
+        }
 
         markOrderPaid(order, completedAt);
         List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, completedAt);
@@ -295,9 +337,9 @@ public class PaymentService {
         return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
     }
 
-    private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order) {
+    private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order, int expectedDiscount) {
         return order.getOrderNumber().equals(response.orderId())
-                && order.getFinalPrice() == response.totalAmount();
+                && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
     }
 
     private LocalDateTime approvedAtOrNow(OffsetDateTime approvedAt) {

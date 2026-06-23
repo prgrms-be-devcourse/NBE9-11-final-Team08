@@ -8,6 +8,8 @@ public record ConfirmPaymentRequest(
         @Schema(description = "결제 수단", example = "CARD")
         String method,
         @Schema(description = "결제 승인 요청 금액", example = "30000")
-        int amount
+        int amount,
+        @Schema(description = "적용할 발급 쿠폰 ID", example = "1")
+        Long issuedCouponId
 ) {
 }

@@ -163,19 +163,26 @@ public class IssuedCouponService {
         );
     }
 
-    // TODO 나중에 결제에 추가
     // [시스템] 결제 시 쿠폰 사용 처리
     @Transactional
     public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
         LocalDateTime now = LocalDateTime.now(clock);
-        CouponUsageContext context = getUsableCouponContext(userId, issuedCouponId, now);
-        CouponPolicy policy = context.couponPolicy();
+
+        // 비관적 락 조회
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(issuedCouponId)
+                .orElseThrow(CouponNotFoundException::new);
+
+        // 사용 가능 여부 검증
+        issuedCoupon.validateUsable(userId, now);
+
+        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
+                .orElseThrow(CouponPolicyNotFoundException::new);
 
         // 할인 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
 
         // 쿠폰 사용 처리
-        context.issuedCoupon().applyUsage(policy.getUsageType(), now);
+        issuedCoupon.applyUsage(policy.getUsageType(), now);
 
         // 최종 할인된 금액 반환
         return discountAmount;

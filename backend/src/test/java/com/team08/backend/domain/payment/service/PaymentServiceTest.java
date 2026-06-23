@@ -3,9 +3,11 @@ package com.team08.backend.domain.payment.service;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
+import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.domain.payment.client.TossPaymentClient;
@@ -26,6 +28,7 @@ import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -81,6 +84,12 @@ class PaymentServiceTest {
     @Mock
     private TossPaymentClient tossPaymentClient;
 
+    @Mock
+    private IssuedCouponService issuedCouponService;
+
+    @Mock
+    private OrderCouponUsageRepository orderCouponUsageRepository;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -92,6 +101,8 @@ class PaymentServiceTest {
                 orderItemRepository,
                 enrollmentRepository,
                 tossPaymentClient,
+                issuedCouponService,
+                orderCouponUsageRepository,
                 FIXED_CLOCK
         );
     }
@@ -149,6 +160,37 @@ class PaymentServiceTest {
                     assertThat(enrollment.getEnrolledAt()).isEqualTo(FIXED_NOW);
                     assertThat(enrollment.getCreatedAt()).isEqualTo(FIXED_NOW);
                 });
+    }
+
+    @Test
+    @DisplayName("쿠폰을 사용하여 결제를 승인하면 할인 금액이 적용되고 사용 내역이 저장된다")
+    void confirmPaymentWithCouponAppliesDiscountAndSavesUsage() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        Long issuedCouponId = 55L;
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+
+        given(issuedCouponService.calculateExpectedDiscount(USER_ID, issuedCouponId, 30_000))
+                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse("Coupon", 30_000, 5000, 25_000));
+        given(issuedCouponService.useCouponForOrder(USER_ID, issuedCouponId, 30_000)).willReturn(5000);
+
+        stubPaymentSave();
+        stubEnrollmentSaveAll();
+
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, new ConfirmPaymentRequest("payment-key", "CARD", 25_000, issuedCouponId));
+
+        verify(orderCouponUsageRepository).save(any());
+        assertThat(order.getDiscountPrice()).isEqualTo(5000);
+        assertThat(order.getFinalPrice()).isEqualTo(25_000);
+        assertThat(response.amount()).isEqualTo(25_000);
     }
 
     @Test
@@ -669,7 +711,7 @@ class PaymentServiceTest {
     }
 
     private ConfirmPaymentRequest confirmRequest(int amount) {
-        return new ConfirmPaymentRequest("payment-key", "CARD", amount);
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null);
     }
 
     private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
@@ -684,7 +726,7 @@ class PaymentServiceTest {
     }
 
     private FailPaymentRequest failRequest(int amount) {
-        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패");
+        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패", null);
     }
 
     private List<Enrollment> toList(Iterable<Enrollment> enrollments) {

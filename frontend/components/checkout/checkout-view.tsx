@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { useCart } from '@/components/providers/cart-provider'
 import { api } from '@/lib/api'
@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
-const POINTS_AVAILABLE = 12000
+
 
 // 기본 제공되는 테스트용 쿠폰 데이터 (실제 데이터 로드 전 Fallback)
 const fallbackCoupons = [
@@ -36,7 +36,7 @@ export function CheckoutView() {
   const router = useRouter()
   const { items, clear } = useCart()
   const [couponId, setCouponId] = useState<string>('none')
-  const [points, setPoints] = useState(0)
+
   const [method, setMethod] = useState('card')
   const [agree, setAgree] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,15 +47,20 @@ export function CheckoutView() {
     // 사용자가 보유한 쿠폰 목록 불러오기 연동
     const fetchCoupons = async () => {
       try {
-        if ('getCoupons' in api) {
-          const res = await (api as any).getCoupons()
+        if ('getMyCoupons' in api) {
+          const res = await api.getMyCoupons()
           if (Array.isArray(res) && res.length > 0) {
-            // 백엔드 구조에 맞춰 변환 (CouponListResponse)
-            const mapped = res.map((c: any) => ({
-              id: c.issuedCouponId?.toString() || c.id,
-              name: c.policyName || c.name,
-              kind: c.discountType === 'RATE' || c.type === 'percent' ? 'percent' : 'amount',
-              value: Number(c.discountValue) || Number(c.amount?.replace(/[^0-9]/g, '') || 0),
+            const activeCouponsFromRes = res.filter((c: any) => c.status === 'ACTIVE')
+            const mapped = activeCouponsFromRes.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              kind: c.type === 'percent' || (typeof c.amount === 'string' && c.amount.includes('%')) ? 'percent' : 'amount',
+              value: Number(c.amount?.replace(/[^0-9]/g, '') || 0),
+              originalAmountString: c.amount,
+              minOrderAmount: c.minOrderAmount || 0,
+              maxDiscountAmount: c.maxDiscountAmount || null,
+              courseIds: c.courseIds || [],
+              categoryIds: c.categoryIds || [],
             }))
             setUserCoupons(mapped)
           } else {
@@ -77,17 +82,30 @@ export function CheckoutView() {
   const activeCoupons = userCoupons.length > 0 ? userCoupons : fallbackCoupons
   const coupon = activeCoupons.find((c) => c.id === couponId)
   
-  const couponDiscount = coupon
-    ? coupon.kind === 'percent'
-      ? Math.round((subtotal * coupon.value) / 100)
-      : coupon.value
-    : 0
+  const isCouponApplicable = (c: any) => {
+    if (c.minOrderAmount && subtotal < c.minOrderAmount) return false
+    if (c.courseIds && c.courseIds.length > 0) {
+      const hasApplicable = items.some(item => c.courseIds.includes(Number(item.courseId)))
+      if (!hasApplicable) return false
+    }
+    return true
+  }
+  
+  const couponDiscount = useMemo(() => {
+    if (!coupon || !isCouponApplicable(coupon)) return 0;
     
-  const usablePoints = Math.max(
-    0,
-    Math.min(points || 0, POINTS_AVAILABLE, subtotal - couponDiscount),
-  )
-  const total = Math.max(0, subtotal - couponDiscount - usablePoints)
+    if (coupon.kind === 'percent') {
+      let calc = Math.round((subtotal * coupon.value) / 100);
+      if (coupon.maxDiscountAmount && calc > coupon.maxDiscountAmount) {
+        calc = coupon.maxDiscountAmount;
+      }
+      return calc;
+    }
+    
+    return coupon.value;
+  }, [coupon, subtotal])
+    
+  const total = Math.max(0, subtotal - couponDiscount)
 
   if (items.length === 0) {
     return (
@@ -108,13 +126,25 @@ export function CheckoutView() {
     
     setIsSubmitting(true)
     try {
-      // 결제 생성 API (api.createOrderFromCart)
+      // 1. 주문 생성
       const order = await api.createOrderFromCart()
+      const orderId = order.orderId
+      
+      // 2. 결제 승인 및 쿠폰 적용 처리 (Mock 결제)
+      const selectedCouponId = couponId !== 'none' ? Number(couponId) : null
+      const paymentResponse = await api.confirmPayment(
+        orderId, 
+        'mock-payment-key-' + Date.now(), 
+        method.toUpperCase(), 
+        total, 
+        selectedCouponId
+      )
+
       await clear() // 결제 성공 시 장바구니 비우기
       
-      // 결제 완료 페이지로 리다이렉트 (주문 번호 및 금액 전달)
-      const orderNum = order.orderNumber || order.orderId || 'NEW_ORDER'
-      const finalPrice = order.finalPrice || total
+      // 결제 완료 페이지로 리다이렉트
+      const orderNum = paymentResponse.orderNumber || order.orderNumber || 'NEW_ORDER'
+      const finalPrice = paymentResponse.amount || total
       router.push(`/orders/complete?orderId=${orderNum}&amount=${finalPrice}`)
       toast.success('결제가 완료되었습니다.')
     } catch (e: any) {
@@ -163,40 +193,27 @@ export function CheckoutView() {
                 <Label>쿠폰</Label>
                 <Select value={couponId} onValueChange={(value) => setCouponId(value ?? 'none')}>
                   <SelectTrigger>
-                    <SelectValue placeholder="사용할 쿠폰을 선택하세요" />
+                    <SelectValue placeholder="사용할 쿠폰을 선택하세요">
+                      {couponId !== 'none' && activeCoupons.find(c => c.id === couponId)
+                        ? `${activeCoupons.find(c => c.id === couponId)?.name} ${activeCoupons.find(c => c.id === couponId)?.originalAmountString ? `(${activeCoupons.find(c => c.id === couponId)?.originalAmountString})` : ''}`
+                        : "사용할 쿠폰을 선택하세요"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">선택 안함</SelectItem>
-                    {activeCoupons.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
+                    {activeCoupons.map((c) => {
+                      const applicable = isCouponApplicable(c)
+                      return (
+                        <SelectItem key={c.id} value={c.id} disabled={!applicable}>
+                          <span className={applicable ? '' : 'text-muted-foreground line-through'}>
+                            {c.name} {c.originalAmountString ? `(${c.originalAmountString})` : ''}
+                          </span>
+                          {!applicable && <span className="ml-2 text-xs text-destructive">(적용 불가)</span>}
+                        </SelectItem>
+                      )
+                    })}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="points">
-                  포인트 사용{' '}
-                  <span className="text-xs text-muted-foreground">
-                    (보유 {formatKRW(POINTS_AVAILABLE)})
-                  </span>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="points"
-                    type="number"
-                    value={points || ''}
-                    onChange={(e) => setPoints(Number(e.target.value))}
-                    placeholder="0"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => setPoints(POINTS_AVAILABLE)}
-                  >
-                    전액 사용
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -244,10 +261,6 @@ export function CheckoutView() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">쿠폰 할인</span>
                 <span className="text-destructive">- {formatKRW(couponDiscount)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">포인트 사용</span>
-                <span className="text-destructive">- {formatKRW(usablePoints)}</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between">

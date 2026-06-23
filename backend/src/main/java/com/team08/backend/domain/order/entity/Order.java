@@ -111,6 +111,14 @@ public class Order {
         this.finalPrice += finalPrice;
     }
 
+    public void applyDiscount(int discountAmount) {
+        if (this.finalPrice < discountAmount) {
+            throw new CustomException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
+        }
+        this.discountPrice += discountAmount;
+        this.finalPrice -= discountAmount;
+    }
+
     public void markPaid(LocalDateTime paidAt) {
         validateStatus(OrderStatus.PENDING_PAYMENT);
         this.status = OrderStatus.PAID;

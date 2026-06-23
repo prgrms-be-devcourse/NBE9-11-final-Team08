@@ -9,6 +9,11 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OrderCouponUsage {
+    public OrderCouponUsage(Long orderId, Long issuedCouponId, Integer discountAmount) {
+        this.orderId = orderId;
+        this.issuedCouponId = issuedCouponId;
+        this.discountAmount = discountAmount;
+    }
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false)
