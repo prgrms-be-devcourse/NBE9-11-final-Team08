@@ -29,7 +29,7 @@ public class LectureModificationApprovalService {
         request.approve(adminId);
 
         Lecture lecture = request.getLecture();
-        lecture.updateM3u8Path(request.getAfterM3u8Path());
+        lecture.updateM3u8Path(request.getAfterM3u8Path(), request.getAfterVideoUuid());
     }
 
     @Transactional

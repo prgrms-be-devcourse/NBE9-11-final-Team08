@@ -37,7 +37,8 @@ public class EncodingResultHandlerImpl implements EncodingResultHandler {
                 lecture,
                 instructorId,
                 description,
-                dbSavePath
+                dbSavePath,
+                targetDirName
         );
         requestRepository.save(modificationRequest);
 

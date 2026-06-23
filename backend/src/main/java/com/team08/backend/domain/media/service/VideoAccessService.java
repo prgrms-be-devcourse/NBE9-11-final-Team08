@@ -16,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -27,7 +25,6 @@ public class VideoAccessService {
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
-    private static final Pattern LECTURE_PATH_PATTERN = Pattern.compile("/lectures/\\d+/([a-f0-9\\-]{36})(?:/|$)");
 
     @Transactional(readOnly = true)
     public VideoStreamResponse verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
@@ -49,24 +46,15 @@ public class VideoAccessService {
             throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
         }
 
-        String uuid = extractUuid(m3u8Path);
-        String resourcePath = "/lectures/" + lectureId + "/" + uuid + "/*";
+        String videoUuid = lecture.getVideoUuid();
+        if (videoUuid == null || videoUuid.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        String resourcePath = "/lectures/" + lectureId + "/" + videoUuid + "/*";
         String cookiePath = "/lectures/" + lectureId + "/";
         ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(resourcePath, cookiePath);
 
         return new VideoStreamResponse(m3u8Path, Arrays.asList(cookies));
-    }
-
-    private String extractUuid(String m3u8Path) {
-        if (m3u8Path == null) {
-            log.warn("Lecture path data integrity violation: path is null");
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        Matcher matcher = LECTURE_PATH_PATTERN.matcher(m3u8Path);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        log.warn("Lecture path format mismatch validation failed. Input: [{}], Expected Pattern: [{}]", m3u8Path, LECTURE_PATH_PATTERN.pattern());
-        throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
     }
 }
