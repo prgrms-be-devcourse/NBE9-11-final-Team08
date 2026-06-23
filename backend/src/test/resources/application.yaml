@@ -48,6 +48,9 @@ spring:
         private-key: test-dummy-private-key-value
 
 app:
+  issued-coupon-job:
+    stream-worker:
+      enabled: false
   feed:
     outbox:
       scheduler-enabled: false

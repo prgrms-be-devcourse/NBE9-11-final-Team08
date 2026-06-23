@@ -37,6 +37,7 @@ function CouponCard({
 }) {
   const [claimed, setClaimed] = useState(isOwned)
   const [loading, setLoading] = useState(false)
+  const [quantity, setQuantity] = useState(coupon.totalQuantity)
   const Icon = iconFor(coupon.type)
   const ended = coupon.category === '종료된 이벤트'
   const isUpcoming = coupon.status === 'SCHEDULED'
@@ -55,6 +56,9 @@ function CouponCard({
     try {
       await api.downloadCoupon(Number(coupon.id))
       setClaimed(true)
+      if (coupon.type === 'firstcome' && quantity !== null && quantity !== undefined) {
+        setQuantity((prev) => (prev && prev > 0 ? prev - 1 : 0))
+      }
       toast.success('쿠폰이 발급되었습니다.')
     } catch (e: any) {
       toast.error(e.message || '쿠폰 발급에 실패했습니다.')
@@ -63,8 +67,24 @@ function CouponCard({
     }
   }
 
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '-'
+  const formatDate = (dateVal?: any | null) => {
+    if (!dateVal) return '-'
+    let dateStr = ''
+    if (Array.isArray(dateVal)) {
+      const [year, month, day, hour = 0, minute = 0] = dateVal
+      const pad = (n: number) => String(n).padStart(2, '0')
+      dateStr = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}`
+    } else if (typeof dateVal === 'string') {
+      dateStr = dateVal
+    } else if (dateVal instanceof Date) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+      dateStr = `${dateVal.getFullYear()}-${pad(dateVal.getMonth() + 1)}-${pad(dateVal.getDate())}T${pad(dateVal.getHours())}:${pad(dateVal.getMinutes())}`
+    } else {
+      dateStr = String(dateVal)
+    }
+
+    if (!dateStr || dateStr === 'null' || dateStr === 'undefined') return '-'
+
     const parts = dateStr.split('T')
     const datePart = parts[0].replace(/-/g, '.')
     if (parts[1]) {
@@ -111,9 +131,9 @@ function CouponCard({
                 {couponTypeLabel}
               </Badge>
             </div>
-            {coupon.type === 'firstcome' && coupon.totalQuantity !== undefined && coupon.totalQuantity !== null && (
+            {coupon.type === 'firstcome' && quantity !== undefined && quantity !== null && (
               <span className="text-xs font-semibold text-destructive mt-0.5">
-                남은 수량: {coupon.totalQuantity.toLocaleString()}개
+                남은 수량: {quantity.toLocaleString()}개
               </span>
             )}
           </div>

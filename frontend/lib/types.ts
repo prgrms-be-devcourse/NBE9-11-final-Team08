@@ -170,7 +170,7 @@ export interface AdminCoupon {
   discountType: CouponDiscountType
   discountValue: number
   maxDiscount: number | null
-  minOrderAmount: number
+  minOrderAmount: number | null
   validDays: number | null
   startAt: string
   endAt: string
@@ -209,7 +209,7 @@ export interface AdminCouponPolicyRequest {
   discountType: CouponDiscountType
   discountValue: number
   maxDiscountAmount: number | null
-  minOrderAmount: number
+  minOrderAmount: number | null
   validDays: number | null
   issueStartDate: string | null
   issueEndDate: string | null
@@ -226,6 +226,11 @@ export interface CouponListResponse {
   status: string
   usageType: string
   isStackable: boolean
+  maxDiscountAmount: number | null
+  minOrderAmount: number | null
+  couponTarget: 'ALL' | 'CATEGORY' | 'COURSE'
+  categoryIds: number[]
+  courseIds: number[]
 }
 
 export interface QnaPost {

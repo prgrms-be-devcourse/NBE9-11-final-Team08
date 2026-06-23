@@ -6,6 +6,10 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   application:
     name: backend
@@ -56,6 +60,12 @@ app:
       max-retries: ${FEED_OUTBOX_MAX_RETRIES:5}
       retry-base-delay-seconds: ${FEED_OUTBOX_RETRY_BASE_DELAY_SECONDS:10}
       retry-max-delay-seconds: ${FEED_OUTBOX_RETRY_MAX_DELAY_SECONDS:600}
+  payment:
+    toss:
+      base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
+      secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
+      connect-timeout: ${TOSS_PAYMENTS_CONNECT_TIMEOUT:3s}
+      read-timeout: ${TOSS_PAYMENTS_READ_TIMEOUT:5s}
 
 cloud:
   aws:

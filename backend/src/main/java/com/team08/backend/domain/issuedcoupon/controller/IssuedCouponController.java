@@ -1,8 +1,8 @@
 package com.team08.backend.domain.issuedcoupon.controller;
 
+import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
-import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +30,7 @@ public class IssuedCouponController {
     // [사용자] 쿠폰 다운로드 /api/coupons/{policyId}/download
     @PostMapping("/{policyId}/download")
     @Operation(summary = "쿠폰 다운로드", description = "지정한 쿠폰 정책 ID로 쿠폰을 다운로드합니다. (일반/선착순 등 타입에 따라 자동 처리)")
-    public IssuedCouponResponse downloadCoupon(
+    public CouponDownloadResponse downloadCoupon(
             @Parameter(description = "다운로드할 쿠폰 정책 ID")
             @PathVariable Long policyId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {

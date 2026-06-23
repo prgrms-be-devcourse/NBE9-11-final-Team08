@@ -4,13 +4,16 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
-import com.team08.backend.domain.issuedcoupon.dto.IssuedCouponResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -27,9 +32,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -52,7 +59,16 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponWriter issuedCouponWriter;
 
-    private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
+    @Mock
+    private IssuedCouponJobWriter issuedCouponJobWriter;
+
+    @Mock
+    private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
+    private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
 
@@ -64,6 +80,9 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
+                issuedCouponJobWriter,
+                issuedCouponJobStreamPublisher,
+                transactionTemplate,
                 clock
         );
     }
@@ -79,20 +98,48 @@ class IssuedCouponServiceTest {
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-
-        // writer 모킹
         when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
 
         // when
-        IssuedCouponResponse response = issuedCouponService.downloadCoupon(userId, policyId);
+        CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
 
         // then
         assertThat(response).isNotNull();
+        verify(transactionTemplate, times(1)).execute(any());
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
+        verify(issuedCouponJobWriter, never()).createRequested(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("성공: 선착순 쿠폰 Stream 적재 실패 시 예외를 전파한다")
+    void downloadFcfsCoupon_streamPublishFail_throwException() {
+        // given
+        Long userId = 1L;
+        Long policyId = 1L;
+        IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        IssuedCouponJob issuedCouponJob = mock(IssuedCouponJob.class);
+
+        when(userRepository.existsById(userId)).thenReturn(true);
+        when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
+        when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
+        when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
+        when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
+        when(issuedCouponJob.getId()).thenReturn(1L);
+        when(issuedCouponJobStreamPublisher.publish(1L, userId, policyId))
+                .thenThrow(new IllegalStateException("stream"));
+
+        // when & then
+        assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -175,4 +222,5 @@ class IssuedCouponServiceTest {
         verify(issuedCoupon).validateUsable(userId, now);
         verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE, now);
     }
+
 }

@@ -5,6 +5,7 @@ import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,9 @@ class FcfsIssuedCouponStrategyTest {
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
 
+    @Mock
+    private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private FcfsIssuedCouponStrategy fcfsIssuedCouponStrategy;
@@ -44,9 +48,9 @@ class FcfsIssuedCouponStrategyTest {
     @BeforeEach
     void setUp() {
         fcfsIssuedCouponStrategy = new FcfsIssuedCouponStrategy(
-                issuedCouponRepository,
                 clock,
-                couponPolicyRepository
+                couponPolicyRepository,
+                fcfsCouponRedisIssuer
         );
     }
 
@@ -59,8 +63,7 @@ class FcfsIssuedCouponStrategyTest {
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now(clock);
 
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
-        when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(policy.getId()).thenReturn(policyId);
         when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
 
@@ -69,9 +72,11 @@ class FcfsIssuedCouponStrategyTest {
 
         // then
         assertThat(result).isNotNull();
-        verify(couponPolicyRepository).findByIdWithLock(policyId);
-        verify(couponPolicyRepository, never()).findById(policyId);
-        verify(policy).decreaseQuantity();
+        verify(couponPolicyRepository).findById(policyId);
+        verify(couponPolicyRepository, never()).findByIdWithLock(policyId);
+        verify(issuedCouponRepository, never()).existsByUserIdAndPolicyId(userId, policyId);
+        verify(fcfsCouponRedisIssuer).issue(userId, policy);
+        verify(policy, never()).decreaseQuantity();
     }
 
     @Test
@@ -82,12 +87,13 @@ class FcfsIssuedCouponStrategyTest {
         Long policyId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
 
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
-        doThrow(new CouponExhaustedException()).when(policy).decreaseQuantity();
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
+        doThrow(new CouponExhaustedException()).when(fcfsCouponRedisIssuer).issue(userId, policy);
 
         // when & then
         assertThatThrownBy(() -> fcfsIssuedCouponStrategy.issue(userId, policyId))
                 .isInstanceOf(CouponExhaustedException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_EXHAUSTED);
     }
+
 }

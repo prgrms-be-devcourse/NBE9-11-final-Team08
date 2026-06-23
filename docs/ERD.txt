@@ -45,21 +45,21 @@ Enum study_member_status {
   KICKED
   LEFT
 }
-Enum discount_type {
+Enum discount_type { 
   AMOUNT
-  PERCENT
+  PERCENT 
 }
-Enum coupon_status {
+Enum coupon_status { 
   ISSUED
   USED
-  EXPIRED
+  EXPIRED 
 }
-Enum coupon_type {
+Enum coupon_type { 
   AUTO
   NORMAL
-  FCFS
+  FCFS 
 }
-Enum coupon_target {
+Enum coupon_target { 
   ALL
   CATEGORY
   COURSE
@@ -68,7 +68,7 @@ Enum coupon_usage_type {
   SINGLE_USE
   MULTI_USE
 }
-Enum ai_feedback_status {
+Enum ai_feedback_status { 
   PENDING
   PROCESSING
   COMPLETED
@@ -91,13 +91,11 @@ Enum enrollment_status {
 Enum feed_item_type {
   STUDY_ACTIVITY
 }
-Enum feed_outbox_event_status {
-  PENDING
-  PUBLISHED
-  FAILED
-  DEAD
+Enum issued_coupon_job_status {
+  REQUESTED
+  PROCESSING
+  ISSUED
 }
-
 // =====================================
 // USER DOMAIN
 // =====================================
@@ -194,6 +192,10 @@ Table lecture_modification_requests {
   updated_at datetime [not null]
 }
 
+  managed_by bigint                 // 검토한 관리자 식별자
+  created_at timestamp [not null]   // 신청 일시
+  updated_at timestamp [not null]   // 처리 일시
+}
 // =====================================
 // LEARNING DOMAIN
 // =====================================
@@ -217,6 +219,7 @@ Table enrollments {
 }
 Table lecture_progresses {
   id bigint [pk, increment]
+  lecture_id bigint [not null]
   user_id bigint [not null]
   lecture_id bigint [not null]
   last_position_seconds int [not null, default: 0]
@@ -355,6 +358,19 @@ Table issued_coupons {
 
   indexes {
     (user_id, policy_id) [unique]
+  }
+}
+Table issued_coupon_jobs {
+  id bigint [pk, increment]
+  policy_id bigint [not null]
+  user_id bigint [not null]
+  status issued_coupon_job_status [not null]
+  requested_at datetime [not null]
+  last_tried_at datetime
+  completed_at datetime
+  indexes {
+    (policy_id, user_id)
+    (status)
   }
 }
 Table orders {
@@ -558,6 +574,9 @@ Ref: coupon_policy_courses.coupon_policy_id > coupon_policies.id
 Ref: coupon_policy_courses.course_id > courses.id
 Ref: issued_coupons.policy_id > coupon_policies.id
 Ref: issued_coupons.user_id > users.id
+Ref: issued_coupon_jobs.policy_id > coupon_policies.id
+Ref: issued_coupon_jobs.user_id > users.id
+Ref: seller.user_id > users.id
 Ref: orders.user_id > users.id
 Ref: order_items.order_id > orders.id
 Ref: order_items.course_id > courses.id

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long> {
     // 특정 사용자에게 해당 쿠폰이 이미 발급되었는지 확인
@@ -23,7 +24,10 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
             @Param("issuedStatus") CouponStatus issuedStatus,
             @Param("expiredStatus") CouponStatus expiredStatus
     );
-    
+
     // 특정 정책으로부터 발급된 쿠폰 수 조회
     long countByPolicyId(Long policyId);
+
+    // 특정 사용자에게 발급된 특정 쿠폰 조회
+    Optional<IssuedCoupon> findByUserIdAndPolicyId(Long userId, Long policyId);
 }
