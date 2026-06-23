@@ -61,13 +61,19 @@ class VideoRollbackEventHandlerTest {
     }
 
     @Test
-    void 롤백_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_트리거된다() {
+    void 커밋_완료_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_다형성_메시징으로_트리거된다() {
         videoRollbackEventHandler.cleanUpLeftoverVideos(videoRollbackEvent);
 
-        verify(s3VideoEncodingService, times(1))
-                .deleteEncodedFolder(targetDirName, lectureId);
-        verify(localVideoEncodingService, times(1))
-                .deleteEncodedFolder(targetDirName);
+        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+    }
+
+    @Test
+    void 트랜잭션_롤백_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_다형성_메시징으로_트리거된다() {
+        videoRollbackEventHandler.cleanUpLeftoverVideosOnRollback(videoRollbackEvent);
+
+        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
     }
 
     @Test
@@ -78,9 +84,7 @@ class VideoRollbackEventHandlerTest {
 
         videoRollbackEventHandler.cleanUpLeftoverVideos(videoRollbackEvent);
 
-        verify(s3VideoEncodingService, times(1))
-                .deleteEncodedFolder(targetDirName, lectureId);
-        verify(localVideoEncodingService, times(1))
-                .deleteEncodedFolder(targetDirName);
+        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
     }
 }
