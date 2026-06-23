@@ -40,4 +40,6 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
 
     @Query("SELECT c FROM Course c JOIN Chapter ch ON ch.course = c JOIN Lecture l ON l.chapter = ch WHERE l.id = :lectureId")
     Optional<Course> findByLectureId(@Param("lectureId") Long lectureId);
+
+    Page<Course> findAllByInstructorId(Long instructorId, Pageable pageable);
 }
