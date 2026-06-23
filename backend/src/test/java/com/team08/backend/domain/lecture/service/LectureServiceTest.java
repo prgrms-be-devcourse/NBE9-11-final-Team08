@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,6 +62,7 @@ class LectureServiceTest {
         LectureCreateRequest request = new LectureCreateRequest(
                 "스프링 시큐리티 구조와 흐름",
                 "videos/security.m3u8",
+                UUID.randomUUID().toString(),
                 "시큐리티 필터 체인 분석",
                 1200,
                 1,
@@ -90,6 +92,7 @@ class LectureServiceTest {
         LectureCreateRequest request = new LectureCreateRequest(
                 "스프링 시큐리티 구조와 흐름",
                 "videos/security.m3u8",
+                UUID.randomUUID().toString(),
                 "시큐리티 필터 체인 분석",
                 1200,
                 1,
@@ -112,6 +115,7 @@ class LectureServiceTest {
         LectureCreateRequest request = new LectureCreateRequest(
                 "스프링 시큐리티 구조와 흐름",
                 "videos/security.m3u8",
+                UUID.randomUUID().toString(),
                 "시큐리티 필터 체인 분석",
                 1200,
                 1,

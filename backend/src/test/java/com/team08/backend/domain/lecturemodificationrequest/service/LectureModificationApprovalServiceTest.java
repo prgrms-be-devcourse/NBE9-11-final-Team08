@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +49,7 @@ class LectureModificationApprovalServiceTest {
         Chapter mockChapter = mock(Chapter.class);
         lecture = Lecture.createWithStream(
                 "old-path/output.m3u8",
+                UUID.randomUUID().toString(),
                 "테스트 강의",
                 "요약",
                 600,
@@ -60,7 +62,8 @@ class LectureModificationApprovalServiceTest {
                 lecture,
                 100L,
                 "강의 영상 수정 요청 사유",
-                "new-path/output.m3u8"
+                "new-path/output.m3u8",
+                UUID.randomUUID().toString()
         );
         ReflectionTestUtils.setField(pendingRequest, "id", requestId);
     }

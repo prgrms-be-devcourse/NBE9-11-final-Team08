@@ -41,6 +41,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.UUID;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -133,6 +134,7 @@ class CourseServiceTest {
 
         Lecture paidLecture = Lecture.createWithStream(
                 "videos/paid.m3u8",
+                UUID.randomUUID().toString(),
                 "유료 본 강의",
                 "요약",
                 1200,
@@ -264,7 +266,7 @@ class CourseServiceTest {
         makeAccessible(chapterIdField);
         setField(chapterIdField, chapter, 10L);
 
-        Lecture lecture = Lecture.createWithStream("vid.m3u8", "원래 강의", "", 300, 1, false, chapter);
+        Lecture lecture = Lecture.createWithStream("vid.m3u8", UUID.randomUUID().toString(), "원래 강의", "", 300, 1, false, chapter);
         Field lectureIdField = findField(Lecture.class, "id");
         makeAccessible(lectureIdField);
         setField(lectureIdField, lecture, 20L);
@@ -367,7 +369,7 @@ class CourseServiceTest {
         setField(idField, course, courseId);
 
         Chapter chapter = Chapter.create("챕터", 1, course);
-        Lecture lecture = Lecture.createWithStream("path.m3u8", "강의", "", 300, 1, false, chapter);
+        Lecture lecture = Lecture.createWithStream("path.m3u8", UUID.randomUUID().toString(), "강의", "", 300, 1, false, chapter);
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
@@ -676,7 +678,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 판매자가_삭제_요청_시_소유자가_아니면_예외가_발생한다() {
+    void 판매자가_삭제_요청_시_소유자가_아닌_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
