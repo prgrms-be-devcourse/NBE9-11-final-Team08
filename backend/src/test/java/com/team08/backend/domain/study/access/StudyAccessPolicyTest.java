@@ -64,6 +64,31 @@ class StudyAccessPolicyTest {
     }
 
     @Test
+    void 스터디_OWNER는_수강권_없이도_QnA_답변이_가능하다() {
+        // 강사는 자기 강의를 결제하지 않으므로 enrollment 가 없어도 통과해야 한다.
+        StudyAccessContext context = context(
+                StudyStatus.ACTIVE,
+                false,
+                true,
+                StudyMemberRole.OWNER
+        );
+
+        policy.authorize(context, StudyAction.MANAGE_ANSWER);
+    }
+
+    @Test
+    void OWNER가_아니면_QnA_답변이_거부된다() {
+        StudyAccessContext context = context(
+                StudyStatus.ACTIVE,
+                true,
+                true,
+                StudyMemberRole.MEMBER
+        );
+
+        assertDenied(() -> policy.authorize(context, StudyAction.MANAGE_ANSWER));
+    }
+
+    @Test
     void DRAFT_스터디_OWNER는_커리큘럼을_관리할_수_있다() {
         StudyAccessContext context = context(
                 StudyStatus.DRAFT,

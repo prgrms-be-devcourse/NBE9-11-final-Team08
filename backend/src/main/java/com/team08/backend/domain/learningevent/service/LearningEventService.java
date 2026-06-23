@@ -8,10 +8,12 @@ import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
 import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
+import com.team08.backend.domain.learningevent.event.LectureExitedEvent;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class LearningEventService {
 
     private final LearningEventRepository learningEventRepository;
     private final CourseRepository courseRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     // ── 이벤트 기록 (중복 방지 포함) ───────────────────────────────────
     @Transactional
@@ -38,6 +41,7 @@ public class LearningEventService {
             throw new CustomException(ErrorCode.DUPLICATE_LEARNING_EVENT);
         }
 
+        //1. 이벤트 적재
         LearningEvent event = LearningEvent.create(
                 userId,
                 request.courseId(),
@@ -49,7 +53,22 @@ public class LearningEventService {
                 eventKey
         );
 
-        return LearningEventResponse.from(learningEventRepository.save(event));
+        LearningEvent saved = learningEventRepository.save(event);
+
+        //2. 이벤트 따라 작업 분기 (publisher)
+            // 퇴장은 단일 출처·비가역이라 이벤트 적재가 1급(반드시 커밋).
+            // lecture_progresses 마지막 위치 flush 는 하트비트로 다중화된 best-effort 보정이라
+            // 이벤트 커밋 후(AFTER_COMMIT) 별도 트랜잭션에서 처리해 이벤트를 롤백시키지 않는다.
+        if (saved.getEventType() == LearningEventType.LECTURE_EXIT) {
+            eventPublisher.publishEvent(new LectureExitedEvent(
+                    saved.getUserId(),
+                    saved.getLectureId(),
+                    saved.getPositionSeconds(),
+                    saved.getEventTime()
+            ));
+        }
+
+        return LearningEventResponse.from(saved);
     }
 
     // ── 사용자별 활동 조회 ────────────────────────────────────────────────
