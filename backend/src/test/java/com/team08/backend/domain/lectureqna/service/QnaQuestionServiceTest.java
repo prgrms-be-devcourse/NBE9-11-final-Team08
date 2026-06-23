@@ -1,13 +1,13 @@
 package com.team08.backend.domain.lectureqna.service;
 
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
+import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
+import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,14 +30,16 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class QnaQuestionServiceTest {
 
     @Mock private QnaQuestionRepository qnaQuestionRepository;
     @Mock private QnaAnswerRepository qnaAnswerRepository;
-    @Mock private LectureRepository lectureRepository;
+    @Mock private StudyAccessAuthorizer studyAccessAuthorizer;
 
     @InjectMocks
     private QnaQuestionService qnaQuestionService;
@@ -51,12 +53,6 @@ class QnaQuestionServiceTest {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
-    private void givenLectureExists(Long lectureId) {
-        Lecture lecture = mock(Lecture.class);
-        given(lecture.getDeletedAt()).willReturn(null);
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
-    }
-
     private void givenQuestionExists(Long questionId, QnaQuestion q) {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId))
                 .willReturn(Optional.of(q));
@@ -65,26 +61,41 @@ class QnaQuestionServiceTest {
     // ── 질문 작성 ─────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("질문 작성 성공")
+    @DisplayName("질문 작성 성공 - 활성 스터디 학습자")
     void createQuestion_success() {
-        givenLectureExists(lecture_id);
         given(qnaQuestionRepository.save(any())).willReturn(question);
 
         QnaQuestionResponse response = qnaQuestionService.createQuestion(lecture_id, user_id, "제목", "내용");
 
         assertThat(response.title()).isEqualTo("제목");
         assertThat(response.answer()).isNull();
+        verify(studyAccessAuthorizer).authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
     }
 
     @Test
     @DisplayName("질문 작성 실패 - 강의 없음")
     void createQuestion_lectureNotFound() {
-        given(lectureRepository.findById(any())).willReturn(Optional.empty());
+        willThrow(new CustomException(ErrorCode.LECTURE_NOT_FOUND))
+                .given(studyAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
 
         assertThatThrownBy(() -> qnaQuestionService.createQuestion(lecture_id, user_id, "제목", "내용"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.LECTURE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("질문 작성 실패 - 스터디 학습자 아님")
+    void createQuestion_notStudyLearner() {
+        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+                .given(studyAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
+
+        assertThatThrownBy(() -> qnaQuestionService.createQuestion(lecture_id, user_id, "제목", "내용"))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
     }
 
     // ── 질문 수정 ─────────────────────────────────────────────────────────
