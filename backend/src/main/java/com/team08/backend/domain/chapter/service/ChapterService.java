@@ -71,6 +71,12 @@ public class ChapterService {
                 .orElseGet(() -> getLastWatchedByProgress(courseId, userId));
     }
 
+    // [마이그레이션 브리지] 정상 경로는 아님.
+    // 정상 입장(enterLecture)은 last_watched_lectures 행을 항상 upsert 하므로 보통 이 폴백은 안 탄다.
+    // 이 폴백이 실제로 값을 찾는 경우는 두 가지뿐:
+    //   1) last_watched_lectures 도입(2026-06-21) 이전 데이터 — progress 행은 있으나 last_watched 행이 없음(백필 없이 무중단용)
+    //   2) "입장 없이 하트비트" 비정상 경로 — LectureProgressService 가 progress 행만 lazy 생성
+    // legacy 데이터가 소진되거나 백필을 돌리면 1) 사유는 사라지므로, 이후 제거 가능.
     private LectureEnterResponse getLastWatchedByProgress(Long courseId, Long userId) {
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
         if (lectureIds.isEmpty()) {
@@ -101,15 +107,10 @@ public class ChapterService {
         Chapter chapter = chapterRepository.findById(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
 
-        // URL 정합성: 해당 챕터가 실제로 path 의 강좌 소속인지 확인한다. (수강권 검사는 enterLecture 가 담당)
-        if (!chapter.getCourse().getId().equals(courseId)) {
-            throw new CustomException(ErrorCode.CHAPTER_NOT_FOUND);
-        }
-
         Lecture lecture = lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER));
 
-        return lectureService.enterLecture(lecture.getId(), userId);
+        return lectureService.enterLecture(courseId,chapterId,lecture.getId(), userId);
     }
 
 }

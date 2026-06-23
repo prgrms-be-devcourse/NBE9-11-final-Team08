@@ -2,7 +2,6 @@ package com.team08.backend.domain.lecture.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
-import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
@@ -27,26 +26,36 @@ public class LectureService {
     private final ChapterRepository chapterRepository;
     private final LectureProgressService lectureProgressService;
     private final LastWatchedLectureService lastWatchedLectureService;
-    private final EnrollmentAccessValidator enrollmentAccessValidator;
     /**
      * 특정 강의 러닝 스페이스 입장 — 강의 메타데이터 + 학습 진행 정보를 반환한다.
      * 입장 시 진행 행이 없으면 생성한다(수강권 보유·무료 강의에 한해). 이는 이후 하트비트가
      * 벽시계 경계를 적용할 서버 기준점(updatedAt)을 입장 시점에 확보하기 위함이다.
      */
     @Transactional
-    public LectureEnterResponse enterLecture(Long lectureId, Long userId) {
+    public LectureEnterResponse enterLecture(Long courseId, Long chapterId,Long lectureId, Long userId) {
+
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
-        Long courseId = lecture.getChapter().getCourse().getId();
+        // URL 정합성: lecture 가 path 의 chapter·course 소속인지 검증한다.
+        // findByIdWithChapterAndCourse 가 chapter/course 를 이미 join fetch 하므로 추가 쿼리 없이 ID 비교만 한다.
+        Chapter chapter = lecture.getChapter();
+        if (!chapter.getId().equals(chapterId)) {
+            throw new CustomException(ErrorCode.CHAPTER_NOT_FOUND);
+        }
+        if (!chapter.getCourse().getId().equals(courseId)) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
 
-        //수강권 검사
-        enrollmentAccessValidator.validateActiveEnrollment(userId, courseId);
-
+        // 입장 자체는 막지 않는다(미등록자도 메타데이터 제공). 영상 재생은 VideoAccessService 가 차단.
+        // 수강권/무료맛보기일 때만 progress 행이 생긴다(아니면 null).
         LectureProgress progress = lectureProgressService.ensureStarted(userId, lecture, LocalDateTime.now());
 
-        // 강좌별 "마지막 시청 강의" 캐시 갱신 — 이후 조회를 단건 조회로 끝내기 위함
-        lastWatchedLectureService.record(userId, courseId, lecture.getId());
+        // 강좌별 "마지막 시청 강의" 갱신 — progress 가 생긴 정상 시청자에게만.
+        // (record 무조건 호출은 미등록자에게 progress 없는 last_watched 행을 만들어 오염시켰음)
+        if (progress != null) {
+            lastWatchedLectureService.record(userId, courseId, lecture.getId());
+        }
 
         return LectureEnterResponse.of(lecture, progress);
     }
