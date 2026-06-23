@@ -10,6 +10,8 @@ public record FailPaymentRequest(
         @Schema(description = "결제 실패 요청 금액", example = "30000")
         int amount,
         @Schema(description = "결제 실패 사유", example = "카드 승인 실패")
-        String failedReason
+        String failedReason,
+        @Schema(description = "적용 시도한 발급 쿠폰 ID", example = "1")
+        Long issuedCouponId
 ) {
 }

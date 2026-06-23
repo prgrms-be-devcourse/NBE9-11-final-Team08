@@ -13,6 +13,7 @@ interface CartContextValue {
   removeItem: (cartItemId: number) => Promise<void>
   removeItems: (cartItemIds: number[]) => Promise<void>
   clear: () => Promise<void>
+  refreshCart: () => Promise<void>
   has: (courseId: string | number) => boolean
   total: number
   loading: boolean
@@ -110,6 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem,
       removeItems,
       clear,
+      refreshCart,
       has: (courseId: string | number) => items.some((i) => i.courseId.toString() === courseId.toString()),
       total,
       loading

@@ -8,6 +8,8 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
 import com.team08.backend.domain.payment.client.TossPaymentClient;
 import com.team08.backend.domain.payment.client.TossPaymentException;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
@@ -81,6 +83,12 @@ class PaymentServiceTest {
     @Mock
     private TossPaymentClient tossPaymentClient;
 
+    @Mock
+    private IssuedCouponService issuedCouponService;
+
+    @Mock
+    private OrderCouponUsageRepository orderCouponUsageRepository;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -92,6 +100,8 @@ class PaymentServiceTest {
                 orderItemRepository,
                 enrollmentRepository,
                 tossPaymentClient,
+                issuedCouponService,
+                orderCouponUsageRepository,
                 FIXED_CLOCK
         );
     }
@@ -669,7 +679,7 @@ class PaymentServiceTest {
     }
 
     private ConfirmPaymentRequest confirmRequest(int amount) {
-        return new ConfirmPaymentRequest("payment-key", "CARD", amount);
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null);
     }
 
     private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
@@ -684,7 +694,7 @@ class PaymentServiceTest {
     }
 
     private FailPaymentRequest failRequest(int amount) {
-        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패");
+        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패", null);
     }
 
     private List<Enrollment> toList(Iterable<Enrollment> enrollments) {
