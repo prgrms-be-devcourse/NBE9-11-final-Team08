@@ -4,13 +4,14 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.enrollment.service.EnrollmentAccessValidator;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -30,9 +31,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+
+import java.time.LocalDateTime;
 
 @ExtendWith(MockitoExtension.class)
 class LectureServiceTest {
@@ -50,7 +52,7 @@ class LectureServiceTest {
     private LastWatchedLectureService lastWatchedLectureService;
 
     @Mock
-    private EnrollmentAccessValidator enrollmentAccessValidator;
+    private LectureAccessValidator lectureAccessValidator;
 
     @InjectMocks
     private LectureService lectureService;
@@ -136,57 +138,50 @@ class LectureServiceTest {
     }
 
     // ── 강의 입장 (enterLecture) ──────────────────────────────────────────
+    // URL 정합성·시청 권한 검증은 LectureAccessValidator 책임이므로 여기선 목으로 대체하고,
+    // enterLecture 의 고유 책임(progress 생성 여부에 따른 last_watched 기록)만 검증한다.
 
     @Test
-    void 수강권이_있으면_강의에_입장한다() {
+    void 진행행이_생기면_입장하고_마지막시청을_기록한다() {
         Long courseId = 10L;
         Long lectureId = 50L;
         Long userId = 1L;
         Lecture lecture = lectureWithCourse(lectureId, courseId);
 
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureAccessValidator.validateForEnter(courseId, CHAPTER_ID, lectureId, userId))
+                .willReturn(lecture);
+        given(lectureProgressService.ensureStarted(eq(userId), eq(lecture), any()))
+                .willReturn(LectureProgress.start(userId, lectureId, 0, LocalDateTime.now()));
 
-        LectureEnterResponse response = lectureService.enterLecture(lectureId, userId);
+        LectureEnterResponse response = lectureService.enterLecture(courseId, CHAPTER_ID, lectureId, userId);
 
         assertThat(response.lectureId()).isEqualTo(lectureId);
-        verify(enrollmentAccessValidator).validateActiveEnrollment(userId, courseId);
-        verify(lectureProgressService).ensureStarted(eq(userId), eq(lecture), any());
         verify(lastWatchedLectureService).record(userId, courseId, lectureId);
     }
 
     @Test
-    void 수강권이_없으면_강의_입장에_실패하고_진행행을_생성하지_않는다() {
+    void 진행행이_없으면_마지막시청을_기록하지_않는다() {
         Long courseId = 10L;
         Long lectureId = 50L;
         Long userId = 1L;
         Lecture lecture = lectureWithCourse(lectureId, courseId);
 
-        given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
-        willThrow(new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED))
-                .given(enrollmentAccessValidator).validateActiveEnrollment(userId, courseId);
+        given(lectureAccessValidator.validateForEnter(courseId, CHAPTER_ID, lectureId, userId))
+                .willReturn(lecture);
+        given(lectureProgressService.ensureStarted(eq(userId), eq(lecture), any())).willReturn(null);
 
-        assertThatThrownBy(() -> lectureService.enterLecture(lectureId, userId))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.ENROLLMENT_ACCESS_DENIED);
+        LectureEnterResponse response = lectureService.enterLecture(courseId, CHAPTER_ID, lectureId, userId);
 
-        verify(lectureProgressService, never()).ensureStarted(any(), any(), any());
+        assertThat(response.lectureId()).isEqualTo(lectureId);
+        verify(lastWatchedLectureService, never()).record(any(), any(), any());
     }
 
-    @Test
-    void 존재하지_않는_강의_입장_시_예외가_발생한다() {
-        given(lectureRepository.findByIdWithChapterAndCourse(any())).willReturn(Optional.empty());
-
-        assertThatThrownBy(() -> lectureService.enterLecture(999L, 1L))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.LECTURE_NOT_FOUND);
-    }
+    private static final Long CHAPTER_ID = 1L;
 
     private Lecture lectureWithCourse(Long lectureId, Long courseId) {
         Course course = TestEntityFactory.course(courseId);
         ReflectionTestUtils.setField(course, "id", courseId);
-        Chapter chapter = ChapterFixture.chapter(1L, "보안 기본", 1, course);
+        Chapter chapter = ChapterFixture.chapter(CHAPTER_ID, "보안 기본", 1, course);
         return LectureFixture.lecture(lectureId, "강의1", "videos/1.m3u8", 600, 1, chapter);
     }
 }
