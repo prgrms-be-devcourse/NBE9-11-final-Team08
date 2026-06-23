@@ -2,6 +2,7 @@ package com.team08.backend.domain.media.service;
 
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.dto.EncodingContext;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +68,11 @@ class LocalVideoEncodingServiceTest {
 
         localVideoEncodingService.encodeToHls(realMockMultipartFile, targetDirName, lectureId);
 
-        verify(encodingResultHandler).handleSuccess(lectureId, expectedDbPath, targetDirName, EncodingPurpose.CREATE, null, null);
+        EncodingContext expectedContext = new EncodingContext(
+                lectureId, expectedDbPath, targetDirName, EncodingPurpose.CREATE, null, null
+        );
+
+        verify(encodingResultHandler).handleSuccess(expectedContext);
 
         Path targetWorkspace = tempUploadDir.resolve(targetDirName);
         assertThat(Files.exists(targetWorkspace.resolve("output.m3u8"))).isTrue();

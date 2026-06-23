@@ -6,6 +6,7 @@ import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.dto.EncodingContext;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
@@ -49,10 +50,13 @@ class EncodingResultHandlerImplTest {
         String targetDirName = UUID.randomUUID().toString();
         String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
 
-        encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, EncodingPurpose.CREATE, null, null);
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.CREATE, null, null);
 
+        encodingResultHandler.handleSuccess(context);
+
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureDbService).updateLectureM3u8(lectureId, dbSavePath, targetDirName);
-        verifyNoInteractions(lectureRepository, requestRepository, eventPublisher);
+        verifyNoInteractions(lectureRepository, requestRepository);
     }
 
     @Test
@@ -77,11 +81,13 @@ class EncodingResultHandlerImplTest {
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
 
-        encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId);
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId);
 
+        encodingResultHandler.handleSuccess(context);
+
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureRepository).findById(lectureId);
         verify(requestRepository).save(any(LectureModificationRequest.class));
-        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verifyNoInteractions(lectureDbService);
     }
 
@@ -95,11 +101,14 @@ class EncodingResultHandlerImplTest {
 
         given(lectureRepository.findById(lectureId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId))
+        EncodingContext context = new EncodingContext(lectureId, dbSavePath, targetDirName, EncodingPurpose.MODIFY, description, instructorId);
+
+        assertThatThrownBy(() -> encodingResultHandler.handleSuccess(context))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.LECTURE_NOT_FOUND.getMessage());
 
+        verify(eventPublisher).publishEvent(any(VideoRollbackEvent.class));
         verify(lectureRepository).findById(lectureId);
-        verifyNoInteractions(requestRepository, eventPublisher, lectureDbService);
+        verifyNoInteractions(requestRepository, lectureDbService);
     }
 }

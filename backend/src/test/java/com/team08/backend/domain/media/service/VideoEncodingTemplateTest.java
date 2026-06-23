@@ -44,7 +44,7 @@ class VideoEncodingTemplateTest {
         isCompleteCalled = false;
         shouldThrowInPrepare = false;
 
-        EncodingResultHandler mockHandler = (id, path, dir, purpose, desc, instId) -> isCompleteCalled = true;
+        EncodingResultHandler mockHandler = context -> isCompleteCalled = true;
 
         videoEncodingTemplate = new VideoEncodingTemplate(mockHandler) {
             @Override
