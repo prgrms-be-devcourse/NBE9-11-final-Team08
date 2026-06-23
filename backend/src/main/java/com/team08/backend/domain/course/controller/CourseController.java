@@ -50,6 +50,14 @@ public class CourseController {
         return courseService.getCourses(sortType, pageable);
     }
 
+    @GetMapping("/instructor")
+    @ResponseStatus(HttpStatus.OK)
+    public Page<CourseCardResponse> getCoursesByInstructor(
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return courseService.getCoursesByInstructor(loginUserPrincipal.user().id(), pageable);
+    }
+
     @PutMapping("/{courseId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateCourseGeneralInfo(

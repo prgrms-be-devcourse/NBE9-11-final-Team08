@@ -142,6 +142,31 @@ class CourseControllerTest {
 
     @Test
     @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
+    void 인증된_판매자가_본인의_강좌_목록_조회_요청_시_200_상태코드와_강좌_데이터를_반환한다() throws Exception {
+        CourseCardResponse courseCard = new CourseCardResponse(
+                1L, 1L, 5L, "스프링 부트 완벽 가이드", "images/thumb.jpg", 30000, 150
+        );
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
+
+        given(courseService.getCoursesByInstructor(eq(1L), any(Pageable.class))).willReturn(pagedResponses);
+
+        mockMvc.perform(get("/api/courses/instructor")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].instructorId").value(1L));
+    }
+
+    @Test
+    void 비인증_사용자가_강사의_강좌_목록_조회_요청_시_401_상태코드를_반환한다() throws Exception {
+        mockMvc.perform(get("/api/courses/instructor")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_유효한_데이터로_강좌_일반_정보_수정_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
         CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
