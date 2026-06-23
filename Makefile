@@ -14,10 +14,10 @@ DEV         := -f compose.dev.yaml             # dev 는 단독 실행 (base 머
 PROD        := $(BASE) -f compose.prod.yaml    # prod 는 base 에 덮어쓰기
 
 # 부하 테스트(k6)
-BASE_DC      := docker compose $(BASE)  # 부하 stack (k6 + influx + grafana)
 PERF_DIR     := perf
-PERF_DC      := docker compose -f compose.perf.yml      # 부하 stack (k6 + influx + grafana)
-PERF_SCRIPT  ?= last-watched-baseline.js   # make perf PERF_SCRIPT=other.js 로 교체 가능
+PERF_DC      := docker compose -f compose.client.yml    # 부하기 stack (k6 + influx + grafana)
+T3_OVERRIDE  := -f ../../perf/compose.server-t3small.yml # base(compose.yaml) 위에 얹는 t3.small 제한 override
+PERF_SCRIPT  ?= last-watched-baseline.js   # make perf-client PERF_SCRIPT=other.js 로 교체 가능
 BASE_URL     ?= http://host.docker.internal:8080
 
 # 개발(dev/edge) compose 명령은 .env.dev 로 실행
@@ -31,7 +31,7 @@ define run-prod
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
+.PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-server-t3small perf-server-t3small-down perf-server-t3small-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
 
 ## ─────────────── 개발 (DB/Redis만) ───────────────
 
@@ -62,9 +62,10 @@ dev-reset: ## [개발] DB/Redis 완전 초기화 (DB 볼륨 삭제 + Redis FLUSH
 	fi
 
 ## ─────────────── 부하 테스트 (k6) ───────────────
-# 측정 대상 서버는 별도로 띄운다:
-#   Docker 서버 : make perf-server
-#   로컬 서버   : IntelliJ 등으로 localhost:8080 실행
+# 측정 대상 서버는 별도로 띄운다 (8080 노출, 셋 중 하나만 선택):
+#   무제한 Docker 서버 : make perf-server
+#   t3.small 제한 서버  : make perf-server-t3small   (2 vCPU / 2 GiB 재현)
+#   로컬 서버           : IntelliJ 등으로 localhost:8080 실행
 # 그다음 make perf-client 가 BASE_URL 로 지정한 서버를 친다.
 
 perf-server: ## [부하] 서버 stack(db+app) 기동 — 측정 대상, 8080 노출
@@ -78,6 +79,18 @@ perf-server-down: ## [부하] 서버 컨테이너 내리기 (데이터 유지)
 perf-server-reset: ## [부하] DB 컨테이너 삭제 (데이터 삭제)
 	$(call run,$(BASE) down -v)
 	@echo "🗑️ 서버 스택 삭제 (볼륨 삭제)"
+
+perf-server-t3small: ## [부하] t3.small(2vCPU/2GiB) 제한 서버 stack(db+redis+backend) 기동 — base 머지, 8080 노출
+	$(call run,$(BASE) $(T3_OVERRIDE) up -d --build --wait)
+	@echo "✅ t3.small 제한 서버 준비됨 → http://localhost:8080"
+
+perf-server-t3small-down: ## [부하] t3.small 서버 내리기 (데이터 유지)
+	$(call run,$(BASE) $(T3_OVERRIDE) down)
+	@echo "🗑️ t3.small 서버 스택 내림 (볼륨 유지)"
+
+perf-server-t3small-reset: ## [부하] t3.small 서버 삭제 (데이터 삭제)
+	$(call run,$(BASE) $(T3_OVERRIDE) down -v)
+	@echo "🗑️ t3.small 서버 스택 삭제 (볼륨 삭제)"
 
 perf-client: ## [부하] k6 실행 (BASE_URL 타격) + influx/grafana 기동
 	cd $(PERF_DIR) && $(PERF_DC) up -d influxdb grafana
@@ -138,5 +151,5 @@ all-reset: ## [공통] 모든 컨테이너 삭제 (데이터 삭제)
 	$(call run,$(DEV) down -v)
 
 help: ## [공통] 이 도움말 출력
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-26s\033[0m %s\n", $$1, $$2}'

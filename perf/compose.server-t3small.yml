@@ -1,0 +1,44 @@
+# ============================================================================
+# 부하 테스트 - 측정 대상 서버 override [t3.small 제한]
+# ----------------------------------------------------------------------------
+# 단독 실행용이 아니라 infra/compose/compose.yaml 위에 머지하는 override 다.
+# 베이스(db + redis + backend)를 그대로 이어받고, AWS t3.small(2 vCPU / 2 GiB)
+# 한 대에 세 컨테이너를 올린 상황을 리소스 제한으로 재현한다.
+# → 베이스 compose.yaml 의 변경(새 env/서비스 등)은 자동으로 따라간다.
+#
+# 실행:  make perf-server-t3small
+#   = cd infra/compose && docker compose --env-file .env.dev \
+#       -f compose.yaml -f ../../perf/compose.server-t3small.yml up -d --build
+#
+# 합산 상한 = 2.0 CPU / 2048M
+#   backend 1.25 CPU / 1280M  +  db 0.5 CPU / 640M  +  redis 0.25 CPU / 128M
+#   비율은 워크로드에 맞게 각 서비스 deploy.resources.limits 에서 조정 가능.
+# ============================================================================
+
+# 베이스(nbe9-11-final-team08)와 볼륨/네트워크 네임스페이스를 분리해
+# dev 데이터(mysql_data/redis_data)와 섞이지 않게 별도 프로젝트로 띄운다.
+name: team08-perf-server-t3small
+
+services:
+  db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"      # t3.small 합산 2 vCPU 중 db 몫
+          memory: 640M     # t3.small 합산 2 GiB 중 db 몫
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"     # t3.small 합산 2 vCPU 중 redis 몫
+          memory: 128M     # t3.small 합산 2 GiB 중 redis 몫
+
+  backend:
+    environment:
+      APP_DATA_INIT_MODE: bulk   # 부하용 대량 시드
+    deploy:
+      resources:
+        limits:
+          cpus: "1.25"     # t3.small 합산 2 vCPU 중 backend 몫
+          memory: 1280M    # t3.small 합산 2 GiB 중 backend 몫
