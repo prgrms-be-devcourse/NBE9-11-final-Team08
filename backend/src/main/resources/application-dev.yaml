@@ -24,5 +24,10 @@ app:
       secure: false
       same-site: None
 
+cloud:
+  aws:
+    cloudfront:
+      enabled: false
+
 file:
   upload-dir: ${LOCAL_UPLOAD_DIR:./videos-local}

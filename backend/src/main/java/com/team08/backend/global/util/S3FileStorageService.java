@@ -22,7 +22,6 @@ public class S3FileStorageService {
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
-
     private final S3Template s3Template;
 
     public String uploadFile(File file, String s3Key) {
@@ -34,7 +33,7 @@ public class S3FileStorageService {
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }
-
+    
     public File downloadFile(String s3Key, File destinationFile) {
         try (InputStream inputStream = s3Template.download(bucket, s3Key).getInputStream()) {
             Files.copy(inputStream, destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING);

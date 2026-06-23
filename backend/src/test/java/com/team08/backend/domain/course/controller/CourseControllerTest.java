@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -82,7 +83,7 @@ class CourseControllerTest {
         Long courseId = 100L;
 
         LectureInfoResponse lectureResponse = new LectureInfoResponse(
-                10L, "무료 맛보기 강의", "videos/free.m3u8", 600, 1, true
+                10L, "무료 맛보기 강의", "videos/free.m3u8", UUID.randomUUID().toString(), 600, 1, true
         );
         ChapterInfoResponse chapterResponse = new ChapterInfoResponse(
                 1L, "첫 번째 챕터", 1, List.of(lectureResponse)

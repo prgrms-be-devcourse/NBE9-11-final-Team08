@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,6 +50,7 @@ class LectureControllerTest {
         LectureCreateRequest request = new LectureCreateRequest(
                 "객체지향과 스프링",
                 "videos/oop.m3u8",
+                UUID.randomUUID().toString(),
                 "스프링이 사랑한 오대 객체지향 원칙",
                 600,
                 1,

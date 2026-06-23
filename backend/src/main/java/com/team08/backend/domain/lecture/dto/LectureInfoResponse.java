@@ -6,6 +6,7 @@ public record LectureInfoResponse(
         Long id,
         String title,
         String m3u8Path,
+        String videoUuid,
         int durationSeconds,
         int orderNo,
         boolean isFreePreview
@@ -15,6 +16,7 @@ public record LectureInfoResponse(
                 lecture.getId(),
                 lecture.getTitle(),
                 lecture.isFreePreview() ? lecture.getM3u8Path() : null,
+                lecture.getVideoUuid(),
                 lecture.getDurationSeconds(),
                 lecture.getOrderNo(),
                 lecture.isFreePreview()

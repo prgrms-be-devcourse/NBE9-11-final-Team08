@@ -239,7 +239,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void paymentFailureKeepsOrderPendingAndDoesNotIssueEnrollment() {
+    void declinedPaymentKeepsOrderPendingAndDoesNotIssueEnrollment() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
@@ -252,24 +252,24 @@ class PaymentServiceTest {
         verify(paymentRepository).save(paymentCaptor.capture());
         Payment payment = paymentCaptor.getValue();
 
-        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
         assertThat(payment.getPaymentKey()).isEqualTo("payment-key");
         assertThat(payment.getMethod()).isEqualTo("CARD");
         assertThat(payment.getFailedReason()).isEqualTo("승인 실패");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.FAILED);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.DECLINED);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         verifyNoInteractions(orderItemRepository, enrollmentRepository);
     }
 
     @Test
-    void failedPaymentCanBeConfirmedAgain() {
+    void declinedPaymentCanBeConfirmedAgain() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        Payment failedPayment = payment(order, PaymentStatus.FAILED);
+        Payment declinedPayment = payment(order, PaymentStatus.DECLINED);
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
-        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(failedPayment));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(declinedPayment));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
         given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
                 USER_ID,
@@ -281,12 +281,29 @@ class PaymentServiceTest {
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
-        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(failedPayment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(declinedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(declinedPayment.getPaymentKey()).isEqualTo("payment-key");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
         verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void unknownPaymentCannotBeConfirmedAndDoesNotIssueEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment unknownPayment = payment(order, PaymentStatus.UNKNOWN);
+
+        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(unknownPayment));
+
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000)))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verifyNoInteractions(orderItemRepository, enrollmentRepository);
     }
 
     @Test
@@ -413,12 +430,18 @@ class PaymentServiceTest {
         Payment payment = Payment.createReady(order, FIXED_NOW.minusDays(1));
         ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
         if (status == PaymentStatus.SUCCESS) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
             payment.succeed("existing-payment-key", "CARD", FIXED_NOW.minusDays(1));
-        } else if (status == PaymentStatus.FAILED) {
-            payment.fail("existing-payment-key", "CARD", "기존 실패", FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.DECLINED) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
+            payment.decline("existing-payment-key", "CARD", "기존 거절", FIXED_NOW.minusDays(1));
+        } else if (status == PaymentStatus.UNKNOWN) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
+            payment.markUnknown("TIMEOUT", "승인 결과 확인 필요", FIXED_NOW.minusDays(1));
         } else if (status == PaymentStatus.CANCELED) {
             payment.cancel(FIXED_NOW.minusDays(1));
         } else if (status == PaymentStatus.REFUNDED) {
+            payment.markProcessing(FIXED_NOW.minusDays(2));
             payment.succeed("existing-payment-key", "CARD", FIXED_NOW.minusDays(2));
             payment.refund(FIXED_NOW.minusDays(1));
         }

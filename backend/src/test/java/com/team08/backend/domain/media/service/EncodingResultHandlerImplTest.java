@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,8 +45,8 @@ class EncodingResultHandlerImplTest {
     @Test
     void 설명문이_없으면_일반_강의_영상_경로만_업데이트하고_이벤트를_발행하지_않는다() {
         Long lectureId = 1L;
-        String dbSavePath = "lectures/1/uuid/output.m3u8";
-        String targetDirName = "uuid";
+        String targetDirName = UUID.randomUUID().toString();
+        String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
 
         encodingResultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, null, null);
 
@@ -56,8 +57,8 @@ class EncodingResultHandlerImplTest {
     @Test
     void 설명문이_존재하면_수정_신청_요청을_저장하고_롤백_이벤트를_발행한다() {
         Long lectureId = 1L;
-        String dbSavePath = "lectures/1/uuid/output.m3u8";
-        String targetDirName = "uuid";
+        String targetDirName = UUID.randomUUID().toString();
+        String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
         String description = "강의 수정 요청";
         Long instructorId = 100L;
 
@@ -65,6 +66,7 @@ class EncodingResultHandlerImplTest {
         Chapter mockChapter = mock(Chapter.class);
         Lecture lecture = Lecture.createWithStream(
                 "old/path",
+                UUID.randomUUID().toString(),
                 "테스트 강의 제목",
                 "요약",
                 600,
@@ -86,8 +88,8 @@ class EncodingResultHandlerImplTest {
     @Test
     void 설명문이_존재하지만_강의를_찾을_수_없으면_예외를_던지고_저장_및_이벤트_발행을_수행하지_않는다() {
         Long lectureId = 1L;
-        String dbSavePath = "lectures/1/uuid/output.m3u8";
-        String targetDirName = "uuid";
+        String targetDirName = UUID.randomUUID().toString();
+        String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
         String description = "강의 수정 요청";
         Long instructorId = 100L;
 

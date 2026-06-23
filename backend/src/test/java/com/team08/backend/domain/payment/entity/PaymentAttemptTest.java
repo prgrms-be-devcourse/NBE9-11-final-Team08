@@ -11,9 +11,82 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PaymentAttemptTest {
 
     @Test
-    void paymentAttemptCanBeRequestedAndSucceeded() {
+    void requestedAttemptCanSucceed() {
         LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
         LocalDateTime completedAt = requestedAt.plusSeconds(3);
+        PaymentAttempt attempt = requestedAttempt(requestedAt);
+
+        attempt.succeed("payment-key", completedAt);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+        assertThat(attempt.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(attempt.getFailureCode()).isNull();
+        assertThat(attempt.getFailureMessage()).isNull();
+        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
+        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void requestedAttemptCanBeDeclined() {
+        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
+        LocalDateTime completedAt = requestedAt.plusSeconds(3);
+        PaymentAttempt attempt = requestedAttempt(requestedAt);
+
+        attempt.decline("CARD_DECLINED", "카드 승인 거절", completedAt);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.DECLINED);
+        assertThat(attempt.getFailureCode()).isEqualTo("CARD_DECLINED");
+        assertThat(attempt.getFailureMessage()).isEqualTo("카드 승인 거절");
+        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
+        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void requestedAttemptCanBeMarkedProviderError() {
+        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
+        LocalDateTime completedAt = requestedAt.plusSeconds(3);
+        PaymentAttempt attempt = requestedAttempt(requestedAt);
+
+        attempt.markProviderError("PROVIDER_ERROR", "PG 오류", completedAt);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.PROVIDER_ERROR);
+        assertThat(attempt.getFailureCode()).isEqualTo("PROVIDER_ERROR");
+        assertThat(attempt.getFailureMessage()).isEqualTo("PG 오류");
+        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
+        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void requestedAttemptCanBeMarkedTimeout() {
+        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
+        LocalDateTime completedAt = requestedAt.plusSeconds(3);
+        PaymentAttempt attempt = requestedAttempt(requestedAt);
+
+        attempt.markTimeout("TIMEOUT", "응답 시간 초과", completedAt);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.TIMEOUT);
+        assertThat(attempt.getFailureCode()).isEqualTo("TIMEOUT");
+        assertThat(attempt.getFailureMessage()).isEqualTo("응답 시간 초과");
+        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
+        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    void requestedAttemptCanBeMarkedUnknown() {
+        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
+        LocalDateTime completedAt = requestedAt.plusSeconds(3);
+        PaymentAttempt attempt = requestedAttempt(requestedAt);
+
+        attempt.markUnknown("UNKNOWN", "승인 결과 확인 필요", completedAt);
+
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(attempt.getFailureCode()).isEqualTo("UNKNOWN");
+        assertThat(attempt.getFailureMessage()).isEqualTo("승인 결과 확인 필요");
+        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
+        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+    }
+
+    private PaymentAttempt requestedAttempt(LocalDateTime requestedAt) {
         PaymentAttempt attempt = PaymentAttempt.requested(
                 payment(),
                 PaymentProviderType.TOSS,
@@ -21,38 +94,12 @@ class PaymentAttemptTest {
                 requestedAt
         );
 
-        attempt.succeed("payment-key", completedAt);
-
         assertThat(attempt.getProvider()).isEqualTo(PaymentProviderType.TOSS);
-        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.REQUESTED);
         assertThat(attempt.getAmount()).isEqualTo(30_000);
-        assertThat(attempt.getPaymentKey()).isEqualTo("payment-key");
-        assertThat(attempt.getFailureCode()).isNull();
-        assertThat(attempt.getFailureMessage()).isNull();
         assertThat(attempt.getRequestedAt()).isEqualTo(requestedAt);
-        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
         assertThat(attempt.getCreatedAt()).isEqualTo(requestedAt);
-        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
-    }
-
-    @Test
-    void paymentAttemptCanFail() {
-        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
-        LocalDateTime completedAt = requestedAt.plusSeconds(3);
-        PaymentAttempt attempt = PaymentAttempt.requested(
-                payment(),
-                PaymentProviderType.NICEPAY,
-                30_000,
-                requestedAt
-        );
-
-        attempt.fail("NICEPAY_ERROR", "승인 실패", completedAt);
-
-        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.FAILED);
-        assertThat(attempt.getFailureCode()).isEqualTo("NICEPAY_ERROR");
-        assertThat(attempt.getFailureMessage()).isEqualTo("승인 실패");
-        assertThat(attempt.getCompletedAt()).isEqualTo(completedAt);
-        assertThat(attempt.getUpdatedAt()).isEqualTo(completedAt);
+        return attempt;
     }
 
     private Payment payment() {
