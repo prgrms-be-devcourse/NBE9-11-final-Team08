@@ -45,8 +45,8 @@ public class LectureReflectionService {
 
     @Transactional(readOnly = true)
     public LectureReflectionResponse getReflection(Long userId, Long lectureId) {
-        LectureReflection reflection = reflectionRepository.findByUserIdAndLectureId(userId, lectureId)
-                .orElseThrow(() -> new CustomException(ErrorCode.RETROSPECTION_NOT_FOUND));
-        return LectureReflectionResponse.from(reflection);
+        return reflectionRepository.findByUserIdAndLectureId(userId, lectureId)
+                .map(LectureReflectionResponse::from)
+                .orElse(LectureReflectionResponse.empty());
     }
 }

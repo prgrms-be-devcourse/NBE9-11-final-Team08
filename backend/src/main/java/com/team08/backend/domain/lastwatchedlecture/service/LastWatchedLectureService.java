@@ -15,15 +15,10 @@ public class LastWatchedLectureService {
 
     private final LastWatchedLectureRepository lastWatchedLectureRepository;
 
-    //최근 시청내역 갱신
+    //최근 시청내역 갱신 — 동시 입장 레이스에도 안전하도록 원자적 UPSERT 로 처리
     @Transactional
     public void record(Long userId, Long courseId, Long lectureId) {
-        lastWatchedLectureRepository.findByUserIdAndCourseId(userId, courseId)
-                .ifPresentOrElse(
-                        entry -> entry.changeLecture(lectureId),    //이전내역있으면 갱신
-                        () -> lastWatchedLectureRepository.save(
-                                LastWatchedLecture.of(userId, courseId, lectureId))     //없으면 생성
-                );
+        lastWatchedLectureRepository.upsert(userId, courseId, lectureId);
     }
 
     public Optional<Long> findLectureId(Long userId, Long courseId) {
