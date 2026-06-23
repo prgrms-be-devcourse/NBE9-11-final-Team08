@@ -16,11 +16,26 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent" ]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 40s
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: [ "redis-server", "--appendonly", "yes" ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     networks:
       - internal
 
@@ -36,6 +51,8 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MILLIS: ${JWT_EXPIRATION_MILLIS:-3600000}
       JWT_REFRESH_EXPIRATION_MILLIS: ${JWT_REFRESH_EXPIRATION_MILLIS:-1209600000}
@@ -51,6 +68,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health"]
       interval: 15s
@@ -63,6 +82,7 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:
 
 networks:
   internal:
