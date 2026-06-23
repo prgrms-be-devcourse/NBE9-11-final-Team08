@@ -64,9 +64,9 @@ class StudyAccessAuthorizerTest {
         StudyAccessContext context = context();
         given(contextResolver.fromLectureId(LECTURE_ID, USER_ID)).willReturn(context);
 
-        authorizer.authorizeByLectureId(LECTURE_ID, USER_ID, StudyAction.VIEW_OWN_REPORT);
+        authorizer.authorizeByLectureId(LECTURE_ID, USER_ID, StudyAction.WRITE_STUDY_CONTENT);
 
-        verify(policy).authorize(context, StudyAction.VIEW_OWN_REPORT);
+        verify(policy).authorize(context, StudyAction.WRITE_STUDY_CONTENT);
     }
 
     private StudyAccessContext context() {

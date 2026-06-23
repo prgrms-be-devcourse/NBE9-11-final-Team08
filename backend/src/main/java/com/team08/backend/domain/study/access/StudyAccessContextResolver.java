@@ -7,7 +7,6 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.study.entity.Study;
-import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
@@ -35,7 +34,7 @@ public class StudyAccessContextResolver {
     }
 
     public StudyAccessContext fromCourseId(Long courseId, Long userId) {
-        Study study = studyRepository.findByCourseIdAndStatusNotWithCourse(courseId, StudyStatus.INACTIVE)
+        Study study = studyRepository.findByCourseIdWithCourse(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
 
         return build(study, userId);

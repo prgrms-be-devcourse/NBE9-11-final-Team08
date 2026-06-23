@@ -30,23 +30,23 @@ public interface StudyRepository extends JpaRepository<Study, Long> {
     @Query("""
         SELECT s
         FROM Study s
-        JOIN FETCH s.course c
-        WHERE c.id = :courseId
-            AND s.status <> :status
+        JOIN FETCH s.owner
+        JOIN StudyMember sm ON sm.study = s
+        JOIN Course c ON c = s.course
+        JOIN Enrollment e ON e.courseId = c.id AND e.userId = :userId
+        WHERE e.status = 'ACTIVE'
+            AND sm.user.id = :userId
+            AND sm.status = 'ACTIVE'
+            AND s.status IN ('ACTIVE', 'READONLY')
     """)
-    Optional<Study> findByCourseIdAndStatusNotWithCourse(
-            @Param("courseId") Long courseId,
-            @Param("status") StudyStatus status
-    );
+    List<Study> findVisibleStudiesByUserId(Long userId);
 
     @Query("""
         SELECT s
         FROM Study s
         JOIN FETCH s.owner
-        JOIN StudyMember sm ON sm.study = s
-        WHERE sm.user.id = :userId
-            AND sm.status = 'ACTIVE'
-            AND s.status = 'ACTIVE'
+        JOIN Course c ON c = s.course
+        WHERE c.id = :courseId
     """)
-    List<Study> findActiveStudiesByMemberUserId(Long userId);
+    Optional<Study> findByCourseIdWithCourse(Long courseId);
 }

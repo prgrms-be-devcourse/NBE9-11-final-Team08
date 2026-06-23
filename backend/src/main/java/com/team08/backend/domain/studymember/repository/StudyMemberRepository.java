@@ -18,4 +18,6 @@ public interface StudyMemberRepository extends JpaRepository<StudyMember, Long> 
             Long userId,
             StudyMemberStatus status
     );
+
+    Optional<StudyMember> findByStudyIdAndUserId(Long studyId, Long userId);
 }
