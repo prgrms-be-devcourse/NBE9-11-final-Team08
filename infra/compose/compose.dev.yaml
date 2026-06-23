@@ -1,14 +1,14 @@
 # 개발용 standalone compose — 단독 실행 (base 와 머지하지 않는다).
 #
-# 개발 환경에서는 MySQL만 Docker로 띄우고,
+# 개발 환경에서는 MySQL/Redis만 Docker로 띄우고,
 # Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행한다.
 # (핫 리로드 / 디버깅 / 빠른 피드백을 위해 backend 컨테이너는 쓰지 않는다.)
 #
-# DB만 기동:
-#   docker compose -f compose.dev.yaml up -d db                 (= make dev)
+# DB/Redis 기동:
+#   docker compose -f compose.dev.yaml up -d db redis           (= make dev)
 #
 # nginx 라우팅/프록시까지 점검할 때만 (선택):
-#   docker compose -f compose.dev.yaml --profile edge up -d db nginx-dev   (= make edge)
+#   docker compose -f compose.dev.yaml --profile edge up -d db redis nginx-dev   (= make edge)
 #   → http://localhost:80 (nginx) → host.docker.internal:8080 (IntelliJ Spring Boot)
 #
 # 프로젝트명을 base 와 동일하게 두어 기존 dev DB 볼륨(nbe9-11-final-team08_mysql_data)을 유지한다.
@@ -38,6 +38,20 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+    networks:
+      - dev
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"   # IntelliJ가 localhost:6379로 접속
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     networks:
       - dev
 
