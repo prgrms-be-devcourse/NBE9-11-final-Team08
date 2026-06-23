@@ -32,6 +32,9 @@ public class LectureModificationRequest extends BaseTimeEntity {
     @Column(nullable = false)
     private String afterM3u8Path;
 
+    @Column(name = "after_video_uuid", length = 36)
+    private String afterVideoUuid;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status;
@@ -52,13 +55,14 @@ public class LectureModificationRequest extends BaseTimeEntity {
         this.managedBy = managedBy;
     }
 
-    public static LectureModificationRequest createPending(Lecture lecture, Long instructorId, String description, String afterM3u8Path) {
+    public static LectureModificationRequest createPending(Lecture lecture, Long instructorId, String description, String afterM3u8Path, String afterVideoUuid) {
         LectureModificationRequest request = new LectureModificationRequest();
         request.lecture = lecture;
         request.instructorId = instructorId;
         request.description = description;
         request.beforeM3u8Path = lecture.getM3u8Path();
         request.afterM3u8Path = afterM3u8Path;
+        request.afterVideoUuid = afterVideoUuid;
         request.status = RequestStatus.PENDING;
         return request;
     }

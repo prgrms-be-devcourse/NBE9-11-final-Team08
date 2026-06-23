@@ -10,6 +10,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "lectures", indexes = {
@@ -27,6 +28,9 @@ public class Lecture extends BaseTimeEntity {
 
     @Column(nullable = false)
     private String m3u8Path;
+
+    @Column(name = "video_uuid", length = 36)
+    private String videoUuid;
 
     @Column(nullable = false)
     private String title;
@@ -48,9 +52,11 @@ public class Lecture extends BaseTimeEntity {
     @JoinColumn(name = "chapter_id", nullable = false)
     private Chapter chapter;
 
-    private Lecture(String m3u8Path, String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
+    private Lecture(String m3u8Path, String videoUuid, String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
         validateInitialState(title, durationSeconds, orderNo, chapter);
+        validateVideoUuid(videoUuid);
         this.m3u8Path = m3u8Path;
+        this.videoUuid = videoUuid;
         this.title = title;
         this.summary = summary;
         this.durationSeconds = durationSeconds;
@@ -60,14 +66,14 @@ public class Lecture extends BaseTimeEntity {
     }
 
     public static Lecture createDraft(String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
-        return new Lecture("", title, summary, durationSeconds, orderNo, isFreePreview, chapter);
+        return new Lecture("", "", title, summary, durationSeconds, orderNo, isFreePreview, chapter);
     }
 
-    public static Lecture createWithStream(String m3u8Path, String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
+    public static Lecture createWithStream(String m3u8Path, String videoUuid, String title, String summary, int durationSeconds, int orderNo, boolean isFreePreview, Chapter chapter) {
         if (m3u8Path == null || m3u8Path.isBlank()) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
-        return new Lecture(m3u8Path, title, summary, durationSeconds, orderNo, isFreePreview, chapter);
+        return new Lecture(m3u8Path, videoUuid, title, summary, durationSeconds, orderNo, isFreePreview, chapter);
     }
 
     public void assignChapter(Chapter chapter) {
@@ -86,11 +92,13 @@ public class Lecture extends BaseTimeEntity {
         this.isFreePreview = isFreePreview;
     }
 
-    public void updateM3u8Path(String m3u8Path) {
+    public void updateM3u8Path(String m3u8Path, String videoUuid) {
         if (m3u8Path == null || m3u8Path.isBlank()) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
+        validateVideoUuid(videoUuid);
         this.m3u8Path = m3u8Path;
+        this.videoUuid = videoUuid;
     }
 
     public void updateOrderNo(int orderNo) {
@@ -115,6 +123,17 @@ public class Lecture extends BaseTimeEntity {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
         if (orderNo < 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private void validateVideoUuid(String videoUuid) {
+        if (videoUuid == null || videoUuid.isBlank()) {
+            return;
+        }
+        try {
+            UUID.fromString(videoUuid);
+        } catch (IllegalArgumentException e) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }
