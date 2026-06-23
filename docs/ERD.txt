@@ -91,6 +91,11 @@ Enum enrollment_status {
 Enum feed_item_type {
   STUDY_ACTIVITY
 }
+Enum issued_coupon_job_status {
+  REQUESTED
+  PROCESSING
+  ISSUED
+}
 // =====================================
 // USER DOMAIN
 // =====================================
@@ -360,8 +365,6 @@ Table issued_coupon_jobs {
   policy_id bigint [not null]
   user_id bigint [not null]
   status issued_coupon_job_status [not null]
-  failure_reason varchar(500)
-  retry_count int [not null, default: 0]
   requested_at datetime [not null]
   last_tried_at datetime
   completed_at datetime

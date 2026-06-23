@@ -17,10 +17,10 @@ public record CouponDownloadResponse(
         LocalDateTime issuedAt,
         LocalDateTime expiredAt
 ) {
-    public static CouponDownloadResponse issued(IssuedCoupon issuedCoupon, IssuedCouponJob job) {
+    public static CouponDownloadResponse issued(IssuedCoupon issuedCoupon) {
         return new CouponDownloadResponse(
                 issuedCoupon.getId(),
-                job.getId(),
+                null,
                 issuedCoupon.getPolicyId(),
                 issuedCoupon.getUserId(),
                 issuedCoupon.getStatus(),

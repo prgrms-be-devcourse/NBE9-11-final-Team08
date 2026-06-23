@@ -95,21 +95,6 @@ class FcfsCouponRedisIssuerTest {
         assertThat(redisTemplate.opsForSet().isMember(ISSUED_KEY, "2")).isFalse();
     }
 
-    @Test
-    @DisplayName("성공: Redis 발급 보상 시 발급 유저를 제거하고 재고를 복구한다")
-    void rollback_success() {
-        // given
-        CouponPolicy policy = policy(1L, 1);
-        fcfsCouponRedisIssuer.issue(1L, policy);
-
-        // when
-        fcfsCouponRedisIssuer.rollback(1L, 1L);
-
-        // then
-        assertThat(redisTemplate.opsForValue().get(STOCK_KEY)).isEqualTo("1");
-        assertThat(redisTemplate.opsForSet().isMember(ISSUED_KEY, "1")).isFalse();
-    }
-
     private CouponPolicy policy(Long policyId, Integer totalQuantity) {
         CouponPolicy policy = mock(CouponPolicy.class);
         when(policy.getId()).thenReturn(policyId);

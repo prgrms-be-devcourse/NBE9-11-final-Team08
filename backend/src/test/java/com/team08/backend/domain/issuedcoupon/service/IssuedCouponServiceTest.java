@@ -12,9 +12,6 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
-import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
-import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobProcessor;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -24,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -34,9 +30,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -60,12 +58,6 @@ class IssuedCouponServiceTest {
     private IssuedCouponWriter issuedCouponWriter;
 
     @Mock
-    private IssuedCouponJobRepository issuedCouponJobRepository;
-
-    @Mock
-    private IssuedCouponJobProcessor issuedCouponJobProcessor;
-
-    @Mock
     private IssuedCouponJobWriter issuedCouponJobWriter;
 
     @Mock
@@ -83,8 +75,6 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
-                issuedCouponJobRepository,
-                issuedCouponJobProcessor,
                 issuedCouponJobWriter,
                 issuedCouponJobStreamPublisher,
                 clock
@@ -99,14 +89,11 @@ class IssuedCouponServiceTest {
         Long policyId = 1L;
         IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
         IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
-        IssuedCouponJob issuedCouponJob = mock(IssuedCouponJob.class);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-        when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
-        when(issuedCouponJob.getId()).thenReturn(1L);
 
         // writer 모킹
         when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
@@ -119,12 +106,12 @@ class IssuedCouponServiceTest {
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
-        verify(issuedCouponJobWriter).markIssued(any(), any());
+        verify(issuedCouponJobWriter, never()).createRequested(any(), any(), any());
     }
 
     @Test
-    @DisplayName("성공: 선착순 쿠폰 Stream 적재 실패 시 재시도 상태로 남기고 요청 응답을 반환한다")
-    void downloadFcfsCoupon_streamPublishFail_retrying() {
+    @DisplayName("성공: 선착순 쿠폰 Stream 적재 실패 시 예외를 전파한다")
+    void downloadFcfsCoupon_streamPublishFail_throwException() {
         // given
         Long userId = 1L;
         Long policyId = 1L;
@@ -139,14 +126,11 @@ class IssuedCouponServiceTest {
         when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
         when(issuedCouponJob.getId()).thenReturn(1L);
         when(issuedCouponJobStreamPublisher.publish(1L, userId, policyId))
-                .thenThrow(new DataIntegrityViolationException("stream"));
+                .thenThrow(new IllegalStateException("stream"));
 
-        // when
-        CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
-
-        // then
-        assertThat(response).isNotNull();
-        verify(issuedCouponJobWriter).markRetrying(any(), any(), any());
+        // when & then
+        assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -230,36 +214,4 @@ class IssuedCouponServiceTest {
         verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE, now);
     }
 
-    @Test
-    @DisplayName("성공: 발급 작업 즉시 반영 시 처리 가능한 Job이면 DB 저장을 시도하고 발급 완료 응답을 반환한다")
-    void completeCouponIssueJob_processable_success() {
-        // given
-        Long userId = 1L;
-        Long jobId = 10L;
-        Long policyId = 100L;
-        IssuedCouponJob job = mock(IssuedCouponJob.class);
-        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
-
-        when(issuedCouponJobRepository.findByIdAndUserId(jobId, userId))
-                .thenReturn(Optional.of(job))
-                .thenReturn(Optional.of(job));
-        when(job.isProcessable()).thenReturn(true);
-        when(job.getPolicyId()).thenReturn(policyId);
-        when(job.getId()).thenReturn(jobId);
-        when(issuedCouponRepository.findByUserIdAndPolicyId(userId, policyId)).thenReturn(Optional.of(issuedCoupon));
-        when(issuedCoupon.getId()).thenReturn(1L);
-        when(issuedCoupon.getPolicyId()).thenReturn(policyId);
-        when(issuedCoupon.getUserId()).thenReturn(userId);
-        when(issuedCoupon.getStatus()).thenReturn(com.team08.backend.domain.issuedcoupon.entity.CouponStatus.ISSUED);
-        when(issuedCoupon.getIssuedAt()).thenReturn(LocalDateTime.now(clock));
-        when(issuedCoupon.getExpiredAt()).thenReturn(LocalDateTime.now(clock).plusDays(7));
-
-        // when
-        CouponDownloadResponse response = issuedCouponService.completeCouponIssueJob(userId, jobId);
-
-        // then
-        assertThat(response.jobStatus()).isEqualTo(IssuedCouponJobStatus.ISSUED);
-        assertThat(response.issuedCouponId()).isEqualTo(1L);
-        verify(issuedCouponJobProcessor).process(jobId);
-    }
 }

@@ -49,8 +49,6 @@ spring:
 
 app:
   issued-coupon-job:
-    scheduler:
-      enabled: false
     stream-worker:
       enabled: false
   feed:

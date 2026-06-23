@@ -9,13 +9,9 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 public interface IssuedCouponJobRepository extends JpaRepository<IssuedCouponJob, Long> {
-    // 재처리 대상 쿠폰 발급 작업을 요청 순서대로 최대 100개 조회
-    List<IssuedCouponJob> findTop100ByStatusInOrderByRequestedAtAsc(Collection<IssuedCouponJobStatus> statuses);
-
     // 특정 사용자의 쿠폰 발급 작업 조회
     Optional<IssuedCouponJob> findByIdAndUserId(Long id, Long userId);
 
@@ -33,22 +29,5 @@ public interface IssuedCouponJobRepository extends JpaRepository<IssuedCouponJob
             @Param("processingStatus") IssuedCouponJobStatus processingStatus,
             @Param("processableStatuses") Collection<IssuedCouponJobStatus> processableStatuses,
             @Param("startedAt") LocalDateTime startedAt
-    );
-
-    // 오래된 PROCESSING 작업을 재시도 대상으로 복구
-    @Modifying(clearAutomatically = true)
-    @Query("""
-            UPDATE IssuedCouponJob j
-            SET j.status = :retryingStatus,
-                j.failureReason = :failureReason,
-                j.completedAt = null
-            WHERE j.status = :processingStatus
-              AND j.lastTriedAt < :threshold
-            """)
-    int recoverStuckProcessingJobs(
-            @Param("processingStatus") IssuedCouponJobStatus processingStatus,
-            @Param("retryingStatus") IssuedCouponJobStatus retryingStatus,
-            @Param("failureReason") String failureReason,
-            @Param("threshold") LocalDateTime threshold
     );
 }

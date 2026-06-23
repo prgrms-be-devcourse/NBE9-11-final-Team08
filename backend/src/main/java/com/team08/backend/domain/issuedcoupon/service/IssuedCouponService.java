@@ -13,8 +13,6 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
-import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobProcessor;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -41,8 +39,6 @@ public class IssuedCouponService {
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
     private final IssuedCouponWriter issuedCouponWriter;
-    private final IssuedCouponJobRepository issuedCouponJobRepository;
-    private final IssuedCouponJobProcessor issuedCouponJobProcessor;
     private final IssuedCouponJobWriter issuedCouponJobWriter;
     private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
     private final Clock clock;
@@ -99,46 +95,19 @@ public class IssuedCouponService {
 
         // 쿠폰 발급 로직 실행
         IssuedCoupon newCoupon = strategy.issue(userId, policyId);
-        IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
-                userId,
-                policyId,
-                LocalDateTime.now(clock)
-        );
 
         if (couponType == CouponType.FCFS) {
-            try {
-                issuedCouponJobStreamPublisher.publish(issuedCouponJob.getId(), userId, policyId);
-            } catch (RuntimeException e) {
-                issuedCouponJobWriter.markRetrying(issuedCouponJob.getId(), e.getClass().getSimpleName(), LocalDateTime.now(clock));
-            }
+            IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
+                    userId,
+                    policyId,
+                    LocalDateTime.now(clock)
+            );
+            issuedCouponJobStreamPublisher.publish(issuedCouponJob.getId(), userId, policyId);
             return CouponDownloadResponse.requested(userId, policyId, issuedCouponJob);
         }
 
-        try {
-            IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
-            issuedCouponJobWriter.markIssued(issuedCouponJob.getId(), LocalDateTime.now(clock));
-            return CouponDownloadResponse.issued(savedCoupon, issuedCouponJob);
-        } catch (RuntimeException e) {
-            issuedCouponJobWriter.markRetrying(issuedCouponJob.getId(), e.getClass().getSimpleName(), LocalDateTime.now(clock));
-            throw e;
-        }
-    }
-
-    // [사용자] 선착순 쿠폰 발급 작업 즉시 반영
-    public CouponDownloadResponse completeCouponIssueJob(Long userId, Long jobId) {
-        IssuedCouponJob job = issuedCouponJobRepository.findByIdAndUserId(jobId, userId)
-                .orElseThrow(CouponNotFoundException::new);
-
-        if (job.isProcessable()) {
-            issuedCouponJobProcessor.process(jobId);
-            job = issuedCouponJobRepository.findByIdAndUserId(jobId, userId)
-                    .orElseThrow(CouponNotFoundException::new);
-        }
-
-        IssuedCouponJob currentJob = job;
-        return issuedCouponRepository.findByUserIdAndPolicyId(userId, currentJob.getPolicyId())
-                .map(issuedCoupon -> CouponDownloadResponse.issued(issuedCoupon, currentJob))
-                .orElse(CouponDownloadResponse.requested(userId, currentJob.getPolicyId(), currentJob));
+        IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
+        return CouponDownloadResponse.issued(savedCoupon);
     }
 
     // [사용자] 내 쿠폰 목록 조회

@@ -55,14 +55,6 @@ public class FcfsCouponRedisIssuer {
         }
     }
 
-    // 선착순 쿠폰 발급 보상
-    public void rollback(Long userId, Long policyId) {
-        Long removed = redisTemplate.opsForSet().remove(issuedKey(policyId), String.valueOf(userId));
-        if (removed != null && removed > 0 && redisTemplate.hasKey(stockKey(policyId))) {
-            redisTemplate.opsForValue().increment(stockKey(policyId));
-        }
-    }
-
     private String stockKey(Long policyId) {
         return KEY_PREFIX + "{" + policyId + "}:stock";
     }

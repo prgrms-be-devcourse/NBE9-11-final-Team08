@@ -4,7 +4,6 @@ import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +13,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class IssuedCouponJobWriter {
-
-    private static final int MAX_RETRY_COUNT = 5;
 
     private final IssuedCouponJobRepository issuedCouponJobRepository;
 
@@ -35,24 +31,10 @@ public class IssuedCouponJobWriter {
         int updatedCount = issuedCouponJobRepository.markProcessing(
                 jobId,
                 IssuedCouponJobStatus.PROCESSING,
-                List.of(IssuedCouponJobStatus.REQUESTED, IssuedCouponJobStatus.RETRYING),
+                List.of(IssuedCouponJobStatus.REQUESTED),
                 startedAt
         );
         return updatedCount == 1;
-    }
-
-    // 오래된 PROCESSING 작업을 RETRYING으로 되돌림
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recoverStuckProcessingJobs(LocalDateTime threshold) {
-        int recoveredCount = issuedCouponJobRepository.recoverStuckProcessingJobs(
-                IssuedCouponJobStatus.PROCESSING,
-                IssuedCouponJobStatus.RETRYING,
-                "PROCESSING_TIMEOUT",
-                threshold
-        );
-        if (recoveredCount > 0) {
-            log.warn("PROCESSING 상태 쿠폰 발급 작업 복구. count={}, threshold={}", recoveredCount, threshold);
-        }
     }
 
     // 쿠폰 발급 성공 처리
@@ -62,36 +44,5 @@ public class IssuedCouponJobWriter {
                 .orElseThrow();
         job.markIssued(completedAt);
         issuedCouponJobRepository.flush();
-    }
-
-    // 쿠폰 발급 재시도 처리
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markRetrying(Long jobId, String failureReason, LocalDateTime failedAt) {
-        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
-                .orElseThrow();
-        job.markRetrying(failureReason, failedAt, MAX_RETRY_COUNT);
-        issuedCouponJobRepository.flush();
-
-        if (job.getStatus() == IssuedCouponJobStatus.DEAD) {
-            log.error("선착순 쿠폰 발급 작업 자동 복구 실패. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
-                    job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
-            return;
-        }
-
-        log.warn("선착순 쿠폰 발급 작업 재시도 대기. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
-                job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
-    }
-
-    // 쿠폰 소진 등 재시도해도 복구할 수 없는 실패 처리
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void markDead(Long jobId, String failureReason, LocalDateTime failedAt) {
-        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
-                .orElseThrow();
-        job.markDead(failureReason, failedAt);
-        issuedCouponJobRepository.flush();
-
-        // TODO 나중에 쿠폰 자동 발급 고도화 후 이벤트 보내기 
-        log.warn("선착순 쿠폰 발급 작업 복구 불가. jobId={}, userId={}, policyId={}, retryCount={}, failureReason={}",
-                job.getId(), job.getUserId(), job.getPolicyId(), job.getRetryCount(), job.getFailureReason());
     }
 }

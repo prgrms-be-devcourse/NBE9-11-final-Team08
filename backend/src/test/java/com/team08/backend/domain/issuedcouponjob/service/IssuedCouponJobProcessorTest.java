@@ -1,6 +1,5 @@
 package com.team08.backend.domain.issuedcouponjob.service;
 
-import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,6 +11,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,34 +40,16 @@ class IssuedCouponJobProcessorTest {
     }
 
     @Test
-    @DisplayName("성공: 쿠폰 발급 작업 처리 중 예외가 발생하면 재시도 상태로 변경한다")
-    void process_fail_markRetrying() {
+    @DisplayName("성공: 쿠폰 발급 작업 처리 중 예외가 발생하면 그대로 전파한다")
+    void process_fail_throwException() {
         // given
         Long jobId = 1L;
         when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(true);
         doThrow(new IllegalStateException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
 
-        // when
-        issuedCouponJobProcessor.process(jobId);
-
-        // then
-        verify(issuedCouponJobWriter).markRetrying(jobId, "IllegalStateException", java.time.LocalDateTime.now(clock));
-    }
-
-    @Test
-    @DisplayName("성공: 재시도 불가능한 쿠폰 정책 예외가 발생하면 실패 상태로 변경한다")
-    void process_couponPolicyException_markDead() {
-        // given
-        Long jobId = 1L;
-        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(true);
-        doThrow(new CouponExhaustedException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
-
-        // when
-        issuedCouponJobProcessor.process(jobId);
-
-        // then
-        verify(issuedCouponJobWriter).markDead(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
-        verify(issuedCouponJobWriter, never()).markRetrying(jobId, "CouponExhaustedException", java.time.LocalDateTime.now(clock));
+        // when & then
+        assertThatThrownBy(() -> issuedCouponJobProcessor.process(jobId))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test

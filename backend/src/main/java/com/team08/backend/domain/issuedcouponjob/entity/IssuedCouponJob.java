@@ -34,12 +34,6 @@ public class IssuedCouponJob {
     @Column(nullable = false)
     private IssuedCouponJobStatus status;
 
-    @Column(length = 500)
-    private String failureReason;
-
-    @Column(nullable = false)
-    private int retryCount;
-
     @Column(nullable = false)
     private LocalDateTime requestedAt;
 
@@ -51,7 +45,6 @@ public class IssuedCouponJob {
         this.userId = userId;
         this.policyId = policyId;
         this.status = IssuedCouponJobStatus.REQUESTED;
-        this.retryCount = 0;
         this.requestedAt = requestedAt;
     }
 
@@ -63,38 +56,12 @@ public class IssuedCouponJob {
     // 쿠폰 발급 성공 처리
     public void markIssued(LocalDateTime completedAt) {
         this.status = IssuedCouponJobStatus.ISSUED;
-        this.failureReason = null;
         this.lastTriedAt = completedAt;
         this.completedAt = completedAt;
     }
 
-    // 쿠폰 발급 재시도 처리
-    public void markRetrying(String failureReason, LocalDateTime failedAt, int maxRetryCount) {
-        this.retryCount++;
-        this.failureReason = failureReason;
-        this.lastTriedAt = failedAt;
-
-        if (this.retryCount >= maxRetryCount) {
-            this.status = IssuedCouponJobStatus.DEAD;
-            this.completedAt = failedAt;
-            return;
-        }
-
-        this.status = IssuedCouponJobStatus.RETRYING;
-        this.completedAt = null;
-    }
-
-    // 재시도해도 복구할 수 없는 실패 처리
-    public void markDead(String failureReason, LocalDateTime failedAt) {
-        this.failureReason = failureReason;
-        this.lastTriedAt = failedAt;
-        this.completedAt = failedAt;
-        this.status = IssuedCouponJobStatus.DEAD;
-    }
-
     public boolean isProcessable() {
-        return this.status == IssuedCouponJobStatus.REQUESTED
-                || this.status == IssuedCouponJobStatus.RETRYING;
+        return this.status == IssuedCouponJobStatus.REQUESTED;
     }
 
     public boolean isProcessing() {
