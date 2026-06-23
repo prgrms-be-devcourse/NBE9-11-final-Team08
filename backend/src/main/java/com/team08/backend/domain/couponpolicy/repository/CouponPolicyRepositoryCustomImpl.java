@@ -62,7 +62,8 @@ public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryC
     public Optional<CouponPolicy> findByIdWithDetails(Long id) {
         return Optional.ofNullable(queryFactory
                 .selectFrom(couponPolicy)
-                .leftJoin(couponPolicy.targetCategories, couponPolicyCategory).fetchJoin()
+                .leftJoin(couponPolicy.targetCategories, couponPolicyCategory)
+                .fetchJoin()
                 .where(couponPolicy.id.eq(id))
                 .distinct()
                 .fetchOne());
