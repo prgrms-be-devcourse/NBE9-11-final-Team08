@@ -4,7 +4,8 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
+import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
@@ -54,7 +55,7 @@ class StudyAccessContextResolverTest {
     private StudyMemberRepository studyMemberRepository;
 
     @Mock
-    private EnrollmentQueryService enrollmentQueryService;
+    private EnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private StudyAccessContextResolver resolver;
@@ -65,7 +66,7 @@ class StudyAccessContextResolverTest {
         StudyMember member = studyMember(study, StudyMemberRole.MEMBER);
         given(studyRepository.findByIdWithCourse(STUDY_ID)).willReturn(Optional.of(study));
         givenActiveMember(member);
-        given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(true);
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(true);
 
         StudyAccessContext context = resolver.fromStudyId(STUDY_ID, USER_ID);
 
@@ -79,7 +80,7 @@ class StudyAccessContextResolverTest {
         given(studyRepository.findByCourseIdAndStatusNotWithCourse(COURSE_ID, StudyStatus.INACTIVE))
                 .willReturn(Optional.of(study));
         givenActiveMember(member);
-        given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(true);
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(true);
 
         StudyAccessContext context = resolver.fromCourseId(COURSE_ID, USER_ID);
 
@@ -98,7 +99,7 @@ class StudyAccessContextResolverTest {
                 USER_ID,
                 StudyMemberStatus.ACTIVE
         )).willReturn(Optional.empty());
-        given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(false);
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
 
         StudyAccessContext context = resolver.fromChapterId(CHAPTER_ID, USER_ID);
 
@@ -115,7 +116,7 @@ class StudyAccessContextResolverTest {
         given(studyRepository.findByCourseIdAndStatusNotWithCourse(COURSE_ID, StudyStatus.INACTIVE))
                 .willReturn(Optional.of(study));
         givenActiveMember(owner);
-        given(enrollmentQueryService.hasActiveEnrollment(USER_ID, COURSE_ID)).willReturn(false);
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
 
         StudyAccessContext context = resolver.fromLectureId(LECTURE_ID, USER_ID);
 
