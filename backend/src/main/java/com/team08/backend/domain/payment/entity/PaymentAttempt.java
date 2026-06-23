@@ -1,5 +1,7 @@
 package com.team08.backend.domain.payment.entity;
 
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -88,6 +90,7 @@ public class PaymentAttempt {
     }
 
     public void succeed(String paymentKey, LocalDateTime completedAt) {
+        validateStatus(PaymentAttemptStatus.REQUESTED);
         this.status = PaymentAttemptStatus.SUCCESS;
         this.paymentKey = paymentKey;
         this.failureCode = null;
@@ -96,11 +99,39 @@ public class PaymentAttempt {
         this.updatedAt = completedAt;
     }
 
-    public void fail(String failureCode, String failureMessage, LocalDateTime completedAt) {
-        this.status = PaymentAttemptStatus.FAILED;
+    public void decline(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        completeAs(PaymentAttemptStatus.DECLINED, failureCode, failureMessage, completedAt);
+    }
+
+    public void markProviderError(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        completeAs(PaymentAttemptStatus.PROVIDER_ERROR, failureCode, failureMessage, completedAt);
+    }
+
+    public void markTimeout(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        completeAs(PaymentAttemptStatus.TIMEOUT, failureCode, failureMessage, completedAt);
+    }
+
+    public void markUnknown(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        completeAs(PaymentAttemptStatus.UNKNOWN, failureCode, failureMessage, completedAt);
+    }
+
+    private void completeAs(
+            PaymentAttemptStatus status,
+            String failureCode,
+            String failureMessage,
+            LocalDateTime completedAt
+    ) {
+        validateStatus(PaymentAttemptStatus.REQUESTED);
+        this.status = status;
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
         this.completedAt = completedAt;
         this.updatedAt = completedAt;
+    }
+
+    private void validateStatus(PaymentAttemptStatus expectedStatus) {
+        if (this.status != expectedStatus) {
+            throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
+        }
     }
 }

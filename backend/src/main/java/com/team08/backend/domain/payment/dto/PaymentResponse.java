@@ -15,7 +15,7 @@ public record PaymentResponse(
         Long orderId,
         @Schema(description = "결제 금액", example = "30000")
         int amount,
-        @Schema(description = "결제 상태", example = "FAILED")
+        @Schema(description = "결제 상태", example = "DECLINED")
         PaymentStatus paymentStatus,
         @Schema(description = "주문 상태", example = "PENDING_PAYMENT")
         OrderStatus orderStatus,
