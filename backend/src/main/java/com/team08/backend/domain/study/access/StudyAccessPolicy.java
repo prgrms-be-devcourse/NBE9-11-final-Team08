@@ -23,6 +23,11 @@ public class StudyAccessPolicy {
                     context.isReadableStudy()
                             && context.isActiveMember()
                             && context.isOwner();
+            // QnA 답변: 강의 강사(= 스터디 OWNER)만. 강사는 수강권이 없으므로 enrollment 를 보지 않는다.
+            case MANAGE_ANSWER ->
+                    context.isReadableStudy()
+                            && context.isActiveMember()
+                            && context.isOwner();
             case MANAGE_CURRICULUM ->
                     context.isDraftStudy()
                             && context.isOwner();

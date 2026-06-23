@@ -47,8 +47,8 @@ class QnaAnswerControllerTest {
     @WithMockLoginUser(id = 10L, role = "ROLE_SELLER")
     @DisplayName("QnA 답변 작성 - 201 반환")
     void createAnswer_returns201() throws Exception {
-        QnaAnswerRequest request = new QnaAnswerRequest(3L, "답변 내용");
-        given(qnaAnswerService.createAnswer(eq(100L), eq(3L), eq(10L), eq("답변 내용")))
+        QnaAnswerRequest request = new QnaAnswerRequest("답변 내용");
+        given(qnaAnswerService.createAnswer(eq(100L), eq(10L), eq("답변 내용")))
                 .willReturn(sampleAnswer(200L));
 
         mockMvc.perform(post("/api/qna/questions/100/answers")
@@ -61,9 +61,9 @@ class QnaAnswerControllerTest {
 
     @Test
     @WithMockLoginUser(id = 10L, role = "ROLE_SELLER")
-    @DisplayName("courseId 누락 시 400 반환")
-    void createAnswer_missingCourseId_returns400() throws Exception {
-        QnaAnswerRequest request = new QnaAnswerRequest(null, "답변 내용");
+    @DisplayName("content 누락 시 400 반환")
+    void createAnswer_missingContent_returns400() throws Exception {
+        QnaAnswerRequest request = new QnaAnswerRequest(null);
 
         mockMvc.perform(post("/api/qna/questions/100/answers")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -81,7 +81,7 @@ class QnaAnswerControllerTest {
     @WithMockLoginUser(id = 10L, role = "ROLE_SELLER")
     @DisplayName("QnA 답변 수정 - 200 반환")
     void updateAnswer_returns200() throws Exception {
-        QnaAnswerRequest request = new QnaAnswerRequest(3L, "수정 답변");
+        QnaAnswerRequest request = new QnaAnswerRequest("수정 답변");
         given(qnaAnswerService.updateAnswer(eq(100L), eq(10L), eq("수정 답변")))
                 .willReturn(sampleAnswer(200L));
 

@@ -28,7 +28,7 @@ public class QnaAnswerController {
             @Valid @RequestBody QnaAnswerRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
         return qnaAnswerService.createAnswer(
-                questionId, request.courseId(), principal.user().id(), request.content());
+                questionId, principal.user().id(), request.content());
     }
 
     @Operation(summary = "QnA 답변 수정 (강사 전용)")
