@@ -65,8 +65,8 @@ public class PaymentService {
         validateFailableOrder(order);
         validatePaymentAmount(order, request.amount());
 
-        LocalDateTime failedAt = LocalDateTime.now(clock);
-        Payment savedPayment = processFailedPayment(order, request, failedAt);
+        LocalDateTime declinedAt = LocalDateTime.now(clock);
+        Payment savedPayment = processDeclinedPayment(order, request, declinedAt);
         return PaymentResponse.from(savedPayment, order);
     }
 
@@ -155,14 +155,16 @@ public class PaymentService {
             LocalDateTime paidAt
     ) {
         Payment payment = existingPayment.orElseGet(() -> Payment.createReady(order, paidAt));
+        payment.markProcessing(paidAt);
         payment.succeed(request.paymentKey(), request.method(), paidAt);
         return paymentRepository.save(payment);
     }
 
-    private Payment processFailedPayment(Order order, FailPaymentRequest request, LocalDateTime failedAt) {
+    private Payment processDeclinedPayment(Order order, FailPaymentRequest request, LocalDateTime declinedAt) {
         Payment payment = paymentRepository.findByOrder_Id(order.getId())
-                .orElseGet(() -> Payment.createReady(order, failedAt));
-        payment.fail(request.paymentKey(), request.method(), request.failedReason(), failedAt);
+                .orElseGet(() -> Payment.createReady(order, declinedAt));
+        payment.markProcessing(declinedAt);
+        payment.decline(request.paymentKey(), request.method(), request.failedReason(), declinedAt);
         return paymentRepository.save(payment);
     }
 

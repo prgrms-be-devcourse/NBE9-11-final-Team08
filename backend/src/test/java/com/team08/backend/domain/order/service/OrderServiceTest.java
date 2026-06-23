@@ -264,9 +264,9 @@ class OrderServiceTest {
     }
 
     @Test
-    void pendingPaymentOrderWithFailedPaymentCancelsPaymentTogether() {
+    void pendingPaymentOrderWithDeclinedPaymentCancelsPaymentTogether() {
         Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
-        Payment payment = payment(order, PaymentStatus.FAILED);
+        Payment payment = payment(order, PaymentStatus.DECLINED);
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
@@ -333,11 +333,13 @@ class OrderServiceTest {
 
     private Payment payment(Order order, PaymentStatus status) {
         Payment payment = Payment.createReady(order, FIXED_NOW.minusDays(1));
-        if (status == PaymentStatus.FAILED) {
-            payment.fail("payment-key", "CARD", "결제 실패", FIXED_NOW.minusDays(1));
+        if (status == PaymentStatus.DECLINED) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
+            payment.decline("payment-key", "CARD", "결제 거절", FIXED_NOW.minusDays(1));
         } else if (status == PaymentStatus.READY) {
             return payment;
         } else if (status == PaymentStatus.SUCCESS) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
             payment.succeed("payment-key", "CARD", FIXED_NOW.minusDays(1));
         }
         return payment;

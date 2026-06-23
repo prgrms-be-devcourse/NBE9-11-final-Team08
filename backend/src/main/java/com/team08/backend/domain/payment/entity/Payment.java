@@ -94,7 +94,7 @@ public class Payment {
     }
 
     public void succeed(String paymentKey, String method, LocalDateTime paidAt) {
-        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
+        validateStatus(PaymentStatus.PROCESSING);
         this.paymentKey = paymentKey;
         this.method = method;
         this.status = PaymentStatus.SUCCESS;
@@ -105,23 +105,41 @@ public class Payment {
         this.updatedAt = paidAt;
     }
 
-    public void fail(String failedReason, LocalDateTime failedAt) {
-        fail(null, null, failedReason, failedAt);
+    public void markProcessing(LocalDateTime processingStartedAt) {
+        validateStatus(PaymentStatus.READY, PaymentStatus.DECLINED);
+        this.status = PaymentStatus.PROCESSING;
+        this.failureCode = null;
+        this.failureMessage = null;
+        this.failedReason = null;
+        this.updatedAt = processingStartedAt;
     }
 
-    public void fail(String paymentKey, String method, String failedReason, LocalDateTime failedAt) {
-        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
+    public void decline(String failedReason, LocalDateTime declinedAt) {
+        decline(null, null, failedReason, declinedAt);
+    }
+
+    public void decline(String paymentKey, String method, String failedReason, LocalDateTime declinedAt) {
+        validateStatus(PaymentStatus.PROCESSING);
         this.paymentKey = paymentKey;
         this.method = method;
-        this.status = PaymentStatus.FAILED;
+        this.status = PaymentStatus.DECLINED;
         this.failureCode = null;
         this.failureMessage = failedReason;
         this.failedReason = failedReason;
-        this.updatedAt = failedAt;
+        this.updatedAt = declinedAt;
+    }
+
+    public void markUnknown(String failureCode, String failureMessage, LocalDateTime unknownAt) {
+        validateStatus(PaymentStatus.PROCESSING);
+        this.status = PaymentStatus.UNKNOWN;
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+        this.failedReason = failureMessage;
+        this.updatedAt = unknownAt;
     }
 
     public void cancel(LocalDateTime canceledAt) {
-        validateStatus(PaymentStatus.READY, PaymentStatus.FAILED);
+        validateStatus(PaymentStatus.READY, PaymentStatus.DECLINED);
         this.status = PaymentStatus.CANCELED;
         this.canceledAt = canceledAt;
         this.updatedAt = canceledAt;
@@ -139,11 +157,11 @@ public class Payment {
     }
 
     public boolean canBeConfirmed() {
-        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.DECLINED;
     }
 
     public boolean canCancelBeforePaid() {
-        return this.status == PaymentStatus.READY || this.status == PaymentStatus.FAILED;
+        return this.status == PaymentStatus.READY || this.status == PaymentStatus.DECLINED;
     }
 
     public boolean canRefund() {
