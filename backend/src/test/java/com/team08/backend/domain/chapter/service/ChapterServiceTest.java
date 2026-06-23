@@ -232,7 +232,7 @@ class ChapterServiceTest {
         Long userId = 1L;
         Long lectureId = 100L;
 
-        Chapter chapter = mockChapterWithCourse(courseId);
+        Chapter chapter = mockChapter();
         given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
 
         Lecture lecture = mockLecture(lectureId, chapterId, "강의1", 1);
@@ -241,14 +241,14 @@ class ChapterServiceTest {
 
         // 실제 입장은 LectureService 에 위임된다.
         LectureEnterResponse expected = LectureEnterResponse.of(lecture, mockProgress(userId, lectureId, 120, false));
-        given(lectureService.enterLecture(lectureId, userId)).willReturn(expected);
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId)).willReturn(expected);
 
         LectureEnterResponse response = chapterService.enterFirstLecture(courseId, chapterId, userId);
 
         assertThat(response).isSameAs(expected);
         assertThat(response.progress()).isNotNull();
         assertThat(response.progress().lastPositionSeconds()).isEqualTo(120);
-        verify(lectureService).enterLecture(lectureId, userId);
+        verify(lectureService).enterLecture(courseId, chapterId, lectureId, userId);
     }
 
     @Test
@@ -259,7 +259,7 @@ class ChapterServiceTest {
         Long userId = 1L;
         Long lectureId = 100L;
 
-        Chapter chapter = mockChapterWithCourse(courseId);
+        Chapter chapter = mockChapter();
         given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
 
         Lecture lecture = mockLecture(lectureId, chapterId, "강의1", 1);
@@ -267,13 +267,13 @@ class ChapterServiceTest {
                 .willReturn(Optional.of(lecture));
 
         LectureEnterResponse expected = LectureEnterResponse.of(lecture, null);
-        given(lectureService.enterLecture(lectureId, userId)).willReturn(expected);
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId)).willReturn(expected);
 
         LectureEnterResponse response = chapterService.enterFirstLecture(courseId, chapterId, userId);
 
         assertThat(response.lectureId()).isEqualTo(lectureId);
         assertThat(response.progress()).isNull();
-        verify(lectureService).enterLecture(lectureId, userId);
+        verify(lectureService).enterLecture(courseId, chapterId, lectureId, userId);
     }
 
     @Test
@@ -287,26 +287,13 @@ class ChapterServiceTest {
                 .isEqualTo(ErrorCode.CHAPTER_NOT_FOUND);
     }
 
-    @Test
-    @DisplayName("챕터 첫 강의 입장 실패 - 챕터가 해당 강좌 소속이 아님")
-    void enterFirstLecture_chapterCourseMismatch() {
-        Long courseId = 1L;
-        Long chapterId = 10L;
-        Long userId = 1L;
-
-        Chapter chapter = mockChapterWithCourse(2L); // 챕터는 다른 강좌(2L) 소속
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
-
-        assertThatThrownBy(() -> chapterService.enterFirstLecture(courseId, chapterId, userId))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.CHAPTER_NOT_FOUND);
-    }
+    // 챕터-강좌 정합성(소속) 검증은 enterLecture 로 위임되었으므로
+    // LectureServiceTest 에서 CHAPTER_NOT_FOUND/COURSE_NOT_FOUND 로 커버한다.
 
     @Test
     @DisplayName("챕터 첫 강의 입장 실패 - 챕터에 강의 없음")
     void enterFirstLecture_lectureNotFound() {
-        Chapter chapter = mockChapterWithCourse(1L);
+        Chapter chapter = mockChapter();
         given(chapterRepository.findById(any())).willReturn(Optional.of(chapter));
         given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(any()))
                 .willReturn(Optional.empty());
@@ -325,13 +312,13 @@ class ChapterServiceTest {
         Long userId = 1L;
         Long lectureId = 100L;
 
-        Chapter chapter = mockChapterWithCourse(courseId);
+        Chapter chapter = mockChapter();
         given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
         Lecture lecture = mock(Lecture.class);
         given(lecture.getId()).willReturn(lectureId);
         given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId))
                 .willReturn(Optional.of(lecture));
-        given(lectureService.enterLecture(lectureId, userId))
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId))
                 .willThrow(new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED));
 
         assertThatThrownBy(() -> chapterService.enterFirstLecture(courseId, chapterId, userId))
@@ -343,13 +330,10 @@ class ChapterServiceTest {
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
-    private Chapter mockChapterWithCourse(Long courseId) {
-        Course course = mock(Course.class);
-        given(course.getId()).willReturn(courseId);
-
-        Chapter chapter = mock(Chapter.class);
-        given(chapter.getCourse()).willReturn(course);
-        return chapter;
+    // enterFirstLecture 는 챕터 존재 여부만 확인하고 정합성/수강권 검증은 enterLecture 에 위임하므로
+    // 챕터 mock 은 별도 필드 스텁 없이 존재하기만 하면 된다.
+    private Chapter mockChapter() {
+        return mock(Chapter.class);
     }
 
     private Lecture mockLecture(Long id, Long chapterId, String title, int orderNo) {
