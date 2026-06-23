@@ -108,7 +108,8 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
         return targetDirName + "/output.m3u8";
     }
 
-    public void deleteEncodedFolder(String targetDirName) {
+    @Override
+    public void deleteEncodedFolder(String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
         if (Files.exists(targetPath)) {
             try (var stream = Files.walk(targetPath)) {

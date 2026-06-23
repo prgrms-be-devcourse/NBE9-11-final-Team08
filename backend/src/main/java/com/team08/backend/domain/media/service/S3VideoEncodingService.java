@@ -93,6 +93,7 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
         return "lectures/" + lectureId + "/" + targetDirName + "/output.m3u8";
     }
 
+    @Override
     public void deleteEncodedFolder(String targetDirName, Long lectureId) {
         String s3FolderPath = "lectures/" + lectureId + "/" + targetDirName + "/";
         try {
