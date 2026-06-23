@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 @Configuration
@@ -25,8 +26,8 @@ public class AsyncConfig {
         executor.setAwaitTerminationSeconds(60);
 
         executor.setRejectedExecutionHandler((runnable, threadPoolExecutor) -> {
-            log.error("[비동기 인코딩 스레드 풀 포화] 대기 큐(10) 및 최대 스레드(4) 임계치를 초과하여 인코딩 요청이 거절되었습니다. 인프라 확장 혹은 리소스 정리가 필요합니다.");
-            throw new java.util.concurrent.RejectedExecutionException("Video encoding executor resources exhausted.");
+            log.error("[비동기 인코딩 작업 유실 발생] 인프라 임계치 초과(Pool: 4, Queue: 10). 작업 요청이 거절되었습니다.");
+            throw new RejectedExecutionException("인코딩 처리 시스템이 혼잡하여 현재 요청을 수락할 수 없습니다. 잠시 후 다시 시도해주세요.");
         });
 
         executor.initialize();
