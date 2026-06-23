@@ -79,7 +79,6 @@ public class IssuedCouponService {
     }
 
     // [사용자] 쿠폰 다운로드
-    @Transactional
     public CouponDownloadResponse downloadCoupon(Long userId, Long policyId) {
         // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
