@@ -18,6 +18,7 @@ public class DataInitializerRunner implements CommandLineRunner {
 
     private final SimpleDataInitializer simpleDataInitializer;
     private final BulkDataInitializer bulkDataInitializer;
+    private final DemoDataInitializer demoDataInitializer;
 
     @Override
     public void run(String... args) {
@@ -26,6 +27,11 @@ public class DataInitializerRunner implements CommandLineRunner {
                 log.info("[DataInit] 간이 데이터 초기화 시작");
                 simpleDataInitializer.init();
                 log.info("[DataInit] 간이 데이터 초기화 완료");
+            }
+            case "demo" -> {
+                log.info("[DataInit] 시연용 데이터 초기화 시작");
+                demoDataInitializer.init();
+                log.info("[DataInit] 시연용 데이터 초기화 완료");
             }
             case "bulk" -> {
                 log.info("[DataInit] 대량 데이터 초기화 시작");

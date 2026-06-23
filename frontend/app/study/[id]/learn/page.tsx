@@ -14,6 +14,9 @@ export default async function StudyLearnPage({
   const course = await api.getCourse(study.courseId)
   
   if (!course) notFound()
+  const readOnly = study.status === 'READONLY' || study.status === 'INACTIVE'
 
-  return <StudyView course={course} qna={[]} />
+  return (
+    <StudyView course={course} studyId={study.id} readOnly={readOnly} qna={[]} />
+  )
 }

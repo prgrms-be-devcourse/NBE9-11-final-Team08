@@ -11,6 +11,11 @@ export interface Lecture {
   duration: string
   progress: number
   completed: boolean
+  chapterId?: string
+  durationSeconds?: number
+  m3u8Path?: string | null
+  lastPositionSeconds?: number
+  watchedSeconds?: number
 }
 
 export interface Chapter {
@@ -243,35 +248,65 @@ export interface QnaPost {
   answers?: QnaPost[]
 }
 
+// 백엔드 QnaAnswerSummary(record(id, content, createdAt))와 동일한 형태
 export interface QnaAnswerSummary {
   id: number
-  authorId: number
-  authorName: string
   content: string
   createdAt: string
-  updatedAt: string
 }
 
+// 백엔드 QnaQuestionResponse(record)와 동일한 형태. 답변(answer)은 단일이며 없으면 null.
 export interface QnaQuestionResponse {
   id: number
   lectureId: number
-  authorId: number
-  authorName: string
+  userId: number
   title: string
   content: string
   createdAt: string
   updatedAt: string
-  answers: QnaAnswerSummary[]
+  answer: QnaAnswerSummary | null
 }
 
 export interface LectureReflectionResponse {
-  id: number
-  lectureId: number
-  userId: number
-  content: string
-  createdAt: string
-  updatedAt: string
+  id: number | null
+  userId: number | null
+  lectureId: number | null
+  content: string | null
 }
+
+// ── 강의 입장/진행 ──────────────────────────────────────────────
+export interface LectureProgressSummary {
+  lastPositionSeconds: number
+  watchedSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
+export interface LectureEnterResponse {
+  lectureId: number
+  title: string
+  m3u8Path: string | null
+  durationSeconds: number
+  orderNo: number
+  chapterId: number
+  progress: LectureProgressSummary | null
+}
+
+export interface LectureProgressResponse {
+  lectureId: number
+  lastPositionSeconds: number
+  watchedSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
+export type LearningEventType =
+  | 'LECTURE_ENTER'
+  | 'VIDEO_START'
+  | 'VIDEO_END'
+  | 'POSITION_SAVE'
+  | 'LECTURE_EXIT'
+  | 'LECTURE_COMPLETE'
 
 export interface ActivityFeedItem {
   id: string
@@ -510,4 +545,28 @@ export interface StudyReport {
   progressData: { day: string; progress: number; minutes: number }[]
   calendar: { date: string; active: boolean; level?: number }[]
   topLectures: string[]
+}
+
+// 백엔드 StudyReportResponse(record)와 동일한 형태
+export interface StudyReportTopLectureEntry {
+  lectureId: number
+  title: string
+  watchTimeSeconds: number
+}
+
+export interface StudyReportDailyProgressEntry {
+  date: string
+  progressRate: number
+}
+
+export interface StudyReportResponse {
+  studyId: number
+  totalWatchTime: number
+  totalQnaCount: number
+  progressRate: number
+  studyDays: number
+  topLectures: StudyReportTopLectureEntry[]
+  dailyProgress: StudyReportDailyProgressEntry[]
+  dailyActivityMap: Record<string, number>
+  updatedAt: string
 }

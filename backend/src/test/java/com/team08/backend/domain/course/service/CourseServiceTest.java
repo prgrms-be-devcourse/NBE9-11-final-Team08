@@ -115,14 +115,14 @@ class CourseServiceTest {
         course.addChapter(chapter);
         chapter.addLecture(freeLecture);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.id()).isEqualTo(courseId);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
-        verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseRepository).findWithChaptersAsc(courseId);
         verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
@@ -146,12 +146,12 @@ class CourseServiceTest {
         course.addChapter(chapter);
         chapter.addLecture(paidLecture);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
-        verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseRepository).findWithChaptersAsc(courseId);
         verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
@@ -159,13 +159,13 @@ class CourseServiceTest {
     void 존재하지_않는_강좌_ID로_상세_조회_시_예외가_발생한다() {
         Long invalidCourseId = 999L;
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.getCourseDetail(invalidCourseId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
+        verify(courseRepository).findWithChaptersAsc(invalidCourseId);
         verify(courseViewCountManager, never()).increaseViewCountRequiresNew(invalidCourseId);
     }
 
@@ -310,7 +310,7 @@ class CourseServiceTest {
         Long invalidCourseId = 999L;
         Long instructorId = 1L;
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.requestCourseReview(invalidCourseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -323,7 +323,7 @@ class CourseServiceTest {
         Long hackerId = 999L;
         Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, hackerId))
                 .isInstanceOf(CustomException.class)
@@ -339,7 +339,7 @@ class CourseServiceTest {
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -352,7 +352,7 @@ class CourseServiceTest {
         Long instructorId = 1L;
         Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -373,7 +373,7 @@ class CourseServiceTest {
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         courseService.requestCourseReview(courseId, instructorId);
 
