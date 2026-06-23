@@ -14,6 +14,8 @@ public record LectureCreateRequest(
 
         String m3u8Path,
 
+        String videoUuid,
+
         String summary,
 
         @Min(value = 1, message = "강의 재생 시간은 최소 1초 이상이어야 합니다.")
@@ -37,6 +39,7 @@ public record LectureCreateRequest(
         }
         return Lecture.createWithStream(
                 this.m3u8Path,
+                this.videoUuid,
                 this.title,
                 this.summary,
                 this.durationSeconds,
