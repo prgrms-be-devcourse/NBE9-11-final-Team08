@@ -15,16 +15,11 @@ public class StudyAccessPolicy {
 
     private boolean isAllowed(StudyAccessContext context, StudyAction action) {
         return switch (action) {
-            case VIEW_STUDY_CONTENT, VIEW_OWN_REPORT ->
+            case VIEW_STUDY_CONTENT ->
                     hasReadableMemberAccess(context);
-            case WRITE_STUDY_CONTENT, WRITE_OWN_STUDY_CONTENT, SAVE_REPORT_RECORD ->
+            case WRITE_STUDY_CONTENT ->
                     hasWritableMemberAccess(context);
-            case VIEW_MEMBER_REPORT ->
-                    context.isReadableStudy()
-                            && context.isActiveMember()
-                            && context.isOwner();
-            // QnA 답변: 강의 강사(= 스터디 OWNER)만. 강사는 수강권이 없으므로 enrollment 를 보지 않는다.
-            case MANAGE_ANSWER ->
+            case VIEW_MEMBER_REPORT, MANAGE_ANSWER ->
                     context.isReadableStudy()
                             && context.isActiveMember()
                             && context.isOwner();
