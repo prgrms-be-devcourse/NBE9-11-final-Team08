@@ -32,6 +32,12 @@ import type {
   CourseUpdateRequest,
   AdminCouponPolicyRequest,
   AdminCouponPolicyResponse,
+  LectureEnterResponse,
+  LectureProgressResponse,
+  LearningEventType,
+  LearningEventResponse,
+  QnaQuestionResponse,
+  StudyReportResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -193,6 +199,9 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       duration: `${Math.floor(lec.durationSeconds / 60)}:${(lec.durationSeconds % 60).toString().padStart(2, '0')}`,
       progress: 0,
       completed: false,
+      chapterId: ch.id.toString(),
+      durationSeconds: lec.durationSeconds,
+      m3u8Path: lec.m3u8Path ?? null,
     })) || [],
   })) || [],
   status: detail.status,
@@ -483,6 +492,58 @@ const saveCourseDraft = (id: string | number, data: any) => {
   }
 }
 
+const formatWatchTime = (totalSeconds: number): string => {
+  if (!totalSeconds || totalSeconds <= 0) return '0분'
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  if (hours > 0) return `${hours}시간 ${minutes}분`
+  return `${minutes}분`
+}
+
+// 백엔드 StudyReportResponse 를 화면용 StudyReport(studyName/userName 제외)로 변환한다.
+const mapStudyReportToDisplay = (
+  raw: StudyReportResponse,
+): Omit<StudyReport, 'studyName' | 'userName'> => {
+  const progressData = (raw.dailyProgress ?? []).map((d) => ({
+    day: d.date?.slice(5) ?? '', // MM-DD
+    progress: Number(d.progressRate ?? 0),
+    minutes: 0,
+  }))
+
+  const activity = raw.dailyActivityMap ?? {}
+  const activeDates = Object.keys(activity).sort()
+  let calendar: StudyReport['calendar'] = []
+  if (activeDates.length > 0) {
+    const start = new Date(activeDates[0])
+    const end = new Date()
+    const max = Math.max(...Object.values(activity), 1)
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().slice(0, 10)
+      const value = activity[key] ?? 0
+      calendar.push({
+        date: key,
+        active: value > 0,
+        level: value > 0 ? Math.min(3, Math.ceil((value / max) * 3)) : 0,
+      })
+    }
+  }
+
+  let period = '기능 없음'
+  if (activeDates.length > 0) {
+    period = `${activeDates[0]} ~ ${activeDates[activeDates.length - 1]}`
+  }
+
+  return {
+    period,
+    totalStudyTime: formatWatchTime(raw.totalWatchTime ?? 0),
+    commentCount: raw.totalQnaCount ?? 0,
+    studyDays: raw.studyDays ?? 0,
+    progressData,
+    calendar,
+    topLectures: (raw.topLectures ?? []).map((l) => l.title),
+  }
+}
+
 const getCurrentUserId = async (): Promise<number> => {
   try {
     const authHeaders = await getAuthHeaders()
@@ -659,9 +720,40 @@ export const api = {
     return mutate<void>(`/api/courses/lectures/${lectureId}/videos`, 'POST', formData, true)
   },
 
+  // Lecture enter / progress / last-watched
+  enterLecture: (lectureId: string | number) =>
+    request<LectureEnterResponse | null>(`/api/lectures/${lectureId}/enter`, null),
+
+  getLastWatched: (courseId: string | number) =>
+    request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
+
+  enterFirstLecture: (courseId: string | number, chapterId: string | number) =>
+    request<LectureEnterResponse | null>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/first`,
+      null,
+    ),
+
+  updateLectureProgress: (
+    lectureId: string | number,
+    positionSeconds: number,
+    watchedDeltaSeconds: number,
+  ) =>
+    mutate<LectureProgressResponse>(`/api/lectures/${lectureId}/progress`, 'PATCH', {
+      positionSeconds,
+      watchedDeltaSeconds,
+    }),
+
   // QnA
-  getQna: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/qna`, { content: [] }),
-  createQuestion: (lectureId: string | number, title: string, content: string) => mutate<any>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
+  getQna: (lectureId: string | number) =>
+    request<PageResponse<QnaQuestionResponse>>(`/api/lectures/${lectureId}/qna`, {
+      content: [],
+      pageable: { pageNumber: 0, pageSize: 20 },
+      totalElements: 0,
+      totalPages: 0,
+      last: true,
+    }),
+  createQuestion: (lectureId: string | number, title: string, content: string) =>
+    mutate<QnaQuestionResponse>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
 
   // Reflections
   getReflection: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/reflections`, null),
@@ -761,8 +853,36 @@ export const api = {
   getAttendance: () => request<AttendanceStatusResponse | null>('/api/attendances/me', null),
   checkAttendance: () => mutate<AttendanceResponse>('/api/attendances', 'POST'),
 
-  recordLearningEvent: (data: { eventType: string, courseId: number, chapterId?: number, lectureId?: number }) =>
-    mutate<void>('/api/learning-events', 'POST', data),
+  // Learning events
+  recordLearningEvent: (data: {
+    eventType: LearningEventType
+    lectureId: number
+    courseId?: number
+    chapterId?: number
+    positionSeconds?: number
+    eventTime?: string
+    eventKey?: string
+  }) =>
+    mutate<LearningEventResponse>('/api/learning-events', 'POST', {
+      ...data,
+      // 백엔드 RecordLearningEventRequest 는 eventTime(@NotNull) 을 요구한다.
+      eventTime: data.eventTime ?? new Date().toISOString().slice(0, 19),
+      // 멱등 처리를 위한 클라이언트 고유 키 (중복 이벤트 방지)
+      eventKey: data.eventKey ?? (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${data.lectureId}-${data.eventType}-${Date.now()}`),
+    }),
+
+  getMyLearningActivities: async (page = 0, size = 20): Promise<PageResponse<LearningEventResponse>> => {
+    const empty: PageResponse<LearningEventResponse> = {
+      content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true,
+    }
+    const userId = await getCurrentUserId()
+    return request<PageResponse<LearningEventResponse>>(
+      `/api/learning-events/users/${userId}/activities?page=${page}&size=${size}`,
+      empty,
+    )
+  },
 
   // Coupons & Admin
   getCoupons: async () => {
@@ -903,6 +1023,26 @@ export const api = {
 
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
+  // 저장된 리포트 조회. 없으면 null.
+  getStudyReportRaw: (studyId: string | number) =>
+    request<StudyReportResponse | null>(`/api/studies/${studyId}/report`, null),
+
+  // 학습 이벤트를 집계해 리포트를 생성/갱신한다.
+  generateStudyReport: (studyId: string | number) =>
+    mutate<StudyReportResponse>(`/api/studies/${studyId}/report`, 'POST'),
+
+  // 조회 후 없으면 생성까지 시도한다.
+  getOrGenerateStudyReport: async (studyId: string | number): Promise<StudyReportResponse | null> => {
+    const existing = await api.getStudyReportRaw(studyId)
+    if (existing && existing.studyId) return existing
+    try {
+      return await api.generateStudyReport(studyId)
+    } catch (e) {
+      console.warn('Failed to generate study report:', e)
+      return null
+    }
+  },
+
   getStudyReport: async (_studyId: string): Promise<StudyReport> => {
     let studyTitle = '기능 없음'
     let resolvedStudyId = _studyId
@@ -943,17 +1083,26 @@ export const api = {
       console.warn('Failed to fetch user profile:', e)
     }
 
-    return {
-      studyName: studyTitle,
-      userName: userName,
-      period: '기능 없음',
-      totalStudyTime: '기능 없음',
-      commentCount: -1,
-      studyDays: -1,
-      progressData: [],
-      calendar: [],
-      topLectures: [],
+    // 3. 실제 학습 리포트(StudyReportResponse) 조회/생성 후 화면용 StudyReport 로 매핑
+    const raw = isNaN(Number(resolvedStudyId))
+      ? null
+      : await api.getOrGenerateStudyReport(resolvedStudyId)
+
+    if (!raw) {
+      return {
+        studyName: studyTitle,
+        userName,
+        period: '기능 없음',
+        totalStudyTime: '기능 없음',
+        commentCount: -1,
+        studyDays: -1,
+        progressData: [],
+        calendar: [],
+        topLectures: [],
+      }
     }
+
+    return { studyName: studyTitle, userName, ...mapStudyReportToDisplay(raw) }
   },
 
   // Admin Course APIs

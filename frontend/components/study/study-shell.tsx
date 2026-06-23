@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   ArrowLeft,
+  BarChart3,
   BookOpen,
   ExternalLink,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const NAV: NavItem[] = [
   { segment: '', label: '대시보드', icon: LayoutDashboard },
   { segment: 'course', label: '강좌', icon: BookOpen },
   { segment: 'board', label: '게시판', icon: MessageSquare },
+  { segment: 'report', label: '리포트', icon: BarChart3 },
   { segment: 'settings', label: '설정', icon: Settings, ownerOnly: true },
 ]
 
