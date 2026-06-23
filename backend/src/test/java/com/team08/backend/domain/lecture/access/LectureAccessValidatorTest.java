@@ -115,6 +115,25 @@ class LectureAccessValidatorTest {
                 .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
     }
 
+    @Test
+    void validateCourseAccess는_강좌_권한검사를_위임한다() {
+        validator.validateCourseAccess(COURSE_ID, USER_ID);
+
+        verify(studyAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+    }
+
+    @Test
+    void validateCourseAccess_권한이_없으면_예외가_전파된다() {
+        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+                .given(studyAccessAuthorizer)
+                .authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+
+        assertThatThrownBy(() -> validator.validateCourseAccess(COURSE_ID, USER_ID))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+    }
+
     private Lecture lecture(boolean freePreview) {
         Course course = TestEntityFactory.course(COURSE_ID);
         ReflectionTestUtils.setField(course, "id", COURSE_ID);

@@ -48,6 +48,14 @@ public class LectureAccessValidator {
         return lecture;
     }
 
+    /**
+     * 강좌 단위 접근 검증 — 특정 강의가 아니라 강좌 범위 조회(예: 마지막 시청 강의)에 쓴다.
+     * 계층 정합성·무료 맛보기는 강좌 단위에선 의미가 없으므로 적용하지 않고, 권한 판단만 위임한다.
+     */
+    public void validateCourseAccess(Long courseId, Long userId) {
+        studyAccessAuthorizer.authorizeByCourseId(courseId, userId, StudyAction.VIEW_STUDY_CONTENT);
+    }
+
     // URL 정합성: findByIdWithChapterAndCourse 가 chapter/course 를 이미 join fetch 하므로 추가 쿼리 없이 ID 비교만 한다.
     private void validateHierarchy(Lecture lecture, Long courseId, Long chapterId) {
         Chapter chapter = lecture.getChapter();
