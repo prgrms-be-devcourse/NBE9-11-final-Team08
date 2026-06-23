@@ -142,11 +142,11 @@ ps: ## [공통] 실행 중인 컨테이너 상태 보기
 	$(call run,$(BASE) ps)
 	$(call run,$(DEV) ps)
 
-all-down: ## [공통] 모든 컨테이너 내리기 (데이터 유지)
+all-down: perf-server-t3small-down perf-client-down ## [공통] 모든 컨테이너 내리기 (데이터 유지) — base/dev + perf(t3small·client)
 	$(call run,$(BASE) down)
 	$(call run,$(DEV) down)
 
-all-reset: ## [공통] 모든 컨테이너 삭제 (데이터 삭제)
+all-reset: perf-server-t3small-reset perf-client-reset ## [공통] 모든 컨테이너 삭제 (데이터 삭제) — base/dev + perf(t3small·client)
 	$(call run,$(BASE) down -v)
 	$(call run,$(DEV) down -v)
 
