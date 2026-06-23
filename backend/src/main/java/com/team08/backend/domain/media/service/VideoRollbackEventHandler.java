@@ -32,4 +32,21 @@ public class VideoRollbackEventHandler {
             }
         }
     }
+
+    @Async("videoEncodingExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_ROLLBACK)
+    public void cleanUpLeftoverVideosOnRollback(VideoRollbackEvent event) {
+        log.warn("[트랜잭션 롤백 발생] 파일 시스템 및 S3 정합성을 맞추기 위해 인코딩 찌꺼기 폴더를 일괄 정리합니다. folder: {}", event.targetDirName());
+        for (MediaEncodingService service : mediaEncodingServices) {
+            try {
+                if (service instanceof S3VideoEncodingService s3Service) {
+                    s3Service.deleteEncodedFolder(event.targetDirName(), event.lectureId());
+                } else if (service instanceof LocalVideoEncodingService localService) {
+                    localService.deleteEncodedFolder(event.targetDirName());
+                }
+            } catch (Exception e) {
+                log.error("Failed to rollback leftover video folder for service: {}", service.getClass().getSimpleName(), e);
+            }
+        }
+    }
 }

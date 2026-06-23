@@ -1,5 +1,6 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.dto.EncodingContext;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -41,7 +42,11 @@ public abstract class VideoEncodingTemplate {
 
             String dbSavePath = getDbSavePath(targetDirName, lectureId);
 
-            resultHandler.handleSuccess(lectureId, dbSavePath, targetDirName, purpose, description, instructorId);
+            EncodingContext encodingContext = new EncodingContext(
+                    lectureId, dbSavePath, targetDirName, purpose, description, instructorId
+            );
+
+            resultHandler.handleSuccess(encodingContext);
 
         } catch (Exception e) {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
