@@ -79,6 +79,11 @@ public class CourseService {
                 .map(CourseCardResponse::from);
     }
 
+    public Page<CourseCardResponse> getCoursesByInstructor(Long instructorId, Pageable pageable) {
+        return courseRepository.findAllByInstructorId(instructorId, pageable)
+                .map(CourseCardResponse::from);
+    }
+
     @Transactional
     public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request) {
         Course course = courseRepository.findById(courseId)

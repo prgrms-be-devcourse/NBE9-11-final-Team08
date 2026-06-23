@@ -186,6 +186,22 @@ class CourseServiceTest {
     }
 
     @Test
+    void 강사_ID로_강좌_목록을_조회하면_해당_강사의_모든_상태의_강좌를_반환한다() {
+        Long instructorId = 1L;
+        Course course1 = TestEntityFactory.course(1L);
+        Course course2 = TestEntityFactory.course(2L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorId(instructorId, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, pageable);
+
+        assertThat(response.getContent()).hasSize(2);
+        verify(courseRepository).findAllByInstructorId(instructorId, pageable);
+    }
+
+    @Test
     void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
