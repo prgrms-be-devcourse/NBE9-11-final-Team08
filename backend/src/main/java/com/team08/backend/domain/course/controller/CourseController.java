@@ -5,6 +5,7 @@ import com.team08.backend.domain.course.dto.CourseCreateRequest;
 import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.CourseSortType;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -54,8 +55,9 @@ public class CourseController {
     @ResponseStatus(HttpStatus.OK)
     public Page<CourseCardResponse> getCoursesByInstructor(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            @RequestParam(name = "status", required = false) CourseStatus status,
             @PageableDefault(size = 10) Pageable pageable) {
-        return courseService.getCoursesByInstructor(loginUserPrincipal.user().id(), pageable);
+        return courseService.getCoursesByInstructor(loginUserPrincipal.user().id(), status, pageable);
     }
 
     @PutMapping("/{courseId}")

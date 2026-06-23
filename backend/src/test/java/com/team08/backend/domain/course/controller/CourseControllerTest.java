@@ -148,9 +148,28 @@ class CourseControllerTest {
         );
         Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
 
-        given(courseService.getCoursesByInstructor(eq(1L), any(Pageable.class))).willReturn(pagedResponses);
+        given(courseService.getCoursesByInstructor(eq(1L), eq(null), any(Pageable.class))).willReturn(pagedResponses);
 
         mockMvc.perform(get("/api/courses/instructor")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1L))
+                .andExpect(jsonPath("$.content[0].instructorId").value(1L));
+    }
+
+    @Test
+    @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
+    void 인증된_판매자가_특정_상태_파라미터와_함께_본인_강좌_목록_조회_요청_시_필터링된_데이터를_반환한다() throws Exception {
+        CourseCardResponse courseCard = new CourseCardResponse(
+                1L, 1L, 5L, "임시 저장 강좌", "images/thumb.jpg", 30000, 0
+        );
+        Page<CourseCardResponse> pagedResponses = new PageImpl<>(List.of(courseCard));
+
+        given(courseService.getCoursesByInstructor(eq(1L), eq(CourseStatus.DRAFT), any(Pageable.class))).willReturn(pagedResponses);
+
+        mockMvc.perform(get("/api/courses/instructor")
+                        .param("status", "DRAFT")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
