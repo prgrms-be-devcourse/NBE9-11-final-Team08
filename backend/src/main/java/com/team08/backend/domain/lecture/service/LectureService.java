@@ -2,11 +2,13 @@ package com.team08.backend.domain.lecture.service;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
@@ -28,6 +30,7 @@ public class LectureService {
     private final LectureProgressService lectureProgressService;
     private final LastWatchedLectureService lastWatchedLectureService;
     private final LectureAccessValidator lectureAccessValidator;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     /**
      * 특정 강의 러닝 스페이스 입장 — 강의 메타데이터 + 학습 진행 정보를 반환한다.
@@ -54,7 +57,10 @@ public class LectureService {
     }
 
     @Transactional
-    public Long createLecture(Long courseId, Long chapterId, LectureCreateRequest request) {
+    public Long createLecture(Long courseId, Long chapterId, Long userId, LectureCreateRequest request) {
+        // TODO: course access 검증 추가. 도훈님 확인 필요
+         courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
+
         Chapter chapter = chapterRepository.findByIdWithCourse(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
 

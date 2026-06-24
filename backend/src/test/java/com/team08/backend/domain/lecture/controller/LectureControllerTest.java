@@ -44,6 +44,7 @@ class LectureControllerTest {
     private VideoAccessService videoAccessService;
 
     @Test
+    @WithMockLoginUser
     void 유효한_데이터로_강의_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         Long courseId = 10L;
         Long chapterId = 1L;
@@ -57,7 +58,7 @@ class LectureControllerTest {
                 true
         );
 
-        given(lectureService.createLecture(eq(courseId), eq(chapterId), any(LectureCreateRequest.class))).willReturn(50L);
+        given(lectureService.createLecture(eq(courseId), eq(chapterId), eq(1L), any(LectureCreateRequest.class))).willReturn(50L);
 
         mockMvc.perform(post("/api/courses/{courseId}/chapters/{chapterId}/lectures", courseId, chapterId)
                         .contentType(MediaType.APPLICATION_JSON)
