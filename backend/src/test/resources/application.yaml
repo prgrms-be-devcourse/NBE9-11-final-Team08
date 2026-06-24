@@ -1,5 +1,6 @@
 spring:
   profiles:
+    default: test
     active: test
   flyway:
     enabled: false
@@ -13,16 +14,11 @@ spring:
         speech: none
         transcription: none
   datasource:
-    # 운영(Asia/Seoul)과 동일하게 DB 세션 타임존을 +09:00으로 맞춘다.
-    # 컨테이너 MySQL은 기본 UTC라, 이게 없으면 CURRENT_TIMESTAMP 가 JVM의
-    # LocalDateTime(KST)과 어긋나 만료 비교 같은 시간 로직이 깨진다.
     url: jdbc:tc:mysql:8.4:///team08_test?sessionVariables=time_zone='%2B09:00'
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     username: test
     password: test
 
-  # @DataJpaTest 가 기본으로 시도하는 임베디드 DB 교체를 끄고 (운영db참조 안하도록),
-  # 위에서 지정한 Testcontainers MySQL 데이터소스를 그대로 사용한다.
   test:
     database:
       replace: none
@@ -46,6 +42,19 @@ spring:
         distribution-domain: test-domain.cloudfront.net
         key-pair-id: test-key-pair-id
         private-key: test-dummy-private-key-value
+
+cloud:
+  aws:
+    s3:
+      bucket: test-bucket-name
+
+AWS_ACCESS_KEY_ID: mock-access-key
+AWS_SECRET_ACCESS_KEY: mock-secret-key
+AWS_S3_BUCKET_NAME: test-bucket-name
+CLOUDFRONT_DOMAIN: test-domain.cloudfront.net
+CLOUDFRONT_KEY_PAIR_ID: test-key-pair-id
+CLOUDFRONT_PRIVATE_KEY: test-dummy-private-key-value
+JWT_SECRET: test-secret-key-test-secret-key-test-secret-key
 
 app:
   issued-coupon-job:
