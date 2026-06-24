@@ -1,6 +1,7 @@
 package com.team08.backend.domain.chapter.dto;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.lecture.dto.LectureSummaryResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 
 import java.util.Comparator;

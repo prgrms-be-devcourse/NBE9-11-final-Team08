@@ -1,14 +1,12 @@
 package com.team08.backend.domain.studyactivity.service;
 
 import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
-import com.team08.backend.domain.study.entity.Study;
-import com.team08.backend.domain.study.entity.StudyStatus;
-import com.team08.backend.domain.study.repository.StudyRepository;
+import com.team08.backend.domain.feed.outbox.FeedOutboxService;
+import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
+import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
-import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
-import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -24,18 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class StudyActivityService {
 
     private final StudyActivityRepository studyActivityRepository;
-    private final StudyRepository studyRepository;
-    private final StudyMemberRepository studyMemberRepository;
     private final AiFeedbackInvalidator aiFeedbackInvalidator;
+    private final FeedOutboxService feedOutboxService;
+    private final StudyAccessAuthorizer studyAccessAuthorizer;
 
     @Transactional
     public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
-        Study study = findStudy(studyId);
-        validateActiveStudy(study);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.WRITE_STUDY_CONTENT);
 
         StudyActivity activity = StudyActivity.create(studyId, userId, content);
         StudyActivity savedActivity = studyActivityRepository.save(activity);
+
+        feedOutboxService.createStudyActivityCreatedEvent(savedActivity);
 
         return StudyActivityResponse.from(savedActivity);
     }
@@ -46,8 +44,7 @@ public class StudyActivityService {
             Long userId,
             Pageable pageable
     ) {
-        validateVisibleStudy(studyId);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.VIEW_STUDY_CONTENT);
 
         Pageable latestFirstPageable = PageRequest.of(
                 pageable.getPageNumber(),
@@ -69,8 +66,7 @@ public class StudyActivityService {
             Long activityId,
             Long userId
     ) {
-        validateVisibleStudy(studyId);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.VIEW_STUDY_CONTENT);
 
         StudyActivity activity = findActivity(studyId, activityId);
 
@@ -84,13 +80,14 @@ public class StudyActivityService {
             Long userId,
             String content
     ) {
-        Study study = findStudy(studyId);
-        validateActiveStudy(study);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.WRITE_STUDY_CONTENT);
 
         StudyActivity activity = findActivity(studyId, activityId);
-        validateAuthor(activity, userId);
+
+        activity.validateAuthor(userId);
+
         activity.update(content);
+
         aiFeedbackInvalidator.markStale(activityId);
 
         return StudyActivityResponse.from(activity);
@@ -98,41 +95,13 @@ public class StudyActivityService {
 
     @Transactional
     public void deleteActivity(Long studyId, Long activityId, Long userId) {
-        Study study = findStudy(studyId);
-        validateActiveStudy(study);
-        validateActiveMember(studyId, userId);
+        studyAccessAuthorizer.authorizeByStudyId(studyId, userId, StudyAction.WRITE_STUDY_CONTENT);
 
         StudyActivity activity = findActivity(studyId, activityId);
-        validateAuthor(activity, userId);
+
+        activity.validateAuthor(userId);
+
         activity.delete();
-    }
-
-    private Study findStudy(Long studyId) {
-        return studyRepository.findById(studyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-    }
-
-    private void validateVisibleStudy(Long studyId) {
-        studyRepository.findByIdAndStatusNot(studyId, StudyStatus.DRAFT)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-    }
-
-    private void validateActiveStudy(Study study) {
-        if (study.getStatus() != StudyStatus.ACTIVE) {
-            throw new CustomException(ErrorCode.STUDY_NOT_ACTIVE);
-        }
-    }
-
-    private void validateActiveMember(Long studyId, Long userId) {
-        boolean isActiveMember = studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                studyId,
-                userId,
-                StudyMemberStatus.ACTIVE
-        );
-
-        if (!isActiveMember) {
-            throw new CustomException(ErrorCode.STUDY_ACCESS_DENIED);
-        }
     }
 
     private StudyActivity findActivity(Long studyId, Long activityId) {
@@ -143,9 +112,4 @@ public class StudyActivityService {
                 );
     }
 
-    private void validateAuthor(StudyActivity activity, Long userId) {
-        if (!activity.getAuthorId().equals(userId)) {
-            throw new CustomException(ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED);
-        }
-    }
 }

@@ -12,6 +12,7 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
+import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
@@ -21,6 +22,9 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
+import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.service.CourseThumbnailService;
+import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
@@ -34,9 +38,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.UUID;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -69,6 +76,15 @@ class CourseServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private MediaEncodingService mediaEncodingService;
+
+    @Mock
+    private LectureRepository lectureRepository;
+
+    @Mock
+    private CourseThumbnailService courseThumbnailService;
+
     @InjectMocks
     private CourseService courseService;
 
@@ -82,15 +98,25 @@ class CourseServiceTest {
                 15000,
                 "thumbnail/path.png"
         );
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
+        given(courseThumbnailService.uploadThumbnail(eq(100L), any(MultipartFile.class))).willReturn("courses/thumbnails/100/uuid.png");
 
-        Long courseId = courseService.createCourse(instructorId, request);
+        Long courseId = courseService.createCourse(instructorId, request, mockFile);
+
+        ArgumentCaptor<CourseThumbnailEvent> eventCaptor = ArgumentCaptor.forClass(CourseThumbnailEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        CourseThumbnailEvent publishedEvent = eventCaptor.getValue();
 
         assertThat(courseId).isEqualTo(100L);
+        assertThat(publishedEvent.courseId()).isEqualTo(100L);
+        assertThat(publishedEvent.oldThumbnail()).isNull();
+        assertThat(publishedEvent.newS3Key()).isEqualTo("courses/thumbnails/100/uuid.png");
         verify(courseRepository).save(any(Course.class));
+        verify(courseThumbnailService).uploadThumbnail(eq(100L), any(MultipartFile.class));
     }
 
     @Test
@@ -104,14 +130,14 @@ class CourseServiceTest {
         course.addChapter(chapter);
         chapter.addLecture(freeLecture);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.id()).isEqualTo(courseId);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
-        verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseRepository).findWithChaptersAsc(courseId);
         verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
@@ -121,25 +147,26 @@ class CourseServiceTest {
         Course course = TestEntityFactory.course(courseId);
         Chapter chapter = ChapterFixture.chapter(1L, "첫 번째 챕터", 1, course);
 
-        Lecture paidLecture = Lecture.builder()
-                .title("유료 본 강의")
-                .m3u8Path("videos/paid.m3u8")
-                .summary("요약")
-                .durationSeconds(1200)
-                .orderNo(1)
-                .isFreePreview(false)
-                .chapter(chapter)
-                .build();
+        Lecture paidLecture = Lecture.createWithStream(
+                "videos/paid.m3u8",
+                UUID.randomUUID().toString(),
+                "유료 본 강의",
+                "요약",
+                1200,
+                1,
+                false,
+                chapter
+        );
 
         course.addChapter(chapter);
         chapter.addLecture(paidLecture);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         CourseDetailResponse response = courseService.getCourseDetail(courseId);
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
-        verify(courseRepository).findWithChaptersAndLecturesAsc(courseId);
+        verify(courseRepository).findWithChaptersAsc(courseId);
         verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
@@ -147,13 +174,13 @@ class CourseServiceTest {
     void 존재하지_않는_강좌_ID로_상세_조회_시_예외가_발생한다() {
         Long invalidCourseId = 999L;
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.getCourseDetail(invalidCourseId))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(courseRepository).findWithChaptersAndLecturesAsc(invalidCourseId);
+        verify(courseRepository).findWithChaptersAsc(invalidCourseId);
         verify(courseViewCountManager, never()).increaseViewCountRequiresNew(invalidCourseId);
     }
 
@@ -174,7 +201,39 @@ class CourseServiceTest {
     }
 
     @Test
-    void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
+    void 강사_ID로_강좌_목록을_조회하면_해당_강사의_모든_상태의_강좌를_반환한다() {
+        Long instructorId = 1L;
+        Course course1 = TestEntityFactory.course(1L);
+        Course course2 = TestEntityFactory.course(2L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, null, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, null, pageable);
+
+        assertThat(response.getContent()).hasSize(2);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, null, pageable);
+    }
+
+    @Test
+    void 강사_ID와_특정_상태_조건으로_강좌_목록을_조회하면_필터링된_강좌_목록만_반환한다() {
+        Long instructorId = 1L;
+        CourseStatus statusCondition = CourseStatus.DRAFT;
+        Course draftCourse = TestEntityFactory.course(1L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(draftCourse));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, statusCondition, pageable);
+
+        assertThat(response.getContent()).hasSize(1);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable);
+    }
+
+    @Test
+    void 강좌가_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
         Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
@@ -203,10 +262,11 @@ class CourseServiceTest {
         Long invalidCourseId = 999L;
         Long instructorId = 1L;
         CourseUpdateRequest request = new CourseUpdateRequest("제목", "설명", 2L, 20000, "thumb.png", List.of());
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request))
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request, mockFile))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
     }
@@ -215,21 +275,20 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_강좌_수정_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .categoryId(2L)
-                .title("원래 제목")
-                .description("원래 설명")
-                .thumbnail("old.png")
-                .price(10000)
-                .status(CourseStatus.DRAFT)
-                .build();
-
+        Course course = Course.createDraft(
+                1L,
+                2L,
+                "원래 제목",
+                "원래 설명",
+                "old.png",
+                10000
+        );
         CourseUpdateRequest request = new CourseUpdateRequest("변경 제목", "변경 설명", 3L, 20000, "new.png", List.of());
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request))
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request, mockFile))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage())
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
@@ -237,26 +296,29 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정된다() {
+    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_트랜잭션_중_S3_업로드_및_물리_정합성_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
 
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .categoryId(2L)
-                .title("원래 제목")
-                .description("원래 설명")
-                .thumbnail("old.png")
-                .price(10000)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(
+                instructorId,
+                2L,
+                "원래 제목",
+                "원래 설명",
+                "old.png",
+                10000
+        );
 
-        Chapter chapter = Chapter.builder().title("원래 챕터").orderNo(1).course(course).build();
+        Field courseIdField = findField(Course.class, "id");
+        makeAccessible(courseIdField);
+        setField(courseIdField, course, courseId);
+
+        Chapter chapter = Chapter.create("원래 챕터", 1, course);
         Field chapterIdField = findField(Chapter.class, "id");
         makeAccessible(chapterIdField);
         setField(chapterIdField, chapter, 10L);
 
-        Lecture lecture = Lecture.builder().title("원래 강의").m3u8Path("vid.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
+        Lecture lecture = Lecture.createWithStream("vid.m3u8", UUID.randomUUID().toString(), "원래 강의", "", 300, 1, false, chapter);
         Field lectureIdField = findField(Lecture.class, "id");
         makeAccessible(lectureIdField);
         setField(lectureIdField, lecture, 20L);
@@ -268,31 +330,23 @@ class CourseServiceTest {
         CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", 500, 2, false);
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate, lectureNew));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
-        courseService.updateCourseGeneralInfo(courseId, instructorId, request);
+        courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
+
+        ArgumentCaptor<CourseThumbnailEvent> eventCaptor = ArgumentCaptor.forClass(CourseThumbnailEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        CourseThumbnailEvent publishedEvent = eventCaptor.getValue();
 
         assertThat(course.getTitle()).isEqualTo("수정 제목");
-        assertThat(course.getDescription()).isEqualTo("수정 설명");
-        assertThat(course.getCategoryId()).isEqualTo(5L);
-        assertThat(course.getPrice()).isEqualTo(50000);
-        assertThat(course.getThumbnail()).isEqualTo("new.png");
-
-        assertThat(course.getChapters()).hasSize(1);
-        Chapter updatedChapter = course.getChapters().get(0);
-        assertThat(updatedChapter.getTitle()).isEqualTo("수정 챕터");
-
-        assertThat(updatedChapter.getLectures()).hasSize(2);
-        Lecture updatedLecture = updatedChapter.getLectures().get(0);
-        assertThat(updatedLecture.getTitle()).isEqualTo("수정 강의");
-        assertThat(updatedLecture.getDurationSeconds()).isEqualTo(400);
-        assertThat(updatedLecture.isFreePreview()).isTrue();
-
-        Lecture newlyAddedLecture = updatedChapter.getLectures().get(1);
-        assertThat(newlyAddedLecture.getTitle()).isEqualTo("신규 강의");
-        assertThat(newlyAddedLecture.getDurationSeconds()).isEqualTo(500);
-        assertThat(newlyAddedLecture.isFreePreview()).isFalse();
+        assertThat(course.getThumbnail()).isEqualTo("courses/thumbnails/100/new-uuid.png");
+        assertThat(publishedEvent.courseId()).isEqualTo(courseId);
+        assertThat(publishedEvent.oldThumbnail()).isEqualTo("old.png");
+        assertThat(publishedEvent.newS3Key()).isEqualTo("courses/thumbnails/100/new-uuid.png");
+        verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
     }
 
     @Test
@@ -300,7 +354,7 @@ class CourseServiceTest {
         Long invalidCourseId = 999L;
         Long instructorId = 1L;
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.requestCourseReview(invalidCourseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -311,12 +365,9 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_심사_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, hackerId))
                 .isInstanceOf(CustomException.class)
@@ -327,12 +378,12 @@ class CourseServiceTest {
     void DRAFT_상태가_아닌_강좌_심사_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -343,12 +394,9 @@ class CourseServiceTest {
     void 커리큘럼_조건_미달_시_심사_요청하면_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.requestCourseReview(courseId, instructorId))
                 .isInstanceOf(CustomException.class)
@@ -359,17 +407,17 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_요청_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
 
-        Chapter chapter = Chapter.builder().title("챕터").orderNo(1).course(course).build();
-        Lecture lecture = Lecture.builder().title("강의").m3u8Path("path.m3u8").durationSeconds(300).orderNo(1).isFreePreview(false).chapter(chapter).build();
+        Chapter chapter = Chapter.create("챕터", 1, course);
+        Lecture lecture = Lecture.createWithStream("path.m3u8", UUID.randomUUID().toString(), "강의", "", 300, 1, false, chapter);
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
-        given(courseRepository.findWithChaptersAndLecturesAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
         courseService.requestCourseReview(courseId, instructorId);
 
@@ -393,10 +441,10 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_심사_취소_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.IN_REVIEW)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.IN_REVIEW);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -409,10 +457,7 @@ class CourseServiceTest {
     void IN_REVIEW_상태가_아닌_강좌_심사_취소_시_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -425,10 +470,14 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_취소_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.IN_REVIEW)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.IN_REVIEW);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -442,10 +491,7 @@ class CourseServiceTest {
     void 심사_중이_아닌_강좌를_승인_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -458,12 +504,14 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_심사_승인_상태로_전이되고_이력이_남는다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .title("테스트 제목")
-                .description("테스트 설명")
-                .status(CourseStatus.IN_REVIEW)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "테스트 제목", "테스트 설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.IN_REVIEW);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(courseStudyManager.createForCourse(any(CourseStudyCreateCommand.class))).willReturn(1L);
@@ -480,10 +528,7 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.DRAFT)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -496,10 +541,10 @@ class CourseServiceTest {
     void 강좌_심사_반려_시_사유가_누락되면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.IN_REVIEW)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.IN_REVIEW);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -513,10 +558,14 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.IN_REVIEW)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.IN_REVIEW);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -543,10 +592,10 @@ class CourseServiceTest {
     void 소유자가_아닌_사용자가_강좌_판매_중지_요청_시_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        Course course = Course.builder()
-                .instructorId(1L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -559,10 +608,14 @@ class CourseServiceTest {
     void 정상_조건을_충족하면_강좌가_판매_중지_상태로_전이되고_강좌_폐쇄_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -587,13 +640,13 @@ class CourseServiceTest {
     }
 
     @Test
-    void 관리자가_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
+    void Administration_이_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        Course course = Course.builder()
-                .instructorId(10L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -607,10 +660,14 @@ class CourseServiceTest {
         Long courseId = 100L;
         Long adminId = 1L;
         String reason = "운영 정책 위반";
-        Course course = Course.builder()
-                .instructorId(10L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -625,10 +682,10 @@ class CourseServiceTest {
     void 관리자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        Course course = Course.builder()
-                .instructorId(10L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(true);
@@ -642,13 +699,17 @@ class CourseServiceTest {
     }
 
     @Test
-    void 관리자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+    void admin이_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_기존_썸네일이_S3에서_삭제된다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        Course course = Course.builder()
-                .instructorId(10L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
@@ -656,18 +717,19 @@ class CourseServiceTest {
         courseService.deleteCourseByAdmin(courseId, adminId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
     }
 
     @Test
-    void 판매자가_삭제_요청_시_소유자가_아니면_예외가_발생한다() {
+    void 판매자가_삭제_요청_시_소유자가_아닌_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
-        Course course = Course.builder()
-                .instructorId(10L)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
@@ -682,10 +744,10 @@ class CourseServiceTest {
     void 판매자가_삭제_요청_시_활성_수강생이_존재하면_예외가_발생한다() {
         Long courseId = 100L;
         Long instructorId = 10L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(true);
@@ -699,13 +761,17 @@ class CourseServiceTest {
     }
 
     @Test
-    void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+    void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_기존_썸네일이_S3에서_삭제된다() {
         Long courseId = 100L;
         Long instructorId = 10L;
-        Course course = Course.builder()
-                .instructorId(instructorId)
-                .status(CourseStatus.ON_SALE)
-                .build();
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
@@ -713,7 +779,93 @@ class CourseServiceTest {
         courseService.deleteCourseByInstructor(courseId, instructorId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 올바르지_않은_비디오_포맷_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "test.txt", "text/plain", "invalid content".getBytes()
+        );
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
+
+        verify(courseRepository, never()).findByLectureId(any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 존재하지_않는_강의_ID로_비디오_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long invalidLectureId = 999L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        given(courseRepository.findByLectureId(invalidLectureId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, invalidLectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 강좌_소유자가_아닌_사용자가_비디오_업로드_요청_시_예외가_발생한다() {
+        Long hackerId = 999L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        Course course = Course.createDraft(1L, 0L, "제목", "설명", "thumb.jpg", 0);
+
+        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(hackerId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+    }
+
+    @Test
+    void 소유권_검증을_통과하면_HLS_인코딩_서비스를_성공적으로_트리거한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "video.mp4", "video/mp4", "video data".getBytes()
+        );
+
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+
+        given(courseRepository.findByLectureId(lectureId)).willReturn(Optional.of(course));
+
+        courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
+
+        verify(courseRepository).findByLectureId(lectureId);
+        verify(mediaEncodingService).encodeToHls(eq(mockFile), any(String.class), eq(lectureId));
+    }
+
+    @Test
+    void 유효하지_않은_비디오_확장자_업로드_요청_시_예외가_발생한다() {
+        Long instructorId = 1L;
+        Long lectureId = 10L;
+        MultipartFile mockFile = new MockMultipartFile(
+                "file", "hacker.txt", "text/plain", "invalid_content".getBytes()
+        );
+
+        assertThatThrownBy(() -> courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
+
+        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
     }
 }

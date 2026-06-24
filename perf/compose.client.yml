@@ -1,0 +1,55 @@
+# ============================================================================
+# 부하기(client) stack — k6(부하 발생) + influxdb(이력) + grafana(대시보드)
+# ----------------------------------------------------------------------------
+# 측정 대상 서버(app/db)는 이 stack 에 없다.
+# k6 는 BASE_URL 로 지정한 (호스트 밖) 서버를 친다:
+#     BASE_URL: http://host.docker.internal:8080
+# 관측 도구(influxdb/grafana)를 측정 대상과 분리해 자원 경합/오염을 막는다.
+#
+#   make perf-client PERF_SCRIPT=last-watched-baseline.js
+#   make perf-client-down   (볼륨 유지)  /  make perf-client-reset (볼륨 삭제)
+# ============================================================================
+
+# 프로젝트 이름은 team08-perf 유지 — named 볼륨(team08-perf_*)에 쌓인
+# influx 메트릭 / grafana 대시보드 이력을 보존하기 위함.
+name: team08-perf
+
+services:
+  influxdb:
+    image: influxdb:1.8
+    environment:
+      INFLUXDB_DB: k6
+    volumes:
+      - influxdb-data:/var/lib/influxdb   # named 볼륨 — 지난 런 메트릭 이력 보존
+    networks: [client]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_BASIC_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana    # named 볼륨 — import 한 대시보드 보존
+    depends_on: [influxdb]
+    networks: [client]
+
+  k6:
+    image: grafana/k6:0.49.0
+    profiles: ["k6"]
+    depends_on: [influxdb]
+    environment:
+      BASE_URL: ${BASE_URL:-http://host.docker.internal:8080}
+    volumes:
+      - ./k6:/scripts:ro
+    networks: [client]
+
+networks:
+  client:
+
+volumes:
+  influxdb-data:
+  grafana-data:

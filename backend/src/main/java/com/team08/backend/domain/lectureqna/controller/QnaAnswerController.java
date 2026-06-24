@@ -15,23 +15,24 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "QnA")
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/qna/questions/{questionId}/answers")
 public class QnaAnswerController {
 
     private final QnaAnswerService qnaAnswerService;
 
     @Operation(summary = "QnA 답변 작성 (강사 전용)")
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/api/qna/questions/{questionId}/answers")
+    @PostMapping
     public QnaAnswerResponse createAnswer(
             @PathVariable Long questionId,
             @Valid @RequestBody QnaAnswerRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
         return qnaAnswerService.createAnswer(
-                questionId, request.courseId(), principal.user().id(), request.content());
+                questionId, principal.user().id(), request.content());
     }
 
     @Operation(summary = "QnA 답변 수정 (강사 전용)")
-    @PutMapping("/api/qna/questions/{questionId}/answers")
+    @PutMapping
     public QnaAnswerResponse updateAnswer(
             @PathVariable Long questionId,
             @Valid @RequestBody QnaAnswerRequest request,
@@ -42,7 +43,7 @@ public class QnaAnswerController {
 
     @Operation(summary = "QnA 답변 삭제 (강사 전용)")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/api/qna/questions/{questionId}/answers")
+    @DeleteMapping
     public void deleteAnswer(
             @PathVariable Long questionId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {

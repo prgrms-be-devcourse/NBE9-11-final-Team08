@@ -8,7 +8,6 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
@@ -61,7 +60,27 @@ public class Course extends BaseTimeEntity {
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapters = new ArrayList<>();
 
+    private Course(Long instructorId, Long categoryId, String title, String description,
+                   String thumbnail, int price, CourseStatus status) {
+        validateInitialState(instructorId, categoryId, title, price);
+        this.instructorId = instructorId;
+        this.categoryId = categoryId;
+        this.title = title;
+        this.description = description;
+        this.thumbnail = thumbnail;
+        this.price = price;
+        this.status = status;
+    }
+
+    public static Course createDraft(Long instructorId, Long categoryId, String title, String description,
+                                     String thumbnail, int price) {
+        return new Course(instructorId, categoryId, title, description, thumbnail, price, CourseStatus.DRAFT);
+    }
+
     public void addChapter(Chapter chapter) {
+        if (chapter == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         chapters.add(chapter);
         chapter.assignCourse(this);
     }
@@ -76,7 +95,15 @@ public class Course extends BaseTimeEntity {
         }
     }
 
+    public void updateThumbnail(String thumbnail) {
+        if (thumbnail == null || thumbnail.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        this.thumbnail = thumbnail;
+    }
+
     public void updateGeneralInfo(CourseUpdateRequest request) {
+        validateInitialState(this.instructorId, request.categoryId(), request.title(), request.price());
         this.categoryId = request.categoryId();
         this.title = request.title();
         this.description = request.description();
@@ -102,11 +129,7 @@ public class Course extends BaseTimeEntity {
                 Chapter existingChapter = existingChapterMap.get(chapterReq.id());
                 existingChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
             } else {
-                Chapter newChapter = Chapter.builder()
-                        .title(chapterReq.title())
-                        .orderNo(chapterReq.orderNo())
-                        .course(this)
-                        .build();
+                Chapter newChapter = Chapter.create(chapterReq.title(), chapterReq.orderNo(), this);
                 this.addChapter(newChapter);
                 newChapter.updateGeneralInfo(chapterReq.title(), chapterReq.orderNo(), chapterReq.lectures());
             }
@@ -123,7 +146,6 @@ public class Course extends BaseTimeEntity {
         }
 
         CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.IN_REVIEW, requestUserId);
-
         this.status = CourseStatus.IN_REVIEW;
 
         return history;
@@ -135,7 +157,6 @@ public class Course extends BaseTimeEntity {
         }
 
         CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.DRAFT, requestUserId);
-
         this.status = CourseStatus.DRAFT;
 
         return history;
@@ -147,7 +168,6 @@ public class Course extends BaseTimeEntity {
         }
 
         CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.ON_SALE, adminId);
-
         this.status = CourseStatus.ON_SALE;
 
         return history;
@@ -163,7 +183,6 @@ public class Course extends BaseTimeEntity {
         }
 
         CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.SUSPENDED, adminId, reason);
-
         this.status = CourseStatus.SUSPENDED;
 
         return history;
@@ -177,7 +196,6 @@ public class Course extends BaseTimeEntity {
         }
 
         CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.SUSPENDED, requestUserId);
-
         this.status = CourseStatus.SUSPENDED;
 
         return history;
@@ -210,15 +228,15 @@ public class Course extends BaseTimeEntity {
         return history;
     }
 
-    @Builder
-    public Course(Long instructorId, Long categoryId, String title, String description,
-                  String thumbnail, int price, CourseStatus status) {
-        this.instructorId = instructorId;
-        this.categoryId = categoryId;
-        this.title = title;
-        this.description = description;
-        this.thumbnail = thumbnail;
-        this.price = price;
-        this.status = status;
+    private void validateInitialState(Long instructorId, Long categoryId, String title, int price) {
+        if (instructorId == null || categoryId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (title == null || title.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (price < 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
     }
 }

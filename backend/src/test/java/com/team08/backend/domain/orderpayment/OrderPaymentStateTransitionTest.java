@@ -9,6 +9,7 @@ import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 
@@ -78,20 +79,27 @@ class OrderPaymentStateTransitionTest {
 
     @Test
     void paymentStatusTransitions() {
+        LocalDateTime processingStartedAt = LocalDateTime.parse("2026-06-11T10:00:30");
+        Payment processingPayment = payment(PaymentStatus.READY, null);
+
+        processingPayment.markProcessing(processingStartedAt);
+
+        assertThat(processingPayment.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(processingPayment.getUpdatedAt()).isEqualTo(processingStartedAt);
+
         LocalDateTime paidAt = LocalDateTime.parse("2026-06-11T10:01:00");
-        Payment succeededPayment = payment(PaymentStatus.READY, "previous failure");
+        processingPayment.succeed("payment-key", "CARD", paidAt);
 
-        succeededPayment.succeed("payment-key", "CARD", paidAt);
-
-        assertThat(succeededPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(succeededPayment.getPaymentKey()).isEqualTo("payment-key");
-        assertThat(succeededPayment.getMethod()).isEqualTo("CARD");
-        assertThat(succeededPayment.getPaidAt()).isEqualTo(paidAt);
-        assertThat(succeededPayment.getFailedReason()).isNull();
-        assertThat(succeededPayment.getUpdatedAt()).isEqualTo(paidAt);
+        assertThat(processingPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(processingPayment.getPaymentKey()).isEqualTo("payment-key");
+        assertThat(processingPayment.getMethod()).isEqualTo("CARD");
+        assertThat(processingPayment.getPaidAt()).isEqualTo(paidAt);
+        assertThat(processingPayment.getFailedReason()).isNull();
+        assertThat(processingPayment.getUpdatedAt()).isEqualTo(paidAt);
 
         LocalDateTime retryPaidAt = LocalDateTime.parse("2026-06-11T10:01:30");
-        Payment retrySucceededPayment = payment(PaymentStatus.FAILED, "network error");
+        Payment retrySucceededPayment = payment(PaymentStatus.DECLINED, "network error");
+        retrySucceededPayment.markProcessing(retryPaidAt);
 
         retrySucceededPayment.succeed("retry-payment-key", "CARD", retryPaidAt);
 
@@ -100,25 +108,29 @@ class OrderPaymentStateTransitionTest {
         assertThat(retrySucceededPayment.getFailedReason()).isNull();
         assertThat(retrySucceededPayment.getUpdatedAt()).isEqualTo(retryPaidAt);
 
-        LocalDateTime failedAt = LocalDateTime.parse("2026-06-11T10:02:00");
-        Payment failedPayment = payment(PaymentStatus.READY, null);
+        LocalDateTime declinedAt = LocalDateTime.parse("2026-06-11T10:02:00");
+        Payment declinedPayment = payment(PaymentStatus.READY, null);
+        declinedPayment.markProcessing(declinedAt);
 
-        failedPayment.fail("network error", failedAt);
+        declinedPayment.decline("network error", declinedAt);
 
-        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(failedPayment.getFailedReason()).isEqualTo("network error");
-        assertThat(failedPayment.getUpdatedAt()).isEqualTo(failedAt);
+        assertThat(declinedPayment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(declinedPayment.getFailedReason()).isEqualTo("network error");
+        assertThat(declinedPayment.getUpdatedAt()).isEqualTo(declinedAt);
 
-        LocalDateTime retryFailedAt = LocalDateTime.parse("2026-06-11T10:02:30");
+        LocalDateTime unknownAt = LocalDateTime.parse("2026-06-11T10:02:30");
+        Payment unknownPayment = payment(PaymentStatus.READY, null);
+        unknownPayment.markProcessing(unknownAt);
 
-        failedPayment.fail("timeout", retryFailedAt);
+        unknownPayment.markUnknown("TIMEOUT", "timeout", unknownAt);
 
-        assertThat(failedPayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        assertThat(failedPayment.getFailedReason()).isEqualTo("timeout");
-        assertThat(failedPayment.getUpdatedAt()).isEqualTo(retryFailedAt);
+        assertThat(unknownPayment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(unknownPayment.getFailedReason()).isEqualTo("timeout");
+        assertThat(unknownPayment.getFailureCode()).isEqualTo("TIMEOUT");
+        assertThat(unknownPayment.getUpdatedAt()).isEqualTo(unknownAt);
 
         LocalDateTime canceledAt = LocalDateTime.parse("2026-06-11T10:03:00");
-        Payment canceledPayment = payment(PaymentStatus.FAILED, "network error");
+        Payment canceledPayment = payment(PaymentStatus.DECLINED, "network error");
 
         canceledPayment.cancel(canceledAt);
 
@@ -143,7 +155,7 @@ class OrderPaymentStateTransitionTest {
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).succeed("payment-key", "CARD", changedAt))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
-        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).fail("network error", changedAt))
+        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).decline("network error", changedAt))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).cancel(changedAt))
@@ -188,53 +200,42 @@ class OrderPaymentStateTransitionTest {
     }
 
     private Order order(OrderStatus status) {
-        return new Order(
-                1L,
-                1L,
-                "ORDER-1",
-                10_000,
-                0,
-                10_000,
-                status,
-                CREATED_AT,
-                null,
-                null,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Order order = Order.createPendingPayment(1L, "ORDER-1", CREATED_AT);
+        ReflectionTestUtils.setField(order, "id", 1L);
+        ReflectionTestUtils.setField(order, "totalPrice", 10_000);
+        ReflectionTestUtils.setField(order, "finalPrice", 10_000);
+        ReflectionTestUtils.setField(order, "status", status);
+        return order;
     }
 
     private Payment payment(PaymentStatus status, String failedReason) {
-        return new Payment(
-                1L,
-                1L,
-                null,
-                null,
-                10_000,
-                status,
-                null,
-                failedReason,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Payment payment = Payment.createReady(order(OrderStatus.PENDING_PAYMENT), CREATED_AT);
+        ReflectionTestUtils.setField(payment, "id", 1L);
+        if (status == PaymentStatus.PROCESSING) {
+            payment.markProcessing(CREATED_AT.plusSeconds(1));
+        } else if (status == PaymentStatus.SUCCESS) {
+            payment.markProcessing(CREATED_AT.plusSeconds(1));
+            payment.succeed("payment-key", "CARD", CREATED_AT.plusSeconds(2));
+        } else if (status == PaymentStatus.DECLINED) {
+            payment.markProcessing(CREATED_AT.plusSeconds(1));
+            payment.decline(failedReason, CREATED_AT.plusSeconds(2));
+        } else if (status == PaymentStatus.UNKNOWN) {
+            payment.markProcessing(CREATED_AT.plusSeconds(1));
+            payment.markUnknown("UNKNOWN", failedReason, CREATED_AT.plusSeconds(2));
+        } else if (status == PaymentStatus.CANCELED) {
+            payment.cancel(CREATED_AT.plusSeconds(1));
+        } else if (status == PaymentStatus.REFUNDED) {
+            payment.markProcessing(CREATED_AT.plusSeconds(1));
+            payment.succeed("payment-key", "CARD", CREATED_AT.plusSeconds(2));
+            payment.refund(CREATED_AT.plusSeconds(3));
+        }
+        return payment;
     }
 
     private Enrollment enrollment(EnrollmentStatus status) {
-        return new Enrollment(
-                1L,
-                1L,
-                1L,
-                1L,
-                status,
-                CREATED_AT,
-                null,
-                null,
-                CREATED_AT,
-                null
-        );
+        Enrollment enrollment = Enrollment.createActive(1L, 1L, order(OrderStatus.PAID), CREATED_AT);
+        ReflectionTestUtils.setField(enrollment, "id", 1L);
+        ReflectionTestUtils.setField(enrollment, "status", status);
+        return enrollment;
     }
 }

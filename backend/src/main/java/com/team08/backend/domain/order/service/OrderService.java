@@ -3,7 +3,6 @@ package com.team08.backend.domain.order.service;
 import com.team08.backend.domain.cart.entity.Cart;
 import com.team08.backend.domain.cart.repository.CartRepository;
 import com.team08.backend.domain.cartitem.entity.CartItem;
-import com.team08.backend.domain.cartitem.repository.CartItemRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
@@ -15,12 +14,14 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -39,16 +40,17 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final PaymentRepository paymentRepository;
+    private final Clock clock;
 
     @Transactional
     public OrderDetailResponse createOrderFromCart(Long userId) {
-        Cart cart = cartRepository.findByUserId(userId)
+        Cart cart = cartRepository.findByUserIdWithItems(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.EMPTY_CART));
 
-        List<CartItem> cartItems = cartItemRepository.findAllByCartId(cart.getId());
+        List<CartItem> cartItems = cart.getItems();
         if (cartItems.isEmpty()) {
             throw new CustomException(ErrorCode.EMPTY_CART);
         }
@@ -60,8 +62,8 @@ public class OrderService {
 
         OrderDetailResponse response = createPendingPaymentOrder(userId, orderCourses);
 
-        // MVP 정책상 장바구니 주문이 성공하면 재주문 방지를 위해 주문에 사용한 장바구니 항목을 비웁니다.
-        cartItemRepository.deleteAllByCartId(cart.getId());
+        // 장바구니 주문 성공 후 동일 항목으로 재주문되지 않도록 Cart 도메인 메서드로 비운다.
+        cart.clearItems();
 
         return response;
     }
@@ -93,38 +95,29 @@ public class OrderService {
     public OrderDetailResponse cancelMyOrder(Long userId, Long orderId) {
         Order order = findMyOrder(userId, orderId);
 
-        order.cancel(LocalDateTime.now());
+        LocalDateTime canceledAt = LocalDateTime.now(clock);
+        order.cancel(canceledAt);
+        cancelCancelablePayment(order, canceledAt);
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         return OrderDetailResponse.from(order, orderItems);
     }
 
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {
-        courses.forEach(course -> validateOrderableCourse(userId, course));
+        courses.forEach(this::validateOrderableCourse);
+        validateNotAlreadyEnrolled(userId, courses);
 
-        int totalPrice = courses.stream()
-                .mapToInt(Course::getPrice)
-                .sum();
-        int discountPrice = 0;
-        int finalPrice = totalPrice - discountPrice;
-        LocalDateTime orderedAt = LocalDateTime.now();
-
-        // 이번 이슈는 결제 연동 전 단계이므로 주문은 결제 대기 상태까지만 생성합니다.
-        Order order = orderRepository.save(Order.createPendingPayment(
+        LocalDateTime orderedAt = LocalDateTime.now(clock);
+        Order order = Order.createPendingPayment(
                 userId,
                 createOrderNumber(orderedAt),
-                totalPrice,
-                discountPrice,
-                finalPrice,
                 orderedAt
-        ));
+        );
 
-        List<OrderItem> orderItems = courses.stream()
-                .map(course -> toOrderItem(order.getId(), course, orderedAt))
-                .toList();
-        List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
+        courses.forEach(course -> order.addItem(course.getId(), course.getTitle(), course.getPrice(), orderedAt));
+        Order savedOrder = orderRepository.save(order);
 
-        return OrderDetailResponse.from(order, savedItems);
+        return OrderDetailResponse.from(savedOrder, savedOrder.getItems());
     }
 
     private Map<Long, Course> findCourseMap(List<CartItem> cartItems) {
@@ -147,31 +140,27 @@ public class OrderService {
         return course;
     }
 
-    private void validateOrderableCourse(Long userId, Course course) {
-        // 장바구니에 담은 뒤 판매 상태가 바뀔 수 있으므로 주문 생성 직전에 Course 상태를 다시 검증합니다.
+    private void validateOrderableCourse(Course course) {
+        // 장바구니에 담은 뒤 Course 상태가 바뀔 수 있으므로 주문 생성 직전에 다시 검증한다.
         if (course.getStatus() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_ON_SALE);
         }
-
-        if (enrollmentRepository.existsByUserIdAndCourseIdAndStatus(userId, course.getId(), EnrollmentStatus.ACTIVE)) {
-            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
-        }
     }
 
-    private OrderItem toOrderItem(Long orderId, Course course, LocalDateTime createdAt) {
-        int discountPrice = 0;
-        int finalPrice = course.getPrice() - discountPrice;
+    private void validateNotAlreadyEnrolled(Long userId, List<Course> courses) {
+        List<Long> courseIds = courses.stream()
+                .map(Course::getId)
+                .distinct()
+                .toList();
 
-        // 강의명과 가격은 이후 Course가 수정되어도 주문 내역이 변하지 않도록 주문 시점 값으로 저장합니다.
-        return OrderItem.createSnapshot(
-                orderId,
-                course.getId(),
-                course.getTitle(),
-                course.getPrice(),
-                discountPrice,
-                finalPrice,
-                createdAt
+        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                userId,
+                EnrollmentStatus.ACTIVE,
+                courseIds
         );
+        if (!activeCourseIds.isEmpty()) {
+            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
+        }
     }
 
     private String createOrderNumber(LocalDateTime orderedAt) {
@@ -181,5 +170,11 @@ public class OrderService {
     private Order findMyOrder(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserId(orderId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void cancelCancelablePayment(Order order, LocalDateTime canceledAt) {
+        paymentRepository.findByOrder_Id(order.getId())
+                .filter(payment -> payment.canCancelBeforePaid())
+                .ifPresent(payment -> payment.cancel(canceledAt));
     }
 }

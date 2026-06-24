@@ -16,7 +16,7 @@ public class QnaAnswer extends BaseTimeEntity {
     private Long questionId;
     @Column(nullable = false)
     private Long instructorId;
-    @Lob @Column(nullable = false)
+    @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
 
     private QnaAnswer(Long questionId, Long instructorId, String content) {

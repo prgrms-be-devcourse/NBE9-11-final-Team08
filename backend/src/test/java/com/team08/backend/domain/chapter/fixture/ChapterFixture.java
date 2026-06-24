@@ -10,11 +10,7 @@ public final class ChapterFixture {
     }
 
     public static Chapter chapter(String title, int orderNo, Course course) {
-        return Chapter.builder()
-                .title(title)
-                .orderNo(orderNo)
-                .course(course)
-                .build();
+        return Chapter.create(title, orderNo, course);
     }
 
     public static Chapter chapter(Long id, String title, int orderNo, Course course) {

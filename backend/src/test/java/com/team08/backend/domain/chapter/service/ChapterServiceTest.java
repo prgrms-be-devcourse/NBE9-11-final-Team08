@@ -2,7 +2,9 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
@@ -10,6 +12,9 @@ import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
+import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -22,7 +27,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 
@@ -50,6 +55,14 @@ class ChapterServiceTest {
     private LectureRepository lectureRepository;
     @Mock
     private LectureProgressRepository lectureProgressRepository;
+    @Mock
+    private LastWatchedLectureService lastWatchedLectureService;
+    @Mock
+    private LectureService lectureService;
+    @Mock
+    private LectureAccessValidator lectureAccessValidator;
+    @Mock
+    private CourseAccessAuthorizer courseAccessAuthorizer;
 
     // ── 챕터 생성 ──────────────────────────────────────────────────
 
@@ -57,6 +70,7 @@ class ChapterServiceTest {
     @DisplayName("챕터 생성 성공")
     void createChapter_success() {
         Long courseId = 1L;
+        Long userId = 1L;
         ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
         Course course = TestEntityFactory.course(courseId);
 
@@ -65,11 +79,12 @@ class ChapterServiceTest {
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(chapterRepository.save(any(Chapter.class))).willReturn(savedChapter);
 
-        Long chapterId = chapterService.createChapter(courseId, request);
+        Long chapterId = chapterService.createChapter(courseId, userId, request);
 
         assertThat(chapterId).isEqualTo(10L);
         verify(courseRepository).findById(courseId);
         verify(chapterRepository).save(any(Chapter.class));
+        verify(courseAccessAuthorizer).authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
     }
 
     @Test
@@ -80,7 +95,7 @@ class ChapterServiceTest {
 
         given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> chapterService.createChapter(invalidCourseId, request))
+        assertThatThrownBy(() -> chapterService.createChapter(invalidCourseId, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
@@ -124,8 +139,31 @@ class ChapterServiceTest {
     // ── 강좌 내 최근 수강 강의 조회 ─────────────────────────────────────────
 
     @Test
-    @DisplayName("최근 수강 강의 조회 성공")
-    void getLastWatchedLecture_success() {
+    @DisplayName("최근 수강 강의 조회 성공 - last_watched 행 존재 (단건 조회)")
+    void getLastWatchedLecture_fromLastWatchedTable() {
+        Long courseId = 1L;
+        Long userId = 1L;
+        Long lectureId = 100L;
+
+        given(lastWatchedLectureService.findLectureId(userId, courseId))
+                .willReturn(Optional.of(lectureId));
+
+        Lecture lecture = mockLecture(lectureId, 10L, "강의1", 1);
+        LectureProgress progress = mockProgress(userId, lectureId, 300, false);
+        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId))
+                .willReturn(Optional.of(progress));
+
+        LectureEnterResponse response = chapterService.getLastWatchedLecture(courseId, userId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.lectureId()).isEqualTo(lectureId);
+        assertThat(response.progress().lastPositionSeconds()).isEqualTo(300);
+    }
+
+    @Test
+    @DisplayName("최근 수강 강의 조회 성공 - last_watched 행이 없으면 진행도 집계로 폴백")
+    void getLastWatchedLecture_fallbackToProgress() {
         Long courseId = 1L;
         Long userId = 1L;
         Long lectureId = 100L;
@@ -133,6 +171,7 @@ class ChapterServiceTest {
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(List.of(lectureId));
 
         LectureProgress progress = mockProgress(userId, lectureId, 300, false);
+        given(progress.getLectureId()).willReturn(lectureId);
         given(lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, List.of(lectureId)))
                 .willReturn(Optional.of(progress));
 
@@ -174,54 +213,73 @@ class ChapterServiceTest {
         assertThat(response).isNull();
     }
 
+    @Test
+    @DisplayName("최근 수강 강의 조회 실패 - 접근 권한 없음")
+    void getLastWatchedLecture_accessDenied() {
+        Long courseId = 1L;
+        Long userId = 1L;
+
+        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+                .given(lectureAccessValidator).validateCourseAccess(courseId, userId);
+
+        assertThatThrownBy(() -> chapterService.getLastWatchedLecture(courseId, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+    }
+
     // ── 챕터 첫 강의 입장 ──────────────────────────────────────────────────
 
     @Test
     @DisplayName("챕터 첫 강의 입장 성공 - 학습 이력 있음")
     void enterFirstLecture_success_withProgress() {
+        Long courseId = 1L;
         Long chapterId = 10L;
         Long userId = 1L;
         Long lectureId = 100L;
 
-        Chapter chapter = mock(Chapter.class);
+        Chapter chapter = mockChapter();
         given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
 
         Lecture lecture = mockLecture(lectureId, chapterId, "강의1", 1);
         given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId))
                 .willReturn(Optional.of(lecture));
 
-        LectureProgress progress = mockProgress(userId, lectureId, 120, false);
-        given(lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId))
-                .willReturn(Optional.of(progress));
+        // 실제 입장은 LectureService 에 위임된다.
+        LectureEnterResponse expected = LectureEnterResponse.of(lecture, mockProgress(userId, lectureId, 120, false));
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId)).willReturn(expected);
 
-        LectureEnterResponse response = chapterService.enterFirstLecture(chapterId, userId);
+        LectureEnterResponse response = chapterService.enterFirstLecture(courseId, chapterId, userId);
 
-        assertThat(response.lectureId()).isEqualTo(lectureId);
-        assertThat(response.title()).isEqualTo("강의1");
+        assertThat(response).isSameAs(expected);
         assertThat(response.progress()).isNotNull();
         assertThat(response.progress().lastPositionSeconds()).isEqualTo(120);
+        verify(lectureService).enterLecture(courseId, chapterId, lectureId, userId);
     }
 
     @Test
     @DisplayName("챕터 첫 강의 입장 성공 - 학습 이력 없음 (progress null)")
     void enterFirstLecture_success_withoutProgress() {
+        Long courseId = 1L;
         Long chapterId = 10L;
         Long userId = 1L;
         Long lectureId = 100L;
 
-        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(mock(Chapter.class)));
+        Chapter chapter = mockChapter();
+        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
 
         Lecture lecture = mockLecture(lectureId, chapterId, "강의1", 1);
         given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId))
                 .willReturn(Optional.of(lecture));
 
-        given(lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId))
-                .willReturn(Optional.empty());
+        LectureEnterResponse expected = LectureEnterResponse.of(lecture, null);
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId)).willReturn(expected);
 
-        LectureEnterResponse response = chapterService.enterFirstLecture(chapterId, userId);
+        LectureEnterResponse response = chapterService.enterFirstLecture(courseId, chapterId, userId);
 
         assertThat(response.lectureId()).isEqualTo(lectureId);
         assertThat(response.progress()).isNull();
+        verify(lectureService).enterLecture(courseId, chapterId, lectureId, userId);
     }
 
     @Test
@@ -229,27 +287,60 @@ class ChapterServiceTest {
     void enterFirstLecture_chapterNotFound() {
         given(chapterRepository.findById(any())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> chapterService.enterFirstLecture(10L, 1L))
+        assertThatThrownBy(() -> chapterService.enterFirstLecture(1L, 10L, 1L))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAPTER_NOT_FOUND);
     }
 
+    // 챕터-강좌 정합성(소속) 검증은 enterLecture 로 위임되었으므로
+    // LectureServiceTest 에서 CHAPTER_NOT_FOUND/COURSE_NOT_FOUND 로 커버한다.
+
     @Test
     @DisplayName("챕터 첫 강의 입장 실패 - 챕터에 강의 없음")
     void enterFirstLecture_lectureNotFound() {
-        given(chapterRepository.findById(any())).willReturn(Optional.of(mock(Chapter.class)));
+        Chapter chapter = mockChapter();
+        given(chapterRepository.findById(any())).willReturn(Optional.of(chapter));
         given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(any()))
                 .willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> chapterService.enterFirstLecture(10L, 1L))
+        assertThatThrownBy(() -> chapterService.enterFirstLecture(1L, 10L, 1L))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER);
     }
 
+    @Test
+    @DisplayName("챕터 첫 강의 입장 - 수강권 검사는 enterLecture 에 위임되어 예외가 전파된다")
+    void enterFirstLecture_delegatesEnrollmentToEnterLecture() {
+        Long courseId = 1L;
+        Long chapterId = 10L;
+        Long userId = 1L;
+        Long lectureId = 100L;
+
+        Chapter chapter = mockChapter();
+        given(chapterRepository.findById(chapterId)).willReturn(Optional.of(chapter));
+        Lecture lecture = mock(Lecture.class);
+        given(lecture.getId()).willReturn(lectureId);
+        given(lectureRepository.findFirstByChapterIdOrderByOrderNoAsc(chapterId))
+                .willReturn(Optional.of(lecture));
+        given(lectureService.enterLecture(courseId, chapterId, lectureId, userId))
+                .willThrow(new CustomException(ErrorCode.ENROLLMENT_ACCESS_DENIED));
+
+        assertThatThrownBy(() -> chapterService.enterFirstLecture(courseId, chapterId, userId))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ENROLLMENT_ACCESS_DENIED);
+    }
+
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
+
+    // enterFirstLecture 는 챕터 존재 여부만 확인하고 정합성/수강권 검증은 enterLecture 에 위임하므로
+    // 챕터 mock 은 별도 필드 스텁 없이 존재하기만 하면 된다.
+    private Chapter mockChapter() {
+        return mock(Chapter.class);
+    }
 
     private Lecture mockLecture(Long id, Long chapterId, String title, int orderNo) {
         Chapter chapter = mock(Chapter.class);
@@ -269,7 +360,7 @@ class ChapterServiceTest {
         LectureProgress progress = mock(LectureProgress.class);
         given(progress.getLastPositionSeconds()).willReturn(lastPos);
         given(progress.getWatchedSeconds()).willReturn(lastPos);
-        given(progress.getProgressRate()).willReturn(BigDecimal.valueOf(50.00));
+        given(progress.getProgressRate()).willReturn(50);
         given(progress.getCompleted()).willReturn(completed);
         return progress;
     }

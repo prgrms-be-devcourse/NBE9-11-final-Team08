@@ -1,7 +1,7 @@
 package com.team08.backend.domain.lectureqna.service;
 
-import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
@@ -24,14 +24,16 @@ import static com.team08.backend.domain.lectureqna.fixture.QnaFixture.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class QnaAnswerServiceTest {
 
     @Mock private QnaAnswerRepository qnaAnswerRepository;
     @Mock private QnaQuestionRepository qnaQuestionRepository;
-    @Mock private CourseRepository courseRepository;
+    @Mock private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @InjectMocks
     private QnaAnswerService qnaAnswerService;
@@ -46,30 +48,26 @@ class QnaAnswerServiceTest {
     // ── 헬퍼 ──────────────────────────────────────────────────────────────
 
     private void givenQuestion(Long questionId) {
+        QnaQuestion question = mock(QnaQuestion.class);
+        given(question.getLectureId()).willReturn(lecture_id);
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(questionId))
-                .willReturn(Optional.of(mock(QnaQuestion.class)));
-    }
-
-    private void givenCourseOwnedBy(Long courseId, Long instructorId) {
-        Course course = mock(Course.class);
-        given(course.getInstructorId()).willReturn(instructorId);
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+                .willReturn(Optional.of(question));
     }
 
     // ── 답변 작성 ─────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("답변 작성 성공")
+    @DisplayName("답변 작성 성공 - 강의 강사")
     void createAnswer_success() {
         givenQuestion(question_id);
-        givenCourseOwnedBy(course_id, instructor_id);
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(false);
         given(qnaAnswerRepository.save(any())).willReturn(answer);
 
-        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "답변 내용");
+        QnaAnswerResponse response = qnaAnswerService.createAnswer(question_id, instructor_id, "답변 내용");
 
         assertThat(response.content()).isEqualTo("답변 내용");
         assertThat(response.instructorId()).isEqualTo(instructor_id);
+        verify(courseAccessAuthorizer).authorizeByLectureId(lecture_id, instructor_id, CourseAction.MANAGE_ANSWER);
     }
 
     @Test
@@ -77,44 +75,33 @@ class QnaAnswerServiceTest {
     void createAnswer_questionNotFound() {
         given(qnaQuestionRepository.findByIdAndDeletedAtIsNull(any())).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_QUESTION_NOT_FOUND);
     }
 
     @Test
-    @DisplayName("답변 작성 실패 - 코스 없음")
-    void createAnswer_courseNotFound() {
+    @DisplayName("답변 작성 실패 - 강의 강사 아님 (스터디 OWNER 아님)")
+    void createAnswer_notInstructor() {
         givenQuestion(question_id);
-        given(courseRepository.findById(course_id)).willReturn(Optional.empty());
+        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+                .given(courseAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, 99L, CourseAction.MANAGE_ANSWER);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, 99L, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("답변 작성 실패 - 해당 코스 강사 아님")
-    void createAnswer_notCourseInstructor() {
-        givenQuestion(question_id);
-        givenCourseOwnedBy(course_id, instructor_id);
-
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, 99L, "content"))
-                .isInstanceOf(CustomException.class)
-                .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.QNA_ACCESS_DENIED);
+                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
     }
 
     @Test
     @DisplayName("답변 작성 실패 - 이미 답변 존재")
     void createAnswer_alreadyExists() {
         givenQuestion(question_id);
-        givenCourseOwnedBy(course_id, instructor_id);
         given(qnaAnswerRepository.existsByQuestionId(question_id)).willReturn(true);
 
-        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, course_id, instructor_id, "content"))
+        assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, instructor_id, "content"))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.QNA_ANSWER_ALREADY_EXISTS);

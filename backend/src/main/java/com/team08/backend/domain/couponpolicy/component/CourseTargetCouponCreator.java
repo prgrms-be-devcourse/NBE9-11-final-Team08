@@ -1,0 +1,51 @@
+package com.team08.backend.domain.couponpolicy.component;
+
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CourseTargetCouponCreator extends AbstractCouponPolicyCreator {
+
+    public CourseTargetCouponCreator(CouponPolicyValidator validator) {
+        super(validator);
+    }
+
+    @Override
+    public boolean supports(CouponPolicyCreateRequest request) {
+        return request.couponTarget() == CouponTarget.COURSE;
+    }
+
+    @Override
+    protected void validateSpecific(CouponPolicyCreateRequest request) {
+        // 코스 대상 특화 검증
+        if (request.courseIds() == null || request.courseIds().isEmpty() ||
+                (request.categoryIds() != null && !request.categoryIds().isEmpty())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    @Override
+    protected CouponPolicy createEntity(CouponPolicyCreateRequest request) {
+        return CouponPolicy.createPolicy(
+                request.name(),
+                request.couponTarget(),
+                request.couponType(),
+                request.totalQuantity(),
+                request.usageType(),
+                request.isStackable(),
+                request.discountType(),
+                request.discountValue(),
+                request.maxDiscountAmount(),
+                request.minOrderAmount(),
+                request.validDays(),
+                request.issueStartDate(),
+                request.issueEndDate(),
+                null,
+                request.courseIds()
+        );
+    }
+}

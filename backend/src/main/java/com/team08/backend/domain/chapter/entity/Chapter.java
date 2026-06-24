@@ -4,9 +4,10 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
@@ -47,26 +48,44 @@ public class Chapter extends BaseTimeEntity {
     )
     private List<Lecture> lectures = new ArrayList<>();
 
-    @Builder
-    public Chapter(String title, int orderNo, Course course) {
+    private Chapter(String title, int orderNo, Course course) {
+        validateInitialState(title, orderNo, course);
         this.title = title;
         this.orderNo = orderNo;
         this.course = course;
     }
 
+    public static Chapter create(String title, int orderNo, Course course) {
+        return new Chapter(title, orderNo, course);
+    }
+
     public void addLecture(Lecture lecture) {
+        if (lecture == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         lectures.add(lecture);
         lecture.assignChapter(this);
     }
 
     public void assignCourse(Course course) {
+        if (course == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
         this.course = course;
     }
 
     public void updateGeneralInfo(String title, int orderNo, List<CourseUpdateRequest.LectureUpdateRequest> lectureRequests) {
+        validateTitleAndOrder(title, orderNo);
         this.title = title;
         this.orderNo = orderNo;
         updateLectures(lectureRequests);
+    }
+
+    public void updateOrderNo(int orderNo) {
+        if (orderNo < 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        this.orderNo = orderNo;
     }
 
     private void updateLectures(List<CourseUpdateRequest.LectureUpdateRequest> lectureRequests) {
@@ -91,14 +110,31 @@ public class Chapter extends BaseTimeEntity {
                         lectureReq.isFreePreview()
                 );
             } else {
-                this.addLecture(Lecture.create(
+                this.addLecture(Lecture.createDraft(
                         lectureReq.title(),
+                        "",
                         lectureReq.durationSeconds(),
                         lectureReq.orderNo(),
                         lectureReq.isFreePreview(),
                         this
                 ));
             }
+        }
+    }
+
+    private void validateInitialState(String title, int orderNo, Course course) {
+        validateTitleAndOrder(title, orderNo);
+        if (course == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private void validateTitleAndOrder(String title, int orderNo) {
+        if (title == null || title.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if (orderNo < 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }
 }

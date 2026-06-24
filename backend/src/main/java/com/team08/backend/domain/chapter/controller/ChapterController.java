@@ -2,7 +2,7 @@ package com.team08.backend.domain.chapter.controller;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
-import com.team08.backend.domain.chapter.dto.LectureEnterResponse;
+import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.service.ChapterService;
 import jakarta.validation.Valid;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -21,17 +21,19 @@ import java.util.List;
 @Tag(name = "챕터", description = "챕터 조회 및 강의 입장 API")
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/courses/{courseId}")
 public class ChapterController {
 
     private final ChapterService chapterService;
 
-    @PostMapping("/api/courses/{courseId}/chapters")
+    @PostMapping("/chapters")
     @ResponseStatus(HttpStatus.CREATED)
     public Long createChapter(
             @PathVariable Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal principal,
             @Valid @RequestBody ChapterCreateRequest request) {
 
-        return chapterService.createChapter(courseId, request);
+        return chapterService.createChapter(courseId, principal.user().id(), request);
     }
 
     @Operation(
@@ -41,7 +43,7 @@ public class ChapterController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공")
     })
-    @GetMapping("/api/courses/{courseId}/chapters")
+    @GetMapping("/chapters")
     public List<ChapterWithLecturesResponse> getChapters(
             @Parameter(description = "코스 ID") @PathVariable Long courseId) {
         return chapterService.getChaptersWithLectures(courseId);
@@ -54,7 +56,7 @@ public class ChapterController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (수강 이력 없으면 null)")
     })
-    @GetMapping("/api/courses/{courseId}/lectures/last-watched")
+    @GetMapping("/lectures/last-watched")
     public LectureEnterResponse getLastWatchedLecture(
             @Parameter(description = "강좌 ID") @PathVariable Long courseId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
@@ -69,11 +71,12 @@ public class ChapterController {
             @ApiResponse(responseCode = "200", description = "입장 성공"),
             @ApiResponse(responseCode = "404", description = "챕터 또는 강의를 찾을 수 없음")
     })
-    @GetMapping("/api/chapters/{chapterId}/lectures/first")
+    @GetMapping("/chapters/{chapterId}/lectures/first")
     public LectureEnterResponse enterFirstLecture(
+            @Parameter(description = "강좌 ID") @PathVariable Long courseId,
             @Parameter(description = "챕터 ID") @PathVariable Long chapterId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return chapterService.enterFirstLecture(chapterId, principal.user().id());
+        return chapterService.enterFirstLecture(courseId, chapterId, principal.user().id());
     }
 
 }

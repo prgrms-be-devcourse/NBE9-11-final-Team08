@@ -6,14 +6,10 @@ import com.team08.backend.domain.aifeedback.entity.AiFeedback;
 import com.team08.backend.domain.aifeedback.entity.AiFeedbackStatus;
 import com.team08.backend.domain.aifeedback.generator.AiFeedbackGenerator;
 import com.team08.backend.domain.aifeedback.repository.AiFeedbackRepository;
-import com.team08.backend.domain.study.entity.Study;
-import com.team08.backend.domain.study.entity.StudyStatus;
-import com.team08.backend.domain.study.fixture.StudyFixture;
-import com.team08.backend.domain.study.repository.StudyRepository;
+import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
+import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
-import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
-import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -32,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AiFeedbackServiceTest {
@@ -42,12 +39,6 @@ class AiFeedbackServiceTest {
     private static final String CONTENT = "AI 피드백을 요청할 스터디 활동 내용입니다.";
 
     @Mock
-    private StudyRepository studyRepository;
-
-    @Mock
-    private StudyMemberRepository studyMemberRepository;
-
-    @Mock
     private StudyActivityRepository studyActivityRepository;
 
     @Mock
@@ -56,13 +47,15 @@ class AiFeedbackServiceTest {
     @Mock
     private AiFeedbackGenerator aiFeedbackGenerator;
 
+    @Mock
+    private StudyAccessAuthorizer studyAccessAuthorizer;
+
     @InjectMocks
     private AiFeedbackService aiFeedbackService;
 
     @Test
     void 작성자가_구조화된_한국어_AI_피드백을_생성한다() {
         StructuredFeedback generated = structuredFeedback();
-        givenActiveStudyAndMember(AUTHOR_ID);
         givenActivity();
         given(aiFeedbackRepository.findByStudyActivityIdForUpdate(ACTIVITY_ID))
                 .willReturn(Optional.empty());
@@ -77,17 +70,18 @@ class AiFeedbackServiceTest {
 
         assertThat(response.status()).isEqualTo(AiFeedbackStatus.COMPLETED);
         assertThat(response.result()).isEqualTo(generated);
+        verify(studyAccessAuthorizer)
+                .authorizeByStudyId(STUDY_ID, AUTHOR_ID, StudyAction.WRITE_STUDY_CONTENT);
     }
 
     @Test
     void 작성자가_아니면_피드백을_생성할_수_없다() {
         Long memberId = 2L;
-        givenActiveStudyAndMember(memberId);
         givenActivity();
 
         assertError(
                 () -> aiFeedbackService.generate(STUDY_ID, ACTIVITY_ID, memberId),
-                ErrorCode.AI_FEEDBACK_REQUEST_DENIED
+                ErrorCode.STUDY_ACTIVITY_ACCESS_DENIED
         );
         then(aiFeedbackGenerator).shouldHaveNoInteractions();
     }
@@ -95,7 +89,6 @@ class AiFeedbackServiceTest {
     @Test
     void 완료된_피드백과_활동_스냅샷이_같으면_AI를_다시_호출하지_않는다() {
         AiFeedback completed = completedFeedback(CONTENT);
-        givenActiveStudyAndMember(AUTHOR_ID);
         givenActivity();
         given(aiFeedbackRepository.findByStudyActivityIdForUpdate(ACTIVITY_ID))
                 .willReturn(Optional.of(completed));
@@ -138,7 +131,6 @@ class AiFeedbackServiceTest {
         AiFeedback processing = AiFeedback.startProcessing(
                 AUTHOR_ID, STUDY_ID, ACTIVITY_ID, CONTENT, "stub", "v1"
         );
-        givenActiveStudyAndMember(AUTHOR_ID);
         givenActivity();
         given(aiFeedbackRepository.findByStudyActivityIdForUpdate(ACTIVITY_ID))
                 .willReturn(Optional.of(processing));
@@ -153,7 +145,6 @@ class AiFeedbackServiceTest {
     @Test
     void AI_호출이_실패하면_FAILED로_저장하고_오류를_반환한다() {
         AtomicReference<AiFeedback> savedFeedback = new AtomicReference<>();
-        givenActiveStudyAndMember(AUTHOR_ID);
         givenActivity();
         given(aiFeedbackRepository.findByStudyActivityIdForUpdate(ACTIVITY_ID))
                 .willReturn(Optional.empty());
@@ -179,8 +170,6 @@ class AiFeedbackServiceTest {
     void 생성_도중_활동_내용이_변경되면_결과를_STALE로_완료한다() {
         String originalContent = "생성 시작 시점의 활동 내용입니다.";
         StudyActivity changingActivity = org.mockito.Mockito.mock(StudyActivity.class);
-        givenActiveStudyAndMember(AUTHOR_ID);
-        given(changingActivity.getAuthorId()).willReturn(AUTHOR_ID);
         given(changingActivity.getContent()).willReturn(originalContent, CONTENT);
         given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
                 ACTIVITY_ID, STUDY_ID
@@ -200,57 +189,20 @@ class AiFeedbackServiceTest {
     }
 
     @Test
-    void READONLY_스터디의_ACTIVE_멤버도_기존_피드백을_조회한다() {
-        Study readonlyStudy = StudyFixture.activeStudy();
-        ReflectionTestUtils.setField(readonlyStudy, "status", StudyStatus.READONLY);
+    void 기존_피드백을_조회한다() {
         AiFeedback completed = completedFeedback(CONTENT);
-        given(studyRepository.findByIdAndStatusNot(STUDY_ID, StudyStatus.DRAFT))
-                .willReturn(Optional.of(readonlyStudy));
-        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                STUDY_ID, 2L, StudyMemberStatus.ACTIVE
-        )).willReturn(true);
-        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
-                ACTIVITY_ID, STUDY_ID
-        )).willReturn(Optional.of(activity()));
         given(aiFeedbackRepository.findByStudyActivityId(ACTIVITY_ID))
                 .willReturn(Optional.of(completed));
 
         AiFeedbackResponse response = aiFeedbackService.get(STUDY_ID, ACTIVITY_ID, 2L);
 
         assertThat(response.status()).isEqualTo(AiFeedbackStatus.COMPLETED);
-    }
-
-    @Test
-    void ACTIVE_멤버가_아니면_피드백을_조회할_수_없다() {
-        given(studyRepository.findByIdAndStatusNot(STUDY_ID, StudyStatus.DRAFT))
-                .willReturn(Optional.of(StudyFixture.activeStudy()));
-        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                STUDY_ID, 2L, StudyMemberStatus.ACTIVE
-        )).willReturn(false);
-
-        assertError(
-                () -> aiFeedbackService.get(STUDY_ID, ACTIVITY_ID, 2L),
-                ErrorCode.STUDY_ACCESS_DENIED
-        );
-    }
-
-    @Test
-    void 삭제된_활동의_피드백은_조회할_수_없다() {
-        givenVisibleStudyAndMember(2L);
-        given(studyActivityRepository.findByIdAndStudyIdAndDeletedAtIsNull(
-                ACTIVITY_ID, STUDY_ID
-        )).willReturn(Optional.empty());
-
-        assertError(
-                () -> aiFeedbackService.get(STUDY_ID, ACTIVITY_ID, 2L),
-                ErrorCode.STUDY_ACTIVITY_NOT_FOUND
-        );
+        verify(studyAccessAuthorizer)
+                .authorizeByStudyId(STUDY_ID, 2L, StudyAction.VIEW_STUDY_CONTENT);
     }
 
     @Test
     void 피드백이_없으면_NOT_FOUND를_반환한다() {
-        givenVisibleStudyAndMember(2L);
-        givenActivity();
         given(aiFeedbackRepository.findByStudyActivityId(ACTIVITY_ID))
                 .willReturn(Optional.empty());
 
@@ -261,29 +213,12 @@ class AiFeedbackServiceTest {
     }
 
     private void givenRetryableFeedback(AiFeedback feedback) {
-        givenActiveStudyAndMember(AUTHOR_ID);
         givenActivity();
         given(aiFeedbackRepository.findByStudyActivityIdForUpdate(ACTIVITY_ID))
                 .willReturn(Optional.of(feedback));
         given(aiFeedbackGenerator.modelName()).willReturn("stub");
         given(aiFeedbackGenerator.promptVersion()).willReturn("v1");
         given(aiFeedbackGenerator.generateKorean(CONTENT)).willReturn(structuredFeedback());
-    }
-
-    private void givenActiveStudyAndMember(Long userId) {
-        given(studyRepository.findById(STUDY_ID))
-                .willReturn(Optional.of(StudyFixture.activeStudy()));
-        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                STUDY_ID, userId, StudyMemberStatus.ACTIVE
-        )).willReturn(true);
-    }
-
-    private void givenVisibleStudyAndMember(Long userId) {
-        given(studyRepository.findByIdAndStatusNot(STUDY_ID, StudyStatus.DRAFT))
-                .willReturn(Optional.of(StudyFixture.activeStudy()));
-        given(studyMemberRepository.existsByStudyIdAndUserIdAndStatus(
-                STUDY_ID, userId, StudyMemberStatus.ACTIVE
-        )).willReturn(true);
     }
 
     private void givenActivity() {

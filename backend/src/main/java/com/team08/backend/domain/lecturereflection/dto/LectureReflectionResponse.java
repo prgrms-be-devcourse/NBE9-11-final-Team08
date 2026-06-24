@@ -17,4 +17,8 @@ public record LectureReflectionResponse(
                 reflection.getContent()
         );
     }
+
+    public static LectureReflectionResponse empty() {
+        return new LectureReflectionResponse(null, null, null, null);
+    }
 }

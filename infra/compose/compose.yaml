@@ -16,11 +16,26 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent" ]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 40s
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: [ "redis-server", "--appendonly", "yes" ]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
     networks:
       - internal
 
@@ -30,12 +45,14 @@ services:
     image: ${BACKEND_IMAGE:-team08-backend}:${IMAGE_TAG:-local}
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: ${DB_NAME}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MILLIS: ${JWT_EXPIRATION_MILLIS:-3600000}
       JWT_REFRESH_EXPIRATION_MILLIS: ${JWT_REFRESH_EXPIRATION_MILLIS:-1209600000}
@@ -43,12 +60,18 @@ services:
       SAME_SITE: ${SAME_SITE:-Lax}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      LOCAL_UPLOAD_DIR: ${LOCAL_UPLOAD_DIR:-/tmp/videos-local} # 도커는 /video-local이 root파일로 보임
+      APP_DATA_INIT_MODE: ${APP_DATA_INIT_MODE:-none}
       TZ: Asia/Seoul
+    ports:
+      - "${BACKEND_PORT:-8080}:8080" # pc포트 - 컨테이너 포트 포트포워딩
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -57,41 +80,9 @@ services:
       - internal
       - public
 
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
-    depends_on:
-      backend:
-        condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx/templates/local.conf.template:/etc/nginx/templates/default.conf.template:ro
-      - certbot_www:/var/www/certbot:ro
-      - letsencrypt:/etc/letsencrypt
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal
-      - public
-
-  certbot:
-    image: certbot/certbot:v3.3.0
-    profiles: ["certbot"]
-    volumes:
-      - certbot_www:/var/www/certbot
-      - letsencrypt:/etc/letsencrypt
-
 volumes:
   mysql_data:
-  certbot_www:
-  letsencrypt:
+  redis_data:
 
 networks:
   internal:

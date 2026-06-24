@@ -1,0 +1,83 @@
+# 개발용 standalone compose — 단독 실행 (base 와 머지하지 않는다).
+#
+# 개발 환경에서는 MySQL/Redis만 Docker로 띄우고,
+# Spring Boot는 IntelliJ에서 dev 프로파일로 직접 실행한다.
+# (핫 리로드 / 디버깅 / 빠른 피드백을 위해 backend 컨테이너는 쓰지 않는다.)
+#
+# DB/Redis 기동:
+#   docker compose -f compose.dev.yaml up -d db redis           (= make dev)
+#
+# nginx 라우팅/프록시까지 점검할 때만 (선택):
+#   docker compose -f compose.dev.yaml --profile edge up -d db redis nginx-dev   (= make edge)
+#   → http://localhost:80 (nginx) → host.docker.internal:8080 (IntelliJ Spring Boot)
+#
+# 프로젝트명을 base 와 동일하게 두어 기존 dev DB 볼륨(nbe9-11-final-team08_mysql_data)을 유지한다.
+
+name: nbe9-11-final-team08-dev
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "3306:3306"   # IntelliJ가 localhost:3306으로 접속
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - dev
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"   # IntelliJ가 localhost:6379로 접속
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - dev
+
+  # 평소엔 뜨지 않음. --profile edge 로만 기동.
+  nginx-dev:
+    image: nginx:1.27-alpine
+    profiles: [ "edge" ]
+    restart: unless-stopped
+    environment:
+      DOMAIN: localhost
+    ports:
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux 대응 (Mac/Win은 기본 지원)
+    volumes:
+      - ../nginx/templates/dev.conf.template:/etc/nginx/templates/default.conf.template:ro
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/nginx-health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dev
+
+volumes:
+  mysql_data:
+
+networks:
+  dev:
