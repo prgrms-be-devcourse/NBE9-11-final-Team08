@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,6 +48,30 @@ class S3FileStorageServiceTest {
 
         Path tempPath = Files.createTempFile("s3-test-", ".mp4");
         tempFile = tempPath.toFile();
+    }
+
+    @Test
+    void InputStream_기반_S3_파일_업로드_성공_시_S3_키를_반환한다() {
+        InputStream is = new ByteArrayInputStream("content".getBytes());
+
+        String result = s3FileStorageService.uploadFile(is, s3Key);
+
+        assertEquals(s3Key, result);
+        verify(s3Template).upload(eq(bucket), eq(s3Key), eq(is));
+    }
+
+    @Test
+    void InputStream_기반_S3_파일_업로드_중_예외_발생_시_S3_UPLOAD_FAILED_에러코드를_던진다() {
+        InputStream is = new ByteArrayInputStream("content".getBytes());
+        doThrow(new RuntimeException())
+                .when(s3Template)
+                .upload(anyString(), anyString(), any(InputStream.class));
+
+        CustomException exception = assertThrows(CustomException.class, () ->
+                s3FileStorageService.uploadFile(is, s3Key)
+        );
+
+        assertEquals(ErrorCode.S3_UPLOAD_FAILED, exception.getErrorCode());
     }
 
     @Test

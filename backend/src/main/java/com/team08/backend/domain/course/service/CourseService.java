@@ -10,12 +10,14 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
+import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.service.CourseThumbnailService;
 import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
@@ -49,11 +51,20 @@ public class CourseService {
     private final ApplicationEventPublisher eventPublisher;
     private final MediaEncodingService mediaEncodingService;
     private final LectureRepository lectureRepository;
+    private final CourseThumbnailService courseThumbnailService;
 
     @Transactional
-    public Long createCourse(Long instructorId, CourseCreateRequest request) {
+    public Long createCourse(Long instructorId, CourseCreateRequest request, MultipartFile thumbnailFile) {
         Course course = request.toEntity(instructorId);
-        return courseRepository.save(course).getId();
+        Course savedCourse = courseRepository.save(course);
+
+        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+            String newS3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
+            savedCourse.updateThumbnail(newS3Key);
+            eventPublisher.publishEvent(new CourseThumbnailEvent(savedCourse.getId(), null, newS3Key));
+        }
+
+        return savedCourse.getId();
     }
 
     @Transactional
@@ -85,13 +96,21 @@ public class CourseService {
     }
 
     @Transactional
-    public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request) {
+    public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request, MultipartFile thumbnailFile) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         course.validateOwner(instructorId);
 
+        String oldThumbnail = course.getThumbnail();
+
         course.updateGeneralInfo(request);
+
+        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+            String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
+            course.updateThumbnail(newS3Key);
+            eventPublisher.publishEvent(new CourseThumbnailEvent(course.getId(), oldThumbnail, newS3Key));
+        }
     }
 
     @Transactional
@@ -182,6 +201,8 @@ public class CourseService {
 
         validateActiveEnrollments(courseId);
 
+        courseThumbnailService.deleteThumbnail(course.getThumbnail());
+
         CourseStatusHistory history = course.delete(adminId);
         courseStatusHistoryRepository.save(history);
 
@@ -195,6 +216,8 @@ public class CourseService {
 
         course.validateOwner(instructorId);
         validateActiveEnrollments(courseId);
+
+        courseThumbnailService.deleteThumbnail(course.getThumbnail());
 
         CourseStatusHistory history = course.delete(instructorId);
         courseStatusHistoryRepository.save(history);

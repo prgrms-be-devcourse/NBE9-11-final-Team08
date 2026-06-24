@@ -21,8 +21,10 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -60,19 +62,33 @@ class CourseControllerTest {
     @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_유효한_데이터로_강좌_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         CourseCreateRequest request = new CourseCreateRequest(
-                "스프링 부트 완벽 가이드",
+                "스프Prompt 부트 완벽 가이드",
                 "백엔드 개발자를 위한 강의",
                 5L,
                 30000,
                 "images/thumb.jpg"
         );
 
-        given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class))).willReturn(55L);
+        MockMultipartFile requestPart = new MockMultipartFile(
+                "request",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request)
+        );
 
-        mockMvc.perform(post("/api/courses")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile thumbnailPart = new MockMultipartFile(
+                "thumbnail",
+                "thumb.png",
+                MediaType.IMAGE_PNG_VALUE,
+                "mock-image-content".getBytes()
+        );
+
+        given(courseService.createCourse(eq(1L), any(CourseCreateRequest.class), any(MultipartFile.class))).willReturn(55L);
+
+        mockMvc.perform(multipart("/api/courses")
+                        .file(requestPart)
+                        .file(thumbnailPart)
+                        .with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$").value(55L));
     }
@@ -192,13 +208,28 @@ class CourseControllerTest {
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
 
-        doNothing().when(courseService).updateCourseGeneralInfo(eq(courseId), any(Long.class), any(CourseUpdateRequest.class));
+        MockMultipartFile requestPart = new MockMultipartFile(
+                "request",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request)
+        );
 
-        mockMvc.perform(put("/api/courses/{courseId}", courseId)
+        MockMultipartFile thumbnailPart = new MockMultipartFile(
+                "thumbnail",
+                "new_thumb.png",
+                MediaType.IMAGE_PNG_VALUE,
+                "mock-image-content".getBytes()
+        );
+
+        doNothing().when(courseService).updateCourseGeneralInfo(eq(courseId), any(Long.class), any(CourseUpdateRequest.class), any(MultipartFile.class));
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/courses/{courseId}", courseId)
+                        .file(requestPart)
+                        .file(thumbnailPart)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .with(req -> { req.setMethod("PUT"); return req; }))
                 .andExpect(status().isNoContent());
     }
 
@@ -208,11 +239,18 @@ class CourseControllerTest {
         Long courseId = 100L;
         CourseUpdateRequest request = new CourseUpdateRequest("", "설명", 5L, 50000, "new.png", List.of());
 
-        mockMvc.perform(put("/api/courses/{courseId}", courseId)
+        MockMultipartFile requestPart = new MockMultipartFile(
+                "request",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request)
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.multipart("/api/courses/{courseId}", courseId)
+                        .file(requestPart)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer mock-access-token")
                         .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .with(req -> { req.setMethod("PUT"); return req; }))
                 .andExpect(status().isBadRequest());
     }
 
