@@ -10,10 +10,10 @@ import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.DailyProgressEntry;
+import com.team08.backend.domain.studyreport.dto.ReportStatus;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.dto.TopLectureEntry;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
-import com.team08.backend.domain.studyreport.exception.StudyReportNotFoundException;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.studyreport.util.StudyReportJson;
 import lombok.RequiredArgsConstructor;
@@ -47,16 +47,37 @@ public class StudyReportService {
     private final StudyReportJson studyReportJson;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 리포트를 조회하거나, 필요 시 집계해 갱신하는 read-or-upsert 진입점.
+     *
+     * <ul>
+     *   <li>refresh=false (조회 의도): 기존 리포트가 있으면 그대로 반환(LOADED).
+     *       없으면 최초 집계 후 반환(REGENERATED).</li>
+     *   <li>refresh=true (갱신 의도): 쿨다운이 지났거나 리포트가 없으면 재집계(REGENERATED).
+     *       쿨다운 이내면 재집계를 건너뛰고 기존 리포트를 반환(COOLDOWN).</li>
+     * </ul>
+     */
     @Transactional
-    public StudyReportResponse generateReport(Long userId, Long studyId) {
-        // 레포트에 들어가는 내용: 총 시청시간 / 질문 개수 / 강좌 진행 률 / 학습한 일 수 / 최고 많이 학습한 강의 / 하루 학습량 맵 / 하루 학습량 맵
-
-        // 집계는 비용이 큰 작업이므로, 마지막 갱신 후 쿨다운 이내면 재집계 없이 기존 리포트를 반환한다.
+    public StudyReportResponse getReport(Long userId, Long studyId, boolean refresh) {
         StudyReport existing = studyReportRepository.findByUserIdAndStudyId(userId, studyId).orElse(null);
-        if (existing != null && isWithinCooldown(existing)) {
-            return StudyReportResponse.from(existing, objectMapper);
+
+        if (existing != null) {
+            // 조회 의도이거나, 갱신 의도지만 아직 쿨다운 이내라면 재집계 없이 기존 리포트를 반환한다.
+            if (!refresh) {
+                return response(existing, ReportStatus.LOADED);
+            }
+            if (isWithinCooldown(existing)) {
+                return response(existing, ReportStatus.COOLDOWN);
+            }
         }
 
+        // 여기 도달: 리포트가 없거나(최초 집계), 갱신 의도이면서 쿨다운이 지난 경우.
+        StudyReport report = regenerate(userId, studyId, existing);
+        return response(report, ReportStatus.REGENERATED);
+    }
+
+    private StudyReport regenerate(Long userId, Long studyId, StudyReport existing) {
+        // 레포트에 들어가는 내용: 총 시청시간 / 질문 개수 / 강좌 진행 률 / 학습한 일 수 / 최고 많이 학습한 강의 / 하루 학습량 맵 / 하루 학습량 맵
         Study study = studyRepository.findById(studyId)
                 .orElseThrow(StudyNotFoundException::new);
 
@@ -93,7 +114,7 @@ public class StudyReportService {
         report.update(totalWatchTime, totalQnaCount, progressRate, studyDays,
                 topLecturesJson, dailyProgressJson, dailyActivityMapJson);
 
-        return StudyReportResponse.from(report, objectMapper);
+        return report;
     }
 
     private boolean isWithinCooldown(StudyReport report) {
@@ -101,11 +122,14 @@ public class StudyReportService {
                 && report.getUpdatedAt().isAfter(LocalDateTime.now().minus(REGENERATION_COOLDOWN));
     }
 
-    @Transactional(readOnly = true)
-    public StudyReportResponse getReport(Long userId, Long studyId) {
-        StudyReport report = studyReportRepository.findByUserIdAndStudyId(userId, studyId)
-                .orElseThrow(StudyReportNotFoundException::new);
-        return StudyReportResponse.from(report, objectMapper);
+    /** 쿨다운이 해제되는(다음 재집계가 가능한) 시각. updatedAt 이 없으면 즉시 가능으로 본다. */
+    private LocalDateTime nextRegenerableAt(StudyReport report) {
+        return report.getUpdatedAt() == null ? null
+                : report.getUpdatedAt().plus(REGENERATION_COOLDOWN);
+    }
+
+    private StudyReportResponse response(StudyReport report, ReportStatus status) {
+        return StudyReportResponse.from(report, status, nextRegenerableAt(report), objectMapper);
     }
 
     // ── 집계 헬퍼 ─────────────────────────────────────────────────────────
