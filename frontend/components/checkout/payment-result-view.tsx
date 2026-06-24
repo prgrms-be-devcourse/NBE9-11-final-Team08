@@ -75,17 +75,27 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
       return
     }
 
+    if (tossOrderId !== pendingPayment.orderNumber) {
+      setState('api-error')
+      setDetailMessage('Toss에서 돌아온 주문번호가 생성된 주문번호와 다릅니다.')
+      return
+    }
+
     if (amount !== pendingPayment.amount) {
       setState('api-error')
       setDetailMessage('Toss에서 돌아온 금액이 주문 금액과 다릅니다.')
       return
     }
 
+    const idempotencyKey =
+      pendingPayment.idempotencyKey ?? `${pendingPayment.provider}-${pendingPayment.serviceOrderId}-${paymentKey}`
+
     api.confirmTossPayment(pendingPayment.serviceOrderId, {
       paymentKey,
       method: 'CARD',
       amount,
       issuedCouponId: pendingPayment.issuedCouponId,
+      idempotencyKey,
     })
       .then(async (response) => {
         setConfirmedPayment(response)
