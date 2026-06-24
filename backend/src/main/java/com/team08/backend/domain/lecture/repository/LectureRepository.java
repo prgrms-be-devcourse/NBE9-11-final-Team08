@@ -34,4 +34,6 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Lecture l SET l.orderNo = :orderNo WHERE l.id = :id AND l.chapter.id = :chapterId")
     void updateOrderNo(@Param("id") Long id, @Param("orderNo") Integer orderNo, @Param("chapterId") Long chapterId);
+
+    boolean existsByChapterCourseIdAndIsFreePreviewTrue(Long courseId);
 }
