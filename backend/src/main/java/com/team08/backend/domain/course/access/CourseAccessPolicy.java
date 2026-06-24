@@ -9,7 +9,7 @@ public class CourseAccessPolicy {
 
     public void authorize(CourseAccessContext context, CourseAction action) {
         if (!isAllowed(context, action)) {
-            throw new CustomException(ErrorCode.STUDY_ACCESS_DENIED);
+            throw new CustomException(ErrorCode.COURSE_ACCESS_DENIED);
         }
     }
 

@@ -103,6 +103,6 @@ public class CourseAccessPolicyTest {
         assertThatThrownBy(action::run)
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+                .isEqualTo(ErrorCode.COURSE_ACCESS_DENIED);
     }
 }

@@ -67,13 +67,13 @@ class VideoAccessServiceTest {
         given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(false);
-        doThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+        doThrow(new CustomException(ErrorCode.COURSE_ACCESS_DENIED))
                 .when(courseAccessAuthorizer)
                 .authorizeByLectureId(lectureId, userId, CourseAction.VIEW_CONTENT);
 
         assertThatThrownBy(() -> videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId))
                 .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.STUDY_ACCESS_DENIED.getMessage());
+                .hasMessageContaining(ErrorCode.COURSE_ACCESS_DENIED.getMessage());
 
         verifyNoInteractions(cloudFrontCookieSigner);
     }
