@@ -15,9 +15,11 @@ import java.io.File;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -82,6 +84,18 @@ class CourseThumbnailServiceImplTest {
         String s3Key = "courses/thumbnails/100/file.png";
 
         courseThumbnailService.deleteThumbnail(s3Key);
+
+        verify(s3FileStorageService).deleteFile(s3Key);
+    }
+
+    @Test
+    void S3에서_썸네일_삭제_중_예외가_발생해도_상위_비즈니스_로직으로_예외를_던지지_않는다() {
+        String s3Key = "courses/thumbnails/100/file.png";
+        willThrow(new CustomException(ErrorCode.S3_DELETE_FAILED))
+                .given(s3FileStorageService).deleteFile(s3Key);
+
+        assertThatCode(() -> courseThumbnailService.deleteThumbnail(s3Key))
+                .doesNotThrowAnyException();
 
         verify(s3FileStorageService).deleteFile(s3Key);
     }

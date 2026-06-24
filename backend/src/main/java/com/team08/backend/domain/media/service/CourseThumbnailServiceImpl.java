@@ -4,12 +4,14 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.S3FileStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CourseThumbnailServiceImpl implements CourseThumbnailService {
@@ -46,7 +48,11 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
         if (s3Key == null || s3Key.isBlank()) {
             return;
         }
-        s3FileStorageService.deleteFile(s3Key);
+        try {
+            s3FileStorageService.deleteFile(s3Key);
+        } catch (Exception e) {
+            log.error("Failed to delete thumbnail from S3. key: {}", s3Key, e);
+        }
     }
 
     private String getFileExtension(String fileName) {
