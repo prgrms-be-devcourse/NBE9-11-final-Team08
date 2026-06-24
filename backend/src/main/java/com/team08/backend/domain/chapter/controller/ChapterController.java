@@ -30,9 +30,10 @@ public class ChapterController {
     @ResponseStatus(HttpStatus.CREATED)
     public Long createChapter(
             @PathVariable Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal principal,
             @Valid @RequestBody ChapterCreateRequest request) {
 
-        return chapterService.createChapter(courseId, request);
+        return chapterService.createChapter(courseId, principal.user().id(), request);
     }
 
     @Operation(

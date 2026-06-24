@@ -4,10 +4,12 @@ import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
@@ -34,10 +36,14 @@ public class ChapterService {
     private final LastWatchedLectureService lastWatchedLectureService;
     private final LectureService lectureService;
     private final LectureAccessValidator lectureAccessValidator;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     //챕터생성
     @Transactional
-    public Long createChapter(Long courseId, ChapterCreateRequest request) {
+    public Long createChapter(Long courseId, Long userId, ChapterCreateRequest request) {
+        // TODO: course access 검증 추가됨. 도훈님 확인 필요
+        courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
+
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
