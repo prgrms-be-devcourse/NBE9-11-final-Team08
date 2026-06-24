@@ -15,12 +15,14 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Set;
 
 @Component
 public class TossPaymentClient {
 
     private static final String CONFIRM_PATH = "/v1/payments/confirm";
+    private static final String ORDER_LOOKUP_PATH = "/v1/payments/orders/{orderId}";
     private static final String UNKNOWN_ERROR_CODE = "TOSS_UNKNOWN";
     private static final String TIMEOUT_ERROR_CODE = "TOSS_TIMEOUT";
     private static final Set<String> DECLINED_ERROR_CODES = Set.of(
@@ -80,6 +82,26 @@ public class TossPaymentClient {
             throw TossPaymentException.unknown(errorResponse.code(), errorResponse.message());
         } catch (RestClientException e) {
             throw TossPaymentException.unknown(UNKNOWN_ERROR_CODE, "Toss Payments 승인 결과를 확인할 수 없습니다.");
+        }
+    }
+
+    public Optional<TossPaymentResponse> findByOrderId(String orderId) {
+        try {
+            TossPaymentResponse response = restClient.get()
+                    .uri(ORDER_LOOKUP_PATH, orderId)
+                    .retrieve()
+                    .body(TossPaymentResponse.class);
+            return Optional.ofNullable(response);
+        } catch (ResourceAccessException e) {
+            throw TossPaymentException.timeout(TIMEOUT_ERROR_CODE, "Toss Payments 조회 응답 시간이 초과되었습니다.");
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return Optional.empty();
+            }
+            TossPaymentErrorResponse errorResponse = parseErrorResponse(e);
+            throw TossPaymentException.unknown(errorResponse.code(), errorResponse.message());
+        } catch (RestClientException e) {
+            throw TossPaymentException.unknown(UNKNOWN_ERROR_CODE, "Toss Payments 결제 결과를 조회할 수 없습니다.");
         }
     }
 

@@ -132,6 +132,24 @@ public class PaymentAttempt {
         completeAs(PaymentAttemptStatus.UNKNOWN, failureCode, failureMessage, completedAt);
     }
 
+    public void recoverSucceed(String paymentKey, LocalDateTime completedAt) {
+        validateRecoverableStatus();
+        this.status = PaymentAttemptStatus.SUCCESS;
+        this.paymentKey = paymentKey;
+        this.failureCode = null;
+        this.failureMessage = null;
+        this.completedAt = completedAt;
+        this.updatedAt = completedAt;
+    }
+
+    public void recoverDecline(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        recoverAs(PaymentAttemptStatus.DECLINED, failureCode, failureMessage, completedAt);
+    }
+
+    public void recoverUnknown(String failureCode, String failureMessage, LocalDateTime completedAt) {
+        recoverAs(PaymentAttemptStatus.UNKNOWN, failureCode, failureMessage, completedAt);
+    }
+
     private void completeAs(
             PaymentAttemptStatus status,
             String failureCode,
@@ -146,9 +164,33 @@ public class PaymentAttempt {
         this.updatedAt = completedAt;
     }
 
+    private void recoverAs(
+            PaymentAttemptStatus status,
+            String failureCode,
+            String failureMessage,
+            LocalDateTime completedAt
+    ) {
+        validateRecoverableStatus();
+        this.status = status;
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+        this.completedAt = completedAt;
+        this.updatedAt = completedAt;
+    }
+
     private void validateStatus(PaymentAttemptStatus expectedStatus) {
         if (this.status != expectedStatus) {
             throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
         }
+    }
+
+    private void validateRecoverableStatus() {
+        if (this.status == PaymentAttemptStatus.REQUESTED
+                || this.status == PaymentAttemptStatus.TIMEOUT
+                || this.status == PaymentAttemptStatus.UNKNOWN
+                || this.status == PaymentAttemptStatus.PROVIDER_ERROR) {
+            return;
+        }
+        throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
     }
 }

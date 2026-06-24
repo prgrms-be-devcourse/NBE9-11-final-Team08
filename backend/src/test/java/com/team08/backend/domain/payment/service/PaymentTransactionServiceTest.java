@@ -264,6 +264,144 @@ class PaymentTransactionServiceTest {
         verify(enrollmentRepository, never()).saveAll(any());
     }
 
+    @Test
+    void processingTossPaymentRecoveredAsSuccessIssuesEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        stubPaymentSave(new AtomicReference<>());
+        stubEnrollmentSaveAll();
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "DONE", 30_000)
+        );
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void unknownTossPaymentRecoveredAsSuccessIssuesEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.UNKNOWN);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        stubPaymentSave(new AtomicReference<>());
+        stubEnrollmentSaveAll();
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "DONE", 30_000)
+        );
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void tossCanceledLookupRecoversPaymentAsDeclinedWithoutEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+        stubPaymentSave(new AtomicReference<>());
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "CANCELED", 30_000)
+        );
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.DECLINED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void unclearTossLookupKeepsPaymentUnknownWithoutEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+        stubPaymentSave(new AtomicReference<>());
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "WAITING_FOR_DEPOSIT", 30_000)
+        );
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void missingTossLookupRecoversPaymentAsReadyForRetry() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+
+        boolean recovered = paymentTransactionService.recoverTossPaymentNotFound(recoveryTarget(order));
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.READY);
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void successPaymentIsNotRecoveredAgain() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+        payment.succeed("payment-key", "CARD", FIXED_NOW.minusMinutes(1));
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "DONE", 30_000)
+        );
+
+        assertThat(recovered).isFalse();
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.REQUESTED);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
     private PaymentTransactionService.TossPaymentProcessingContext prepareTossPayment(
             Order order,
             OrderItem orderItem,
@@ -349,6 +487,38 @@ class PaymentTransactionServiceTest {
                 "CARD",
                 amount,
                 OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+        );
+    }
+
+    private Payment recoverablePayment(Order order, PaymentStatus status) {
+        Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(10));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(10));
+        if (status == PaymentStatus.UNKNOWN) {
+            payment.markUnknown("TOSS_TIMEOUT", "Toss timeout", FIXED_NOW.minusMinutes(9));
+        }
+        return payment;
+    }
+
+    private PaymentAttempt recoverableAttempt(Payment payment) {
+        PaymentAttempt attempt = PaymentAttempt.requested(
+                payment,
+                PaymentProviderType.TOSS,
+                30_000,
+                "idem-1",
+                FIXED_NOW.minusMinutes(10)
+        );
+        ReflectionTestUtils.setField(attempt, "id", ATTEMPT_ID);
+        return attempt;
+    }
+
+    private PaymentTransactionService.TossPaymentRecoveryTarget recoveryTarget(Order order) {
+        return new PaymentTransactionService.TossPaymentRecoveryTarget(
+                PAYMENT_ID,
+                ORDER_ID,
+                USER_ID,
+                order.getOrderNumber(),
+                30_000
         );
     }
 }
