@@ -25,7 +25,7 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
         }
 
         try (InputStream is = file.getInputStream()) {
-            String extension = getFileExtension(file.getOriginalFilename());
+            String extension = getFileExtension(file);
             String s3Key = "courses/thumbnails/" + courseId + "/" + UUID.randomUUID() + extension;
 
             return s3FileStorageService.uploadFile(is, s3Key);
@@ -46,7 +46,15 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
         }
     }
 
-    private String getFileExtension(String fileName) {
+    private String getFileExtension(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType != null) {
+            if (contentType.equals("image/jpeg")) return ".jpg";
+            if (contentType.equals("image/gif")) return ".gif";
+            if (contentType.equals("image/webp")) return ".webp";
+        }
+
+        String fileName = file.getOriginalFilename();
         if (fileName == null || !fileName.contains(".")) {
             return ".png";
         }

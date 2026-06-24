@@ -65,6 +65,21 @@ class CourseThumbnailServiceImplTest {
     }
 
     @Test
+    void 파일_콘텐트타입이_jpeg이면_jpg_확장자를_적용하여_S3에_업로드한다() {
+        Long courseId = 100L;
+        MultipartFile jpegFile = new MockMultipartFile(
+                "thumbnail", "test-file", "image/jpeg", "mock-image-bytes".getBytes()
+        );
+
+        given(s3FileStorageService.uploadFile(any(InputStream.class), contains(".jpg"))).willReturn("courses/thumbnails/100/uuid.jpg");
+
+        String resultKey = courseThumbnailService.uploadThumbnail(courseId, jpegFile);
+
+        assertThat(resultKey).endsWith(".jpg");
+        verify(s3FileStorageService).uploadFile(any(InputStream.class), contains(".jpg"));
+    }
+
+    @Test
     void 파일_이름에_확장자가_없으면_기본_확장자인_png를_적용하여_S3에_업로드한다() {
         Long courseId = 100L;
         MultipartFile noExtensionFile = new MockMultipartFile(
