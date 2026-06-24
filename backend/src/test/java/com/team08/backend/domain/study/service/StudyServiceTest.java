@@ -18,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -86,27 +85,19 @@ public class StudyServiceTest {
     }
 
     @Test
-    void courseId로_조회_가능한_스터디_상세를_조회한다() {
-        Long userId = 1L;
+    void courseId로_조회_가능한_스터디_id를_조회한다() {
         Study study = StudyFixture.activeStudy();
-        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
-        StudyMember member = member(StudyMemberRole.OWNER);
 
         given(studyRepository.findByCourseIdWithCourse(study.getCourse().getId()))
                 .willReturn(Optional.of(study));
-        given(studyMemberRepository.findByStudyIdAndUserId(study.getId(), userId))
-                .willReturn(Optional.of(member));
 
-        StudyDetailResponse result = studyService.getStudyDetailByCourseId(
-                study.getCourse().getId(), userId
-        );
+        Long result = studyService.getStudyIdByCourseId(study.getCourse().getId());
 
-        assertThat(result.studyId()).isEqualTo(study.getId());
-        assertThat(result.status()).isEqualTo(StudyStatus.READONLY);
-        assertThat(result.myRole()).isEqualTo(StudyMemberRole.OWNER);
+        assertThat(result).isEqualTo(study.getId());
 
-        verify(studyAccessAuthorizer)
-                .authorizeByCourseId(study.getCourse().getId(), userId, StudyAction.VIEW_STUDY_CONTENT);
+        verify(studyAccessAuthorizer, never())
+                .authorizeByCourseId(anyLong(), anyLong(), any(StudyAction.class));
+        verify(studyMemberRepository, never()).findByStudyIdAndUserId(anyLong(), anyLong());
     }
 
     @Test

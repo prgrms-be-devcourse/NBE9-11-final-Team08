@@ -20,6 +20,7 @@ import type {
   QnaPost,
   Study,
   StudyDetailResponse,
+  StudyIdResponse,
   StudyReport,
   UserProfile,
   SignupRequest,
@@ -881,12 +882,14 @@ export const api = {
     let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
 
     if (!detail) return undefined
+
+    return mapStudyDetailToStudy(detail);
   },
 
-  getStudyByCourseId: async (courseId: string | number): Promise<Study | undefined> => {
-    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/by-course/${courseId}`, undefined)
+  getStudyIdByCourseId: async (courseId: string | number): Promise<string | null> => {
+    const res = await request<StudyIdResponse | null>(`/api/studies/by-course/${courseId}`, null)
 
-    if (!detail) return undefined
+    return res?.studyId ? res.studyId.toString() : null
   },
 
   getBoardPosts: async (studyId: string | number): Promise<StudyActivityResponse[]> => {

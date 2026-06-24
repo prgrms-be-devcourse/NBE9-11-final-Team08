@@ -30,6 +30,7 @@ export function CourseDetail({ course }: { course: Course }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isPurchased, setIsPurchased] = useState(false)
   const [hasStudyAccess, setHasStudyAccess] = useState(false)
+  const [studyId, setStudyId] = useState<string | null>(null)
 
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
@@ -41,19 +42,17 @@ export function CourseDetail({ course }: { course: Course }) {
     setIsLoggedIn(!!token)
 
     const fetchAccess = async () => {
-      if (!token) {
-        setIsPurchased(false)
-        setHasStudyAccess(false)
-        return
-      }
       try {
-        const active = await api.isCourseEnrollmentActive(course.id)
+        const nextStudyId = await api.getStudyIdByCourseId(course.id)
+        const active = token ? await api.isCourseEnrollmentActive(course.id) : false
         setIsPurchased(active)
-        setHasStudyAccess(active)
+        setHasStudyAccess(active && !!nextStudyId)
+        setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
         setIsPurchased(false)
         setHasStudyAccess(false)
+        setStudyId(null)
       }
     }
     fetchAccess()
@@ -257,9 +256,9 @@ export function CourseDetail({ course }: { course: Course }) {
                   }} variant="outline" className="w-full">
                     스터디 입장
                   </Button>
-                ) : hasStudyAccess ? (
+                ) : hasStudyAccess && studyId ? (
                   <Button asChild variant="outline" className="w-full">
-                    <Link href={`/study/${course.id}`}>스터디 입장</Link>
+                    <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>

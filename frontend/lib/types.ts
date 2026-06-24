@@ -541,6 +541,10 @@ export interface StudyDetailResponse {
   myRole: string
 }
 
+export interface StudyIdResponse {
+  studyId: number
+}
+
 export interface StudyActivityResponse {
   activityId: number
   studyId: number
