@@ -30,40 +30,34 @@ export function CourseDetail({ course }: { course: Course }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isPurchased, setIsPurchased] = useState(false)
   const [hasStudyAccess, setHasStudyAccess] = useState(false)
-  
+
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
   const inCart = has(course.id)
+  const canPurchase = !(isLoggedIn && isPurchased)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
     setIsLoggedIn(!!token)
-    
+
     const fetchAccess = async () => {
-      if (!token) return
+      if (!token) {
+        setIsPurchased(false)
+        setHasStudyAccess(false)
+        return
+      }
       try {
-        let purchased = false
-        if ('getPurchasedCourses' in api) {
-          const list = await api.getPurchasedCourses()
-          purchased = list.some(c => c.id.toString() === course.id.toString())
-          if (purchased) {
-            setIsPurchased(true)
-            setHasStudyAccess(true)
-          }
-        }
-        
-        if (!purchased && 'getStudy' in api) {
-          const study = await api.getStudy(course.id)
-          if (study) {
-            setHasStudyAccess(true)
-          }
-        }
+        const active = await api.isCourseEnrollmentActive(course.id)
+        setIsPurchased(active)
+        setHasStudyAccess(active)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
+        setIsPurchased(false)
+        setHasStudyAccess(false)
       }
     }
     fetchAccess()
-  }, [])
+  }, [course.id])
 
   const handleAdd = async () => {
     if (!isLoggedIn) {
@@ -227,31 +221,35 @@ export function CourseDetail({ course }: { course: Course }) {
                 />
               </div>
               <div className="space-y-4 p-5">
-                <div className="flex items-baseline gap-2">
-                  {course.discountRate ? (
-                    <>
-                      <span className="text-lg font-bold text-destructive">
-                        {course.discountRate}%
-                      </span>
-                      <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                  )}
-                </div>
-                {course.discountRate ? (
-                  <p className="-mt-2 text-sm text-muted-foreground line-through">
-                    {formatKRW(course.price)}
-                  </p>
+                {canPurchase ? (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      {course.discountRate ? (
+                        <>
+                          <span className="text-lg font-bold text-destructive">
+                            {course.discountRate}%
+                          </span>
+                          <span className="text-2xl font-bold">{formatKRW(final)}</span>
+                        </>
+                      ) : (
+                        <span className="text-2xl font-bold">{formatKRW(final)}</span>
+                      )}
+                    </div>
+                    {course.discountRate ? (
+                      <p className="-mt-2 text-sm text-muted-foreground line-through">
+                        {formatKRW(course.price)}
+                      </p>
+                    ) : null}
+                    <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
+                      {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      코스 구매하기
+                    </Button>
+                    <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && inCart)}>
+                      {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
+                    </Button>
+                  </>
                 ) : null}
-
-                <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying || (isLoggedIn && isPurchased)}>
-                  {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoggedIn && isPurchased ? '이미 구매한 강좌' : '코스 구매하기'}
-                </Button>
-                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && (inCart || isPurchased))}>
-                  {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && isPurchased) ? '구매 완료' : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
-                </Button>
+                {/* TODO: 코스에 무료 미리보기가 있으면 비로그인 또는 미구매 상태에서도 스터디 입장이 가능해야 한다. */}
                 {!isLoggedIn ? (
                   <Button onClick={() => {
                     toast.error('로그인이 필요한 서비스입니다.')
