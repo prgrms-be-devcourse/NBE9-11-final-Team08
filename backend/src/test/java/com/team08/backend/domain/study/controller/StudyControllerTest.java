@@ -20,6 +20,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(StudyController.class)
@@ -83,26 +84,16 @@ public class StudyControllerTest {
     }
 
     @Test
-    @WithMockLoginUser()
-    void courseId로_스터디_상세를_조회한다() throws Exception {
-        Long userId = 1L;
+    void courseId로_스터디_id를_조회한다() throws Exception {
         Long courseId = 20L;
-        StudyDetailResponse response = new StudyDetailResponse(
-                10L,
-                courseId,
-                "스터디 제목",
-                "스터디 설명",
-                StudyStatus.READONLY,
-                "스터디장",
-                StudyMemberRole.OWNER
-        );
+        Long studyId = 10L;
 
-        given(studyService.getStudyDetailByCourseId(courseId, userId)).willReturn(response);
+        given(studyService.getStudyIdByCourseId(courseId)).willReturn(studyId);
 
         mockMvc.perform(get("/api/studies/by-course/{courseId}", courseId))
                 .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+                .andExpect(jsonPath("$.studyId").value(studyId));
 
-        then(studyService).should().getStudyDetailByCourseId(courseId, userId);
+        then(studyService).should().getStudyIdByCourseId(courseId);
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -63,6 +64,13 @@ class SecurityConfigTest {
     void logout_요청은_accessToken_없이_접근할_수_있다() throws Exception {
         mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void 강좌별_스터디_ID_조회는_accessToken_없이_접근할_수_있다() throws Exception {
+        mockMvc.perform(get("/api/studies/by-course/{courseId}", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studyId").value(100L));
     }
 
     @Test
@@ -148,6 +156,11 @@ class SecurityConfigTest {
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void logout() {
         }
+
+        @GetMapping("/api/studies/by-course/{courseId}")
+        StudyIdResponse studyId(@PathVariable Long courseId) {
+            return new StudyIdResponse(100L);
+        }
     }
 
     record TestAuthenticationResponse(
@@ -156,6 +169,11 @@ class SecurityConfigTest {
             String name,
             String role,
             String authority
+    ) {
+    }
+
+    record StudyIdResponse(
+            Long studyId
     ) {
     }
 }
