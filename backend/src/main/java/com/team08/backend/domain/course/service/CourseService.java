@@ -10,6 +10,7 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
+import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
@@ -32,8 +33,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import static java.util.UUID.randomUUID;
@@ -60,17 +59,9 @@ public class CourseService {
         Course savedCourse = courseRepository.save(course);
 
         if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        String s3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
-                        savedCourse.updateThumbnail(s3Key);
-                    } catch (Exception e) {
-                        log.error("Failed to upload thumbnail after commit for course: {}", savedCourse.getId(), e);
-                    }
-                }
-            });
+            String newS3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
+            savedCourse.updateThumbnail(newS3Key);
+            eventPublisher.publishEvent(new CourseThumbnailEvent(savedCourse.getId(), null, newS3Key));
         }
 
         return savedCourse.getId();
@@ -116,18 +107,9 @@ public class CourseService {
         course.updateGeneralInfo(request);
 
         if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        courseThumbnailService.deleteThumbnail(oldThumbnail);
-                        String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
-                        course.updateThumbnail(newS3Key);
-                    } catch (Exception e) {
-                        log.error("Failed to update thumbnail after commit for course: {}", course.getId(), e);
-                    }
-                }
-            });
+            String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
+            course.updateThumbnail(newS3Key);
+            eventPublisher.publishEvent(new CourseThumbnailEvent(course.getId(), oldThumbnail, newS3Key));
         }
     }
 

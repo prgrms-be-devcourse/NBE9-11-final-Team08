@@ -12,6 +12,7 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
+import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.course.fixture.CourseFixture;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.course.service.CourseService.CourseViewCountManager;
@@ -29,8 +30,6 @@ import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -40,8 +39,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Field;
@@ -91,16 +88,6 @@ class CourseServiceTest {
     @InjectMocks
     private CourseService courseService;
 
-    @BeforeEach
-    void setUp() {
-        TransactionSynchronizationManager.initSynchronization();
-    }
-
-    @AfterEach
-    void tearDown() {
-        TransactionSynchronizationManager.clear();
-    }
-
     @Test
     void 강좌를_성공적으로_생성하고_ID를_반환한다() {
         Long instructorId = 1L;
@@ -116,14 +103,18 @@ class CourseServiceTest {
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
+        given(courseThumbnailService.uploadThumbnail(eq(100L), any(MultipartFile.class))).willReturn("courses/thumbnails/100/uuid.png");
 
         Long courseId = courseService.createCourse(instructorId, request, mockFile);
 
-        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
-        assertThat(synchronizations).hasSize(1);
-        synchronizations.get(0).afterCommit();
+        ArgumentCaptor<CourseThumbnailEvent> eventCaptor = ArgumentCaptor.forClass(CourseThumbnailEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        CourseThumbnailEvent publishedEvent = eventCaptor.getValue();
 
         assertThat(courseId).isEqualTo(100L);
+        assertThat(publishedEvent.courseId()).isEqualTo(100L);
+        assertThat(publishedEvent.oldThumbnail()).isNull();
+        assertThat(publishedEvent.newS3Key()).isEqualTo("courses/thumbnails/100/uuid.png");
         verify(courseRepository).save(any(Course.class));
         verify(courseThumbnailService).uploadThumbnail(eq(100L), any(MultipartFile.class));
     }
@@ -242,7 +233,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
+    void 강좌가_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
         Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
@@ -305,7 +296,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_트랜잭션_커밋_후_기존_썸네일이_S3에서_교체된다() {
+    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_트랜잭션_중_S3_업로드_및_물리_정합성_이벤트가_발행된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
 
@@ -342,17 +333,20 @@ class CourseServiceTest {
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
         courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
 
+        ArgumentCaptor<CourseThumbnailEvent> eventCaptor = ArgumentCaptor.forClass(CourseThumbnailEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        CourseThumbnailEvent publishedEvent = eventCaptor.getValue();
+
         assertThat(course.getTitle()).isEqualTo("수정 제목");
-
-        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
-        assertThat(synchronizations).hasSize(1);
-        synchronizations.get(0).afterCommit();
-
+        assertThat(course.getThumbnail()).isEqualTo("courses/thumbnails/100/new-uuid.png");
+        assertThat(publishedEvent.courseId()).isEqualTo(courseId);
+        assertThat(publishedEvent.oldThumbnail()).isEqualTo("old.png");
+        assertThat(publishedEvent.newS3Key()).isEqualTo("courses/thumbnails/100/new-uuid.png");
         verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
-        verify(courseThumbnailService).deleteThumbnail("old.png");
     }
 
     @Test
