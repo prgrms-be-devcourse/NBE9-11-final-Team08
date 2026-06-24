@@ -14,6 +14,7 @@ export interface Lecture {
   chapterId?: string
   durationSeconds?: number
   m3u8Path?: string | null
+  isFreePreview?: boolean
   lastPositionSeconds?: number
   watchedSeconds?: number
 }
@@ -404,6 +405,7 @@ export interface UserProfile {
 
 export interface EnrolledCourse {
   id: string
+  courseId?: string
   title: string
   instructor: string
   thumbnailUrl: string
@@ -469,7 +471,7 @@ export interface LoginResponse {
 }
 
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'
-export type StudyRole = 'owner' | 'member' | 'OWNER' | 'MEMBER'
+export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 
 export interface StudyMember {
   id: string
@@ -538,7 +540,7 @@ export interface StudyDetailResponse {
   description: string
   status: string
   ownerNickname: string
-  myRole: string
+  myRole: string | null
 }
 
 export interface StudyIdResponse {

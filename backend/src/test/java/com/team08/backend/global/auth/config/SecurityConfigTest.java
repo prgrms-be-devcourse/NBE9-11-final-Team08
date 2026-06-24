@@ -74,6 +74,20 @@ class SecurityConfigTest {
     }
 
     @Test
+    void 스터디_상세_조회는_accessToken_없이_접근할_수_있다() throws Exception {
+        mockMvc.perform(get("/api/studies/{studyId}", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studyId").value(10L))
+                .andExpect(jsonPath("$.myRole").doesNotExist());
+    }
+
+    @Test
+    void 내_스터디_목록_조회는_accessToken_없이_접근할_수_없다() throws Exception {
+        mockMvc.perform(get("/api/studies/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void 유효한_accessToken이면_사용자_정보와_권한으로_인증한다() throws Exception {
         String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
 
@@ -161,6 +175,11 @@ class SecurityConfigTest {
         StudyIdResponse studyId(@PathVariable Long courseId) {
             return new StudyIdResponse(100L);
         }
+
+        @GetMapping("/api/studies/{studyId}")
+        StudyDetailResponse studyDetail(@PathVariable Long studyId) {
+            return new StudyDetailResponse(studyId, null);
+        }
     }
 
     record TestAuthenticationResponse(
@@ -174,6 +193,12 @@ class SecurityConfigTest {
 
     record StudyIdResponse(
             Long studyId
+    ) {
+    }
+
+    record StudyDetailResponse(
+            Long studyId,
+            String myRole
     ) {
     }
 }

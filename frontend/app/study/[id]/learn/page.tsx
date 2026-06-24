@@ -8,7 +8,7 @@ export default async function StudyLearnPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const study = await api.getStudy(id)
+  const study = await api.getStudyForEntry(id)
   if (!study) notFound()
 
   const course = await api.getCourse(study.courseId)
