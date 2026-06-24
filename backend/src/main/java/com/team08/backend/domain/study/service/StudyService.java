@@ -9,6 +9,8 @@ import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberRole;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,13 +29,29 @@ public class StudyService {
 
     private final StudyRepository studyRepository;
     private final StudyMemberRepository studyMemberRepository;
+    private final StudyReportRepository studyReportRepository;
 
     @Transactional(readOnly = true)
     public List<StudySummaryResponse> getMyStudies(Long userId) {
         List<Study> studies = studyRepository.findVisibleStudiesByUserId(userId);
 
+        // 진행도는 단일 소스인 study_reports 에서 읽는다(강의 완료 이벤트마다 증분 갱신됨).
+        // 리포트 행은 스터디당 1개이므로 배치 조회 1번으로 끝난다(스터디별 추가 쿼리 없음).
+        List<Long> studyIds = studies.stream().map(Study::getId).toList();
+        Map<Long, StudyReport> reportByStudyId = studyIds.isEmpty()
+                ? Map.of()
+                : studyReportRepository.findByUserIdAndStudyIdIn(userId, studyIds).stream()
+                        .collect(Collectors.toMap(StudyReport::getStudyId, Function.identity()));
+
         return studies.stream()
-                .map(StudySummaryResponse::from)
+                .map(study -> {
+                    StudyReport report = reportByStudyId.get(study.getId());
+                    int completed = report != null && report.getCompletedLectures() != null
+                            ? report.getCompletedLectures() : 0;
+                    int total = report != null && report.getTotalLectures() != null
+                            ? report.getTotalLectures() : 0;
+                    return StudySummaryResponse.from(study, completed, total);
+                })
                 .toList();
     }
 

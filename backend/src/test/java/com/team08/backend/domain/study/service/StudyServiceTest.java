@@ -10,6 +10,7 @@ import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberRole;
 import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ public class StudyServiceTest {
 
     @Mock
     private StudyMemberRepository studyMemberRepository;
+
+    @Mock
+    private StudyReportRepository studyReportRepository;
 
     @InjectMocks
     private StudyService studyService;

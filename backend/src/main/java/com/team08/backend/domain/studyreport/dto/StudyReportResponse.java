@@ -30,7 +30,7 @@ public record StudyReportResponse(
                 report.getStudyId(),
                 report.getTotalWatchTime(),
                 report.getTotalQnaCount(),
-                report.getProgressRate(),
+                progressRate(report),
                 report.getStudyDays(),
                 parseList(objectMapper, report.getTopLectures(), new TypeReference<>() {}),
                 parseList(objectMapper, report.getDailyProgress(), new TypeReference<>() {}),
@@ -39,6 +39,17 @@ public record StudyReportResponse(
                 status,
                 nextRegenerableAt
         );
+    }
+
+    /** 진행률(0~100, 소수2자리)은 저장하지 않고 완료/전체 강의 수에서 파생한다. */
+    private static BigDecimal progressRate(StudyReport report) {
+        int total = report.getTotalLectures() == null ? 0 : report.getTotalLectures();
+        int completed = report.getCompletedLectures() == null ? 0 : report.getCompletedLectures();
+        if (total == 0) return BigDecimal.ZERO.setScale(2);
+        return BigDecimal.valueOf(completed)
+                .divide(BigDecimal.valueOf(total), 4, java.math.RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private static <T> List<T> parseList(ObjectMapper mapper, String json, TypeReference<List<T>> type) {

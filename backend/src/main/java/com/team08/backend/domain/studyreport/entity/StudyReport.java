@@ -3,7 +3,6 @@ package com.team08.backend.domain.studyreport.entity;
 import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "study_reports")
@@ -18,8 +17,9 @@ public class StudyReport extends BaseTimeEntity {
     private Long studyId;
     private Integer totalWatchTime;
     private Integer totalQnaCount;
-    @Column(precision = 5, scale = 2)
-    private BigDecimal progressRate;
+    // progressRate 는 completedLectures/totalLectures 의 파생값이라 저장하지 않는다(필요 시 계산).
+    private Integer completedLectures;
+    private Integer totalLectures;
     private Integer studyDays;
     @Column(columnDefinition = "TEXT")
     private String topLectures;      // JSON: [{lectureId, title, watchTimeSeconds}]
@@ -38,7 +38,8 @@ public class StudyReport extends BaseTimeEntity {
     public void update(
             Integer totalWatchTime,
             Integer totalQnaCount,
-            BigDecimal progressRate,
+            Integer completedLectures,
+            Integer totalLectures,
             Integer studyDays,
             String topLectures,
             String dailyProgress,
@@ -46,7 +47,8 @@ public class StudyReport extends BaseTimeEntity {
     ) {
         this.totalWatchTime = totalWatchTime;
         this.totalQnaCount = totalQnaCount;
-        this.progressRate = progressRate;
+        this.completedLectures = completedLectures;
+        this.totalLectures = totalLectures;
         this.studyDays = studyDays;
         this.topLectures = topLectures;
         this.dailyProgress = dailyProgress;

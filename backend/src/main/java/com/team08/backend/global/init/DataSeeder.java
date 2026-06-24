@@ -438,7 +438,7 @@ public class DataSeeder {
             StudyActivity activity = studyActivityRepository.save(
                     StudyActivity.create(study.getId(), seller.getId(), "활동 내용 " + (s + 1)));
             StudyReport report = StudyReport.create(users.get(s % users.size()).getId(), study.getId());
-            report.update(3600, 5, new BigDecimal("80.00"), 10,
+            report.update(3600, 5, 8, 10, 10,
                     "[{\"lectureId\":1,\"title\":\"Spring Core\",\"watchTimeSeconds\":1800}]",
                     "[{\"date\":\"2026-06-07\",\"progressRate\":40.00},{\"date\":\"2026-06-14\",\"progressRate\":80.00}]",
                     "{\"2026-06-07\":3,\"2026-06-08\":5,\"2026-06-14\":2}");
@@ -1022,7 +1022,7 @@ public class DataSeeder {
                 .filter(r -> studyId.equals(r.getStudyId()))
                 .findFirst()
                 .ifPresent(r -> r.update(
-                        5400, 1, new BigDecimal("85.00"), 4,
+                        5400, 1, 17, 20, 4,
                         "[{\"lectureId\":1,\"title\":\"1강\",\"watchTimeSeconds\":3600}]",
                         "[{\"date\":\"" + today.minusDays(3) + "\",\"progressRate\":40.00},"
                                 + "{\"date\":\"" + today + "\",\"progressRate\":85.00}]",
