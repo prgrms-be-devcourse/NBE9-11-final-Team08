@@ -860,18 +860,16 @@ export const api = {
       if (detail?.status === 'CLOSED') {
         status = '완료' // Map 'CLOSED' from backend to '완료' for frontend display
       }
-      // Note: progress, totalLectures, and completedLectures cannot be accurately
-      // populated from StudySummaryResponse or StudyDetailResponse without
-      // further backend changes, so they remain hardcoded to 0.
+      // 진행도/강의 수는 백엔드 StudySummaryResponse 에서 집계해 내려준다.
       return {
         id: study.studyId.toString(),
         courseId: detail?.courseId?.toString(),
         title: study.title,
         instructor: study.ownerNickname,
         thumbnailUrl: '/placeholder.svg',
-        progress: 0,
-        totalLectures: 0,
-        completedLectures: 0,
+        progress: study.progressRate ?? 0,
+        totalLectures: study.totalLectures ?? 0,
+        completedLectures: study.completedLectures ?? 0,
         status: status,
       }
     })

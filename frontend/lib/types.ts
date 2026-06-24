@@ -531,6 +531,9 @@ export interface StudySummaryResponse {
   title: string
   description: string
   ownerNickname: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
 }
 
 export interface StudyDetailResponse {
