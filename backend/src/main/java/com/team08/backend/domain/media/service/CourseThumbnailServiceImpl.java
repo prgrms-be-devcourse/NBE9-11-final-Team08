@@ -5,10 +5,12 @@ import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.S3FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.UUID;
 
 @Slf4j
@@ -17,6 +19,7 @@ import java.util.UUID;
 public class CourseThumbnailServiceImpl implements CourseThumbnailService {
 
     private final S3FileStorageService s3FileStorageService;
+    private final Environment environment;
 
     @Override
     public String uploadThumbnail(Long courseId, MultipartFile file) {
@@ -30,7 +33,15 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
 
             return s3FileStorageService.uploadFile(is, s3Key);
         } catch (Exception e) {
-            throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
+            boolean isProd = Arrays.asList(environment.getActiveProfiles()).contains("prod");
+
+            if (isProd) {
+                log.error("[S3 업로드 최종 실패] 운영 서버 장애 발생. 원인: {}", e.getMessage(), e);
+                throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
+            }
+
+            log.warn("[S3 업로드 실패 우회] 로컬 개발 환경이므로 테스트용 더미 이미지 주소로 대체합니다.");
+            return "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop";
         }
     }
 
