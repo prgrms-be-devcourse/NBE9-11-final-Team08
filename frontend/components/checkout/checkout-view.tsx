@@ -41,6 +41,8 @@ type CheckoutStep = 'idle' | 'loading-order' | 'creating-order' | 'mock-confirmi
 export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const router = useRouter()
   const { items, clear } = useCart()
+  const tossClientKey = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY ?? ''
+  const canUseToss = tossClientKey.trim().length > 0
   const [directOrder, setDirectOrder] = useState<OrderDetailResponse | null>(null)
   const [orderLoadError, setOrderLoadError] = useState('')
   const [couponId, setCouponId] = useState<string>('none')
@@ -48,6 +50,12 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const [agree, setAgree] = useState(false)
   const [step, setStep] = useState<CheckoutStep>(initialOrderId ? 'loading-order' : 'idle')
   const [userCoupons, setUserCoupons] = useState<CouponOption[]>([])
+
+  useEffect(() => {
+    if (!canUseToss && provider === 'toss') {
+      setProvider('mock')
+    }
+  }, [canUseToss, provider])
 
   useEffect(() => {
     if (!initialOrderId) return
@@ -242,8 +250,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   async function handleTossPay() {
     if (!assertReadyToPay()) return
 
-    const clientKey = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY
-    if (!clientKey) {
+    if (!canUseToss) {
       toast.error('Toss client key가 설정되지 않았습니다. .env.local을 확인해주세요.')
       return
     }
@@ -263,7 +270,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
 
       setStep('opening-toss')
       const TossPayments = await loadTossPayments()
-      const tossPayments = TossPayments(clientKey)
+      const tossPayments = TossPayments(tossClientKey)
       const payment = tossPayments.payment({ customerKey: TossPayments.ANONYMOUS })
 
       await payment.requestPayment({
@@ -412,19 +419,23 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
                     value: 'mock',
                     label: 'Mock 결제',
                     description: '백엔드 Mock 승인 API로 바로 결제를 완료합니다.',
+                    disabled: false,
                   },
                   {
                     value: 'toss',
                     label: 'Toss 테스트 결제',
-                    description: 'Toss 결제창 완료 후 백엔드 confirm API를 호출합니다.',
+                    description: canUseToss
+                      ? 'Toss 결제창 완료 후 백엔드 confirm API를 호출합니다.'
+                      : 'Toss client key 설정 후 사용할 수 있습니다.',
+                    disabled: !canUseToss,
                   },
                 ].map((option) => (
                   <Label
                     key={option.value}
                     htmlFor={option.value}
-                    className="flex min-h-28 cursor-pointer items-start gap-3 rounded-lg border p-4 has-[:checked]:border-primary has-[:checked]:bg-accent"
+                    className="flex min-h-28 cursor-pointer items-start gap-3 rounded-lg border p-4 has-[:checked]:border-primary has-[:checked]:bg-accent has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
                   >
-                    <RadioGroupItem id={option.value} value={option.value} className="mt-1" />
+                    <RadioGroupItem id={option.value} value={option.value} className="mt-1" disabled={option.disabled} />
                     <span>
                       <span className="flex items-center gap-2 text-sm font-semibold">
                         <CreditCard className="h-4 w-4" />

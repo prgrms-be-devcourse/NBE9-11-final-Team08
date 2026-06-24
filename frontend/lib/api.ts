@@ -5,6 +5,7 @@ import type {
   Coupon,
   Course,
   CourseCardResponse,
+  CategoryResponse,
   CourseDetailResponse,
   ChapterInfoResponse,
   PageResponse,
@@ -13,9 +14,9 @@ import type {
   OrderDetailResponse,
   ConfirmPaymentResponse,
   ConfirmTossPaymentRequest,
+  PaymentResponse,
   EnrolledCourse,
   MyComment,
-  Order,
   QnaPost,
   Study,
   StudyDetailResponse,
@@ -632,6 +633,9 @@ export const api = {
     }
   },
 
+  // Categories
+  getCategories: () => request<CategoryResponse[]>('/api/categories', [], false, false),
+
   getCourse: async (id: string | number): Promise<Course | undefined> => {
     const detail = await request<CourseDetailResponse | undefined>(
       `/api/courses/${id}`,
@@ -809,6 +813,7 @@ export const api = {
 
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
+  cancelOrder: (orderId: number | string) => mutate<OrderDetailResponse>(`/api/orders/${orderId}/cancel`, 'PATCH'),
   confirmMockPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
       paymentKey,
@@ -818,6 +823,8 @@ export const api = {
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
+  refundPayment: (orderId: number | string) =>
+    mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
   confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) => 
     api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId),
 

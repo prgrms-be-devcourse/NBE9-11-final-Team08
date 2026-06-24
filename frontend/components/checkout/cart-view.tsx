@@ -4,11 +4,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Loader2, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
 import { useCart } from '@/components/providers/cart-provider'
 import { api } from '@/lib/api'
@@ -16,24 +15,8 @@ import { formatKRW } from '@/lib/utils'
 
 export function CartView() {
   const router = useRouter()
-  const { items, total: providerTotal, removeItem, removeItems, clear, loading, refreshCart } = useCart()
-  const [selected, setSelected] = useState<number[]>([])
+  const { items, total: providerTotal, removeItem, clear, loading, refreshCart } = useCart()
   const [ordering, setOrdering] = useState(false)
-
-  useEffect(() => {
-    if (!loading && selected.length === 0 && items.length > 0) {
-      setSelected(items.map((i) => i.cartItemId))
-    }
-  }, [loading, items, selected.length])
-
-  const validSelected = selected.filter((id) => items.some((i) => i.cartItemId === id))
-  const allChecked = items.length > 0 && validSelected.length === items.length
-
-  const toggle = (id: number) =>
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-
-  const toggleAll = () =>
-    setSelected(allChecked ? [] : items.map((i) => i.cartItemId))
 
   const handleCreateCartOrder = async () => {
     setOrdering(true)
@@ -72,29 +55,9 @@ export function CartView() {
   return (
     <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_320px]">
       <div>
-        <div className="flex items-center justify-between rounded-lg border bg-card px-4 py-3">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
-            전체 선택 ({validSelected.length}/{items.length})
-          </label>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            disabled={validSelected.length === 0}
-            onClick={() => removeItems(validSelected)}
-          >
-            <Trash2 className="mr-1 h-4 w-4" /> 선택삭제
-          </Button>
-        </div>
-
-        <ul className="mt-3 space-y-3">
+        <ul className="space-y-3">
           {items.map((item) => (
             <li key={item.cartItemId} className="flex items-center gap-3 rounded-xl border bg-card p-3">
-              <Checkbox
-                checked={validSelected.includes(item.cartItemId)}
-                onCheckedChange={() => toggle(item.cartItemId)}
-              />
               <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-muted">
                 <Image
                   src={'/placeholder.svg'}
@@ -129,9 +92,6 @@ export function CartView() {
             <span className="text-muted-foreground">장바구니 강의 ({items.length})</span>
             <span>{formatKRW(providerTotal)}</span>
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            체크박스는 삭제할 강의 선택에만 사용됩니다. 주문은 현재 장바구니 전체로 생성됩니다.
-          </p>
           <Separator className="my-4" />
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-medium">총 상품 금액</span>

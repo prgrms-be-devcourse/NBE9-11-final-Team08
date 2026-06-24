@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { getPendingPayment, removePendingPayment } from '@/lib/checkout-payment'
+import { formatOrderStatus, formatPaymentStatus } from '@/lib/order-payment-labels'
 import { formatKRW } from '@/lib/utils'
 import { useCart } from '@/components/providers/cart-provider'
 import type { ConfirmPaymentResponse } from '@/lib/types'
@@ -98,8 +99,15 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
           return
         }
 
+        const statusMessage = `결제 상태: ${formatPaymentStatus(response.paymentStatus)}, 주문 상태: ${formatOrderStatus(response.orderStatus)}`
+        if (response.paymentStatus === 'PROCESSING' || response.paymentStatus === 'UNKNOWN') {
+          setState('checking')
+          setDetailMessage(statusMessage)
+          return
+        }
+
         setState('fail')
-        setDetailMessage(`결제 승인 결과가 완료 상태가 아닙니다. payment=${response.paymentStatus}, order=${response.orderStatus}`)
+        setDetailMessage(statusMessage)
       })
       .catch((err) => {
         setState('api-error')
@@ -114,7 +122,7 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
   const copy = {
     checking: {
       title: '결제 결과 확인 중입니다',
-      description: 'Toss 결제 결과를 백엔드 confirm API로 승인하고 있습니다.',
+      description: detailMessage || 'Toss 결제 결과를 백엔드 confirm API로 승인하고 있습니다.',
       icon: <Loader2 className="size-16 animate-spin text-primary" />,
     },
     success: {
