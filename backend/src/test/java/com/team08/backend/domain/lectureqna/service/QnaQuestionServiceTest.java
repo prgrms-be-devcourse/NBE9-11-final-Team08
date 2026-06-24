@@ -1,13 +1,13 @@
 package com.team08.backend.domain.lectureqna.service;
 
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ class QnaQuestionServiceTest {
 
     @Mock private QnaQuestionRepository qnaQuestionRepository;
     @Mock private QnaAnswerRepository qnaAnswerRepository;
-    @Mock private StudyAccessAuthorizer studyAccessAuthorizer;
+    @Mock private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @InjectMocks
     private QnaQuestionService qnaQuestionService;
@@ -69,15 +69,15 @@ class QnaQuestionServiceTest {
 
         assertThat(response.title()).isEqualTo("제목");
         assertThat(response.answer()).isNull();
-        verify(studyAccessAuthorizer).authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
+        verify(courseAccessAuthorizer).authorizeByLectureId(lecture_id, user_id, CourseAction.WRITE_CONTENT);
     }
 
     @Test
     @DisplayName("질문 작성 실패 - 강의 없음")
     void createQuestion_lectureNotFound() {
         willThrow(new CustomException(ErrorCode.LECTURE_NOT_FOUND))
-                .given(studyAccessAuthorizer)
-                .authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
+                .given(courseAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, user_id, CourseAction.WRITE_CONTENT);
 
         assertThatThrownBy(() -> qnaQuestionService.createQuestion(lecture_id, user_id, "제목", "내용"))
                 .isInstanceOf(CustomException.class)
@@ -89,8 +89,8 @@ class QnaQuestionServiceTest {
     @DisplayName("질문 작성 실패 - 스터디 학습자 아님")
     void createQuestion_notStudyLearner() {
         willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
-                .given(studyAccessAuthorizer)
-                .authorizeByLectureId(lecture_id, user_id, StudyAction.WRITE_STUDY_CONTENT);
+                .given(courseAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, user_id, CourseAction.WRITE_CONTENT);
 
         assertThatThrownBy(() -> qnaQuestionService.createQuestion(lecture_id, user_id, "제목", "내용"))
                 .isInstanceOf(CustomException.class)
@@ -200,7 +200,7 @@ class QnaQuestionServiceTest {
         given(qnaAnswerRepository.findByQuestionIdIn(any())).willReturn(List.of(answer));
 
         List<QnaQuestionResponse> result = qnaQuestionService
-                .getQuestionsNAnswers(lecture_id, PageRequest.of(0, 1))
+                .getQuestionsNAnswers(lecture_id, user_id, PageRequest.of(0, 1))
                 .getContent();
 
         assertThat(result).hasSize(1);

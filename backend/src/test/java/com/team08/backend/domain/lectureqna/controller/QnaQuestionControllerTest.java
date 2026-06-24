@@ -55,7 +55,7 @@ class QnaQuestionControllerTest {
     @DisplayName("강의 QnA 목록 조회 - 200 반환")
     void getQna_returns200() throws Exception {
         Page<QnaQuestionResponse> page = new PageImpl<>(List.of(sampleQuestion(1L)));
-        given(qnaQuestionService.getQuestionsNAnswers(eq(5L), any(Pageable.class)))
+        given(qnaQuestionService.getQuestionsNAnswers(eq(5L), eq(1L), any(Pageable.class)))
                 .willReturn(page);
 
         mockMvc.perform(get("/api/lectures/5/qna"))
