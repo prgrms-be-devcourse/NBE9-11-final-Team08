@@ -766,8 +766,15 @@ export const api = {
   },
 
   // Lecture enter / progress / last-watched
-  enterLecture: (lectureId: string | number) =>
-    request<LectureEnterResponse | null>(`/api/lectures/${lectureId}/enter`, null),
+  enterLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<LectureEnterResponse | null>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/enter`,
+      null,
+    ),
 
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),

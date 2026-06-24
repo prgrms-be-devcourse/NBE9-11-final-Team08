@@ -2,6 +2,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
@@ -74,9 +75,16 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     ),
   )
 
-  const [activeId, setActiveId] = useState<string>(
-    lectures.find((l) => !l.completed)?.id ?? lectures[0]?.id,
-  )
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  // 최초 렌더 시점의 URL lecture 파라미터. 있으면 그 강의로 시작하고, 이어보기로 덮지 않는다.
+  const initialLectureRef = useRef(searchParams?.get('lecture') ?? null)
+
+  const [activeId, setActiveId] = useState<string>(() => {
+    const fromUrl = initialLectureRef.current
+    if (fromUrl && lectures.some((l) => l.id === fromUrl)) return fromUrl
+    return lectures.find((l) => !l.completed)?.id ?? lectures[0]?.id
+  })
   const [openChapters, setOpenChapters] = useState<string[]>(
     course.chapters.map((c) => c.id),
   )
@@ -126,8 +134,9 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     lectures.reduce((s, l) => s + lectureProgress(l), 0) / Math.max(lectures.length, 1),
   )
 
-  // 강좌 진입 시 마지막으로 본 강의로 이어보기
+  // 강좌 진입 시 마지막으로 본 강의로 이어보기 (URL 이 강의를 지정한 경우는 그쪽 우선)
   useEffect(() => {
+    if (initialLectureRef.current) return
     if (!Number.isFinite(courseId)) return
     api
       .getLastWatched(courseId)
@@ -142,6 +151,17 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // 현재 강의(chapter/lecture)를 URL 쿼리에 반영 → 새로고침/공유 시 위치 유지.
+  // 페이지 네비게이션을 일으키지 않도록 history.replaceState 로 주소만 갱신한다.
+  useEffect(() => {
+    if (!active?.id || !pathname) return
+    const params = new URLSearchParams()
+    const chapterId = chapterIdOf(active.id)
+    if (chapterId) params.set('chapter', chapterId)
+    params.set('lecture', active.id)
+    window.history.replaceState(null, '', `${pathname}?${params.toString()}`)
+  }, [active?.id, pathname, chapterIdOf])
+
   // 강의 입장: 메타데이터/진행 정보 로드 + LECTURE_ENTER 기록, 퇴장 시 LECTURE_EXIT 기록
   useEffect(() => {
     const lectureId = active?.id
@@ -155,7 +175,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     setEntering(true)
 
     api
-      .enterLecture(lectureId)
+      .enterLecture(courseId, chapterIdOf(lectureId) ?? '', lectureId)
       .then((res) => {
         if (cancelled) return
         setEntering(false)
