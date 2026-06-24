@@ -3,7 +3,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { api } from '@/lib/api'
+import { formatOrderStatus, formatPaymentStatus, getOrderStatusVariant } from '@/lib/order-payment-labels'
 import { formatKRW } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,42 +21,55 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from 'sonner'
-import type { OrderDetailResponse, OrderItemResponse } from '@/lib/types'
+import type { OrderDetailResponse, PaymentStatus } from '@/lib/types'
 
-const statusVariant: Record<string, 'secondary' | 'outline' | 'destructive'> = {
-  'COMPLETED': 'secondary',
-  '결제 완료': 'secondary',
-  'REFUND_AVAILABLE': 'outline',
-  '환불 가능': 'outline',
-  'REFUNDED': 'destructive',
-  '환불 완료': 'destructive',
-  'PARTIAL_REFUNDED': 'destructive',
-  '부분 환불': 'destructive',
-}
+type ActionType = 'cancel' | 'refund'
 
 export function OrderDetailView({ order: initial }: { order: OrderDetailResponse }) {
   const [order, setOrder] = useState<OrderDetailResponse>(initial)
-  const [target, setTarget] = useState<OrderItemResponse | null>(null)
+  const [dialogAction, setDialogAction] = useState<ActionType | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null)
 
-  function confirmRefund() {
-    if (!target) return
-    // TODO: 실제 환불 API 연동 필요 (POST /api/orders/{id}/refund)
-    setOrder((prev) => ({
-      ...prev,
-      status: 'PARTIAL_REFUNDED',
-      finalPrice: prev.finalPrice - target.finalPrice,
-      items: prev.items.map((it) =>
-        it.orderItemId === target.orderItemId ? { ...it, status: '환불 완료' } as any : it,
-      ),
-    }))
-    toast.success(`${formatKRW(target.finalPrice)} 환불이 접수되었습니다.`)
-    setTarget(null)
+  const displayStatus = formatOrderStatus(order.status)
+  const orderedDate = order.orderedAt ? new Date(order.orderedAt).toLocaleString() : ''
+  const canCancel = order.status === 'PENDING_PAYMENT'
+  const canRefund = order.status === 'PAID'
+
+  const refreshOrder = async () => {
+    const latest = await api.getOrder(String(order.orderId))
+    if (latest) {
+      setOrder(latest)
+    }
+    return latest
   }
 
-  const displayStatus = order.status === 'COMPLETED' ? '결제 완료' : order.status === 'REFUNDED' ? '환불 완료' : order.status
-  const orderedDate = order.orderedAt ? new Date(order.orderedAt).toLocaleString() : ''
-  const refundedAmount = initial.finalPrice - order.finalPrice
+  const handleConfirmAction = async () => {
+    if (!dialogAction) return
+
+    setIsSubmitting(true)
+    try {
+      if (dialogAction === 'cancel') {
+        const canceled = await api.cancelOrder(order.orderId)
+        setOrder(canceled)
+        toast.success('주문이 취소되었습니다.')
+      } else {
+        const refunded = await api.refundPayment(order.orderId)
+        setPaymentStatus(refunded.paymentStatus)
+        const latest = await refreshOrder()
+        if (!latest) {
+          setOrder((prev) => ({ ...prev, status: refunded.orderStatus }))
+        }
+        toast.success('전체 환불이 처리되었습니다.')
+      }
+      setDialogAction(null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '요청 처리에 실패했습니다.'
+      toast.error(message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="max-w-3xl">
@@ -64,11 +80,25 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
         <ChevronLeft className="h-4 w-4" /> 주문 내역으로
       </Link>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold">주문 상세</h1>
-        <Badge variant={displayStatus === '환불 완료' || displayStatus === 'PARTIAL_REFUNDED' ? 'destructive' : 'secondary'}>
-          {displayStatus === 'PARTIAL_REFUNDED' ? '부분 환불' : displayStatus}
-        </Badge>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold">주문 상세</h1>
+          <Badge variant={getOrderStatusVariant(order.status)}>
+            {displayStatus}
+          </Badge>
+        </div>
+        <div className="flex gap-2">
+          {canCancel ? (
+            <Button variant="outline" size="sm" onClick={() => setDialogAction('cancel')}>
+              주문취소
+            </Button>
+          ) : null}
+          {canRefund ? (
+            <Button variant="destructive" size="sm" onClick={() => setDialogAction('refund')}>
+              전체 환불
+            </Button>
+          ) : null}
+        </div>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         {order.orderNumber} · {orderedDate}
@@ -79,31 +109,18 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
           <CardTitle className="text-base">주문 강의</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {order.items?.map((item) => {
-            const itemStatus = (item as any).status || '결제 완료'
-            return (
-              <div
-                key={item.orderItemId || item.courseId}
-                className="flex items-center justify-between gap-4 border-b pb-4 last:border-0 last:pb-0"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{item.courseTitle}</p>
-                    <Badge variant={statusVariant[itemStatus] || 'secondary'} className="text-[11px]">
-                      {itemStatus}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">담당 강사</p>
-                  <p className="mt-1 text-sm font-semibold">{formatKRW(item.finalPrice)}</p>
-                </div>
-                {itemStatus === '결제 완료' && (
-                  <Button variant="outline" size="sm" onClick={() => setTarget(item)}>
-                    환불 요청
-                  </Button>
-                )}
+          {order.items?.map((item) => (
+            <div
+              key={item.orderItemId || item.courseId}
+              className="flex items-center justify-between gap-4 border-b pb-4 last:border-0 last:pb-0"
+            >
+              <div>
+                <p className="text-sm font-medium">{item.courseTitle}</p>
+                <p className="mt-1 text-xs text-muted-foreground">담당 강사</p>
               </div>
-            )
-          })}
+              <p className="shrink-0 text-sm font-semibold">{formatKRW(item.finalPrice)}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
@@ -112,14 +129,14 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
           <CardTitle className="text-base">결제 정보</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          <Row label="결제 상태" value={displayStatus === 'PARTIAL_REFUNDED' ? '부분 환불' : displayStatus} />
+          <Row label="주문 상태" value={displayStatus} />
+          {paymentStatus ? (
+            <Row label="결제 상태" value={formatPaymentStatus(paymentStatus)} />
+          ) : null}
           <Row label="결제 수단" value="신용카드 (기본)" />
           <Separator />
           <Row label="상품 금액" value={formatKRW(order.totalPrice)} />
           <Row label="할인 금액" value={`- ${formatKRW(order.discountPrice)}`} />
-          {refundedAmount > 0 && (
-            <Row label="환불 금액" value={`- ${formatKRW(refundedAmount)}`} muted />
-          )}
           <Separator />
           <div className="flex items-center justify-between">
             <span className="font-medium">최종 결제 금액</span>
@@ -130,21 +147,27 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
         </CardContent>
       </Card>
 
-      <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
+      <Dialog open={!!dialogAction} onOpenChange={(open) => !open && setDialogAction(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>환불 요청</DialogTitle>
+            <DialogTitle>{dialogAction === 'refund' ? '전체 환불' : '주문취소'}</DialogTitle>
             <DialogDescription>
-              {target?.courseTitle} 강의를 환불하시겠습니까? 환불 금액{' '}
-              {target && formatKRW(target.finalPrice)}이 결제 수단으로 환불됩니다.
+              {dialogAction === 'refund'
+                ? `주문 ${order.orderNumber} 전체를 환불하시겠습니까? 환불 금액은 ${formatKRW(order.finalPrice)}입니다.`
+                : `결제 대기 중인 주문 ${order.orderNumber}을 취소하시겠습니까?`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">취소</Button>
+              <Button variant="outline" disabled={isSubmitting}>닫기</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={confirmRefund}>
-              환불 요청하기
+            <Button
+              variant={dialogAction === 'refund' ? 'destructive' : 'default'}
+              onClick={handleConfirmAction}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {dialogAction === 'refund' ? '전체 환불하기' : '주문취소하기'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -153,11 +176,11 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
   )
 }
 
-function Row({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className={muted ? 'text-destructive' : ''}>{value}</span>
+      <span className="text-right">{value}</span>
     </div>
   )
 }
