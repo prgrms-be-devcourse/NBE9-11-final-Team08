@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import java.io.InputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,13 +39,13 @@ class CourseThumbnailServiceImplTest {
                 "thumbnail", "강의썸네일.png", "image/png", "mock-image-bytes".getBytes()
         );
 
-        given(s3FileStorageService.uploadFile(any(File.class), contains("courses/thumbnails/100/"))).willReturn("courses/thumbnails/100/generated-uuid.png");
+        given(s3FileStorageService.uploadFile(any(InputStream.class), contains("courses/thumbnails/100/"))).willReturn("courses/thumbnails/100/generated-uuid.png");
 
         String resultKey = courseThumbnailService.uploadThumbnail(courseId, mockFile);
 
         assertThat(resultKey).contains("courses/thumbnails/100/");
         assertThat(resultKey).endsWith(".png");
-        verify(s3FileStorageService).uploadFile(any(File.class), contains("courses/thumbnails/100/"));
+        verify(s3FileStorageService).uploadFile(any(InputStream.class), contains("courses/thumbnails/100/"));
     }
 
     @Test
@@ -61,7 +61,7 @@ class CourseThumbnailServiceImplTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.INVALID_INPUT_VALUE.getMessage());
 
-        verify(s3FileStorageService, never()).uploadFile(any(File.class), any(String.class));
+        verify(s3FileStorageService, never()).uploadFile(any(InputStream.class), any(String.class));
     }
 
     @Test
@@ -71,12 +71,12 @@ class CourseThumbnailServiceImplTest {
                 "thumbnail", "no-extension-filename", "image/png", "mock-image-bytes".getBytes()
         );
 
-        given(s3FileStorageService.uploadFile(any(File.class), contains(".png"))).willReturn("courses/thumbnails/100/uuid.png");
+        given(s3FileStorageService.uploadFile(any(InputStream.class), contains(".png"))).willReturn("courses/thumbnails/100/uuid.png");
 
         String resultKey = courseThumbnailService.uploadThumbnail(courseId, noExtensionFile);
 
         assertThat(resultKey).endsWith(".png");
-        verify(s3FileStorageService).uploadFile(any(File.class), contains(".png"));
+        verify(s3FileStorageService).uploadFile(any(InputStream.class), contains(".png"));
     }
 
     @Test

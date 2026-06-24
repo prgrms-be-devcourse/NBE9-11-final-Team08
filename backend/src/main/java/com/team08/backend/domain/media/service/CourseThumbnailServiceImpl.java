@@ -8,7 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
+import java.io.InputStream;
 import java.util.UUID;
 
 @Slf4j
@@ -24,20 +24,11 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        try {
+        try (InputStream is = file.getInputStream()) {
             String extension = getFileExtension(file.getOriginalFilename());
             String s3Key = "courses/thumbnails/" + courseId + "/" + UUID.randomUUID() + extension;
 
-            File tempFile = File.createTempFile("thumb-", extension);
-            file.transferTo(tempFile);
-
-            try {
-                return s3FileStorageService.uploadFile(tempFile, s3Key);
-            } finally {
-                if (tempFile.exists()) {
-                    tempFile.delete();
-                }
-            }
+            return s3FileStorageService.uploadFile(is, s3Key);
         } catch (Exception e) {
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }

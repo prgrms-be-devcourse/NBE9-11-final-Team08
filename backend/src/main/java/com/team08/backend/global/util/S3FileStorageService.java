@@ -22,6 +22,16 @@ public class S3FileStorageService {
     private String bucket;
     private final S3Template s3Template;
 
+    public String uploadFile(InputStream inputStream, String s3Key) {
+        try {
+            s3Template.upload(bucket, s3Key, inputStream);
+            return s3Key;
+        } catch (Exception e) {
+            log.error("Failed to upload file to S3 via InputStream. key: {}", s3Key, e);
+            throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
+        }
+    }
+
     public String uploadFile(File file, String s3Key) {
         try (InputStream is = Files.newInputStream(file.toPath())) {
             s3Template.upload(bucket, s3Key, is);
@@ -31,7 +41,7 @@ public class S3FileStorageService {
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }
-    
+
     public File downloadFile(String s3Key, File destinationFile) {
         try (InputStream inputStream = s3Template.download(bucket, s3Key).getInputStream()) {
             Files.copy(inputStream, destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
