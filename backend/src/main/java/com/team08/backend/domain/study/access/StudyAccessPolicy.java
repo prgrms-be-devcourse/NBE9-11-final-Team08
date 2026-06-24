@@ -16,28 +16,11 @@ public class StudyAccessPolicy {
     private boolean isAllowed(StudyAccessContext context, StudyAction action) {
         return switch (action) {
             case VIEW_STUDY_CONTENT ->
-                    hasReadableMemberAccess(context);
+                    context.isActiveMember()
+                            && context.isReadableStudy();
             case WRITE_STUDY_CONTENT ->
-                    hasWritableMemberAccess(context);
-            case VIEW_MEMBER_REPORT, MANAGE_ANSWER ->
-                    context.isReadableStudy()
-                            && context.isActiveMember()
-                            && context.isOwner();
-            case MANAGE_CURRICULUM ->
-                    context.isDraftStudy()
-                            && context.isOwner();
+                    context.isActiveMember()
+                            && context.isWritableStudy();
         };
-    }
-
-    private boolean hasReadableMemberAccess(StudyAccessContext context) {
-        return context.hasActiveEnrollment()
-                && context.isActiveMember()
-                && context.isReadableStudy();
-    }
-
-    private boolean hasWritableMemberAccess(StudyAccessContext context) {
-        return context.hasActiveEnrollment()
-                && context.isActiveMember()
-                && context.isWritableStudy();
     }
 }
