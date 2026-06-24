@@ -35,6 +35,19 @@ export function CatalogView() {
   const [courses, setCourses] = useState<Course[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [loading, setLoading] = useState(true)
+  // categoryId(string) → 카테고리 이름 매핑. 사이드바에 ID 대신 이름을 표시하기 위함.
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    api
+      .getCategories()
+      .then((list) =>
+        setCategoryNames(Object.fromEntries(list.map((c) => [String(c.id), c.name]))),
+      )
+      .catch(() => setCategoryNames({}))
+  }, [])
+
+  const categoryLabel = (id: string) => (id === '전체' ? '전체' : categoryNames[id] ?? id)
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -84,7 +97,7 @@ export function CatalogView() {
                     category === c && 'bg-secondary font-medium text-foreground',
                   )}
                 >
-                  {c}
+                  {categoryLabel(c)}
                 </button>
               </li>
             ))}
@@ -125,7 +138,7 @@ export function CatalogView() {
                     : 'text-muted-foreground',
                 )}
               >
-                {c}
+                {categoryLabel(c)}
               </button>
             ))}
           </div>

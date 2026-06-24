@@ -55,6 +55,13 @@ export interface CourseCardResponse {
   viewCount: number
 }
 
+export interface CategoryResponse {
+  id: number
+  name: string
+  parentCategoryId: number | null
+  depth: number
+}
+
 export interface LectureInfoResponse {
   id: number
   title: string
