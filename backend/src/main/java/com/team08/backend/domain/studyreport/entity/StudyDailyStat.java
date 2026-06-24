@@ -44,4 +44,16 @@ public class StudyDailyStat {
 
     @Column(name = "completed_count", nullable = false)
     private int completedCount;
+
+    /** 시드/백필 등에서 집계된 일별 카운트를 직접 적재할 때 사용. 평상시 갱신은 upsertIncrement 로만 한다. */
+    public static StudyDailyStat of(Long userId, Long courseId, LocalDate activityDate,
+                                    int eventCount, int completedCount) {
+        StudyDailyStat s = new StudyDailyStat();
+        s.userId = userId;
+        s.courseId = courseId;
+        s.activityDate = activityDate;
+        s.eventCount = eventCount;
+        s.completedCount = completedCount;
+        return s;
+    }
 }

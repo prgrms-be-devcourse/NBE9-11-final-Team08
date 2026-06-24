@@ -51,7 +51,9 @@ import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.studyreport.entity.StudyDailyStat;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.studyreport.repository.StudyDailyStatRepository;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
@@ -120,11 +122,14 @@ public class DataSeeder {
     private final StudyMemberRepository studyMemberRepository;
     private final StudyActivityRepository studyActivityRepository;
     private final StudyReportRepository studyReportRepository;
+    private final StudyDailyStatRepository studyDailyStatRepository;
     private final AiFeedbackRepository aiFeedbackRepository;
     private final PasswordEncoder passwordEncoder;
 
-    /** 강의(Course)별 대표 Lecture 를 묶어 카탈로그 결과를 전달한다. */
-    private record CatalogData(List<Course> courses, Map<Long, Lecture> sampleLectureByCourse) {}
+    /** 강의(Course)별 대표 Lecture + 전체 Lecture 목록을 묶어 카탈로그 결과를 전달한다. */
+    private record CatalogData(List<Course> courses,
+                              Map<Long, Lecture> sampleLectureByCourse,
+                              Map<Long, List<Lecture>> lecturesByCourse) {}
 
     /** @return 실제로 데이터를 새로 생성했으면 true, 이미 데이터가 있어 건너뛰면 false */
     @Transactional
@@ -196,6 +201,7 @@ public class DataSeeder {
         List<Chapter> chapterBatch = new ArrayList<>();
         List<Lecture> lectureBatch = new ArrayList<>();
         Map<Long, Lecture> sampleLectureByCourse = new HashMap<>();
+        Map<Long, List<Lecture>> lecturesByCourse = new HashMap<>();
 
         for (int s = 0; s < sellers.size(); s++) {
             User seller = sellers.get(s);
@@ -227,7 +233,7 @@ public class DataSeeder {
                     addLectures(cfg, chapterRepository.saveAll(chapterBatch), lectureBatch);
                     chapterBatch.clear();
                     if (lectureBatch.size() >= batchSize) {
-                        persistLectures(lectureBatch, sampleLectureByCourse);
+                        persistLectures(lectureBatch, sampleLectureByCourse, lecturesByCourse);
                     }
                 }
             }
@@ -237,14 +243,14 @@ public class DataSeeder {
             addLectures(cfg, chapterRepository.saveAll(chapterBatch), lectureBatch);
         }
         if (!lectureBatch.isEmpty()) {
-            persistLectures(lectureBatch, sampleLectureByCourse);
+            persistLectures(lectureBatch, sampleLectureByCourse, lecturesByCourse);
         }
 
         log.info("[DataInit] 챕터 {}개, 강의영상 {}개 생성 완료",
                 (long) savedCourses.size() * cfg.chaptersPerCourse(),
                 (long) savedCourses.size() * cfg.chaptersPerCourse() * cfg.lecturesPerChapter());
 
-        return new CatalogData(savedCourses, sampleLectureByCourse);
+        return new CatalogData(savedCourses, sampleLectureByCourse, lecturesByCourse);
     }
 
     private void addLectures(SeedConfig cfg, List<Chapter> chapters, List<Lecture> buffer) {
@@ -265,10 +271,13 @@ public class DataSeeder {
         }
     }
 
-    /** 강의 영상 저장 + 강의(Course)별 대표 Lecture 캡처 (in-memory 참조라 추가 조회 없음) */
-    private void persistLectures(List<Lecture> buffer, Map<Long, Lecture> sampleLectureByCourse) {
+    /** 강의 영상 저장 + 강의(Course)별 대표/전체 Lecture 캡처 (in-memory 참조라 추가 조회 없음) */
+    private void persistLectures(List<Lecture> buffer, Map<Long, Lecture> sampleLectureByCourse,
+                                 Map<Long, List<Lecture>> lecturesByCourse) {
         for (Lecture lecture : lectureRepository.saveAll(buffer)) {
-            sampleLectureByCourse.putIfAbsent(lecture.getChapter().getCourse().getId(), lecture);
+            Long courseId = lecture.getChapter().getCourse().getId();
+            sampleLectureByCourse.putIfAbsent(courseId, lecture);
+            lecturesByCourse.computeIfAbsent(courseId, k -> new ArrayList<>()).add(lecture);
         }
         buffer.clear();
     }
@@ -359,39 +368,103 @@ public class DataSeeder {
         log.info("[DataInit] 커머스 데이터 생성 (주문 {}건)", savedOrders.size());
     }
 
-    /** 학습 진행 / 이벤트 / 출석 / 회고 (수강생 1명당 1건) */
+    /** 학습자 1인이 시청하는 최대 강의 수(진행도 분포용). */
+    private static final int LECTURES_PER_LEARNER = 5;
+    /** 학습 활동을 흩뿌릴 날짜 범위(잔디/일별진도용). */
+    private static final int SPREAD_DAYS = 14;
+
+    /**
+     * 학습 연쇄 데이터: 모든 수강생이 강좌의 여러 강의를 여러 날에 걸쳐 시청한 것으로
+     * lecture_progresses · learning_events · learning_daily_stats 를 서로 일관되게 생성한다.
+     * 일부는 완강(COMPLETE), 일부는 중도 이탈로 진행도 분포를 만든다.
+     * (study_reports 는 이 데이터로부터 리포트 조회 시점에 재집계된다.)
+     */
     private void seedLearning(List<User> users, CatalogData catalog) {
         List<Course> courses = catalog.courses();
-        Map<Long, Lecture> sample = catalog.sampleLectureByCourse();
+        Map<Long, List<Lecture>> lecturesByCourse = catalog.lecturesByCourse();
+        if (courses.isEmpty()) return;
+
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = LocalDate.now();
-        int count = Math.min(users.size(), courses.size());
 
         List<LectureProgress> progresses = new ArrayList<>();
         List<LearningEvent> events = new ArrayList<>();
-        // TODO: 학습 도메인이아니라 커머스/쿠폰 도메인으로 옮겨야함
-        // TODO: 비기능적 요구사항에 의거한 데이터 규모를 채택해야해서 얼마만큼의 데이터를 생성할지는 추가 결정 필요
         List<Attendance> attendances = new ArrayList<>();
         List<LectureReflection> reflections = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Course course = courses.get(i);
-            Lecture lecture = sample.get(course.getId());
-            Long userId = users.get(i).getId();
+        // (userId|courseId|date) → [eventCount, completedCount] 일별 롤업 누적
+        Map<String, int[]> dailyAgg = new LinkedHashMap<>();
+        Map<String, Object[]> dailyKey = new HashMap<>();
 
-            progresses.add(new LectureProgress(
-                    null, lecture.getId(), userId, 300, 300, 50, false, null, now, now));
-            events.add(LearningEvent.create(
-                    userId, course.getId(), lecture.getChapter().getId(), lecture.getId(),
-                    LearningEventType.LECTURE_ENTER, 0, now, "evt-seed-" + i));
+        for (int i = 0; i < users.size(); i++) {
+            Long userId = users.get(i).getId();
+            Course course = courses.get(i % courses.size()); // 강좌당 여러 수강생 분포
+            Long courseId = course.getId();
+            List<Lecture> lectures = lecturesByCourse.getOrDefault(courseId, List.of());
+            if (lectures.isEmpty()) continue;
+
+            int watchCount = 1 + (i % Math.min(lectures.size(), LECTURES_PER_LEARNER));
+            int completedCount = switch (i % 3) {
+                case 0 -> watchCount;                    // 완강형
+                case 1 -> Math.max(1, watchCount - 1);   // 거의 완강
+                default -> Math.max(0, watchCount - 2);  // 초반 이탈형
+            };
+            int userOffset = i % SPREAD_DAYS; // 수강생마다 활동 시작일을 흩뿌림
+
+            for (int j = 0; j < watchCount; j++) {
+                Lecture lecture = lectures.get(j);
+                Long chapterId = lecture.getChapter().getId();
+                int duration = lecture.getDurationSeconds();
+                boolean completed = j < completedCount;
+                LocalDate date = today.minusDays(userOffset + (watchCount - j));
+                LocalDateTime base = date.atTime(20, 0).plusMinutes(j);
+
+                int watched = completed ? duration : Math.max(60, duration * 6 / 10);
+                int rate = completed ? 100 : Math.min(89, watched * 100 / Math.max(1, duration));
+                progresses.add(new LectureProgress(
+                        null, lecture.getId(), userId, watched, watched, rate,
+                        completed, completed ? base.plusSeconds(duration) : null, base, base));
+
+                String k = "evt-seed-" + userId + "-" + lecture.getId() + "-";
+                int evCount = 2; // ENTER + EXIT 는 항상
+                events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
+                        LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
+                events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
+                        LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
+                evCount++;
+                if (completed) {
+                    events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
+                            LearningEventType.LECTURE_COMPLETE, duration, base.plusSeconds(duration), k + "complete"));
+                    evCount++;
+                }
+                events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
+                        LearningEventType.LECTURE_EXIT, watched, base.plusSeconds(watched), k + "exit"));
+
+                String dk = userId + "|" + courseId + "|" + date;
+                int[] agg = dailyAgg.computeIfAbsent(dk, x -> new int[2]);
+                agg[0] += evCount;
+                agg[1] += completed ? 1 : 0;
+                dailyKey.putIfAbsent(dk, new Object[]{userId, courseId, date});
+            }
+
             attendances.add(Attendance.record(userId, today, Optional.empty(), 0, now));
-            reflections.add(LectureReflection.create(userId, lecture.getId(), "학습 회고 " + i));
+            reflections.add(LectureReflection.create(userId, lectures.get(0).getId(), "학습 회고 " + (i + 1)));
         }
+
+        List<StudyDailyStat> dailyStats = new ArrayList<>();
+        for (Map.Entry<String, int[]> e : dailyAgg.entrySet()) {
+            Object[] kv = dailyKey.get(e.getKey());
+            dailyStats.add(StudyDailyStat.of(
+                    (Long) kv[0], (Long) kv[1], (LocalDate) kv[2], e.getValue()[0], e.getValue()[1]));
+        }
+
         lectureProgressRepository.saveAll(progresses);
         learningEventRepository.saveAll(events);
+        studyDailyStatRepository.saveAll(dailyStats);
         attendanceRepository.saveAll(attendances);
         lectureReflectionRepository.saveAll(reflections);
 
-        log.info("[DataInit] 학습 데이터 생성 ({}건)", count);
+        log.info("[DataInit] 학습 연쇄 데이터 — 진행 {}건, 이벤트 {}건, 일별롤업 {}건",
+                progresses.size(), events.size(), dailyStats.size());
     }
 
     /** Q&A 질문/답변 + 강의 수정 요청 */
@@ -991,6 +1064,15 @@ public class DataSeeder {
     private void demoAttendanceStreak(List<User> learners) {
         Long userId = learners.get(10).getId();
         LocalDate today = LocalDate.now();
+        LocalDate streakStart = today.minusDays(4);
+
+        List<Attendance> existingStreak = attendanceRepository
+                .findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(userId, streakStart, today);
+        if (!existingStreak.isEmpty()) {
+            attendanceRepository.deleteAllInBatch(existingStreak);
+            attendanceRepository.flush();
+        }
+
         List<Attendance> streak = new ArrayList<>();
         Attendance prev = null;
         for (int d = 4; d >= 0; d--) {
