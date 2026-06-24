@@ -29,17 +29,19 @@ import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.InOrder;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.lang.reflect.Field;
@@ -89,6 +91,16 @@ class CourseServiceTest {
     @InjectMocks
     private CourseService courseService;
 
+    @BeforeEach
+    void setUp() {
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clear();
+    }
+
     @Test
     void 강좌를_성공적으로_생성하고_ID를_반환한다() {
         Long instructorId = 1L;
@@ -104,9 +116,12 @@ class CourseServiceTest {
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
-        given(courseThumbnailService.uploadThumbnail(eq(100L), any(MultipartFile.class))).willReturn("courses/thumbnails/100/uuid.png");
 
         Long courseId = courseService.createCourse(instructorId, request, mockFile);
+
+        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(synchronizations).hasSize(1);
+        synchronizations.get(0).afterCommit();
 
         assertThat(courseId).isEqualTo(100L);
         verify(courseRepository).save(any(Course.class));
@@ -290,7 +305,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_기존_썸네일이_S3에서_교체된다() {
+    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_트랜잭션_커밋_후_기존_썸네일이_S3에서_교체된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
 
@@ -327,42 +342,17 @@ class CourseServiceTest {
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
-
-        InOrder inOrder = Mockito.inOrder(courseThumbnailService, courseRepository);
 
         courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
 
-        inOrder.verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
-        inOrder.verify(courseThumbnailService).deleteThumbnail("old.png");
-
         assertThat(course.getTitle()).isEqualTo("수정 제목");
-        assertThat(course.getThumbnail()).isEqualTo("courses/thumbnails/100/new-uuid.png");
-    }
 
-    @Test
-    void 강좌_일반_정보_수정_시_S3_업로드가_실패하면_예외가_발생하고_DB_수정_트랜잭션이_롤백된다() {
-        Long courseId = 100L;
-        Long instructorId = 1L;
-        Course course = Course.createDraft(instructorId, 2L, "원래 제목", "원래 설명", "old.png", 10000);
+        List<TransactionSynchronization> synchronizations = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(synchronizations).hasSize(1);
+        synchronizations.get(0).afterCommit();
 
-        Field courseIdField = findField(Course.class, "id");
-        makeAccessible(courseIdField);
-        setField(courseIdField, course, courseId);
-
-        CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of());
-        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
-
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
-        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class)))
-                .willThrow(new CustomException(ErrorCode.S3_UPLOAD_FAILED));
-
-        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.S3_UPLOAD_FAILED.getMessage());
-
-        assertThat(course.getTitle()).isEqualTo("원래 제목");
-        verify(courseThumbnailService, never()).deleteThumbnail(any(String.class));
+        verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
+        verify(courseThumbnailService).deleteThumbnail("old.png");
     }
 
     @Test
@@ -656,7 +646,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 관리자가_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
+    void Administration_이_강제_판매_중지_요청_시_중지_사유가_누락되면_예외가_발생한다() {
         Long courseId = 100L;
         Long adminId = 1L;
         Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);

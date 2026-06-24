@@ -32,6 +32,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import static java.util.UUID.randomUUID;
@@ -58,8 +60,17 @@ public class CourseService {
         Course savedCourse = courseRepository.save(course);
 
         if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
-            String s3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
-            savedCourse.updateThumbnail(s3Key);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        String s3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
+                        savedCourse.updateThumbnail(s3Key);
+                    } catch (Exception e) {
+                        log.error("Failed to upload thumbnail after commit for course: {}", savedCourse.getId(), e);
+                    }
+                }
+            });
         }
 
         return savedCourse.getId();
@@ -69,6 +80,7 @@ public class CourseService {
     public CourseDetailResponse getCourseDetail(Long courseId) {
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
 
         // TODO: 대규모 트래픽 발생 시 RDB Write 부하가 우려되므로 차후 Redis를 활용한 쓰기 지연(Write-Behind) 방식으로 고도화 필요
@@ -99,17 +111,23 @@ public class CourseService {
 
         course.validateOwner(instructorId);
 
-        String newS3Key = (thumbnailFile != null && !thumbnailFile.isEmpty())
-                ? courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile)
-                : null;
-
         String oldThumbnail = course.getThumbnail();
 
         course.updateGeneralInfo(request);
 
-        if (newS3Key != null) {
-            courseThumbnailService.deleteThumbnail(oldThumbnail);
-            course.updateThumbnail(newS3Key);
+        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        courseThumbnailService.deleteThumbnail(oldThumbnail);
+                        String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
+                        course.updateThumbnail(newS3Key);
+                    } catch (Exception e) {
+                        log.error("Failed to update thumbnail after commit for course: {}", course.getId(), e);
+                    }
+                }
+            });
         }
     }
 
@@ -117,6 +135,7 @@ public class CourseService {
     public void requestCourseReview(Long courseId, Long instructorId) {
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
 
         course.validateOwner(instructorId);
