@@ -1,22 +1,26 @@
 # ============================================================================
-# 부하 테스트 - 분리 모드 [부하 stack] (부하 발생 + 관측)
+# 부하기(client) stack — k6(부하 발생) + influxdb(이력) + grafana(대시보드)
 # ----------------------------------------------------------------------------
-# k6 + influxdb + grafana 만 정의한다. 측정 대상(app/db)은 compose.server.yml.
-# k6 는 docker 내부망의 app 이 아니라 호스트 밖 서버를 때린다:
-#     BASE_URL: http://host.docker.internal:8080   ← 분리의 핵심 한 줄
-# 관측 도구(influxdb/grafana)를 서버가 아닌 부하 쪽에 두어 측정 오염을 막는다.
+# 측정 대상 서버(app/db)는 이 stack 에 없다.
+# k6 는 BASE_URL 로 지정한 (호스트 밖) 서버를 친다:
+#     BASE_URL: http://host.docker.internal:8080
+# 관측 도구(influxdb/grafana)를 측정 대상과 분리해 자원 경합/오염을 막는다.
 #
 #   make perf-client PERF_SCRIPT=last-watched-baseline.js
-#   make perf-split-down
+#   make perf-client-down   (볼륨 유지)  /  make perf-client-reset (볼륨 삭제)
 # ============================================================================
 
-name: team08-perf-client
+# 프로젝트 이름은 team08-perf 유지 — named 볼륨(team08-perf_*)에 쌓인
+# influx 메트릭 / grafana 대시보드 이력을 보존하기 위함.
+name: team08-perf
 
 services:
   influxdb:
     image: influxdb:1.8
     environment:
       INFLUXDB_DB: k6
+    volumes:
+      - influxdb-data:/var/lib/influxdb   # named 볼륨 — 지난 런 메트릭 이력 보존
     networks: [client]
 
   grafana:
@@ -29,6 +33,7 @@ services:
       GF_AUTH_BASIC_ENABLED: "false"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana    # named 볼륨 — import 한 대시보드 보존
     depends_on: [influxdb]
     networks: [client]
 
@@ -37,12 +42,14 @@ services:
     profiles: ["k6"]
     depends_on: [influxdb]
     environment:
-      BASE_URL: http://host.docker.internal:8080    # '서버 머신'을 호스트 경유로 호출
-    extra_hosts:
-      - "host.docker.internal:host-gateway"          # Linux 호환용 (Mac 은 기본 지원)
+      BASE_URL: ${BASE_URL:-http://host.docker.internal:8080}
     volumes:
       - ./k6:/scripts:ro
     networks: [client]
 
 networks:
   client:
+
+volumes:
+  influxdb-data:
+  grafana-data:

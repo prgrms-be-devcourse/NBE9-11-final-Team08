@@ -14,6 +14,8 @@ import com.team08.backend.domain.couponpolicy.entity.*;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.repository.CourseRepository;
+import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
+import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
@@ -43,6 +45,7 @@ import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.seller.entity.Seller;
 import com.team08.backend.domain.seller.repository.SellerRepository;
 import com.team08.backend.domain.study.entity.Study;
+import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
@@ -51,6 +54,7 @@ import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.entity.UserRole;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -95,6 +99,7 @@ public class DataSeeder {
     private final SellerRepository sellerRepository;
     private final CategoryRepository categoryRepository;
     private final CourseRepository courseRepository;
+    private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final ChapterRepository chapterRepository;
     private final LectureRepository lectureRepository;
     private final CartRepository cartRepository;
@@ -121,11 +126,12 @@ public class DataSeeder {
     /** 강의(Course)별 대표 Lecture 를 묶어 카탈로그 결과를 전달한다. */
     private record CatalogData(List<Course> courses, Map<Long, Lecture> sampleLectureByCourse) {}
 
+    /** @return 실제로 데이터를 새로 생성했으면 true, 이미 데이터가 있어 건너뛰면 false */
     @Transactional
-    public void seed(SeedConfig cfg) {
+    public boolean seed(SeedConfig cfg) {
         if (userRepository.count() > 0) {
             log.info("[DataInit] 이미 데이터가 존재해 건너뜀");
-            return;
+            return false;
         }
 
         String password = passwordEncoder.encode("Test1234!");
@@ -141,6 +147,7 @@ public class DataSeeder {
         seedLearning(users, catalog);
         seedQna(users, catalog);
         seedStudies(sellers, users, catalog);
+        return true;
     }
 
     private List<Category> saveCategories() {
@@ -440,5 +447,627 @@ public class DataSeeder {
                     seller.getId(), study.getId(), activity.getId(), "활동 스냅샷", "claude-opus-4-8", "v1"));
         }
         log.info("[DataInit] 스터디 데이터 생성 ({}건)", sellers.size());
+    }
+
+    // =========================================================================
+    // 데모 전용 시나리오 보강 (DemoDataInitializer 에서만 호출)
+    // -------------------------------------------------------------------------
+    // seed() 가 만든 "단일 상태" 데이터를, 기능/정책 요구사항이 시연에서 드러나도록
+    // 다양한 상태·흐름으로 펼친다. simple/bulk 는 호출하지 않으므로 영향 없음.
+    // 강좌-수강 인덱스 매핑(seedCommerce): user[i] ↔ course[i]
+    // 스터디-강좌 매핑(seedStudies): study[s] ↔ course[s*2]  (강좌 10개 → 스터디 5개)
+    // =========================================================================
+    @Transactional
+    public void seedDemoScenarios() {
+        Map<Long, User> usersById = new HashMap<>();
+        userRepository.findAll().forEach(u -> usersById.put(u.getId(), u));
+        Long adminId = userRepository.findByEmail("admin@test.com").orElseThrow().getId();
+
+        List<Course> courses = courseRepository.findAll();
+        courses.sort(Comparator.comparing(Course::getId));
+        List<Study> studies = studyRepository.findAll();
+        studies.sort(Comparator.comparing(Study::getId));
+        List<User> learners = usersById.values().stream()
+                .filter(u -> u.getRole() == UserRole.ROLE_USER)
+                .sorted(Comparator.comparing(User::getId))
+                .toList();
+
+        if (courses.size() < 10 || studies.size() < 5 || learners.size() < 11) {
+            log.warn("[DataInit] 데모 시나리오 보강 스킵 (데이터 부족: 강좌 {}, 스터디 {}, 수강생 {})",
+                    courses.size(), studies.size(), learners.size());
+            return;
+        }
+
+        demoCourseLifecycle(courses, adminId);
+        demoStudyStates(courses, studies, usersById);
+        demoRefund(courses, learners);
+        demoLearningActivityFeed(studies, learners);
+        demoAiFeedback(studies, learners);
+        demoLearningFlow(courses, learners);
+        demoQna(courses, learners);
+        demoLectureModificationRequests(courses, adminId);
+        demoAttendanceStreak(learners);
+        demoCoupons();
+        demoReports(studies);
+        demoBulkEnrollStudyCourses(courses, studies, learners);
+
+        log.info("[DataInit] 데모 시나리오 보강 완료");
+    }
+
+    /**
+     * 데모: ACTIVE/READONLY 스터디의 강좌에 수강생을 추가로 등록해 스터디 멤버 수를 늘린다.
+     * <p>
+     * 멤버는 {@code linkLearnersAsStudyMembers}(DemoDataInitializer)가 "ACTIVE 수강생 → 멤버"로
+     * 연결하므로, 멤버를 늘리려면 해당 강좌의 수강 등록을 늘려야 한다. seedCommerce 와 동일하게
+     * 주문(PAID)·결제·수강(ACTIVE)을 함께 생성해 일관성을 유지한다.
+     * (user, course) 유니크 제약이 있어 기존 수강 조합은 건너뛴다.
+     */
+    private void demoBulkEnrollStudyCourses(List<Course> courses, List<Study> studies, List<User> learners) {
+        final int perCourse = 12; // 스터디(강좌)당 추가 수강생 목표 수
+
+        LocalDateTime now = LocalDateTime.now();
+        Map<Long, Course> courseById = new HashMap<>();
+        for (Course c : courses) courseById.put(c.getId(), c);
+
+        // 이미 존재하는 (userId:courseId) 수강 조합 — 유니크 충돌/중복 방지
+        Set<String> existing = new HashSet<>();
+        enrollmentRepository.findAll().forEach(e -> existing.add(e.getUserId() + ":" + e.getCourseId()));
+
+        List<Long> targetCourseIds = studies.stream()
+                .filter(s -> s.getStatus() == StudyStatus.ACTIVE || s.getStatus() == StudyStatus.READONLY)
+                .map(s -> s.getCourse().getId())
+                .distinct()
+                .toList();
+
+        List<Order> orders = new ArrayList<>();
+        List<Payment> payments = new ArrayList<>();
+        List<Enrollment> enrollments = new ArrayList<>();
+        int seq = 0;
+
+        for (Long courseId : targetCourseIds) {
+            Course course = courseById.get(courseId);
+            if (course == null) continue;
+            int added = 0;
+            for (User learner : learners) {
+                if (added >= perCourse) break;
+                String key = learner.getId() + ":" + courseId;
+                if (existing.contains(key)) continue;
+
+                Order order = Order.createPendingPayment(
+                        learner.getId(), "ORD-DEMO-MEM-" + courseId + "-" + learner.getId(), now);
+                order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
+                order.markPaid(now);
+                orders.add(order);
+
+                Payment payment = Payment.createReady(order, now);
+                payment.markProcessing(now);
+                payment.succeed("PAY-DEMO-MEM-" + (seq++), "CARD", now);
+                payments.add(payment);
+
+                enrollments.add(Enrollment.createActive(learner.getId(), courseId, order, now));
+                existing.add(key);
+                added++;
+            }
+        }
+
+        orderRepository.saveAll(orders);
+        paymentRepository.saveAll(payments);
+        enrollmentRepository.saveAll(enrollments);
+        log.info("[DataInit] 데모 스터디 멤버 보강용 수강 {}건 생성 (대상 강좌 {}개)",
+                enrollments.size(), targetCourseIds.size());
+    }
+
+    // =========================================================================
+    // demo 모드 전용: "의미있는 이름" 페르소나로 엣지/예외 케이스를 또렷이 보여주는 쇼케이스.
+    // 파라미터 기반 seed() 와 별개로, 적은 수의 계정을 손으로 구성한다. (비밀번호 모두 Test1234!)
+    // =========================================================================
+    @Transactional
+    public boolean seedPersonaShowcase() {
+        if (userRepository.count() > 0) {
+            log.info("[DataInit] 이미 데이터가 존재해 페르소나 쇼케이스를 건너뜀");
+            return false;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        String pw = passwordEncoder.encode("Test1234!");
+
+        User admin = userRepository.save(User.createAdmin("admin@test.com", pw, "관리자", null));
+
+        List<Category> cats = saveCategories(); // 백엔드/프론트엔드/DevOps/UI/UX/마케팅
+        Long catBackend = cats.get(0).getId();
+        Long catFront = cats.get(1).getId();
+        Long catDevops = cats.get(2).getId();
+        Long catUiux = cats.get(3).getId();
+        Long catMkt = cats.get(4).getId();
+
+        // ── 판매자 + 강좌(생명주기 상태) ──────────────────────────────────────
+        List<CourseStatusHistory> hist = new ArrayList<>();
+
+        User sellerPopular = saveShowcaseSeller("seller1@test.com", "인기강사", pw);
+        Course coursePopular = buildShowcaseCourse(sellerPopular, catBackend, "스프링 부트 실전", 30000);
+        hist.add(coursePopular.requestReview(sellerPopular.getId()));
+        hist.add(coursePopular.approve(admin.getId())); // ON_SALE
+
+        User sellerPending = saveShowcaseSeller("seller2@test.com", "승인대기판매자", pw);
+        Course coursePending = buildShowcaseCourse(sellerPending, catFront, "React 입문", 20000);
+        hist.add(coursePending.requestReview(sellerPending.getId())); // IN_REVIEW(승인 대기)
+
+        User sellerRejected = saveShowcaseSeller("seller3@test.com", "반려당한판매자", pw);
+        Course courseRejected = buildShowcaseCourse(sellerRejected, catDevops, "도커 기초", 15000);
+        hist.add(courseRejected.requestReview(sellerRejected.getId()));
+        hist.add(courseRejected.reject(admin.getId(), "커리큘럼 구성이 미흡하여 반려합니다.")); // SUSPENDED(반려)
+
+        User sellerClosed = saveShowcaseSeller("seller4@test.com", "판매중지판매자", pw);
+        Course courseClosed = buildShowcaseCourse(sellerClosed, catUiux, "피그마 마스터", 25000);
+        hist.add(courseClosed.requestReview(sellerClosed.getId()));
+        hist.add(courseClosed.approve(admin.getId()));
+        hist.add(courseClosed.close(sellerClosed.getId())); // SUSPENDED(판매중지)
+
+        User sellerDraft = saveShowcaseSeller("seller5@test.com", "초안작성자", pw);
+        buildShowcaseCourse(sellerDraft, catMkt, "퍼포먼스 마케팅", 18000); // DRAFT 유지
+
+        courseStatusHistoryRepository.saveAll(hist);
+
+        // ── 스터디: 인기강좌(ACTIVE) + 마감강좌(READONLY) ──────────────────────
+        Study activeStudy = studyRepository.save(
+                Study.createForCourse(sellerPopular, coursePopular, "스프링 실전 스터디", "함께 완주해요"));
+        activeStudy.activate();
+        studyMemberRepository.save(StudyMember.owner(sellerPopular, activeStudy));
+
+        Study readonlyStudy = studyRepository.save(
+                Study.createForCourse(sellerClosed, courseClosed, "마감된 스터디", "기록 열람만 가능"));
+        readonlyStudy.activate();
+        readonlyStudy.changeToReadOnly(); // ACTIVE → READONLY
+        studyMemberRepository.save(StudyMember.owner(sellerClosed, readonlyStudy));
+
+        List<Lecture> popularLectures = lecturesOf(coursePopular);
+        Lecture freeLecture = popularLectures.get(0); // 1장 1강 = 무료 미리보기
+        Lecture firstPaidLecture = popularLectures.get(1);
+
+        List<LectureProgress> progresses = new ArrayList<>();
+        List<LearningEvent> events = new ArrayList<>();
+
+        // ── 수강생 페르소나 ──────────────────────────────────────────────────
+        // 완강수강생: 인기강좌 수강 + 전 강의 100% + LECTURE_COMPLETE
+        User learnerComplete = saveLearner("user1@test.com", "완강수강생", pw);
+        enroll(learnerComplete, coursePopular, now, "COMPLETE");
+        for (Lecture lec : popularLectures) {
+            progresses.add(completedProgress(learnerComplete.getId(), lec, now));
+            events.add(LearningEvent.create(learnerComplete.getId(), coursePopular.getId(),
+                    lec.getChapter().getId(), lec.getId(), LearningEventType.LECTURE_COMPLETE,
+                    lec.getDurationSeconds(), now, "evt-complete-" + lec.getId()));
+        }
+
+        // 진행중수강생: 수강 + 일부 진행
+        User learnerInProgress = saveLearner("learner-inprogress@test.com", "진행중수강생", pw);
+        enroll(learnerInProgress, coursePopular, now, "INPROG");
+        LectureProgress partial = LectureProgress.start(learnerInProgress.getId(), firstPaidLecture.getId(), 0, now);
+        partial.applyProgress(firstPaidLecture.getDurationSeconds() / 2,
+                firstPaidLecture.getDurationSeconds() / 2, firstPaidLecture.getDurationSeconds(), now);
+        progresses.add(partial);
+        events.add(LearningEvent.create(learnerInProgress.getId(), coursePopular.getId(),
+                firstPaidLecture.getChapter().getId(), firstPaidLecture.getId(),
+                LearningEventType.LECTURE_ENTER, 0, now, "evt-inprog-enter"));
+
+        // 환불수강생: 수강 후 환불 → CANCELED (스터디 멤버에서 자연 제외)
+        User learnerRefund = saveLearner("learner-refunded@test.com", "환불수강생", pw);
+        Enrollment refundEnrollment = enroll(learnerRefund, coursePopular, now, "REFUND");
+        refundEnrollment.cancel(now);
+
+        // 맛보기시청자: 미구매·미수강. 무료 미리보기 강의 시청 이벤트만 존재
+        User learnerPreview = saveLearner("learner-preview@test.com", "맛보기시청자", pw);
+        events.add(LearningEvent.create(learnerPreview.getId(), coursePopular.getId(),
+                freeLecture.getChapter().getId(), freeLecture.getId(),
+                LearningEventType.VIDEO_START, 0, now, "evt-preview-start"));
+        events.add(LearningEvent.create(learnerPreview.getId(), coursePopular.getId(),
+                freeLecture.getChapter().getId(), freeLecture.getId(),
+                LearningEventType.VIDEO_END, freeLecture.getDurationSeconds(), now, "evt-preview-end"));
+
+        // 회고작성자: 수강 + 회고
+        User learnerReflection = saveLearner("learner-reflection@test.com", "회고작성자", pw);
+        enroll(learnerReflection, coursePopular, now, "REFLECT");
+        lectureReflectionRepository.save(LectureReflection.create(
+                learnerReflection.getId(), firstPaidLecture.getId(),
+                "오늘 영속성 개념을 확실히 잡았다. 다음엔 트랜잭션을 복습하자."));
+
+        // 개근수강생: 수강 + 3일 연속 출석
+        User learnerAttendance = saveLearner("learner-attendance@test.com", "개근수강생", pw);
+        enroll(learnerAttendance, coursePopular, now, "ATTEND");
+        LocalDate today = LocalDate.now();
+        Attendance a1 = Attendance.record(learnerAttendance.getId(), today.minusDays(2), Optional.empty(), 0, now);
+        Attendance a2 = Attendance.record(learnerAttendance.getId(), today.minusDays(1), Optional.of(a1), 1, now);
+        Attendance a3 = Attendance.record(learnerAttendance.getId(), today, Optional.of(a2), 2, now);
+        attendanceRepository.saveAll(List.of(a1, a2, a3));
+
+        // 읽기전용스터디원: 마감(READONLY) 스터디 강좌 수강 → 멤버로 연결됨(작성 불가 확인용)
+        User learnerReadonly = saveLearner("learner-readonly@test.com", "읽기전용스터디원", pw);
+        enroll(learnerReadonly, courseClosed, now, "READONLY");
+
+        lectureProgressRepository.saveAll(progresses);
+        learningEventRepository.saveAll(events);
+
+        // 질문많은수강생: 수강 + QnA(답변된 질문 + 미답변 질문)
+        User learnerQna = saveLearner("learner-qna@test.com", "질문많은수강생", pw);
+        enroll(learnerQna, coursePopular, now, "QNA");
+        QnaQuestion answered = qnaQuestionRepository.save(QnaQuestion.create(
+                learnerQna.getId(), firstPaidLecture.getId(), "영속성 컨텍스트가 뭔가요?",
+                "1차 캐시랑 같은 건가요?"));
+        qnaAnswerRepository.save(QnaAnswer.create(
+                answered.getId(), sellerPopular.getId(), "네, 1차 캐시를 포함한 더 큰 개념입니다."));
+        qnaQuestionRepository.save(QnaQuestion.create(
+                learnerQna.getId(), freeLecture.getId(), "예제 코드는 어디서 받나요?",
+                "깃허브 링크가 있을까요?")); // 미답변
+
+        // 쿠폰수집가: 사용/만료/보유 쿠폰
+        User learnerCoupon = saveLearner("learner-coupon@test.com", "쿠폰수집가", pw);
+        CouponPolicy welcome = couponPolicyRepository.save(newDemoPolicy("신규 환영 10% 쿠폰", coursePopular.getId(), now));
+        CouponPolicy weekly = couponPolicyRepository.save(newDemoPolicy("주간 특가 10% 쿠폰", coursePopular.getId(), now));
+        CouponPolicy ending = couponPolicyRepository.save(newDemoPolicy("만료 임박 10% 쿠폰", coursePopular.getId(), now));
+        IssuedCoupon usedCoupon = IssuedCoupon.create(welcome, learnerCoupon.getId(), now);
+        IssuedCoupon expiredCoupon = IssuedCoupon.create(weekly, learnerCoupon.getId(), now);
+        IssuedCoupon activeCoupon = IssuedCoupon.create(ending, learnerCoupon.getId(), now);
+        usedCoupon.use(now);
+        expiredCoupon.expire();
+        issuedCouponRepository.saveAll(List.of(usedCoupon, expiredCoupon, activeCoupon));
+
+        log.info("[DataInit] 페르소나 쇼케이스 생성 완료 (판매자 5 · 수강생 9 · 관리자 1)");
+        return true;
+    }
+
+    // ── 페르소나 쇼케이스 헬퍼 ────────────────────────────────────────────────
+    private User saveShowcaseSeller(String email, String nickname, String pw) {
+        User user = userRepository.save(User.createSeller(email, pw, nickname, null));
+        sellerRepository.save(new Seller(null, user.getId(), LocalDateTime.now(), LocalDateTime.now()));
+        return user;
+    }
+
+    private User saveLearner(String email, String nickname, String pw) {
+        return userRepository.save(User.createUser(email, pw, nickname, null));
+    }
+
+    /** 챕터 2개 × 강의 2개(1강은 무료 미리보기)를 가진 강좌를 만들어 저장한다. */
+    private Course buildShowcaseCourse(User seller, Long categoryId, String title, int price) {
+        Course course = Course.createDraft(seller.getId(), categoryId, title,
+                title + " 강좌입니다.", "thumb-demo.jpg", price);
+        for (int ch = 1; ch <= 2; ch++) {
+            Chapter chapter = Chapter.create(ch + "장", ch, course);
+            course.addChapter(chapter);
+            for (int j = 1; j <= 2; j++) {
+                String uuid = UUID.randomUUID().toString();
+                chapter.addLecture(Lecture.createWithStream(
+                        "/hls/demo/" + uuid + "/index.m3u8", uuid,
+                        ch + "장 " + j + "강", "강의 요약", 600 * j, j, j == 1, chapter));
+            }
+        }
+        return courseRepository.save(course); // chapters/lectures cascade
+    }
+
+    private List<Lecture> lecturesOf(Course course) {
+        List<Lecture> result = new ArrayList<>();
+        course.getChapters().forEach(c -> result.addAll(c.getLectures()));
+        return result;
+    }
+
+    /** 주문(PAID)·결제(SUCCESS)·수강(ACTIVE)을 한 번에 생성한다. */
+    private Enrollment enroll(User learner, Course course, LocalDateTime now, String tag) {
+        Order order = Order.createPendingPayment(
+                learner.getId(), "ORD-DEMO-" + tag + "-" + learner.getId(), now);
+        order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
+        order.markPaid(now);
+        orderRepository.save(order);
+
+        Payment payment = Payment.createReady(order, now);
+        payment.markProcessing(now);
+        payment.succeed("PAY-DEMO-" + tag + "-" + learner.getId(), "CARD", now);
+        paymentRepository.save(payment);
+
+        return enrollmentRepository.save(Enrollment.createActive(learner.getId(), course.getId(), order, now));
+    }
+
+    private LectureProgress completedProgress(Long userId, Lecture lec, LocalDateTime now) {
+        LectureProgress p = LectureProgress.start(userId, lec.getId(), 0, now);
+        p.applyProgress(lec.getDurationSeconds(), lec.getDurationSeconds(), lec.getDurationSeconds(), now);
+        return p;
+    }
+
+    private CouponPolicy newDemoPolicy(String name, Long courseId, LocalDateTime now) {
+        return CouponPolicy.createPolicy(
+                name, CouponTarget.COURSE, CouponType.AUTO, 100, CouponUsageType.SINGLE_USE, false,
+                DiscountType.PERCENT, 10, 5000, null, 30,
+                now.minusDays(1), now.plusDays(30), null, List.of(courseId));
+    }
+
+    /** 강좌 생명주기: ON_SALE 5 / IN_REVIEW 1 / SUSPENDED(판매중지) 2 / SUSPENDED(반려) 1 / DRAFT 1 */
+    private void demoCourseLifecycle(List<Course> courses, Long adminId) {
+        List<CourseStatusHistory> histories = new ArrayList<>();
+
+        // 0~4: 심사요청 → 승인 → ON_SALE
+        for (int i = 0; i <= 4; i++) {
+            Course c = courses.get(i);
+            histories.add(c.requestReview(c.getInstructorId()));
+            histories.add(c.approve(adminId));
+        }
+        // 5: 심사 중(IN_REVIEW)
+        Course inReview = courses.get(5);
+        histories.add(inReview.requestReview(inReview.getInstructorId()));
+        // 6, 8: ON_SALE 후 판매자 판매중지(close) → SUSPENDED
+        for (int i : List.of(6, 8)) {
+            Course c = courses.get(i);
+            histories.add(c.requestReview(c.getInstructorId()));
+            histories.add(c.approve(adminId));
+            histories.add(c.close(c.getInstructorId()));
+        }
+        // 7: 관리자 반려(reject) → SUSPENDED
+        Course rejected = courses.get(7);
+        histories.add(rejected.requestReview(rejected.getInstructorId()));
+        histories.add(rejected.reject(adminId, "커리큘럼 구성이 미흡하여 반려합니다."));
+        // 9: DRAFT 유지
+
+        courseStatusHistoryRepository.saveAll(histories);
+    }
+
+    /** 스터디 상태: ACTIVE 3 / READONLY 2(판매중지 강좌) + 신규 INACTIVE 1(반려) / DRAFT 1 */
+    private void demoStudyStates(List<Course> courses, List<Study> studies, Map<Long, User> usersById) {
+        // study[3] ↔ course6, study[4] ↔ course8 : 판매중지 → READONLY
+        studies.get(3).changeToReadOnly();
+        studies.get(4).changeToReadOnly();
+        // study[0,1,2] (course 0,2,4) 는 ACTIVE 유지
+
+        // 신규: 반려 강좌(course7) → INACTIVE 스터디
+        Course rejected = courses.get(7);
+        User rOwner = usersById.get(rejected.getInstructorId());
+        Study inactive = studyRepository.save(
+                Study.createForCourse(rOwner, rejected, "반려된 스터디", "반려된 강좌에 연결된 스터디"));
+        studyMemberRepository.save(StudyMember.owner(rOwner, inactive));
+        inactive.changeToInactive(); // DRAFT → INACTIVE
+
+        // 신규: DRAFT 강좌(course9) → DRAFT 스터디 (생성자/관리자만 조회 가능)
+        Course draftCourse = courses.get(9);
+        User dOwner = usersById.get(draftCourse.getInstructorId());
+        Study draft = studyRepository.save(
+                Study.createForCourse(dOwner, draftCourse, "작성중 스터디", "DRAFT 강좌에 연결된 스터디"));
+        studyMemberRepository.save(StudyMember.owner(dOwner, draft));
+    }
+
+    /** 환불 시나리오: user[4] 수강 취소(CANCELED) → ACTIVE 스터디 멤버 연결에서 제외된다. */
+    private void demoRefund(List<Course> courses, List<User> learners) {
+        Long courseId = courses.get(4).getId();
+        Long userId = learners.get(4).getId();
+        enrollmentRepository.findAll().stream()
+                .filter(e -> courseId.equals(e.getCourseId()) && userId.equals(e.getUserId()))
+                .findFirst()
+                .ifPresent(e -> e.cancel(LocalDateTime.now()));
+    }
+
+    /** 학습 활동 피드: 멤버가 작성, 최신순 노출, 삭제 글은 제외. */
+    private void demoLearningActivityFeed(List<Study> studies, List<User> learners) {
+        Study active0 = studies.get(0); // course0, member = user[0]
+        Long member0 = learners.get(0).getId();
+        studyActivityRepository.save(StudyActivity.create(active0.getId(), member0, "1챕터 완강 후기: 핵심 개념을 정리했습니다."));
+        studyActivityRepository.save(StudyActivity.create(active0.getId(), member0, "2챕터 정리: 개념 A 와 B 의 차이를 이해함."));
+        StudyActivity deleted = studyActivityRepository.save(
+                StudyActivity.create(active0.getId(), member0, "오타가 있어 삭제할 글입니다."));
+        deleted.delete(); // 삭제된 학습 활동은 피드에 노출되지 않음
+
+        Study active1 = studies.get(1); // course2, member = user[2]
+        studyActivityRepository.save(
+                StudyActivity.create(active1.getId(), learners.get(2).getId(), "QnA 답변 감사합니다. 덕분에 이해했어요."));
+    }
+
+    /** AI 코치: 피드백 상태 분산(COMPLETED/PROCESSING/FAILED/STALE) + 일일 3회 한도 도달 케이스. */
+    private void demoAiFeedback(List<Study> studies, List<User> learners) {
+        List<AiFeedback> seeded = aiFeedbackRepository.findAll();
+        seeded.sort(Comparator.comparing(AiFeedback::getId));
+        if (seeded.size() >= 5) {
+            seeded.get(0).complete("학습 기록이 구체적입니다. 개념 설명을 한 줄 더 보강해 보세요.");
+            // seeded.get(1): PROCESSING 유지
+            seeded.get(2).fail();                       // 실패 → 사용자가 재요청 가능
+            seeded.get(3).complete("좋은 회고입니다.");
+            seeded.get(3).markStale();                  // COMPLETED → STALE
+            // seeded.get(4): PROCESSING 유지
+        }
+
+        // 일일 3회 제한 데모: user[0] 가 같은 날 study0 활동에 3회 요청
+        Study study0 = studies.get(0);
+        Long user0 = learners.get(0).getId();
+        List<AiFeedback> today = new ArrayList<>();
+        for (int i = 1; i <= 3; i++) {
+            StudyActivity act = studyActivityRepository.save(
+                    StudyActivity.create(study0.getId(), user0, "AI 코칭 요청용 활동 " + i));
+            today.add(AiFeedback.startProcessing(
+                    user0, study0.getId(), act.getId(), "활동 스냅샷 " + i, "claude-opus-4-8", "v1"));
+        }
+        today.get(0).complete("구체성이 좋습니다.");
+        today.get(1).complete("보완점: 예시를 한 가지 추가해 보세요.");
+        // today.get(2): PROCESSING — 오늘 3번째까지 사용(일일 한도 도달)
+        aiFeedbackRepository.saveAll(today);
+    }
+
+    /**
+     * 학습 흐름: 이벤트(ENTER~COMPLETE) + 완강/진행중 진행도 + 회고.
+     * <p>
+     * lecture_progresses·lecture_reflections 는 (user_id, lecture_id) 유니크 제약이 있고
+     * seedLearning() 이 각 강좌 1강에 user[i] 진행도/회고를 이미 만들어 두었다. 충돌을 피하려고
+     * 1강은 기존 행을 완강으로 끌어올리고(in-place), 2강 이후만 새 행으로 추가한다.
+     */
+    private void demoLearningFlow(List<Course> courses, List<User> learners) {
+        LocalDateTime now = LocalDateTime.now();
+
+        Course course0 = courses.get(0);
+        Long user0 = learners.get(0).getId();
+        List<Lecture> lectures0 = orderedLectures(course0);
+
+        List<LearningEvent> events = new ArrayList<>();
+        List<LectureProgress> newProgresses = new ArrayList<>();
+        List<LectureReflection> reflections = new ArrayList<>();
+
+        // 1강: seed 가 만든 진행도를 완강으로 끌어올림(회고도 이미 존재 → 추가하지 않음)
+        if (!lectures0.isEmpty()) {
+            Lecture lec0 = lectures0.get(0);
+            int dur0 = lec0.getDurationSeconds();
+            appendWatchEvents(events, user0, lec0, now.minusDays(4), true);
+            lectureProgressRepository.findByUserIdAndLectureId(user0, lec0.getId())
+                    .ifPresent(p -> p.applyProgress(dur0, dur0, dur0, now)); // 누적 시청 → 100% 완강
+        }
+        // 2·3강: 신규 완강 + 회고
+        for (int i = 1; i <= 2 && i < lectures0.size(); i++) {
+            Lecture lec = lectures0.get(i);
+            LocalDateTime base = now.minusDays(3 - i); // 날짜 분산(히트맵용)
+            appendWatchEvents(events, user0, lec, base, true);
+            newProgresses.add(completedProgress(user0, lec.getId(), lec.getDurationSeconds(), base));
+            reflections.add(LectureReflection.create(user0, lec.getId(), (i + 1) + "강 회고: 핵심을 정리했습니다."));
+        }
+        // 4강: 신규 진행중(40%)
+        if (lectures0.size() > 3) {
+            Lecture lec = lectures0.get(3);
+            appendWatchEvents(events, user0, lec, now, false);
+            newProgresses.add(partialProgress(user0, lec.getId(), lec.getDurationSeconds(), 40, now));
+        }
+
+        // user[2] / course2 : seed 진행도(진행중) 위에 시청 이벤트만 보강
+        Course course2 = courses.get(2);
+        Long user2 = learners.get(2).getId();
+        List<Lecture> lectures2 = orderedLectures(course2);
+        if (!lectures2.isEmpty()) {
+            appendWatchEvents(events, user2, lectures2.get(0), now, false);
+        }
+
+        learningEventRepository.saveAll(events);
+        lectureProgressRepository.saveAll(newProgresses);
+        lectureReflectionRepository.saveAll(reflections);
+    }
+
+    /** QnA: 답변완료 / 미답변 / 작성자 본인 삭제 케이스. 답변은 강좌 판매자만 작성. */
+    private void demoQna(List<Course> courses, List<User> learners) {
+        Course course0 = courses.get(0);
+        Long instructor0 = course0.getInstructorId();
+        List<Lecture> lectures0 = orderedLectures(course0);
+        if (lectures0.isEmpty()) {
+            return;
+        }
+        Long lec0 = lectures0.get(0).getId();
+        Long lec1 = lectures0.size() > 1 ? lectures0.get(1).getId() : lec0;
+
+        QnaQuestion answered = qnaQuestionRepository.save(
+                QnaQuestion.create(learners.get(0).getId(), lec0, "1강 질문", "초반 설명 속도가 빠른데 보충 가능할까요?"));
+        qnaAnswerRepository.save(QnaAnswer.create(answered.getId(), instructor0, "네, 보충 자료를 첨부했습니다."));
+
+        qnaQuestionRepository.save(
+                QnaQuestion.create(learners.get(2).getId(), lec1, "2강 질문", "예제 코드는 어디서 받을 수 있나요?")); // 미답변
+
+        QnaQuestion removed = qnaQuestionRepository.save(
+                QnaQuestion.create(learners.get(0).getId(), lec0, "삭제할 질문", "잘못 올린 질문입니다."));
+        removed.delete(); // 작성자 본인 삭제 → 조회 제외
+    }
+
+    /** 영상 수정 요청: PENDING / APPROVED / REJECTED 각 1건. */
+    private void demoLectureModificationRequests(List<Course> courses, Long adminId) {
+        Course course0 = courses.get(0);
+        Long instructor = course0.getInstructorId();
+        List<Lecture> lectures = orderedLectures(course0);
+        if (lectures.size() < 3) {
+            return;
+        }
+
+        lectureModificationRequestRepository.save(
+                pendingModRequest(lectures.get(0), instructor, "오디오 음질 개선본 재업로드"));
+
+        LectureModificationRequest approved = lectureModificationRequestRepository.save(
+                pendingModRequest(lectures.get(1), instructor, "자막 추가본 재업로드"));
+        approved.approve(adminId);
+
+        LectureModificationRequest rejected = lectureModificationRequestRepository.save(
+                pendingModRequest(lectures.get(2), instructor, "화질 변경본 재업로드"));
+        rejected.reject("기존 영상보다 화질이 낮아 반려합니다.", adminId);
+    }
+
+    private LectureModificationRequest pendingModRequest(Lecture lecture, Long instructorId, String description) {
+        String uuid = UUID.randomUUID().toString();
+        String afterPath = "/hls/" + lecture.getChapter().getId() + "/" + uuid + "/index.m3u8";
+        return LectureModificationRequest.createPending(lecture, instructorId, description, afterPath, uuid);
+    }
+
+    /** 출석: 시드 출석이 없는 user[10] 에게 최근 5일 연속 출석 스트릭 생성. */
+    private void demoAttendanceStreak(List<User> learners) {
+        Long userId = learners.get(10).getId();
+        LocalDate today = LocalDate.now();
+        List<Attendance> streak = new ArrayList<>();
+        Attendance prev = null;
+        for (int d = 4; d >= 0; d--) {
+            LocalDate date = today.minusDays(d);
+            Attendance a = Attendance.record(
+                    userId, date, Optional.ofNullable(prev), streak.size(), date.atTime(9, 0));
+            streak.add(a);
+            prev = a;
+        }
+        attendanceRepository.saveAll(streak);
+    }
+
+    /** 쿠폰: 발급분 일부를 USED / EXPIRED 로 전환(나머지 ISSUED 유지). */
+    private void demoCoupons() {
+        List<IssuedCoupon> coupons = issuedCouponRepository.findAll();
+        coupons.sort(Comparator.comparing(IssuedCoupon::getId));
+        if (coupons.size() >= 3) {
+            coupons.get(0).use(LocalDateTime.now()); // USED
+            coupons.get(1).expire();                  // EXPIRED
+            // 나머지: ISSUED 유지
+        }
+    }
+
+    /** 레포트: study0 레포트를 학습 흐름과 일관된 집계값으로 갱신. */
+    private void demoReports(List<Study> studies) {
+        Long studyId = studies.get(0).getId();
+        LocalDate today = LocalDate.now();
+        studyReportRepository.findAll().stream()
+                .filter(r -> studyId.equals(r.getStudyId()))
+                .findFirst()
+                .ifPresent(r -> r.update(
+                        5400, 1, new BigDecimal("85.00"), 4,
+                        "[{\"lectureId\":1,\"title\":\"1강\",\"watchTimeSeconds\":3600}]",
+                        "[{\"date\":\"" + today.minusDays(3) + "\",\"progressRate\":40.00},"
+                                + "{\"date\":\"" + today + "\",\"progressRate\":85.00}]",
+                        "{\"" + today.minusDays(3) + "\":3,\"" + today.minusDays(1) + "\":2,\"" + today + "\":1}"));
+    }
+
+    // --- 데모 보강 헬퍼 ---------------------------------------------------------
+
+    /** 강좌의 강의영상을 (챕터 순서 → 강의 순서)로 평탄화. 트랜잭션 내 lazy 로딩 전제. */
+    private List<Lecture> orderedLectures(Course course) {
+        List<Lecture> result = new ArrayList<>();
+        course.getChapters().stream()
+                .sorted(Comparator.comparingInt(Chapter::getOrderNo))
+                .forEach(ch -> ch.getLectures().stream()
+                        .sorted(Comparator.comparingInt(Lecture::getOrderNo))
+                        .forEach(result::add));
+        return result;
+    }
+
+    /** 강의 시청 이벤트 시퀀스: ENTER → START → POSITION_SAVE → END → EXIT (완강 시 COMPLETE). */
+    private void appendWatchEvents(List<LearningEvent> out, Long userId, Lecture lec,
+                                   LocalDateTime base, boolean complete) {
+        Long courseId = lec.getChapter().getCourse().getId();
+        Long chapterId = lec.getChapter().getId();
+        Long lecId = lec.getId();
+        int dur = lec.getDurationSeconds();
+        int endPos = complete ? dur : dur * 4 / 10;
+        String k = userId + "-" + lecId + "-";
+
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.POSITION_SAVE, dur / 2, base.plusMinutes(5), k + "pos"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, endPos, base.plusMinutes(8), k + "end"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, endPos, base.plusMinutes(9), k + "exit"));
+        if (complete) {
+            out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_COMPLETE, dur, base.plusMinutes(9).plusSeconds(1), k + "complete"));
+        }
+    }
+
+    private LectureProgress completedProgress(Long userId, Long lectureId, int dur, LocalDateTime when) {
+        return new LectureProgress(null, lectureId, userId, dur, dur, 100, true, when.plusMinutes(9), when, when);
+    }
+
+    private LectureProgress partialProgress(Long userId, Long lectureId, int dur, int rate, LocalDateTime when) {
+        int pos = dur * rate / 100;
+        return new LectureProgress(null, lectureId, userId, pos, pos, rate, false, null, when, when);
     }
 }
