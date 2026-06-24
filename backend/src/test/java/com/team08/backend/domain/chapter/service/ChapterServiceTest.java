@@ -2,6 +2,8 @@ package com.team08.backend.domain.chapter.service;
 
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
@@ -59,6 +61,8 @@ class ChapterServiceTest {
     private LectureService lectureService;
     @Mock
     private LectureAccessValidator lectureAccessValidator;
+    @Mock
+    private CourseAccessAuthorizer courseAccessAuthorizer;
 
     // ── 챕터 생성 ──────────────────────────────────────────────────
 
@@ -66,6 +70,7 @@ class ChapterServiceTest {
     @DisplayName("챕터 생성 성공")
     void createChapter_success() {
         Long courseId = 1L;
+        Long userId = 1L;
         ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
         Course course = TestEntityFactory.course(courseId);
 
@@ -74,11 +79,12 @@ class ChapterServiceTest {
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(chapterRepository.save(any(Chapter.class))).willReturn(savedChapter);
 
-        Long chapterId = chapterService.createChapter(courseId, request);
+        Long chapterId = chapterService.createChapter(courseId, userId, request);
 
         assertThat(chapterId).isEqualTo(10L);
         verify(courseRepository).findById(courseId);
         verify(chapterRepository).save(any(Chapter.class));
+        verify(courseAccessAuthorizer).authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
     }
 
     @Test
@@ -89,7 +95,7 @@ class ChapterServiceTest {
 
         given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> chapterService.createChapter(invalidCourseId, request))
+        assertThatThrownBy(() -> chapterService.createChapter(invalidCourseId, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 

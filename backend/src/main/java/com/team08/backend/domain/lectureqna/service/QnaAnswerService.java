@@ -1,12 +1,12 @@
 package com.team08.backend.domain.lectureqna.service;
 
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ public class QnaAnswerService {
 
     private final QnaAnswerRepository qnaAnswerRepository;
     private final QnaQuestionRepository qnaQuestionRepository;
-    private final StudyAccessAuthorizer studyAccessAuthorizer;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     @Transactional
     public QnaAnswerResponse createAnswer(Long questionId, Long requesterId, String content) {
@@ -30,7 +30,7 @@ public class QnaAnswerService {
 
         // TODO: validateHierarchy 와 authorizeByLectureId 의 성능을 비교해보고 싶어 따로 courseId나 ChapterId를 받지 않고...byLectureID 남겨두었습니다.
         //  enterlecture와 다르게 authorizeByLectureId 를 활용했습니다
-        studyAccessAuthorizer.authorizeByLectureId(question.getLectureId(), requesterId, StudyAction.MANAGE_ANSWER);
+        courseAccessAuthorizer.authorizeByLectureId(question.getLectureId(), requesterId, CourseAction.MANAGE_ANSWER);
 
         //답변 이미 있는지 검사
         if (qnaAnswerRepository.existsByQuestionId(questionId)) {

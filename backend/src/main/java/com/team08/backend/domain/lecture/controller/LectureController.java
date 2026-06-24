@@ -25,9 +25,10 @@ public class LectureController {
     public Long createLecture(
             @PathVariable Long courseId,
             @PathVariable Long chapterId,
+            @AuthenticationPrincipal LoginUserPrincipal principal,
             @Valid @RequestBody LectureCreateRequest request) {
 
-        return lectureService.createLecture(courseId, chapterId, request);
+        return lectureService.createLecture(courseId, chapterId, principal.user().id(), request);
     }
 
     @GetMapping("/{lectureId}/stream")

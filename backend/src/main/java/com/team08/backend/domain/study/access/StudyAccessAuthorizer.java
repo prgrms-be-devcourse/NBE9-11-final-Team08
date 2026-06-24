@@ -17,12 +17,4 @@ public class StudyAccessAuthorizer {
     public void authorizeByCourseId(Long courseId, Long userId, StudyAction action) {
         policy.authorize(contextResolver.fromCourseId(courseId, userId), action);
     }
-
-    public void authorizeByChapterId(Long chapterId, Long userId, StudyAction action) {
-        policy.authorize(contextResolver.fromChapterId(chapterId, userId), action);
-    }
-
-    public void authorizeByLectureId(Long lectureId, Long userId, StudyAction action) {
-        policy.authorize(contextResolver.fromLectureId(lectureId, userId), action);
-    }
 }

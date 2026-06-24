@@ -3,6 +3,7 @@ package com.team08.backend.domain.chapter.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.service.ChapterService;
+import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,11 +33,12 @@ class ChapterControllerTest {
     private ChapterService chapterService;
 
     @Test
+    @WithMockLoginUser
     void 유효한_데이터로_챕터_생성_요청_시_201_상태코드와_ID를_반환한다() throws Exception {
         Long courseId = 1L;
         ChapterCreateRequest request = new ChapterCreateRequest("기본 문법 마스터", 1);
 
-        given(chapterService.createChapter(eq(courseId), any(ChapterCreateRequest.class))).willReturn(10L);
+        given(chapterService.createChapter(eq(courseId), eq(1L), any(ChapterCreateRequest.class))).willReturn(10L);
 
         mockMvc.perform(post("/api/courses/{courseId}/chapters", courseId)
                         .contentType(MediaType.APPLICATION_JSON)

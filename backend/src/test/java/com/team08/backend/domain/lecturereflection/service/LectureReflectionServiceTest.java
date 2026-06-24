@@ -1,5 +1,7 @@
 package com.team08.backend.domain.lecturereflection.service;
 
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturereflection.dto.LectureReflectionResponse;
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LectureReflectionServiceTest {
@@ -31,6 +34,9 @@ class LectureReflectionServiceTest {
 
     @Mock
     private LectureRepository lectureRepository;
+
+    @Mock
+    private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @InjectMocks
     private LectureReflectionService reflectionService;
@@ -59,6 +65,7 @@ class LectureReflectionServiceTest {
         assertThat(response.content()).isEqualTo("회고 내용");
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.lectureId()).isEqualTo(lectureId);
+        verify(courseAccessAuthorizer).authorizeByLectureId(lectureId, userId, CourseAction.WRITE_CONTENT);
     }
 
     @Test

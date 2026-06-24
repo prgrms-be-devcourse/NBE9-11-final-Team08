@@ -27,8 +27,9 @@ public class QnaQuestionController {
     @GetMapping("/api/lectures/{lectureId}/qna")
     public Page<QnaQuestionResponse> getQna(
             @PathVariable Long lectureId,
+            @AuthenticationPrincipal LoginUserPrincipal principal,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return qnaQuestionService.getQuestionsNAnswers(lectureId, pageable);
+        return qnaQuestionService.getQuestionsNAnswers(lectureId, principal.user().id(), pageable);
     }
 
     @Operation(summary = "QnA 질문 작성")

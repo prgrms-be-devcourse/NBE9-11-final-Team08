@@ -5,10 +5,8 @@ import com.team08.backend.domain.studymember.entity.StudyMemberRole;
 
 public record StudyAccessContext(
         Long studyId,
-        Long courseId,
         Long userId,
         StudyStatus studyStatus,
-        boolean hasActiveEnrollment,
         boolean activeMember,
         StudyMemberRole memberRole
 ) {
@@ -27,9 +25,5 @@ public record StudyAccessContext(
 
     public boolean isWritableStudy() {
         return studyStatus == StudyStatus.ACTIVE;
-    }
-
-    public boolean isDraftStudy() {
-        return studyStatus == StudyStatus.DRAFT;
     }
 }
