@@ -25,6 +25,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -52,8 +53,12 @@ public class PaymentTransactionService {
     public TossPaymentProcessingContext prepareTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
         Order order = findMyPaymentOrderForUpdate(userId, orderId);
 
-        validateConfirmableOrder(order);
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
+        Optional<ConfirmPaymentResponse> idempotentResponse = findIdempotentConfirmResponse(order, existingPayment, request.idempotencyKey());
+        if (idempotentResponse.isPresent()) {
+            return TossPaymentProcessingContext.replay(idempotentResponse.get());
+        }
+        validateConfirmableOrder(order);
         validateConfirmablePayment(existingPayment);
 
         int expectedDiscount = calculateExpectedDiscount(userId, request.issuedCouponId(), order);
@@ -68,10 +73,11 @@ public class PaymentTransactionService {
                 payment,
                 PaymentProviderType.TOSS,
                 request.amount(),
+                request.idempotencyKey(),
                 requestedAt
         ));
 
-        return new TossPaymentProcessingContext(
+        return TossPaymentProcessingContext.requested(
                 userId,
                 order.getId(),
                 order.getOrderNumber(),
@@ -204,6 +210,26 @@ public class PaymentTransactionService {
         });
     }
 
+    private Optional<ConfirmPaymentResponse> findIdempotentConfirmResponse(
+            Order order,
+            Optional<Payment> payment,
+            String idempotencyKey
+    ) {
+        if (!StringUtils.hasText(idempotencyKey) || payment.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(payment.get().getId(), idempotencyKey)
+                .map(attempt -> toIdempotentResponse(order, payment.get()));
+    }
+
+    private ConfirmPaymentResponse toIdempotentResponse(Order order, Payment payment) {
+        List<Enrollment> enrollments = payment.isCompleted()
+                ? enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE)
+                : List.of();
+        return ConfirmPaymentResponse.from(payment, order, enrollments);
+    }
+
     private int calculateExpectedDiscount(Long userId, Long issuedCouponId, Order order) {
         if (issuedCouponId == null) {
             return 0;
@@ -294,7 +320,38 @@ public class PaymentTransactionService {
             Long paymentId,
             Long attemptId,
             Long issuedCouponId,
-            int expectedDiscount
+            int expectedDiscount,
+            ConfirmPaymentResponse idempotentResponse
     ) {
+        public static TossPaymentProcessingContext requested(
+                Long userId,
+                Long orderId,
+                String orderNumber,
+                int amount,
+                Long paymentId,
+                Long attemptId,
+                Long issuedCouponId,
+                int expectedDiscount
+        ) {
+            return new TossPaymentProcessingContext(
+                    userId,
+                    orderId,
+                    orderNumber,
+                    amount,
+                    paymentId,
+                    attemptId,
+                    issuedCouponId,
+                    expectedDiscount,
+                    null
+            );
+        }
+
+        public static TossPaymentProcessingContext replay(ConfirmPaymentResponse response) {
+            return new TossPaymentProcessingContext(null, null, null, 0, null, null, null, 0, response);
+        }
+
+        public boolean isIdempotentReplay() {
+            return idempotentResponse != null;
+        }
     }
 }

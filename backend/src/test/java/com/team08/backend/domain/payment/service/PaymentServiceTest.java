@@ -99,6 +99,7 @@ class PaymentServiceTest {
     void setUp() {
         paymentService = new PaymentService(
                 paymentRepository,
+                paymentAttemptRepository,
                 orderRepository,
                 orderItemRepository,
                 enrollmentRepository,
@@ -216,7 +217,9 @@ class PaymentServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_ALREADY_PAID));
 
-        verifyNoInteractions(paymentRepository, orderItemRepository, enrollmentRepository);
+        verify(paymentRepository).findByOrder_Id(ORDER_ID);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verifyNoInteractions(orderItemRepository, enrollmentRepository);
     }
 
     @Test
@@ -228,7 +231,9 @@ class PaymentServiceTest {
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_ORDER_STATUS));
 
-        verifyNoInteractions(paymentRepository, orderItemRepository, enrollmentRepository);
+        verify(paymentRepository).findByOrder_Id(ORDER_ID);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verifyNoInteractions(orderItemRepository, enrollmentRepository);
     }
 
     @Test
@@ -354,7 +359,7 @@ class PaymentServiceTest {
     @Test
     void tossConfirmDelegatesToTransactionServiceAndCallsTossWithOrderNumber() {
         ConfirmPaymentRequest request = confirmRequest(30_000);
-        PaymentTransactionService.TossPaymentProcessingContext context = new PaymentTransactionService.TossPaymentProcessingContext(
+        PaymentTransactionService.TossPaymentProcessingContext context = PaymentTransactionService.TossPaymentProcessingContext.requested(
                 USER_ID,
                 ORDER_ID,
                 "ORD-20260612100000-ABC12345",
@@ -385,7 +390,7 @@ class PaymentServiceTest {
     @Test
     void tossConfirmFailureDelegatesToFailureTransaction() {
         ConfirmPaymentRequest request = confirmRequest(30_000);
-        PaymentTransactionService.TossPaymentProcessingContext context = new PaymentTransactionService.TossPaymentProcessingContext(
+        PaymentTransactionService.TossPaymentProcessingContext context = PaymentTransactionService.TossPaymentProcessingContext.requested(
                 USER_ID,
                 ORDER_ID,
                 "ORD-20260612100000-ABC12345",
@@ -407,6 +412,106 @@ class PaymentServiceTest {
         verify(paymentTransactionService).failTossPayment(context, request, exception);
         verify(paymentTransactionService, never()).completeTossPayment(any(), any());
         assertThat(response).isSameAs(expectedResponse);
+    }
+
+    @Test
+    void sameIdempotencyKeyReturnsExistingMockSuccessWithoutDuplicateProcessing() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.SUCCESS);
+        PaymentAttempt attempt = paymentAttempt(payment, "idem-1");
+        Enrollment enrollment = Enrollment.createActive(USER_ID, COURSE_ID, order, FIXED_NOW.minusMinutes(1));
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-1")).willReturn(Optional.of(attempt));
+        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE)).willReturn(List.of(enrollment));
+
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1"));
+
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void successPaymentWithDifferentIdempotencyKeyCannotBeConfirmedAgain() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.SUCCESS);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-2")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-2")))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_ALREADY_PAID));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void processingPaymentWithDifferentIdempotencyKeyCannotBeConfirmedAgain() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = Payment.createReady(order, FIXED_NOW.minusMinutes(1));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(FIXED_NOW.minusMinutes(1));
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-2")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-2")))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void declinedPaymentCanBeRetriedWithDifferentIdempotencyKey() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment declinedPayment = payment(order, PaymentStatus.DECLINED);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(declinedPayment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-2")).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+                USER_ID,
+                EnrollmentStatus.ACTIVE,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave();
+        stubPaymentAttemptSave();
+        stubEnrollmentSaveAll();
+
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-2"));
+
+        assertThat(declinedPayment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(paymentAttemptRepository).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void tossSameIdempotencyKeyReplayDoesNotCallTossClient() {
+        ConfirmPaymentResponse expectedResponse = pendingPaymentResponse(PaymentStatus.SUCCESS);
+        PaymentTransactionService.TossPaymentProcessingContext context =
+                PaymentTransactionService.TossPaymentProcessingContext.replay(expectedResponse);
+
+        given(paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1")))
+                .willReturn(context);
+
+        ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1"));
+
+        assertThat(response).isSameAs(expectedResponse);
+        verifyNoInteractions(tossPaymentClient);
+        verify(paymentTransactionService, never()).completeTossPayment(any(), any());
+        verify(paymentTransactionService, never()).failTossPayment(any(), any(), any());
     }
 
     @Test
@@ -574,6 +679,23 @@ class PaymentServiceTest {
 
     private ConfirmPaymentRequest confirmRequest(int amount) {
         return new ConfirmPaymentRequest("payment-key", "CARD", amount, null);
+    }
+
+    private ConfirmPaymentRequest confirmRequest(int amount, String idempotencyKey) {
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null, idempotencyKey);
+    }
+
+    private PaymentAttempt paymentAttempt(Payment payment, String idempotencyKey) {
+        PaymentAttempt attempt = PaymentAttempt.requested(
+                payment,
+                PaymentProviderType.MOCK,
+                payment.getAmount(),
+                idempotencyKey,
+                FIXED_NOW.minusMinutes(1)
+        );
+        ReflectionTestUtils.setField(attempt, "id", 200L);
+        attempt.succeed(payment.getPaymentKey(), FIXED_NOW.minusMinutes(1));
+        return attempt;
     }
 
     private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {

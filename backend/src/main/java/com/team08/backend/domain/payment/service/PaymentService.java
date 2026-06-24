@@ -16,6 +16,9 @@ import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
 import com.team08.backend.domain.payment.entity.Payment;
+import com.team08.backend.domain.payment.entity.PaymentAttempt;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
+import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
@@ -26,6 +29,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -37,6 +41,7 @@ import java.util.Optional;
 public class PaymentService {
 
     private final PaymentRepository paymentRepository;
+    private final PaymentAttemptRepository paymentAttemptRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -51,8 +56,16 @@ public class PaymentService {
         Order order = findMyPaymentOrderForUpdate(userId, orderId);
 
         // 주문 상태와 Payment 존재 여부를 함께 확인해 중복 결제를 방어한다.
-        validateConfirmableOrder(order);
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
+        Optional<ConfirmPaymentResponse> idempotentResponse = findIdempotentConfirmResponse(
+                order,
+                existingPayment,
+                request.idempotencyKey()
+        );
+        if (idempotentResponse.isPresent()) {
+            return idempotentResponse.get();
+        }
+        validateConfirmableOrder(order);
         validateConfirmablePayment(existingPayment);
 
         int expectedDiscount = 0;
@@ -73,6 +86,7 @@ public class PaymentService {
 
         LocalDateTime paidAt = LocalDateTime.now(clock);
         Payment savedPayment = processSuccessfulPayment(order, existingPayment, request, paidAt);
+        saveSuccessfulMockAttempt(savedPayment, request, paidAt);
 
         markOrderPaid(order, paidAt);
 
@@ -84,6 +98,9 @@ public class PaymentService {
 
     public ConfirmPaymentResponse confirmTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
         TossPaymentProcessingContext context = paymentTransactionService.prepareTossPayment(userId, orderId, request);
+        if (context.isIdempotentReplay()) {
+            return context.idempotentResponse();
+        }
 
         try {
             TossConfirmPaymentRequest tossRequest = new TossConfirmPaymentRequest(
@@ -162,6 +179,26 @@ public class PaymentService {
         });
     }
 
+    private Optional<ConfirmPaymentResponse> findIdempotentConfirmResponse(
+            Order order,
+            Optional<Payment> payment,
+            String idempotencyKey
+    ) {
+        if (!StringUtils.hasText(idempotencyKey) || payment.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(payment.get().getId(), idempotencyKey)
+                .map(attempt -> toIdempotentResponse(order, payment.get()));
+    }
+
+    private ConfirmPaymentResponse toIdempotentResponse(Order order, Payment payment) {
+        List<Enrollment> enrollments = payment.isCompleted()
+                ? enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE)
+                : List.of();
+        return ConfirmPaymentResponse.from(payment, order, enrollments);
+    }
+
     private void validateFailableOrder(Order order) {
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
             throw new CustomException(ErrorCode.INVALID_PAYMENT_FAILURE_STATUS);
@@ -206,6 +243,22 @@ public class PaymentService {
         payment.markProcessing(paidAt);
         payment.succeed(request.paymentKey(), request.method(), paidAt);
         return paymentRepository.save(payment);
+    }
+
+    private void saveSuccessfulMockAttempt(Payment payment, ConfirmPaymentRequest request, LocalDateTime paidAt) {
+        if (!StringUtils.hasText(request.idempotencyKey())) {
+            return;
+        }
+
+        PaymentAttempt attempt = PaymentAttempt.requested(
+                payment,
+                PaymentProviderType.MOCK,
+                request.amount(),
+                request.idempotencyKey(),
+                paidAt
+        );
+        attempt.succeed(request.paymentKey(), paidAt);
+        paymentAttemptRepository.save(attempt);
     }
 
     private Payment processDeclinedPayment(Order order, FailPaymentRequest request, LocalDateTime declinedAt) {

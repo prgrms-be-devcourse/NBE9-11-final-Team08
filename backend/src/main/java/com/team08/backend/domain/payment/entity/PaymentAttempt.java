@@ -10,6 +10,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "payment_attempts",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_payment_attempt_payment_id_idempotency_key", columnNames = {"payment_id", "idempotency_key"})
+        },
         indexes = {
                 @Index(name = "idx_payment_attempt_payment_created_at", columnList = "payment_id, created_at"),
                 @Index(name = "idx_payment_attempt_provider_status", columnList = "provider, status")
@@ -30,6 +33,7 @@ public class PaymentAttempt {
     @Column(nullable = false)
     private Integer amount;
     private String paymentKey;
+    private String idempotencyKey;
     private String failureCode;
     private String failureMessage;
     @Column(nullable = false)
@@ -46,6 +50,7 @@ public class PaymentAttempt {
             PaymentAttemptStatus status,
             Integer amount,
             String paymentKey,
+            String idempotencyKey,
             String failureCode,
             String failureMessage,
             LocalDateTime requestedAt,
@@ -59,6 +64,7 @@ public class PaymentAttempt {
         this.status = status;
         this.amount = amount;
         this.paymentKey = paymentKey;
+        this.idempotencyKey = idempotencyKey;
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
         this.requestedAt = requestedAt;
@@ -73,6 +79,16 @@ public class PaymentAttempt {
             Integer amount,
             LocalDateTime requestedAt
     ) {
+        return requested(payment, provider, amount, null, requestedAt);
+    }
+
+    public static PaymentAttempt requested(
+            Payment payment,
+            PaymentProviderType provider,
+            Integer amount,
+            String idempotencyKey,
+            LocalDateTime requestedAt
+    ) {
         return new PaymentAttempt(
                 null,
                 payment,
@@ -80,6 +96,7 @@ public class PaymentAttempt {
                 PaymentAttemptStatus.REQUESTED,
                 amount,
                 null,
+                idempotencyKey,
                 null,
                 null,
                 requestedAt,
