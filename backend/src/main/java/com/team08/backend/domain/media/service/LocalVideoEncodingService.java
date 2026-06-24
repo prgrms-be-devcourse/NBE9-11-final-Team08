@@ -6,6 +6,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +21,7 @@ import static java.util.Comparator.reverseOrder;
 
 @Slf4j
 @Service
+@Profile("!prod")
 public class LocalVideoEncodingService extends VideoEncodingTemplate implements MediaEncodingService {
 
     @Value("${file.upload-dir}")
