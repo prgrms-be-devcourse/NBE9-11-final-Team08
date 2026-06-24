@@ -28,7 +28,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ReflectionEditor } from '@/components/study/reflection-editor'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
-import type { Course, Lecture, LearningEventType, QnaQuestionResponse } from '@/lib/types'
+import { useLearningSession } from '@/lib/hooks/use-learning-session'
+import type { Course, Lecture, QnaQuestionResponse } from '@/lib/types'
 
 interface StudyViewProps {
   course: Course
@@ -113,23 +114,8 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     [lectures],
   )
 
-  const recordEvent = useCallback(
-    (lectureId: string, eventType: LearningEventType, positionSeconds: number) => {
-      const chapterId = chapterIdOf(lectureId)
-      api
-        .recordLearningEvent({
-          eventType,
-          lectureId: Number(lectureId),
-          courseId: Number.isFinite(courseId) ? courseId : undefined,
-          chapterId: chapterId ? Number(chapterId) : undefined,
-          positionSeconds,
-        })
-        .catch(() => {
-          /* 로그 적재 실패는 학습 흐름을 막지 않는다 */
-        })
-    },
-    [chapterIdOf, courseId],
-  )
+  // 학습 세션 오케스트레이션(입장/재생/하트비트/완료/퇴장 시 어떤 API를 어떤 순서로 호출할지)은 훅이 소유.
+  const session = useLearningSession({ courseId, chapterIdOf })
 
   const lectureProgress = (l: Lecture) => progressMap[l.id]?.progress ?? l.progress
   const lectureCompleted = (l: Lecture) => progressMap[l.id]?.completed ?? l.completed
@@ -178,12 +164,12 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     setAccessDenied(false)
     setEntering(true)
 
-    api
-      .enterLecture(courseId, chapterIdOf(lectureId) ?? '', lectureId)
+    session
+      .enter(lectureId)
       .then((res) => {
         if (cancelled) return
         setEntering(false)
-        // enterLecture 가 null → 수강권 없음/입장 불가. 재생·작성 UI를 잠근다.
+        // enter 가 null → 수강권 없음/입장 불가. 재생·작성 UI를 잠근다.
         if (!res) {
           setAccessDenied(true)
           return
@@ -200,7 +186,6 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
             },
           }))
         }
-        recordEvent(lectureId, 'LECTURE_ENTER', 0)
       })
       .catch(() => {
         if (!cancelled) {
@@ -212,10 +197,8 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     return () => {
       cancelled = true
       if (!entered) return // 입장하지 못한 강의는 퇴장/진행 기록을 남기지 않는다.
-      const pos = positionRef.current
-      // 마지막 시청 위치를 진행 정보에 반영하고 퇴장 이벤트를 남긴다.
-      api.updateLectureProgress(lectureId, pos, 0).catch(() => {})
-      recordEvent(lectureId, 'LECTURE_EXIT', pos)
+      // 마지막 시청 위치 flush + LECTURE_EXIT (순서는 세션 훅이 소유).
+      session.exit(lectureId, positionRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
@@ -238,17 +221,14 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
 
       positionRef.current = next
       setPosition(next)
-      api
-        .updateLectureProgress(lectureId, next, delta)
-        .then((res) => {
-          if (res) {
-            setProgressMap((m) => ({
-              ...m,
-              [lectureId]: { progress: res.progressRate, completed: res.completed },
-            }))
-          }
-        })
-        .catch(() => {})
+      session.beat(lectureId, next, delta).then((res) => {
+        if (res) {
+          setProgressMap((m) => ({
+            ...m,
+            [lectureId]: { progress: res.progressRate, completed: res.completed },
+          }))
+        }
+      })
       if (durationSeconds && next >= durationSeconds) {
         setPlaying(false)
       }
@@ -274,7 +254,8 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
       setPosition(0)
     }
     setPlaying(next)
-    recordEvent(active.id, next ? 'VIDEO_START' : 'VIDEO_END', positionRef.current)
+    if (next) session.play(active.id, positionRef.current)
+    else session.pause(active.id, positionRef.current)
   }
 
   const markComplete = async () => {
@@ -284,7 +265,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     const end = durationSeconds || positionRef.current
     const delta = Math.max(0, end - positionRef.current)
     try {
-      const res = await api.updateLectureProgress(active.id, end, delta)
+      const res = await session.complete(active.id, end, delta)
       if (res) {
         setProgressMap((m) => ({
           ...m,
@@ -292,7 +273,6 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
         }))
       }
       setPosition(end)
-      recordEvent(active.id, 'LECTURE_COMPLETE', end)
       toast.success('수강 완료로 표시했어요.')
     } catch {
       toast.error('수강 완료 처리에 실패했습니다.')
