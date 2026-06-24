@@ -812,9 +812,8 @@ export const api = {
   clearCart: () => mutate<CartResponse>('/api/cart', 'DELETE'),
 
   isCourseEnrollmentActive: async (courseId: string | number): Promise<boolean> => {
-    const userId = await getCurrentUserId()
     const res = await request<boolean | { exists?: boolean }>(
-      `/api/enrollments/users/${userId}/courses/${courseId}/active`,
+      `/api/enrollments/courses/${courseId}/active`,
       false,
       true,
       false,

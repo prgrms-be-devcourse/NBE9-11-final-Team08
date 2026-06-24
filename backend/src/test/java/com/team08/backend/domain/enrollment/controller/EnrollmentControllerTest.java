@@ -26,14 +26,14 @@ class EnrollmentControllerTest {
     private EnrollmentQueryService enrollmentQueryService;
 
     @Test
-    @WithMockLoginUser
-    void userId와_courseId로_active_enrollment_존재_여부를_조회한다() throws Exception {
+    @WithMockLoginUser(id = 1L)
+    void 로그인_사용자와_courseId로_active_enrollment_존재_여부를_조회한다() throws Exception {
         Long userId = 1L;
         Long courseId = 10L;
 
         given(enrollmentQueryService.hasActiveEnrollment(userId, courseId)).willReturn(true);
 
-        mockMvc.perform(get("/api/enrollments/users/{userId}/courses/{courseId}/active", userId, courseId))
+        mockMvc.perform(get("/api/enrollments/courses/{courseId}/active", courseId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.exists").value(true));
 
