@@ -34,6 +34,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.InOrder;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.*;
@@ -327,12 +329,40 @@ class CourseServiceTest {
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
+        InOrder inOrder = Mockito.inOrder(courseThumbnailService, courseRepository);
+
         courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
+
+        inOrder.verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
+        inOrder.verify(courseThumbnailService).deleteThumbnail("old.png");
 
         assertThat(course.getTitle()).isEqualTo("수정 제목");
         assertThat(course.getThumbnail()).isEqualTo("courses/thumbnails/100/new-uuid.png");
-        verify(courseThumbnailService).deleteThumbnail("old.png");
-        verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
+    }
+
+    @Test
+    void 강좌_일반_정보_수정_시_S3_업로드가_실패하면_예외가_발생하고_DB_수정_트랜잭션이_롤백된다() {
+        Long courseId = 100L;
+        Long instructorId = 1L;
+        Course course = Course.createDraft(instructorId, 2L, "원래 제목", "원래 설명", "old.png", 10000);
+
+        Field courseIdField = findField(Course.class, "id");
+        makeAccessible(courseIdField);
+        setField(courseIdField, course, courseId);
+
+        CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of());
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class)))
+                .willThrow(new CustomException(ErrorCode.S3_UPLOAD_FAILED));
+
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.S3_UPLOAD_FAILED.getMessage());
+
+        assertThat(course.getTitle()).isEqualTo("원래 제목");
+        verify(courseThumbnailService, never()).deleteThumbnail(any(String.class));
     }
 
     @Test

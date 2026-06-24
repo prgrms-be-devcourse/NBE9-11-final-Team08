@@ -99,13 +99,16 @@ public class CourseService {
 
         course.validateOwner(instructorId);
 
+        String newS3Key = (thumbnailFile != null && !thumbnailFile.isEmpty())
+                ? courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile)
+                : null;
+
         String oldThumbnail = course.getThumbnail();
 
         course.updateGeneralInfo(request);
 
-        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+        if (newS3Key != null) {
             courseThumbnailService.deleteThumbnail(oldThumbnail);
-            String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
             course.updateThumbnail(newS3Key);
         }
     }
