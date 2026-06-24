@@ -107,6 +107,22 @@ export interface CartResponse {
   totalPrice: number
 }
 
+export type OrderStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'CANCELED'
+  | 'REFUNDED'
+  | 'EXPIRED'
+
+export type PaymentStatus =
+  | 'READY'
+  | 'PROCESSING'
+  | 'SUCCESS'
+  | 'DECLINED'
+  | 'UNKNOWN'
+  | 'CANCELED'
+  | 'REFUNDED'
+
 export interface OrderItemResponse {
   orderItemId: number
   courseId: number
@@ -122,7 +138,7 @@ export interface OrderDetailResponse {
   totalPrice: number
   discountPrice: number
   finalPrice: number
-  status: string
+  status: OrderStatus
   orderedAt: string
   canceledAt?: string
   items: OrderItemResponse[]
@@ -132,7 +148,7 @@ export interface OrderSummaryResponse {
   orderId: number
   orderNumber: string
   orderedAt: string
-  status: string
+  status: OrderStatus
   totalPrice: number
   finalPrice: number
 }
@@ -142,8 +158,8 @@ export interface ConfirmPaymentResponse {
   orderId: number
   orderNumber: string
   amount: number
-  paymentStatus: string
-  orderStatus: string
+  paymentStatus: PaymentStatus
+  orderStatus: OrderStatus
   paidAt?: string | null
   enrolledCourseIds?: number[]
 }
@@ -153,6 +169,18 @@ export interface ConfirmTossPaymentRequest {
   method: string
   amount: number
   issuedCouponId?: number | null
+}
+
+export interface PaymentResponse {
+  paymentId: number
+  orderId: number
+  amount: number
+  paymentStatus: PaymentStatus
+  orderStatus: OrderStatus
+  paidAt?: string | null
+  failedReason?: string | null
+  canceledAt?: string | null
+  refundedAt?: string | null
 }
 
 export interface Coupon {
@@ -340,15 +368,15 @@ export interface OrderItem {
   title: string
   instructor: string
   price: number
-  status: '정상 구매' | '환불 가능' | '환불 완료' | '부분 환불'
+  status: OrderStatus
 }
 
 export interface Order {
   id: string
   orderNumber: string
   orderedAt: string
-  status: '결제 완료' | '부분 환불' | '환불 완료'
-  paymentStatus: string
+  status: OrderStatus
+  paymentStatus: PaymentStatus
   paymentMethod: string
   items: OrderItem[]
   productTotal: number
