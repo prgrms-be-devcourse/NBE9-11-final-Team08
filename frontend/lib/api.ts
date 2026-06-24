@@ -1089,24 +1089,20 @@ export const api = {
 
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
-  // 저장된 리포트 조회. 없으면 null.
-  getStudyReportRaw: (studyId: string | number) =>
-    request<StudyReportResponse | null>(`/api/studies/${studyId}/report`, null),
+  // 리포트 조회. 없으면 백엔드에서 즉시 생성한다.
+  getStudyReportRaw: (studyId: string | number, refresh = false) =>
+    request<StudyReportResponse | null>(
+      `/api/studies/${studyId}/report${refresh ? '?refresh=true' : ''}`,
+      null,
+    ),
 
-  // 학습 이벤트를 집계해 리포트를 생성/갱신한다.
+  // 학습 이벤트 재집계를 시도한다. 쿨다운 이내면 기존 리포트가 반환된다.
   generateStudyReport: (studyId: string | number) =>
-    mutate<StudyReportResponse>(`/api/studies/${studyId}/report`, 'POST'),
+    api.getStudyReportRaw(studyId, true),
 
-  // 조회 후 없으면 생성까지 시도한다.
+  // 조회 후 없으면 백엔드에서 생성까지 처리한다.
   getOrGenerateStudyReport: async (studyId: string | number): Promise<StudyReportResponse | null> => {
-    const existing = await api.getStudyReportRaw(studyId)
-    if (existing && existing.studyId) return existing
-    try {
-      return await api.generateStudyReport(studyId)
-    } catch (e) {
-      console.warn('Failed to generate study report:', e)
-      return null
-    }
+    return await api.getStudyReportRaw(studyId)
   },
 
   getStudyReport: async (_studyId: string): Promise<StudyReport> => {

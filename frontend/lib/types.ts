@@ -622,4 +622,6 @@ export interface StudyReportResponse {
   dailyProgress: StudyReportDailyProgressEntry[]
   dailyActivityMap: Record<string, number>
   updatedAt: string
+  status: 'LOADED' | 'REGENERATED' | 'COOLDOWN'
+  nextRegenerableAt: string | null
 }

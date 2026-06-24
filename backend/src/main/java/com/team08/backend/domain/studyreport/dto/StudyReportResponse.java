@@ -18,9 +18,14 @@ public record StudyReportResponse(
         List<TopLectureEntry> topLectures,
         List<DailyProgressEntry> dailyProgress,
         Map<String, Integer> dailyActivityMap,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        /** 이 응답이 조회(LOADED)/갱신(REGENERATED)/갱신 불가(COOLDOWN) 중 무엇인지. */
+        ReportStatus status,
+        /** 다음 재집계가 가능한 시각(쿨다운 해제 시점). 이 시각 이전 refresh 요청은 COOLDOWN 처리된다. */
+        LocalDateTime nextRegenerableAt
 ) {
-    public static StudyReportResponse from(StudyReport report, ObjectMapper objectMapper) {
+    public static StudyReportResponse from(
+            StudyReport report, ReportStatus status, LocalDateTime nextRegenerableAt, ObjectMapper objectMapper) {
         return new StudyReportResponse(
                 report.getStudyId(),
                 report.getTotalWatchTime(),
@@ -30,7 +35,9 @@ public record StudyReportResponse(
                 parseList(objectMapper, report.getTopLectures(), new TypeReference<>() {}),
                 parseList(objectMapper, report.getDailyProgress(), new TypeReference<>() {}),
                 parseMap(objectMapper, report.getDailyActivityMap()),
-                report.getUpdatedAt()
+                report.getUpdatedAt(),
+                status,
+                nextRegenerableAt
         );
     }
 
