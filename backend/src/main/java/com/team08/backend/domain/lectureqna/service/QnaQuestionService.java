@@ -1,13 +1,13 @@
 package com.team08.backend.domain.lectureqna.service;
 
-import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerSummary;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
+import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -26,13 +26,13 @@ public class QnaQuestionService {
 
     private final QnaQuestionRepository qnaQuestionRepository;
     private final QnaAnswerRepository qnaAnswerRepository;
-    private final StudyAccessAuthorizer studyAccessAuthorizer;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     @Transactional
     public QnaQuestionResponse createQuestion(Long lectureId, Long userId, String title, String content) {
         // 해당 강의가 속한 스터디의 활성 학습자만 질문을 작성할 수 있다.
         // authorizer 의 resolver 가 lecture 존재 검증도 함께 수행한다(없으면 LECTURE_NOT_FOUND).
-        studyAccessAuthorizer.authorizeByLectureId(lectureId, userId, StudyAction.WRITE_STUDY_CONTENT);
+        courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.WRITE_CONTENT);
 
         QnaQuestion question = QnaQuestion.create(userId, lectureId, title, content);
         QnaQuestion saved = qnaQuestionRepository.save(question);
@@ -75,7 +75,9 @@ public class QnaQuestionService {
     }
 
     @Transactional(readOnly = true)
-    public Page<QnaQuestionResponse> getQuestionsNAnswers(Long lectureId, Pageable pageable) {
+    public Page<QnaQuestionResponse> getQuestionsNAnswers(Long lectureId, Long userId, Pageable pageable) {
+        courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.WRITE_CONTENT);
+
         Page<QnaQuestion> questions = qnaQuestionRepository.findByLectureIdAndDeletedAtIsNull(lectureId, pageable);
 
         List<Long> questionIds = questions.stream().map(QnaQuestion::getId).toList();

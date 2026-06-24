@@ -1,5 +1,7 @@
 package com.team08.backend.domain.lecturereflection.service;
 
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lecturereflection.dto.LectureReflectionResponse;
 import com.team08.backend.domain.lecturereflection.entity.LectureReflection;
@@ -16,9 +18,13 @@ public class LectureReflectionService {
 
     private final LectureReflectionRepository reflectionRepository;
     private final LectureRepository lectureRepository;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     @Transactional
     public LectureReflectionResponse createReflection(Long userId, Long lectureId, String content) {
+        // TODO: 권한 추가. 은혜님 확인 필요
+        courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.WRITE_CONTENT);
+
         lectureRepository.findById(lectureId)
                 .filter(l -> l.getDeletedAt() == null)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));

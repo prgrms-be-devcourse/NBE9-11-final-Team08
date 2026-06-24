@@ -1,13 +1,13 @@
 package com.team08.backend.domain.lectureqna.service;
 
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +33,7 @@ class QnaAnswerServiceTest {
 
     @Mock private QnaAnswerRepository qnaAnswerRepository;
     @Mock private QnaQuestionRepository qnaQuestionRepository;
-    @Mock private StudyAccessAuthorizer studyAccessAuthorizer;
+    @Mock private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @InjectMocks
     private QnaAnswerService qnaAnswerService;
@@ -67,7 +67,7 @@ class QnaAnswerServiceTest {
 
         assertThat(response.content()).isEqualTo("답변 내용");
         assertThat(response.instructorId()).isEqualTo(instructor_id);
-        verify(studyAccessAuthorizer).authorizeByLectureId(lecture_id, instructor_id, StudyAction.MANAGE_ANSWER);
+        verify(courseAccessAuthorizer).authorizeByLectureId(lecture_id, instructor_id, CourseAction.MANAGE_ANSWER);
     }
 
     @Test
@@ -86,8 +86,8 @@ class QnaAnswerServiceTest {
     void createAnswer_notInstructor() {
         givenQuestion(question_id);
         willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
-                .given(studyAccessAuthorizer)
-                .authorizeByLectureId(lecture_id, 99L, StudyAction.MANAGE_ANSWER);
+                .given(courseAccessAuthorizer)
+                .authorizeByLectureId(lecture_id, 99L, CourseAction.MANAGE_ANSWER);
 
         assertThatThrownBy(() -> qnaAnswerService.createAnswer(question_id, 99L, "content"))
                 .isInstanceOf(CustomException.class)

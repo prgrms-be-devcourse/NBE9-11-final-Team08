@@ -1,10 +1,10 @@
 package com.team08.backend.domain.media.service;
 
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
-import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
-import com.team08.backend.domain.media.dto.VideoStreamResponse;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -23,8 +23,8 @@ import java.util.List;
 public class VideoAccessService {
 
     private final LectureRepository lectureRepository;
-    private final EnrollmentRepository enrollmentRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     @Transactional(readOnly = true)
     public VideoStreamResponse verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
@@ -37,14 +37,8 @@ public class VideoAccessService {
             return new VideoStreamResponse(m3u8Path, List.of());
         }
 
-        Long courseId = lecture.getChapter().getCourse().getId();
-        boolean hasValidEnrollment = enrollmentRepository.existsByUserIdAndCourseIdAndStatus(
-                userId, courseId, EnrollmentStatus.ACTIVE
-        );
-
-        if (!hasValidEnrollment) {
-            throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
-        }
+        // TODO: 권한 추가. 도훈님 확인 필요
+        courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.VIEW_CONTENT);
 
         String videoUuid = lecture.getVideoUuid();
         if (videoUuid == null || videoUuid.isBlank()) {

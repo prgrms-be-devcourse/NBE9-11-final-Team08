@@ -15,7 +15,6 @@ import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
-import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
@@ -24,15 +23,16 @@ import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
+import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentProcessingContext;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -46,17 +46,26 @@ public class PaymentService {
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final TossPaymentClient tossPaymentClient;
+    private final PaymentTransactionService paymentTransactionService;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final Clock clock;
 
     @Transactional
     public ConfirmPaymentResponse confirmPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
-        Order order = findMyPaymentOrder(userId, orderId);
+        Order order = findMyPaymentOrderForUpdate(userId, orderId);
 
         // 주문 상태와 Payment 존재 여부를 함께 확인해 중복 결제를 방어한다.
-        validateConfirmableOrder(order);
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
+        Optional<ConfirmPaymentResponse> idempotentResponse = findIdempotentConfirmResponse(
+                order,
+                existingPayment,
+                request.idempotencyKey()
+        );
+        if (idempotentResponse.isPresent()) {
+            return idempotentResponse.get();
+        }
+        validateConfirmableOrder(order);
         validateConfirmablePayment(existingPayment);
 
         int expectedDiscount = 0;
@@ -77,6 +86,7 @@ public class PaymentService {
 
         LocalDateTime paidAt = LocalDateTime.now(clock);
         Payment savedPayment = processSuccessfulPayment(order, existingPayment, request, paidAt);
+        saveSuccessfulMockAttempt(savedPayment, request, paidAt);
 
         markOrderPaid(order, paidAt);
 
@@ -86,43 +96,21 @@ public class PaymentService {
         return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
     }
 
-    @Transactional
     public ConfirmPaymentResponse confirmTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
-        Order order = findMyPaymentOrder(userId, orderId);
-
-        validateConfirmableOrder(order);
-        Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
-        validateConfirmablePayment(existingPayment);
-
-        int expectedDiscount = 0;
-        if (request.issuedCouponId() != null) {
-            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
+        TossPaymentProcessingContext context = paymentTransactionService.prepareTossPayment(userId, orderId, request);
+        if (context.isIdempotentReplay()) {
+            return context.idempotentResponse();
         }
 
-        validatePaymentAmount(order, request.amount(), expectedDiscount);
-
-        List<OrderItem> orderItems = findOrderItems(order);
-        validateDuplicateEnrollment(userId, orderItems);
-
-        LocalDateTime requestedAt = LocalDateTime.now(clock);
-        Payment payment = processTossPaymentRequested(order, existingPayment, requestedAt);
-        PaymentAttempt attempt = paymentAttemptRepository.save(PaymentAttempt.requested(
-                payment,
-                PaymentProviderType.TOSS,
-                request.amount(),
-                requestedAt
-        ));
-
         try {
-            // TODO: 후속 PR에서 PROCESSING 저장 트랜잭션, PG 외부 호출, 결과 반영 트랜잭션을 분리한다.
-            TossPaymentResponse tossResponse = tossPaymentClient.confirm(new TossConfirmPaymentRequest(
+            TossConfirmPaymentRequest tossRequest = new TossConfirmPaymentRequest(
                     request.paymentKey(),
-                    order.getOrderNumber(),
-                    request.amount()
-            ));
-            return completeTossPayment(userId, order, orderItems, payment, attempt, tossResponse, request.issuedCouponId());
+                    context.orderNumber(),
+                    context.amount()
+            );
+            return paymentTransactionService.completeTossPayment(context, tossPaymentClient.confirm(tossRequest));
         } catch (TossPaymentException e) {
-            return failTossPayment(order, payment, attempt, request, e);
+            return paymentTransactionService.failTossPayment(context, request, e);
         }
     }
 
@@ -157,7 +145,11 @@ public class PaymentService {
     }
 
     private Order findMyPaymentOrder(Long userId, Long orderId) {
-        return orderRepository.findByIdAndUserId(orderId, userId)
+        return findMyPaymentOrderForUpdate(userId, orderId);
+    }
+
+    private Order findMyPaymentOrderForUpdate(Long userId, Long orderId) {
+        return orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 
@@ -185,6 +177,26 @@ public class PaymentService {
                 throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
             }
         });
+    }
+
+    private Optional<ConfirmPaymentResponse> findIdempotentConfirmResponse(
+            Order order,
+            Optional<Payment> payment,
+            String idempotencyKey
+    ) {
+        if (!StringUtils.hasText(idempotencyKey) || payment.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(payment.get().getId(), idempotencyKey)
+                .map(attempt -> toIdempotentResponse(order, payment.get()));
+    }
+
+    private ConfirmPaymentResponse toIdempotentResponse(Order order, Payment payment) {
+        List<Enrollment> enrollments = payment.isCompleted()
+                ? enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE)
+                : List.of();
+        return ConfirmPaymentResponse.from(payment, order, enrollments);
     }
 
     private void validateFailableOrder(Order order) {
@@ -233,6 +245,22 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
+    private void saveSuccessfulMockAttempt(Payment payment, ConfirmPaymentRequest request, LocalDateTime paidAt) {
+        if (!StringUtils.hasText(request.idempotencyKey())) {
+            return;
+        }
+
+        PaymentAttempt attempt = PaymentAttempt.requested(
+                payment,
+                PaymentProviderType.MOCK,
+                request.amount(),
+                request.idempotencyKey(),
+                paidAt
+        );
+        attempt.succeed(request.paymentKey(), paidAt);
+        paymentAttemptRepository.save(attempt);
+    }
+
     private Payment processDeclinedPayment(Order order, FailPaymentRequest request, LocalDateTime declinedAt) {
         Payment payment = paymentRepository.findByOrder_Id(order.getId())
                 .orElseGet(() -> Payment.createReady(order, declinedAt));
@@ -241,113 +269,6 @@ public class PaymentService {
         return paymentRepository.save(payment);
     }
 
-    private Payment processTossPaymentRequested(
-            Order order,
-            Optional<Payment> existingPayment,
-            LocalDateTime requestedAt
-    ) {
-        Payment payment = existingPayment.orElseGet(() -> Payment.createReady(order, PaymentProviderType.TOSS, requestedAt));
-        payment.markProcessing(PaymentProviderType.TOSS, requestedAt);
-        return paymentRepository.save(payment);
-    }
-
-    private ConfirmPaymentResponse completeTossPayment(
-            Long userId,
-            Order order,
-            List<OrderItem> orderItems,
-            Payment payment,
-            PaymentAttempt attempt,
-            TossPaymentResponse tossResponse,
-            Long issuedCouponId
-    ) {
-        LocalDateTime completedAt = approvedAtOrNow(tossResponse.approvedAt());
-        
-        int expectedDiscount = 0;
-        if (issuedCouponId != null) {
-            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, order.getTotalPrice()).discountAmount();
-        }
-
-        if (!isValidTossPaymentResult(tossResponse, order, expectedDiscount)) {
-            attempt.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
-            payment.markUnknown("TOSS_PAYMENT_MISMATCH", "Toss Payments 승인 응답이 주문 정보와 일치하지 않습니다.", completedAt);
-            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
-        }
-
-        if (!isDoneTossPayment(tossResponse)) {
-            attempt.decline("TOSS_NOT_DONE", "Toss Payments 승인 결과가 완료 상태가 아닙니다.", completedAt);
-            payment.decline(
-                    tossResponse.paymentKey(),
-                    tossResponse.method(),
-                    "TOSS_NOT_DONE",
-                    "Toss Payments 승인 결과가 완료 상태가 아닙니다.",
-                    completedAt
-            );
-            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
-        }
-
-        attempt.succeed(tossResponse.paymentKey(), completedAt);
-        payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
-        Payment savedPayment = paymentRepository.save(payment);
-
-        if (issuedCouponId != null) {
-            int actualDiscount = issuedCouponService.useCouponForOrder(userId, issuedCouponId, order.getTotalPrice());
-            order.applyDiscount(actualDiscount);
-            orderCouponUsageRepository.save(new OrderCouponUsage(order.getId(), issuedCouponId, actualDiscount));
-        }
-
-        markOrderPaid(order, completedAt);
-        List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, completedAt);
-
-        return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
-    }
-
-    private ConfirmPaymentResponse failTossPayment(
-            Order order,
-            Payment payment,
-            PaymentAttempt attempt,
-            ConfirmPaymentRequest request,
-            TossPaymentException exception
-    ) {
-        LocalDateTime completedAt = LocalDateTime.now(clock);
-        switch (exception.getFailureType()) {
-            case DECLINED -> {
-                attempt.decline(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-                payment.decline(
-                        request.paymentKey(),
-                        null,
-                        exception.getFailureCode(),
-                        exception.getFailureMessage(),
-                        completedAt
-                );
-            }
-            case TIMEOUT -> {
-                attempt.markTimeout(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-            }
-            case UNKNOWN -> {
-                attempt.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-            }
-        }
-
-        return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
-    }
-
-    private boolean isDoneTossPayment(TossPaymentResponse response) {
-        return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
-    }
-
-    private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order, int expectedDiscount) {
-        return order.getOrderNumber().equals(response.orderId())
-                && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
-    }
-
-    private LocalDateTime approvedAtOrNow(OffsetDateTime approvedAt) {
-        if (approvedAt == null) {
-            return LocalDateTime.now(clock);
-        }
-        return approvedAt.atZoneSameInstant(clock.getZone()).toLocalDateTime();
-    }
 
     private void markOrderPaid(Order order, LocalDateTime paidAt) {
         order.markPaid(paidAt);

@@ -30,40 +30,36 @@ export function CourseDetail({ course }: { course: Course }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isPurchased, setIsPurchased] = useState(false)
   const [hasStudyAccess, setHasStudyAccess] = useState(false)
-  
+  const [studyId, setStudyId] = useState<string | null>(null)
+
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
+  const hasFreePreview = course.chapters.some((chapter) =>
+    chapter.lectures.some((lecture) => lecture.isFreePreview),
+  )
   const inCart = has(course.id)
+  const canPurchase = !(isLoggedIn && isPurchased)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
     setIsLoggedIn(!!token)
-    
+
     const fetchAccess = async () => {
-      if (!token) return
       try {
-        let purchased = false
-        if ('getPurchasedCourses' in api) {
-          const list = await api.getPurchasedCourses()
-          purchased = list.some(c => c.id.toString() === course.id.toString())
-          if (purchased) {
-            setIsPurchased(true)
-            setHasStudyAccess(true)
-          }
-        }
-        
-        if (!purchased && 'getStudy' in api) {
-          const study = await api.getStudy(course.id)
-          if (study) {
-            setHasStudyAccess(true)
-          }
-        }
+        const nextStudyId = await api.getStudyIdByCourseId(course.id)
+        const active = token ? await api.isCourseEnrollmentActive(course.id) : false
+        setIsPurchased(active)
+        setHasStudyAccess((active || hasFreePreview) && !!nextStudyId)
+        setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
+        setIsPurchased(false)
+        setHasStudyAccess(false)
+        setStudyId(null)
       }
     }
     fetchAccess()
-  }, [])
+  }, [course.id, hasFreePreview])
 
   const handleAdd = async () => {
     if (!isLoggedIn) {
@@ -227,41 +223,44 @@ export function CourseDetail({ course }: { course: Course }) {
                 />
               </div>
               <div className="space-y-4 p-5">
-                <div className="flex items-baseline gap-2">
-                  {course.discountRate ? (
-                    <>
-                      <span className="text-lg font-bold text-destructive">
-                        {course.discountRate}%
-                      </span>
-                      <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                    </>
-                  ) : (
-                    <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                  )}
-                </div>
-                {course.discountRate ? (
-                  <p className="-mt-2 text-sm text-muted-foreground line-through">
-                    {formatKRW(course.price)}
-                  </p>
+                {canPurchase ? (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      {course.discountRate ? (
+                        <>
+                          <span className="text-lg font-bold text-destructive">
+                            {course.discountRate}%
+                          </span>
+                          <span className="text-2xl font-bold">{formatKRW(final)}</span>
+                        </>
+                      ) : (
+                        <span className="text-2xl font-bold">{formatKRW(final)}</span>
+                      )}
+                    </div>
+                    {course.discountRate ? (
+                      <p className="-mt-2 text-sm text-muted-foreground line-through">
+                        {formatKRW(course.price)}
+                      </p>
+                    ) : null}
+                    <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
+                      {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      코스 구매하기
+                    </Button>
+                    <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && inCart)}>
+                      {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
+                    </Button>
+                  </>
                 ) : null}
-
-                <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying || (isLoggedIn && isPurchased)}>
-                  {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isLoggedIn && isPurchased ? '이미 구매한 강좌' : '코스 구매하기'}
-                </Button>
-                <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && (inCart || isPurchased))}>
-                  {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && isPurchased) ? '구매 완료' : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
-                </Button>
-                {!isLoggedIn ? (
+                {hasStudyAccess && studyId ? (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={`/study/${studyId}`}>스터디 입장</Link>
+                  </Button>
+                ) : !isLoggedIn ? (
                   <Button onClick={() => {
                     toast.error('로그인이 필요한 서비스입니다.')
                     router.push('/login')
                   }} variant="outline" className="w-full">
                     스터디 입장
-                  </Button>
-                ) : hasStudyAccess ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/study/${course.id}`}>스터디 입장</Link>
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>

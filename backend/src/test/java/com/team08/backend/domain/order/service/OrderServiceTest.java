@@ -252,7 +252,7 @@ class OrderServiceTest {
         Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
 
-        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
 
@@ -269,7 +269,7 @@ class OrderServiceTest {
         Payment payment = payment(order, PaymentStatus.DECLINED);
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
 
-        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
 
@@ -286,7 +286,7 @@ class OrderServiceTest {
         Payment payment = payment(order, PaymentStatus.READY);
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
 
-        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
 
@@ -298,15 +298,33 @@ class OrderServiceTest {
     }
 
     @Test
+    void pendingPaymentOrderWithProcessingPaymentCannotBeCanceled() {
+        Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
+        Payment payment = payment(order, PaymentStatus.PROCESSING);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> orderService.cancelMyOrder(USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        verifyNoInteractions(orderItemRepository);
+    }
+
+    @Test
     void nonPendingPaymentOrderCannotBeCanceled() {
         Order order = order(ORDER_ID, USER_ID, OrderStatus.PAID);
-        given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.cancelMyOrder(USER_ID, ORDER_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_ORDER_STATUS_TRANSITION));
 
-        verifyNoInteractions(orderItemRepository, paymentRepository);
+        verifyNoInteractions(orderItemRepository);
     }
 
     private void stubOrderSave() {
@@ -338,6 +356,8 @@ class OrderServiceTest {
             payment.decline("payment-key", "CARD", "결제 거절", FIXED_NOW.minusDays(1));
         } else if (status == PaymentStatus.READY) {
             return payment;
+        } else if (status == PaymentStatus.PROCESSING) {
+            payment.markProcessing(FIXED_NOW.minusDays(1));
         } else if (status == PaymentStatus.SUCCESS) {
             payment.markProcessing(FIXED_NOW.minusDays(1));
             payment.succeed("payment-key", "CARD", FIXED_NOW.minusDays(1));

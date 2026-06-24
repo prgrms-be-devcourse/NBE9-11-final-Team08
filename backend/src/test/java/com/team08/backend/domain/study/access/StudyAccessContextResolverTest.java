@@ -1,14 +1,6 @@
 package com.team08.backend.domain.study.access;
 
-import com.team08.backend.domain.chapter.entity.Chapter;
-import com.team08.backend.domain.chapter.fixture.ChapterFixture;
-import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
-import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
-import com.team08.backend.domain.lecture.entity.Lecture;
-import com.team08.backend.domain.lecture.fixture.LectureFixture;
-import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
 import com.team08.backend.domain.study.repository.StudyRepository;
@@ -38,24 +30,13 @@ class StudyAccessContextResolverTest {
 
     private static final Long STUDY_ID = 1L;
     private static final Long COURSE_ID = 10L;
-    private static final Long CHAPTER_ID = 20L;
-    private static final Long LECTURE_ID = 30L;
     private static final Long USER_ID = 100L;
 
     @Mock
     private StudyRepository studyRepository;
 
     @Mock
-    private ChapterRepository chapterRepository;
-
-    @Mock
-    private LectureRepository lectureRepository;
-
-    @Mock
     private StudyMemberRepository studyMemberRepository;
-
-    @Mock
-    private EnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private StudyAccessContextResolver resolver;
@@ -66,11 +47,10 @@ class StudyAccessContextResolverTest {
         StudyMember member = studyMember(study, StudyMemberRole.MEMBER);
         given(studyRepository.findByIdWithCourse(STUDY_ID)).willReturn(Optional.of(study));
         givenActiveMember(member);
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(true);
 
         StudyAccessContext context = resolver.fromStudyId(STUDY_ID, USER_ID);
 
-        assertContext(context, StudyStatus.ACTIVE, true, true, StudyMemberRole.MEMBER);
+        assertContext(context, StudyStatus.ACTIVE, true, StudyMemberRole.MEMBER);
     }
 
     @Test
@@ -80,47 +60,10 @@ class StudyAccessContextResolverTest {
         given(studyRepository.findByCourseIdWithCourse(COURSE_ID))
                 .willReturn(Optional.of(study));
         givenActiveMember(member);
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(true);
 
         StudyAccessContext context = resolver.fromCourseId(COURSE_ID, USER_ID);
 
-        assertContext(context, StudyStatus.ACTIVE, true, true, StudyMemberRole.OWNER);
-    }
-
-    @Test
-    void chapterId로_course를_찾아_권한_context를_생성한다() {
-        Study study = study(StudyStatus.READONLY);
-        Chapter chapter = chapter();
-        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
-        given(studyRepository.findByCourseIdWithCourse(COURSE_ID))
-                .willReturn(Optional.of(study));
-        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(
-                STUDY_ID,
-                USER_ID,
-                StudyMemberStatus.ACTIVE
-        )).willReturn(Optional.empty());
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
-
-        StudyAccessContext context = resolver.fromChapterId(CHAPTER_ID, USER_ID);
-
-        assertContext(context, StudyStatus.READONLY, false, false, null);
-    }
-
-    @Test
-    void lectureId로_course를_찾아_권한_context를_생성한다() {
-        Study study = study(StudyStatus.DRAFT);
-        StudyMember owner = studyMember(study, StudyMemberRole.OWNER);
-        Lecture lecture = lecture();
-        given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID))
-                .willReturn(Optional.of(lecture));
-        given(studyRepository.findByCourseIdWithCourse(COURSE_ID))
-                .willReturn(Optional.of(study));
-        givenActiveMember(owner);
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
-
-        StudyAccessContext context = resolver.fromLectureId(LECTURE_ID, USER_ID);
-
-        assertContext(context, StudyStatus.DRAFT, false, true, StudyMemberRole.OWNER);
+        assertContext(context, StudyStatus.ACTIVE, true, StudyMemberRole.OWNER);
     }
 
     @Test
@@ -133,27 +76,6 @@ class StudyAccessContextResolverTest {
         );
     }
 
-    @Test
-    void 챕터가_없으면_CHAPTER_NOT_FOUND를_던진다() {
-        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.empty());
-
-        assertErrorCode(
-                () -> resolver.fromChapterId(CHAPTER_ID, USER_ID),
-                ErrorCode.CHAPTER_NOT_FOUND
-        );
-    }
-
-    @Test
-    void 강의가_없으면_LECTURE_NOT_FOUND를_던진다() {
-        given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID))
-                .willReturn(Optional.empty());
-
-        assertErrorCode(
-                () -> resolver.fromLectureId(LECTURE_ID, USER_ID),
-                ErrorCode.LECTURE_NOT_FOUND
-        );
-    }
-
     private Study study(StudyStatus status) {
         User owner = TestEntityFactory.user(USER_ID);
         Course course = TestEntityFactory.course(COURSE_ID);
@@ -161,22 +83,6 @@ class StudyAccessContextResolverTest {
         ReflectionTestUtils.setField(study, "id", STUDY_ID);
         ReflectionTestUtils.setField(study, "status", status);
         return study;
-    }
-
-    private Chapter chapter() {
-        Course course = TestEntityFactory.course(COURSE_ID);
-        return ChapterFixture.chapter(CHAPTER_ID, "챕터 제목", 1, course);
-    }
-
-    private Lecture lecture() {
-        return LectureFixture.lecture(
-                LECTURE_ID,
-                "강의 제목",
-                "lecture.m3u8",
-                600,
-                1,
-                chapter()
-        );
     }
 
     private StudyMember studyMember(Study study, StudyMemberRole role) {
@@ -196,15 +102,12 @@ class StudyAccessContextResolverTest {
     private void assertContext(
             StudyAccessContext context,
             StudyStatus studyStatus,
-            boolean hasActiveEnrollment,
             boolean activeMember,
             StudyMemberRole memberRole
     ) {
         assertThat(context.studyId()).isEqualTo(STUDY_ID);
-        assertThat(context.courseId()).isEqualTo(COURSE_ID);
         assertThat(context.userId()).isEqualTo(USER_ID);
         assertThat(context.studyStatus()).isEqualTo(studyStatus);
-        assertThat(context.hasActiveEnrollment()).isEqualTo(hasActiveEnrollment);
         assertThat(context.activeMember()).isEqualTo(activeMember);
         assertThat(context.memberRole()).isEqualTo(memberRole);
     }

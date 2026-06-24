@@ -3,13 +3,15 @@ package com.team08.backend.domain.lecture.service;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
-import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
@@ -23,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,8 +36,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-
-import java.time.LocalDateTime;
 
 @ExtendWith(MockitoExtension.class)
 class LectureServiceTest {
@@ -54,6 +55,9 @@ class LectureServiceTest {
     @Mock
     private LectureAccessValidator lectureAccessValidator;
 
+    @Mock
+    private CourseAccessAuthorizer courseAccessAuthorizer;
+
     @InjectMocks
     private LectureService lectureService;
 
@@ -61,6 +65,7 @@ class LectureServiceTest {
     void 강의를_성공적으로_생성하고_ID를_반환한다() {
         Long courseId = 10L;
         Long chapterId = 1L;
+        Long userId = 1L;
         LectureCreateRequest request = new LectureCreateRequest(
                 "스프링 시큐리티 구조와 흐름",
                 "videos/security.m3u8",
@@ -80,11 +85,12 @@ class LectureServiceTest {
         given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
         given(lectureRepository.save(any(Lecture.class))).willReturn(savedLecture);
 
-        Long lectureId = lectureService.createLecture(courseId, chapterId, request);
+        Long lectureId = lectureService.createLecture(courseId, chapterId, userId, request);
 
         assertThat(lectureId).isEqualTo(50L);
         verify(chapterRepository).findByIdWithCourse(chapterId);
         verify(lectureRepository).save(any(Lecture.class));
+        verify(courseAccessAuthorizer).authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
     }
 
     @Test
@@ -103,7 +109,7 @@ class LectureServiceTest {
 
         given(chapterRepository.findByIdWithCourse(invalidChapterId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> lectureService.createLecture(courseId, invalidChapterId, request))
+        assertThatThrownBy(() -> lectureService.createLecture(courseId, invalidChapterId, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.CHAPTER_NOT_FOUND.getMessage());
 
@@ -130,7 +136,7 @@ class LectureServiceTest {
 
         given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
 
-        assertThatThrownBy(() -> lectureService.createLecture(invalidCourseId, chapterId, request))
+        assertThatThrownBy(() -> lectureService.createLecture(invalidCourseId, chapterId, 1L, request))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 

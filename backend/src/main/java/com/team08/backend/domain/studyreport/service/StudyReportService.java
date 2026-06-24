@@ -1,5 +1,6 @@
 package com.team08.backend.domain.studyreport.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
@@ -15,7 +16,6 @@ import com.team08.backend.domain.studyreport.dto.TopLectureEntry;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.studyreport.util.StudyReportJson;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

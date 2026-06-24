@@ -2,12 +2,12 @@ package com.team08.backend.domain.lecture.access;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
@@ -35,7 +35,7 @@ class LectureAccessValidatorTest {
     private LectureRepository lectureRepository;
 
     @Mock
-    private StudyAccessAuthorizer studyAccessAuthorizer;
+    private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @InjectMocks
     private LectureAccessValidator validator;
@@ -53,7 +53,7 @@ class LectureAccessValidatorTest {
         Lecture result = validator.validateForEnter(COURSE_ID, CHAPTER_ID, LECTURE_ID, USER_ID);
 
         assertThat(result).isSameAs(lecture);
-        verify(studyAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+        verify(courseAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
     }
 
     @Test
@@ -64,7 +64,7 @@ class LectureAccessValidatorTest {
         Lecture result = validator.validateForEnter(COURSE_ID, CHAPTER_ID, LECTURE_ID, USER_ID);
 
         assertThat(result).isSameAs(lecture);
-        verify(studyAccessAuthorizer, never()).authorizeByCourseId(any(), any(), any());
+        verify(courseAccessAuthorizer, never()).authorizeByCourseId(any(), any(), any());
     }
 
     @Test
@@ -87,7 +87,7 @@ class LectureAccessValidatorTest {
                 .extracting(e -> ((CustomException) e).getErrorCode())
                 .isEqualTo(ErrorCode.CHAPTER_NOT_FOUND);
 
-        verify(studyAccessAuthorizer, never()).authorizeByCourseId(any(), any(), any());
+        verify(courseAccessAuthorizer, never()).authorizeByCourseId(any(), any(), any());
     }
 
     @Test
@@ -106,8 +106,8 @@ class LectureAccessValidatorTest {
         Lecture lecture = lecture(false);
         given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID)).willReturn(Optional.of(lecture));
         willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
-                .given(studyAccessAuthorizer)
-                .authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+                .given(courseAccessAuthorizer)
+                .authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
 
         assertThatThrownBy(() -> validator.validateForEnter(COURSE_ID, CHAPTER_ID, LECTURE_ID, USER_ID))
                 .isInstanceOf(CustomException.class)
@@ -119,14 +119,14 @@ class LectureAccessValidatorTest {
     void validateCourseAccess는_강좌_권한검사를_위임한다() {
         validator.validateCourseAccess(COURSE_ID, USER_ID);
 
-        verify(studyAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+        verify(courseAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
     }
 
     @Test
     void validateCourseAccess_권한이_없으면_예외가_전파된다() {
         willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
-                .given(studyAccessAuthorizer)
-                .authorizeByCourseId(COURSE_ID, USER_ID, StudyAction.VIEW_STUDY_CONTENT);
+                .given(courseAccessAuthorizer)
+                .authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
 
         assertThatThrownBy(() -> validator.validateCourseAccess(COURSE_ID, USER_ID))
                 .isInstanceOf(CustomException.class)

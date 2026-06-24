@@ -1,10 +1,10 @@
 package com.team08.backend.domain.lecture.access;
 
 import com.team08.backend.domain.chapter.entity.Chapter;
+import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
+import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 public class LectureAccessValidator {
 
     private final LectureRepository lectureRepository;
-    private final StudyAccessAuthorizer studyAccessAuthorizer;
+    private final CourseAccessAuthorizer courseAccessAuthorizer;
 
     public Lecture validateForEnter(Long courseId, Long chapterId, Long lectureId, Long userId) {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
@@ -42,7 +42,7 @@ public class LectureAccessValidator {
         // 무료 맛보기는 권한 검사 없이 통과. 그 외에는 스터디 접근 권한에 위임한다.
         // (courseId 가 lecture 소속임을 위에서 검증했으므로 lecture 재조회 없는 authorizeByCourseId 사용)
         if (!lecture.isFreePreview()) {
-            studyAccessAuthorizer.authorizeByCourseId(courseId, userId, StudyAction.VIEW_STUDY_CONTENT);
+            courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.VIEW_CONTENT);
         }
 
         return lecture;
@@ -53,7 +53,7 @@ public class LectureAccessValidator {
      * 계층 정합성·무료 맛보기는 강좌 단위에선 의미가 없으므로 적용하지 않고, 권한 판단만 위임한다.
      */
     public void validateCourseAccess(Long courseId, Long userId) {
-        studyAccessAuthorizer.authorizeByCourseId(courseId, userId, StudyAction.VIEW_STUDY_CONTENT);
+        courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.VIEW_CONTENT);
     }
 
     // URL 정합성: findByIdWithChapterAndCourse 가 chapter/course 를 이미 join fetch 하므로 추가 쿼리 없이 ID 비교만 한다.

@@ -6,7 +6,6 @@ import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -16,13 +15,22 @@ import java.nio.file.StandardCopyOption;
 
 @Slf4j
 @Component
-@Profile("prod")
 @RequiredArgsConstructor
 public class S3FileStorageService {
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
     private final S3Template s3Template;
+
+    public String uploadFile(InputStream inputStream, String s3Key) {
+        try {
+            s3Template.upload(bucket, s3Key, inputStream);
+            return s3Key;
+        } catch (Exception e) {
+            log.error("Failed to upload file to S3 via InputStream. key: {}", s3Key, e);
+            throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
+        }
+    }
 
     public String uploadFile(File file, String s3Key) {
         try (InputStream is = Files.newInputStream(file.toPath())) {
@@ -33,7 +41,7 @@ public class S3FileStorageService {
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }
-    
+
     public File downloadFile(String s3Key, File destinationFile) {
         try (InputStream inputStream = s3Template.download(bucket, s3Key).getInputStream()) {
             Files.copy(inputStream, destinationFile.toPath(), StandardCopyOption.REPLACE_EXISTING);

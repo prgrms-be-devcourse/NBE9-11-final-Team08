@@ -47,6 +47,19 @@ spring:
         key-pair-id: test-key-pair-id
         private-key: test-dummy-private-key-value
 
+cloud:
+  aws:
+    s3:
+      bucket: test-bucket-name
+
+AWS_ACCESS_KEY_ID: mock-access-key
+AWS_SECRET_ACCESS_KEY: mock-secret-key
+AWS_S3_BUCKET_NAME: test-bucket-name
+CLOUDFRONT_DOMAIN: test-domain.cloudfront.net
+CLOUDFRONT_KEY_PAIR_ID: test-key-pair-id
+CLOUDFRONT_PRIVATE_KEY: test-dummy-private-key-value
+JWT_SECRET: test-secret-key-test-secret-key-test-secret-key
+
 app:
   issued-coupon-job:
     stream-worker:
