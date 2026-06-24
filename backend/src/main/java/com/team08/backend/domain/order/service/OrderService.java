@@ -14,6 +14,7 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -27,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -93,11 +95,13 @@ public class OrderService {
 
     @Transactional
     public OrderDetailResponse cancelMyOrder(Long userId, Long orderId) {
-        Order order = findMyOrder(userId, orderId);
+        Order order = findMyOrderForUpdate(userId, orderId);
+        Optional<Payment> payment = paymentRepository.findByOrder_Id(order.getId());
+        validateCancelablePayment(payment);
 
         LocalDateTime canceledAt = LocalDateTime.now(clock);
         order.cancel(canceledAt);
-        cancelCancelablePayment(order, canceledAt);
+        payment.ifPresent(cancelablePayment -> cancelablePayment.cancel(canceledAt));
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
         return OrderDetailResponse.from(order, orderItems);
@@ -172,9 +176,16 @@ public class OrderService {
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
     }
 
-    private void cancelCancelablePayment(Order order, LocalDateTime canceledAt) {
-        paymentRepository.findByOrder_Id(order.getId())
-                .filter(payment -> payment.canCancelBeforePaid())
-                .ifPresent(payment -> payment.cancel(canceledAt));
+    private Order findMyOrderForUpdate(Long userId, Long orderId) {
+        return orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private void validateCancelablePayment(Optional<Payment> payment) {
+        payment.ifPresent(existingPayment -> {
+            if (!existingPayment.canCancelBeforePaid()) {
+                throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
+            }
+        });
     }
 }
