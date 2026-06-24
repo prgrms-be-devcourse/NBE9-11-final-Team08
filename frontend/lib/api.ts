@@ -5,6 +5,7 @@ import type {
   Coupon,
   Course,
   CourseCardResponse,
+  CategoryResponse,
   CourseDetailResponse,
   ChapterInfoResponse,
   PageResponse,
@@ -631,6 +632,9 @@ export const api = {
       content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
     }
   },
+
+  // Categories
+  getCategories: () => request<CategoryResponse[]>('/api/categories', [], false, false),
 
   getCourse: async (id: string | number): Promise<Course | undefined> => {
     const detail = await request<CourseDetailResponse | undefined>(
