@@ -137,7 +137,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
           if (lectures.some((l) => l.id === id)) setActiveId(id)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
     // 최초 1회만 이어보기 위치를 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -190,7 +190,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
       if (!entered) return // 입장하지 못한 강의는 퇴장/진행 기록을 남기지 않는다.
       const pos = positionRef.current
       // 마지막 시청 위치를 진행 정보에 반영하고 퇴장 이벤트를 남긴다.
-      api.updateLectureProgress(lectureId, pos, 0).catch(() => {})
+      api.updateLectureProgress(lectureId, pos, 0).catch(() => { })
       recordEvent(lectureId, 'LECTURE_EXIT', pos)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,7 +217,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
                 }))
               }
             })
-            .catch(() => {})
+            .catch(() => { })
           recordEvent(lectureId, 'POSITION_SAVE', next)
         }
         if (durationSeconds && next >= durationSeconds) {
@@ -325,7 +325,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card px-4">
         <Button asChild variant="ghost" size="icon" aria-label="스터디로 돌아가기">
-          <Link href={`/study/${course.id}`}>
+          <Link href={`/study/${studyId}`}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>

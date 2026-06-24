@@ -43,12 +43,10 @@ public class StudyService {
     }
 
     @Transactional(readOnly = true)
-    public StudyDetailResponse getStudyDetailByCourseId(Long courseId, Long userId) {
-        studyAccessAuthorizer.authorizeByCourseId(courseId, userId, StudyAction.VIEW_STUDY_CONTENT);
-
+    public Long getStudyIdByCourseId(Long courseId) {
         Study study = findStudyByCourseId(courseId);
 
-        return createDetailResponse(study, userId);
+        return study.getId();
     }
 
     private Study findStudyById(Long studyId) {
