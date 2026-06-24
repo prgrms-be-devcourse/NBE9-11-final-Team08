@@ -42,9 +42,9 @@ class CourseRepositoryTest {
         Chapter ch1 = Chapter.create("1장", 1, course);
         course.addChapter(ch2);
         course.addChapter(ch1);
-        ch1.addLecture(Lecture.createWithStream("/hls/1b.m3u8", "1-2강", "s", 120, 2, false, ch1));
-        ch1.addLecture(Lecture.createWithStream("/hls/1a.m3u8", "1-1강", "s", 60, 1, true, ch1));
-        ch2.addLecture(Lecture.createWithStream("/hls/2a.m3u8", "2-1강", "s", 90, 1, false, ch2));
+        ch1.addLecture(Lecture.createDraft("1-2강", "s", 120, 2, false, ch1));
+        ch1.addLecture(Lecture.createDraft("1-1강", "s", 60, 1, true, ch1));
+        ch2.addLecture(Lecture.createDraft("2-1강", "s", 90, 1, false, ch2));
 
         Long courseId = courseRepository.save(course).getId();
         em.flush();

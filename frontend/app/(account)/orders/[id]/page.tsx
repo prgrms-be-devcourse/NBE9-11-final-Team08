@@ -13,5 +13,5 @@ export default async function OrderDetailPage({
   
   if (!order) notFound()
     
-  return <OrderDetailView order={order as any} />
+  return <OrderDetailView order={order} />
 }

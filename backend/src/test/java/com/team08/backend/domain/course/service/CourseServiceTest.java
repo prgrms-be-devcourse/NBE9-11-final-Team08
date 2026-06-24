@@ -186,6 +186,38 @@ class CourseServiceTest {
     }
 
     @Test
+    void 강사_ID로_강좌_목록을_조회하면_해당_강사의_모든_상태의_강좌를_반환한다() {
+        Long instructorId = 1L;
+        Course course1 = TestEntityFactory.course(1L);
+        Course course2 = TestEntityFactory.course(2L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(course1, course2));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, null, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, null, pageable);
+
+        assertThat(response.getContent()).hasSize(2);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, null, pageable);
+    }
+
+    @Test
+    void 강사_ID와_특정_상태_조건으로_강좌_목록을_조회하면_필터링된_강좌_목록만_반환한다() {
+        Long instructorId = 1L;
+        CourseStatus statusCondition = CourseStatus.DRAFT;
+        Course draftCourse = TestEntityFactory.course(1L);
+        Page<Course> pagedCourses = new PageImpl<>(List.of(draftCourse));
+
+        Pageable pageable = PageRequest.of(0, 10);
+        given(courseRepository.findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable)).willReturn(pagedCourses);
+
+        Page<CourseCardResponse> response = courseService.getCoursesByInstructor(instructorId, statusCondition, pageable);
+
+        assertThat(response.getContent()).hasSize(1);
+        verify(courseRepository).findAllByInstructorIdAndStatus(instructorId, statusCondition, pageable);
+    }
+
+    @Test
     void 강좌_목록_조회_시_지정된_정렬_조건의_값이_동일하면_2순위인_최신순으로_정렬_조건이_체이닝된다() {
         Course course1 = TestEntityFactory.course(1L);
         Course course2 = TestEntityFactory.course(2L);
