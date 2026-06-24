@@ -6,7 +6,6 @@ import io.awspring.cloud.s3.S3Template;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -16,7 +15,6 @@ import java.nio.file.StandardCopyOption;
 
 @Slf4j
 @Component
-@Profile("prod")
 @RequiredArgsConstructor
 public class S3FileStorageService {
 
