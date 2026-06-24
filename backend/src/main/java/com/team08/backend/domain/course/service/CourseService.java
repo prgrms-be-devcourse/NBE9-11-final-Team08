@@ -16,6 +16,7 @@ import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHist
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.service.CourseThumbnailService;
 import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
@@ -49,18 +50,25 @@ public class CourseService {
     private final ApplicationEventPublisher eventPublisher;
     private final MediaEncodingService mediaEncodingService;
     private final LectureRepository lectureRepository;
+    private final CourseThumbnailService courseThumbnailService;
 
     @Transactional
-    public Long createCourse(Long instructorId, CourseCreateRequest request) {
+    public Long createCourse(Long instructorId, CourseCreateRequest request, MultipartFile thumbnailFile) {
         Course course = request.toEntity(instructorId);
-        return courseRepository.save(course).getId();
+        Course savedCourse = courseRepository.save(course);
+
+        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+            String s3Key = courseThumbnailService.uploadThumbnail(savedCourse.getId(), thumbnailFile);
+            savedCourse.updateThumbnail(s3Key);
+        }
+
+        return savedCourse.getId();
     }
 
     @Transactional
     public CourseDetailResponse getCourseDetail(Long courseId) {
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
 
         // TODO: 대규모 트래픽 발생 시 RDB Write 부하가 우려되므로 차후 Redis를 활용한 쓰기 지연(Write-Behind) 방식으로 고도화 필요
@@ -85,20 +93,27 @@ public class CourseService {
     }
 
     @Transactional
-    public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request) {
+    public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request, MultipartFile thumbnailFile) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
 
         course.validateOwner(instructorId);
 
+        String oldThumbnail = course.getThumbnail();
+
         course.updateGeneralInfo(request);
+
+        if (thumbnailFile != null && !thumbnailFile.isEmpty()) {
+            courseThumbnailService.deleteThumbnail(oldThumbnail);
+            String newS3Key = courseThumbnailService.uploadThumbnail(course.getId(), thumbnailFile);
+            course.updateThumbnail(newS3Key);
+        }
     }
 
     @Transactional
     public void requestCourseReview(Long courseId, Long instructorId) {
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
 
         course.validateOwner(instructorId);
@@ -182,6 +197,8 @@ public class CourseService {
 
         validateActiveEnrollments(courseId);
 
+        courseThumbnailService.deleteThumbnail(course.getThumbnail());
+
         CourseStatusHistory history = course.delete(adminId);
         courseStatusHistoryRepository.save(history);
 
@@ -195,6 +212,8 @@ public class CourseService {
 
         course.validateOwner(instructorId);
         validateActiveEnrollments(courseId);
+
+        courseThumbnailService.deleteThumbnail(course.getThumbnail());
 
         CourseStatusHistory history = course.delete(instructorId);
         courseStatusHistoryRepository.save(history);

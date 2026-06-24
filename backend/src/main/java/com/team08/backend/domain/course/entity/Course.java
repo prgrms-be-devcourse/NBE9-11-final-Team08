@@ -95,6 +95,13 @@ public class Course extends BaseTimeEntity {
         }
     }
 
+    public void updateThumbnail(String thumbnail) {
+        if (thumbnail == null || thumbnail.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        this.thumbnail = thumbnail;
+    }
+
     public void updateGeneralInfo(CourseUpdateRequest request) {
         validateInitialState(this.instructorId, request.categoryId(), request.title(), request.price());
         this.categoryId = request.categoryId();

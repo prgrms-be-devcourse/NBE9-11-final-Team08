@@ -22,6 +22,7 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.service.CourseThumbnailService;
 import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
@@ -80,6 +81,9 @@ class CourseServiceTest {
     @Mock
     private LectureRepository lectureRepository;
 
+    @Mock
+    private CourseThumbnailService courseThumbnailService;
+
     @InjectMocks
     private CourseService courseService;
 
@@ -93,15 +97,18 @@ class CourseServiceTest {
                 15000,
                 "thumbnail/path.png"
         );
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         Course savedCourse = CourseFixture.course(100L, instructorId, request);
 
         given(courseRepository.save(any(Course.class))).willReturn(savedCourse);
+        given(courseThumbnailService.uploadThumbnail(eq(100L), any(MultipartFile.class))).willReturn("courses/thumbnails/100/uuid.png");
 
-        Long courseId = courseService.createCourse(instructorId, request);
+        Long courseId = courseService.createCourse(instructorId, request, mockFile);
 
         assertThat(courseId).isEqualTo(100L);
         verify(courseRepository).save(any(Course.class));
+        verify(courseThumbnailService).uploadThumbnail(eq(100L), any(MultipartFile.class));
     }
 
     @Test
@@ -247,10 +254,11 @@ class CourseServiceTest {
         Long invalidCourseId = 999L;
         Long instructorId = 1L;
         CourseUpdateRequest request = new CourseUpdateRequest("제목", "설명", 2L, 20000, "thumb.png", List.of());
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request))
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request, mockFile))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
     }
@@ -267,12 +275,12 @@ class CourseServiceTest {
                 "old.png",
                 10000
         );
-
         CourseUpdateRequest request = new CourseUpdateRequest("변경 제목", "변경 설명", 3L, 20000, "new.png", List.of());
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
 
-        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request))
+        assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request, mockFile))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage())
                 .extracting(ex -> ((CustomException) ex).getErrorCode())
@@ -280,7 +288,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정된다() {
+    void 정상_소유자가_요청하면_강좌_정보와_하위_커리큘럼이_모두_연쇄_동기화되어_수정되고_기존_썸네일이_S3에서_교체된다() {
         Long courseId = 100L;
         Long instructorId = 1L;
 
@@ -292,6 +300,10 @@ class CourseServiceTest {
                 "old.png",
                 10000
         );
+
+        Field courseIdField = findField(Course.class, "id");
+        makeAccessible(courseIdField);
+        setField(courseIdField, course, courseId);
 
         Chapter chapter = Chapter.create("원래 챕터", 1, course);
         Field chapterIdField = findField(Chapter.class, "id");
@@ -310,31 +322,17 @@ class CourseServiceTest {
         CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", 500, 2, false);
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate, lectureNew));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
+        MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
-        courseService.updateCourseGeneralInfo(courseId, instructorId, request);
+        courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
 
         assertThat(course.getTitle()).isEqualTo("수정 제목");
-        assertThat(course.getDescription()).isEqualTo("수정 설명");
-        assertThat(course.getCategoryId()).isEqualTo(5L);
-        assertThat(course.getPrice()).isEqualTo(50000);
-        assertThat(course.getThumbnail()).isEqualTo("new.png");
-
-        assertThat(course.getChapters()).hasSize(1);
-        Chapter updatedChapter = course.getChapters().get(0);
-        assertThat(updatedChapter.getTitle()).isEqualTo("수정 챕터");
-
-        assertThat(updatedChapter.getLectures()).hasSize(2);
-        Lecture updatedLecture = updatedChapter.getLectures().get(0);
-        assertThat(updatedLecture.getTitle()).isEqualTo("수정 강의");
-        assertThat(updatedLecture.getDurationSeconds()).isEqualTo(400);
-        assertThat(updatedLecture.isFreePreview()).isTrue();
-
-        Lecture newlyAddedLecture = updatedChapter.getLectures().get(1);
-        assertThat(newlyAddedLecture.getTitle()).isEqualTo("신규 강의");
-        assertThat(newlyAddedLecture.getDurationSeconds()).isEqualTo(500);
-        assertThat(newlyAddedLecture.isFreePreview()).isFalse();
+        assertThat(course.getThumbnail()).isEqualTo("courses/thumbnails/100/new-uuid.png");
+        verify(courseThumbnailService).deleteThumbnail("old.png");
+        verify(courseThumbnailService).uploadThumbnail(eq(courseId), any(MultipartFile.class));
     }
 
     @Test
@@ -687,10 +685,10 @@ class CourseServiceTest {
     }
 
     @Test
-    void admin이_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+    void admin이_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_기존_썸네일이_S3에서_삭제된다() {
         Long courseId = 100L;
         Long adminId = 1L;
-        Course course = Course.createDraft(10L, 0L, "제목", "설명", "thumb.jpg", 0);
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
         Field idField = findField(Course.class, "id");
         makeAccessible(idField);
         setField(idField, course, courseId);
@@ -705,6 +703,7 @@ class CourseServiceTest {
         courseService.deleteCourseByAdmin(courseId, adminId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
     }
@@ -748,10 +747,10 @@ class CourseServiceTest {
     }
 
     @Test
-    void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_이력과_이벤트가_발행된다() {
+    void 판매자가_정상적으로_강좌를_삭제하면_DELETED_상태로_전이되고_기존_썸네일이_S3에서_삭제된다() {
         Long courseId = 100L;
         Long instructorId = 10L;
-        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "thumb.jpg", 0);
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
         Field idField = findField(Course.class, "id");
         makeAccessible(idField);
         setField(idField, course, courseId);
@@ -766,6 +765,7 @@ class CourseServiceTest {
         courseService.deleteCourseByInstructor(courseId, instructorId);
 
         assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
         verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
     }

@@ -27,12 +27,13 @@ public class CourseController {
 
     private final CourseService courseService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public Long createCourse(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
-            @Valid @RequestBody CourseCreateRequest request) {
-        return courseService.createCourse(loginUserPrincipal.user().id(), request);
+            @Valid @RequestPart("request") CourseCreateRequest request,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnailFile) {
+        return courseService.createCourse(loginUserPrincipal.user().id(), request, thumbnailFile);
     }
 
     @GetMapping("/{courseId}")
@@ -60,13 +61,14 @@ public class CourseController {
         return courseService.getCoursesByInstructor(loginUserPrincipal.user().id(), status, pageable);
     }
 
-    @PutMapping("/{courseId}")
+    @PutMapping(value = "/{courseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateCourseGeneralInfo(
             @PathVariable("courseId") Long courseId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
-            @Valid @RequestBody CourseUpdateRequest request) {
-        courseService.updateCourseGeneralInfo(courseId, loginUserPrincipal.user().id(), request);
+            @Valid @RequestPart("request") CourseUpdateRequest request,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnailFile) {
+        courseService.updateCourseGeneralInfo(courseId, loginUserPrincipal.user().id(), request, thumbnailFile);
     }
 
     @PostMapping("/{courseId}/reviews")
