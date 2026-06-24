@@ -206,6 +206,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       chapterId: ch.id.toString(),
       durationSeconds: lec.durationSeconds,
       m3u8Path: lec.m3u8Path ?? null,
+      isFreePreview: lec.isFreePreview,
     })) || [],
   })) || [],
   status: detail.status,
@@ -221,7 +222,7 @@ const mapStudyDetailToStudy = (
   intro: detail.description,
   status: detail.status as Study['status'],
   ownerName: detail.ownerNickname,
-  myRole: detail.myRole.toLowerCase() as Study['myRole'],
+  myRole: (detail.myRole?.toLowerCase() ?? 'viewer') as Study['myRole'],
   progress: 0,
   members: [
     {
@@ -857,6 +858,7 @@ export const api = {
       // further backend changes, so they remain hardcoded to 0.
       return {
         id: study.studyId.toString(),
+        courseId: detail?.courseId?.toString(),
         title: study.title,
         instructor: study.ownerNickname,
         thumbnailUrl: '/placeholder.svg',
@@ -879,11 +881,27 @@ export const api = {
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
 
   getStudy: async (studyId: string | number): Promise<Study | undefined> => {
-    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
+    const detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
 
     if (!detail) return undefined
 
-    return mapStudyDetailToStudy(detail);
+    return mapStudyDetailToStudy(detail)
+  },
+
+  getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
+    const study = await api.getStudy(studyId)
+    if (!study) return undefined
+
+    const course = await api.getCourse(study.courseId)
+    const hasFreePreview = course?.chapters.some((chapter) =>
+      chapter.lectures.some((lecture) => lecture.isFreePreview),
+    ) ?? false
+    if (hasFreePreview) return study
+
+    const enrolled = await api.isCourseEnrollmentActive(study.courseId)
+    if (!enrolled) return undefined
+
+    return study
   },
 
   getStudyIdByCourseId: async (courseId: string | number): Promise<string | null> => {
@@ -1057,12 +1075,16 @@ export const api = {
       const res = await request<any>('/api/orders', { content: [] })
       const orders = Array.isArray(res) ? res : (res?.content || [])
       const enrolled: EnrolledCourse[] = []
-      orders.forEach((ord: any) => {
+      for (const ord of orders) {
         if (ord.status === 'PAID') {
-          ord.items?.forEach((item: any) => {
-            if (!enrolled.some(e => e.id === item.courseId.toString())) {
+          for (const item of ord.items ?? []) {
+            const courseId = item.courseId.toString()
+            if (!enrolled.some(e => (e.courseId ?? e.id) === courseId)) {
+              const studyId = await api.getStudyIdByCourseId(courseId)
+              if (!studyId) continue
               enrolled.push({
-                id: item.courseId.toString(),
+                id: studyId,
+                courseId,
                 title: item.courseTitle || '',
                 instructor: '강사',
                 thumbnailUrl: '/placeholder.svg',
@@ -1072,9 +1094,9 @@ export const api = {
                 status: '진행 중'
               })
             }
-          })
+          }
         }
-      })
+      }
       return enrolled
     } catch (e) {
       console.error('Failed to get purchased courses from orders:', e)

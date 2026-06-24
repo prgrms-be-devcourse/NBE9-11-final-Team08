@@ -66,6 +66,8 @@ export function StudyListView({ courses }: StudyListViewProps) {
 }
 
 function StudyCard({ course }: { course: EnrolledCourse }) {
+  const courseHref = `/courses/${course.courseId ?? course.id}`
+
   return (
     <li className="group relative flex flex-col rounded-xl border bg-card p-5 transition-colors hover:border-primary/50 focus-within:border-primary/50">
       {/* 카드 전체 클릭 시 스터디 메인페이지로 이동 (오버레이 링크) */}
@@ -117,7 +119,7 @@ function StudyCard({ course }: { course: EnrolledCourse }) {
           size="sm"
           aria-label="강좌 페이지로 이동"
         >
-          <Link href={`/courses/${course.id}`}>
+          <Link href={courseHref}>
             <ExternalLink className="h-4 w-4" />
             <span className="sr-only sm:not-sr-only">강좌</span>
           </Link>

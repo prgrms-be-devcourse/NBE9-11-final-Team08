@@ -84,6 +84,28 @@ public class StudyControllerTest {
     }
 
     @Test
+    void 비로그인_사용자도_studyId로_스터디_상세를_조회한다() throws Exception {
+        Long studyId = 10L;
+        StudyDetailResponse response = new StudyDetailResponse(
+                studyId,
+                20L,
+                "스터디 제목",
+                "스터디 설명",
+                StudyStatus.ACTIVE,
+                "스터디장",
+                null
+        );
+
+        given(studyService.getStudyDetail(studyId, null)).willReturn(response);
+
+        mockMvc.perform(get("/api/studies/{studyId}", studyId))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+
+        then(studyService).should().getStudyDetail(studyId, null);
+    }
+
+    @Test
     void courseId로_스터디_id를_조회한다() throws Exception {
         Long courseId = 20L;
         Long studyId = 10L;

@@ -34,6 +34,9 @@ export function CourseDetail({ course }: { course: Course }) {
 
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
+  const hasFreePreview = course.chapters.some((chapter) =>
+    chapter.lectures.some((lecture) => lecture.isFreePreview),
+  )
   const inCart = has(course.id)
   const canPurchase = !(isLoggedIn && isPurchased)
 
@@ -46,7 +49,7 @@ export function CourseDetail({ course }: { course: Course }) {
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
         const active = token ? await api.isCourseEnrollmentActive(course.id) : false
         setIsPurchased(active)
-        setHasStudyAccess(active && !!nextStudyId)
+        setHasStudyAccess((active || hasFreePreview) && !!nextStudyId)
         setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
@@ -56,7 +59,7 @@ export function CourseDetail({ course }: { course: Course }) {
       }
     }
     fetchAccess()
-  }, [course.id])
+  }, [course.id, hasFreePreview])
 
   const handleAdd = async () => {
     if (!isLoggedIn) {
@@ -248,17 +251,16 @@ export function CourseDetail({ course }: { course: Course }) {
                     </Button>
                   </>
                 ) : null}
-                {/* TODO: 코스에 무료 미리보기가 있으면 비로그인 또는 미구매 상태에서도 스터디 입장이 가능해야 한다. */}
-                {!isLoggedIn ? (
+                {hasStudyAccess && studyId ? (
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href={`/study/${studyId}`}>스터디 입장</Link>
+                  </Button>
+                ) : !isLoggedIn ? (
                   <Button onClick={() => {
                     toast.error('로그인이 필요한 서비스입니다.')
                     router.push('/login')
                   }} variant="outline" className="w-full">
                     스터디 입장
-                  </Button>
-                ) : hasStudyAccess && studyId ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
                 ) : (
                   <Button variant="outline" className="w-full" disabled>
