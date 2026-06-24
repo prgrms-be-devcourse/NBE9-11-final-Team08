@@ -59,7 +59,7 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
       const cookieStore = cookies()
       const store = cookieStore instanceof Promise ? await cookieStore : cookieStore
       token = store.get('accessToken')?.value || ''
-    } catch (e) {}
+    } catch (e) { }
   }
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
@@ -67,12 +67,12 @@ const getAuthHeaders = async (): Promise<Record<string, string>> => {
 const handleUnauthorized = () => {
   if (typeof window !== 'undefined') {
     const hasToken = !!localStorage.getItem('accessToken') || document.cookie.includes('accessToken')
-    
+
     localStorage.removeItem('accessToken')
     document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    
+
     const pathname = window.location.pathname
-    const isPublicRoute = 
+    const isPublicRoute =
       pathname === '/' ||
       pathname.startsWith('/courses') ||
       pathname.startsWith('/study') ||
@@ -105,7 +105,7 @@ async function request<T>(
       },
       cache: 'no-store',
     })
-    
+
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
       if (res.status === 401 && handleAuthError) {
@@ -113,7 +113,7 @@ async function request<T>(
       }
       return defaultData
     }
-    
+
     return await res.json() as T
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -124,12 +124,12 @@ async function request<T>(
 
 async function mutate<T>(path: string, method: string, body?: any, isMultipart = false): Promise<T> {
   if (!BASE_URL) throw new Error('API BASE_URL is not defined')
-  
+
   const headers = await getAuthHeaders()
   if (!isMultipart) {
     headers['Content-Type'] = 'application/json'
   }
-  
+
   const options: RequestInit = {
     method,
     headers,
@@ -137,7 +137,7 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
   if (body) {
     options.body = isMultipart ? body : JSON.stringify(body)
   }
-  
+
   let res: Response
   try {
     res = await fetch(`${BASE_URL}${path}`, options)
@@ -339,7 +339,7 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
   const isRate = policy.discountType === 'PERCENT' || policy.discountType === 'RATE'
   const startAt = toLocalDateTime(policy.issueStartDate)
   const endAt = toLocalDateTime(policy.issueEndDate)
-  
+
   const isExhausted = policy.totalQuantity !== null && policy.totalQuantity !== undefined && policy.totalQuantity <= 0
   const status = isExhausted ? 'ENDED' : inferCouponStatus(startAt, endAt)
   const category = (status === 'ACTIVE' || status === 'SCHEDULED') ? '진행 중인 이벤트' : '종료된 이벤트'
@@ -500,12 +500,12 @@ const getCourseDraftFromCookies = async (id: string | number): Promise<any | nul
     if (match) {
       try {
         return JSON.parse(decodeURIComponent(match[2]))
-      } catch (e) {}
+      } catch (e) { }
     }
     try {
       const local = localStorage.getItem(cookieName)
       if (local) return JSON.parse(local)
-    } catch (e) {}
+    } catch (e) { }
   } else {
     try {
       const { cookies } = await import('next/headers')
@@ -515,7 +515,7 @@ const getCourseDraftFromCookies = async (id: string | number): Promise<any | nul
       if (val) {
         return JSON.parse(decodeURIComponent(val))
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   return null
 }
@@ -530,7 +530,7 @@ const saveCourseDraft = (id: string | number, data: any) => {
       const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]')
       const nextDraftIds = Array.from(new Set([...draftIds, String(id)]))
       localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
-    } catch (e) {}
+    } catch (e) { }
   }
 }
 
@@ -731,7 +731,7 @@ export const api = {
     }
     return courseId
   },
-  
+
   updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
     const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
     const instructorId = await getCurrentUserId()
@@ -811,6 +811,16 @@ export const api = {
   removeFromCart: (cartItemId: number) => mutate<CartResponse>(`/api/cart/items/${cartItemId}`, 'DELETE'),
   clearCart: () => mutate<CartResponse>('/api/cart', 'DELETE'),
 
+  isCourseEnrollmentActive: async (courseId: string | number): Promise<boolean> => {
+    const res = await request<boolean | { exists?: boolean }>(
+      `/api/enrollments/courses/${courseId}/active`,
+      false,
+      true,
+      false,
+    )
+    return typeof res === 'boolean' ? res : !!res?.exists
+  },
+
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
   cancelOrder: (orderId: number | string) => mutate<OrderDetailResponse>(`/api/orders/${orderId}/cancel`, 'PATCH'),
@@ -825,7 +835,7 @@ export const api = {
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
-  confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) => 
+  confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
     api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId),
 
   // Studies
@@ -868,19 +878,15 @@ export const api = {
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
 
   getStudy: async (studyId: string | number): Promise<Study | undefined> => {
-    const numericStudyId = Number(studyId)
     let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
-    if (!detail) {
-      detail = await request<StudyDetailResponse | undefined>(`/api/studies/by-course/${studyId}`, undefined)
-    }
+
     if (!detail) return undefined
+  },
 
-    const numericResolvedStudyId = Number(detail.studyId)
-    const activities = Number.isFinite(numericResolvedStudyId)
-      ? (await api.getStudyActivities(numericResolvedStudyId)).content
-      : []
+  getStudyByCourseId: async (courseId: string | number): Promise<Study | undefined> => {
+    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/by-course/${courseId}`, undefined)
 
-    return mapStudyDetailToStudy(detail, activities)
+    if (!detail) return undefined
   },
 
   getBoardPosts: async (studyId: string | number): Promise<StudyActivityResponse[]> => {
@@ -963,7 +969,7 @@ export const api = {
         console.error('Failed to log in as system admin to fetch public coupons:', e)
       }
     }
-    
+
     const res = await fetch(`${BASE_URL}/api/admin/coupons`, {
       headers: {
         'Content-Type': 'application/json',
@@ -971,12 +977,12 @@ export const api = {
       },
       cache: 'no-store',
     })
-    
+
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on /api/admin/coupons`)
       return []
     }
-    
+
     const result = await res.json() as any
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToUserCoupon)
@@ -1013,7 +1019,7 @@ export const api = {
     mutate<void>(`/api/admin/coupons/${couponId}/terminate`, 'PATCH'),
   deleteAdminCoupon: (couponId: number) =>
     mutate<void>(`/api/admin/coupons/${couponId}`, 'DELETE'),
-  
+
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
     const authHeaders = await getAuthHeaders()
