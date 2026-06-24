@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 
 const navLinks = [
-  { href: '/studies', label: '스터디' },
   { href: '/', label: '강좌' },
   { href: '/events', label: '쿠폰/이벤트' },
   { href: '/attendance', label: '출석' },
