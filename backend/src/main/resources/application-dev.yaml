@@ -23,6 +23,8 @@ app:
     refresh-cookie:
       secure: false
       same-site: None
+  s3:
+    upload-fallback-enabled: true  # 로컬에서는 S3가 터져도 Unsplash 주소로 부드럽게 우회 허용
 
 cloud:
   aws:
