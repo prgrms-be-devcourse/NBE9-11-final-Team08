@@ -716,17 +716,17 @@ export const api = {
     return mapCourseDetailToCourse(detailResponse)
   },
 
-  createCourse: async (data: CourseCreateRequest) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', data)
+  createCourse: async (formData: FormData) => {
+    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
       saveCourseDraft(courseId, {
         instructorId,
-        categoryId: data.categoryId,
-        title: data.title,
-        description: data.description,
-        thumbnail: data.thumbnail || '',
-        price: data.price,
+        categoryId: Number(formData.get('categoryId')),
+        title: formData.get('title') as string,
+        description: formData.get('description') as string,
+        thumbnail: (formData.get('thumbnail') as string) || '',
+        price: Number(formData.get('price')),
         status: 'DRAFT'
       })
     }
