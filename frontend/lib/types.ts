@@ -559,6 +559,31 @@ export interface StudyActivityResponse {
   createdAt: string
 }
 
+export type FeedItemType = 'STUDY_ACTIVITY'
+export type BackendDateTime = string | number[]
+
+export interface FeedItemResponse {
+  id: number
+  studyId: number
+  actorId: number
+  actorNickname: string
+  type: FeedItemType
+  sourceId: number
+  content: string
+  occurredAt: BackendDateTime
+}
+
+export interface FeedCursor {
+  occurredAt: BackendDateTime
+  id: number
+}
+
+export interface FeedCursorResponse {
+  items: FeedItemResponse[]
+  nextCursor: FeedCursor | null
+  hasNext: boolean
+}
+
 export interface StructuredFeedback {
   summary: string
   strengths: string
