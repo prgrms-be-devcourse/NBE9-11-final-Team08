@@ -1,8 +1,8 @@
 package com.team08.backend.domain.couponpolicy.component;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
-import com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory;
-import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicyCategory;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicyCourse;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;

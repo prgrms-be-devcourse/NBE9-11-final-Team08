@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcouponjob.service;
+package com.team08.backend.domain.issuedcoupon.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.connection.stream.MapRecord;
