@@ -32,10 +32,16 @@ variable "public_subnet_cidr" {
   }
 }
 
-variable "instance_type" {
-  description = "EC2 instance type for the Docker Compose host."
+variable "edge_instance_type" {
+  description = "EC2 instance type for the Nginx edge host."
   type        = string
   default     = "t3.small"
+}
+
+variable "app_instance_type" {
+  description = "EC2 instance type for the Spring application host."
+  type        = string
+  default     = "t3.medium"
 }
 
 variable "admin_cidr" {

@@ -1,11 +1,11 @@
 package com.team08.backend.domain.studyactivity.service;
 
 import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
-import com.team08.backend.domain.feed.outbox.FeedOutboxService;
 import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
 import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -43,10 +44,10 @@ class StudyActivityServiceTest {
     private AiFeedbackInvalidator aiFeedbackInvalidator;
 
     @Mock
-    private FeedOutboxService feedOutboxService;
+    private StudyAccessAuthorizer studyAccessAuthorizer;
 
     @Mock
-    private StudyAccessAuthorizer studyAccessAuthorizer;
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private StudyActivityService studyActivityService;
@@ -75,7 +76,13 @@ class StudyActivityServiceTest {
 
         verify(studyAccessAuthorizer)
                 .authorizeByStudyId(studyId, userId, StudyAction.WRITE_STUDY_CONTENT);
-        verify(feedOutboxService).createStudyActivityCreatedEvent(savedActivity);
+
+        ArgumentCaptor<StudyActivityCreated> eventCaptor = ArgumentCaptor.forClass(StudyActivityCreated.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().studyActivityId()).isEqualTo(savedActivity.getId());
+        assertThat(eventCaptor.getValue().studyId()).isEqualTo(studyId);
+        assertThat(eventCaptor.getValue().authorId()).isEqualTo(userId);
+        assertThat(eventCaptor.getValue().createdAt()).isEqualTo(savedActivity.getCreatedAt());
     }
 
     @Test

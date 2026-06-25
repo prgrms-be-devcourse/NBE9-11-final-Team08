@@ -93,6 +93,9 @@ class PaymentServiceTest {
     @Mock
     private OrderCouponUsageRepository orderCouponUsageRepository;
 
+    @Mock
+    private PaidCourseStudyMemberService paidCourseStudyMemberService;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -107,6 +110,7 @@ class PaymentServiceTest {
                 paymentTransactionService,
                 issuedCouponService,
                 orderCouponUsageRepository,
+                paidCourseStudyMemberService,
                 FIXED_CLOCK
         );
     }
@@ -589,6 +593,7 @@ class PaymentServiceTest {
         assertThat(enrollment.getCanceledAt()).isEqualTo(FIXED_NOW);
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.REFUNDED);
+        verify(paidCourseStudyMemberService).leaveMember(USER_ID, List.of(COURSE_ID), FIXED_NOW);
     }
 
     @Test

@@ -21,7 +21,7 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
     @Override
     public String uploadThumbnail(Long courseId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            return null;
         }
 
         try (InputStream is = file.getInputStream()) {
@@ -30,6 +30,7 @@ public class CourseThumbnailServiceImpl implements CourseThumbnailService {
 
             return s3FileStorageService.uploadFile(is, s3Key);
         } catch (Exception e) {
+            log.error("[S3 업로드 최종 실패] S3 스토리지 장애 발생. 원인: {}", e.getMessage(), e);
             throw new CustomException(ErrorCode.S3_UPLOAD_FAILED);
         }
     }

@@ -18,19 +18,20 @@ public class StudyReportController {
 
     private final StudyReportService studyReportService;
 
-    @Operation(summary = "학습 리포트 생성/갱신", description = "학습 이벤트를 집계하여 리포트를 생성합니다. 기존 리포트가 있으면 덮어씁니다.")
-    @PostMapping
-    public StudyReportResponse generateReport(
-            @Parameter(description = "스터디 ID") @PathVariable Long studyId,
-            @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return studyReportService.generateReport(principal.user().id(), studyId);
-    }
-
-    @Operation(summary = "학습 리포트 조회", description = "저장된 학습 리포트를 조회합니다.")
+    @Operation(
+            summary = "학습 리포트 조회/갱신 (read-or-upsert)",
+            description = """
+                    학습 리포트를 조회한다. 리포트가 없으면 즉시 집계해 생성한다.
+                    응답의 status 로 결과를 구분한다.
+                    - LOADED: 기존 리포트를 그대로 조회 (refresh=false)
+                    - REGENERATED: 리포트가 없거나 쿨다운이 지나 새로 집계함
+                    - COOLDOWN: refresh=true 였지만 쿨다운 이내라 재집계하지 않고 기존 리포트 반환 (nextRegenerableAt 참고)
+                    """)
     @GetMapping
     public StudyReportResponse getReport(
             @Parameter(description = "스터디 ID") @PathVariable Long studyId,
+            @Parameter(description = "true 면 재집계를 시도한다(쿨다운 이내면 거부됨). 기본값 false") @RequestParam(defaultValue = "false") boolean refresh,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return studyReportService.getReport(principal.user().id(), studyId);
+        return studyReportService.getReport(principal.user().id(), studyId, refresh);
     }
 }

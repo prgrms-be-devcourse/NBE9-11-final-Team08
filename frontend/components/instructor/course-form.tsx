@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { ArrowLeft, ImagePlus, ListChecks, Sparkles, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -20,9 +20,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import type { Course } from '@/lib/types'
+import type { Chapter, Course } from '@/lib/types'
 
 const subCategories = ['백엔드', '프론트엔드', '데브옵스', '프로그래밍 언어', '업무 생산성']
+
+const buildChapterUpdatePayload = (chapters: Chapter[]) =>
+  chapters.map((chapter, chapterIndex) => ({
+    id: Number(chapter.id),
+    title: chapter.title,
+    orderNo: chapterIndex + 1,
+    lectures: chapter.lectures.map((lecture, lectureIndex) => ({
+      id: Number(lecture.id),
+      title: lecture.title,
+      summary: lecture.summary ?? '',
+      durationSeconds: Number(lecture.durationSeconds) > 0 ? Number(lecture.durationSeconds) : 1,
+      orderNo: lectureIndex + 1,
+      isFreePreview: false,
+    })),
+  }))
 
 export function CourseForm({ course }: { course?: Course }) {
   const router = useRouter()
@@ -39,6 +54,11 @@ export function CourseForm({ course }: { course?: Course }) {
   const [categoryOptions, setCategoryOptions] = useState<string[]>(
     course?.category ? [course.category] : [],
   )
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string>(course?.thumbnailUrl || '')
+  const [courseChapters, setCourseChapters] = useState<Chapter[]>(course?.chapters ?? [])
 
   const isInReview = course && (course.status === 'IN_REVIEW' || course.status === 'REVIEW')
   const isOnSale = course && (course.status === 'ON_SALE' || course.status === 'PUBLISHED')
@@ -69,10 +89,34 @@ export function CourseForm({ course }: { course?: Course }) {
     }
   }, [course?.category])
 
+  useEffect(() => {
+    if (!course?.id) return
+    let active = true
+    api.getCourse(course.id).then((fresh) => {
+      if (!active || !fresh?.chapters?.length) return
+      setCourseChapters(fresh.chapters)
+    })
+    return () => {
+      active = false
+    }
+  }, [course?.id])
+
   const addTag = () => {
     const v = tagInput.trim()
     if (v && !tags.includes(v)) setTags((p) => [...p, v])
     setTagInput('')
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('파일 크기는 최대 10MB를 초과할 수 없습니다.')
+        return
+      }
+      setThumbnailFile(file)
+      setPreviewUrl(URL.createObjectURL(file))
+    }
   }
 
   const handleDelete = async () => {
@@ -126,30 +170,50 @@ export function CourseForm({ course }: { course?: Course }) {
 
     setLoading(true)
     try {
-      const payload = {
-        title,
-        description,
-        categoryId,
-        price: Number(price),
-        thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450',
-      }
-
       if (editing && course) {
-        await api.updateCourse(course.id, {
-          ...payload,
-          chapters: course.chapters.map((chapter, chapterIndex) => ({
-            id: Number(chapter.id),
-            title: chapter.title,
-            orderNo: chapterIndex + 1,
-            lectures: chapter.lectures.map((lecture, lectureIndex) => ({
-              id: Number(lecture.id),
-              title: lecture.title,
-              durationSeconds: 0,
-              orderNo: lectureIndex + 1,
-              isFreePreview: false,
-            })),
-          })),
-        })
+        const freshCourse = await api.getCourse(course.id)
+        const chaptersForUpdate =
+          freshCourse?.chapters?.length ? freshCourse.chapters : courseChapters
+
+        if (freshCourse?.chapters?.length) {
+          setCourseChapters(freshCourse.chapters)
+        }
+
+        const hasCurriculum =
+          chaptersForUpdate.length > 0 &&
+          chaptersForUpdate.every((chapter) => chapter.lectures.length > 0)
+
+        if (status === 'REVIEW' && !hasCurriculum) {
+          toast.error('커리큘럼을 먼저 등록해주세요. 챕터와 강의를 각각 1개 이상 추가해야 합니다.')
+          router.push(`/instructor/courses/${course.id}/curriculum`)
+          return
+        }
+
+        const formData = new FormData()
+
+        const requestData = {
+          title,
+          description,
+          categoryId,
+          price: Number(price),
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
+          chapters: buildChapterUpdatePayload(chaptersForUpdate),
+        }
+
+        const requestBlob = new Blob(
+          [JSON.stringify(requestData)], 
+          { type: 'application/json' }
+        )
+        
+        formData.append('request', requestBlob)
+
+        if (thumbnailFile) {
+          formData.append('thumbnail', thumbnailFile)
+        }
+
+        // 💡 기존 객체 전송 방식에서 FormData 파이프라인 구조로 전환 호출
+        await api.updateCourse(course.id, formData)
+
         if (status === 'REVIEW') {
           await api.requestCourseReview(course.id)
           toast.success('검수 요청이 접수되었습니다.')
@@ -159,7 +223,28 @@ export function CourseForm({ course }: { course?: Course }) {
           router.refresh()
         }
       } else {
-        const courseId = await api.createCourse(payload)
+        const formData = new FormData()
+
+        const requestData = {
+          title,
+          description,
+          categoryId,
+          price: Number(price),
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
+        }
+
+        const requestBlob = new Blob(
+          [JSON.stringify(requestData)], 
+          { type: 'application/json' }
+        )
+        
+        formData.append('request', requestBlob)
+
+        if (thumbnailFile) {
+          formData.append('thumbnail', thumbnailFile)
+        }
+
+        const courseId = await api.createCourse(formData)
         if (status === 'REVIEW') {
           toast.success('강의 기본정보가 저장되었습니다. 커리큘럼 등록 후 검수 요청해주세요.')
           router.push(`/instructor/courses/${courseId}/curriculum`)
@@ -333,20 +418,35 @@ export function CourseForm({ course }: { course?: Course }) {
         <div className="space-y-6">
           <section className="rounded-xl border bg-card p-5">
             <Label>커버 이미지</Label>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/jpeg, image/png" 
+              onChange={handleFileChange}
+              disabled={isReadOnly || loading}
+            />
             <button
               type="button"
               onClick={() => {
                 if (isReadOnly) return
-                toast.info('이미지 업로드는 데모에서 비활성화되어 있습니다.')
+                fileInputRef.current?.click()
               }}
               disabled={isReadOnly || loading}
-              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden relative bg-muted"
             >
-              <ImagePlus className="h-7 w-7" />
-              <span className="text-xs">
-                파일을 드래그하거나 클릭해 업로드
-              </span>
-              <span className="text-[11px]">최대 10MB · JPG, PNG</span>
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+              ) : (
+                <>
+                  <ImagePlus className="h-7 w-7" />
+                  <span className="text-xs">
+                    파일을 드래그하거나 클릭해 업로드
+                  </span>
+                  <span className="text-[11px]">최대 10MB · JPG, PNG</span>
+                </>
+              )}
             </button>
           </section>
 

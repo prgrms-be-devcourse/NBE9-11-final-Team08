@@ -58,6 +58,7 @@ public class PaymentTransactionService {
     private final EnrollmentRepository enrollmentRepository;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
+    private final PaidCourseStudyMemberService paidCourseStudyMemberService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -167,6 +168,11 @@ public class PaymentTransactionService {
                 context.userId(),
                 order,
                 orderItems,
+                completedAt
+        );
+        paidCourseStudyMemberService.joinAsMember(
+                context.userId(),
+                savedEnrollments.stream().map(Enrollment::getCourseId).toList(),
                 completedAt
         );
 
@@ -419,7 +425,12 @@ public class PaymentTransactionService {
 
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             markOrderPaid(order, recoveredAt);
-            issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
+            List<Enrollment> enrollments = issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
+            paidCourseStudyMemberService.joinAsMember(
+                    order.getUserId(),
+                    enrollments.stream().map(Enrollment::getCourseId).toList(),
+                    recoveredAt
+            );
         }
     }
 

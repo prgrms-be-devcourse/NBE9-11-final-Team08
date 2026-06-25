@@ -12,7 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.File;
@@ -42,7 +41,7 @@ class LocalVideoEncodingServiceTest {
     private LectureModificationRequestRepository requestRepository;
 
     private Path tempUploadDir;
-    private MockMultipartFile realMockMultipartFile;
+    private byte[] videoContent;
 
     @BeforeEach
     void setUp() throws IOException {
@@ -50,23 +49,21 @@ class LocalVideoEncodingServiceTest {
         ReflectionTestUtils.setField(localVideoEncodingService, "uploadDir", tempUploadDir.toString());
 
         ClassPathResource videoResource = new ClassPathResource("test-video.mp4");
-        byte[] videoContent = Files.readAllBytes(Path.of(videoResource.getURI()));
-
-        realMockMultipartFile = new MockMultipartFile(
-                "file",
-                "test-video.mp4",
-                "video/mp4",
-                videoContent
-        );
+        videoContent = Files.readAllBytes(Path.of(videoResource.getURI()));
     }
 
     @Test
-    void 비디오_인코딩이_성공하면_HLS_파일_경로가_갱신된다() {
+    void 비디오_인코딩이_성공하면_HLS_파일_경로가_갱신된다() throws IOException {
+        org.junit.jupiter.api.Assumptions.assumeTrue(isFfmpegAvailable(), "ffmpeg is not installed, skipping test");
+
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
         String expectedDbPath = targetDirName + "/output.m3u8";
 
-        localVideoEncodingService.encodeToHls(realMockMultipartFile, targetDirName, lectureId);
+        File testVideoFile = Files.createTempFile("test-video-", ".mp4").toFile();
+        Files.write(testVideoFile.toPath(), videoContent);
+
+        localVideoEncodingService.encodeToHls(testVideoFile, targetDirName, lectureId);
 
         EncodingContext expectedContext = new EncodingContext(
                 lectureId, expectedDbPath, targetDirName, EncodingPurpose.CREATE, null, null
@@ -83,26 +80,22 @@ class LocalVideoEncodingServiceTest {
     }
 
     @Test
-    void 빈_파일을_업로드하면_인코딩_실패_예외를_던진다() {
+    void 빈_파일을_업로드하면_인코딩_실패_예외를_던진다() throws IOException {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
-        MockMultipartFile emptyFile = new MockMultipartFile("file", "", "video/mp4", new byte[0]);
+        File emptyFile = Files.createTempFile("empty-video-", ".mp4").toFile();
 
         assertThatThrownBy(() -> localVideoEncodingService.encodeToHls(emptyFile, targetDirName, lectureId))
                 .isInstanceOf(CustomException.class);
     }
 
     @Test
-    void 인코딩_프로세스는_완료되었으나_결과_파편_파일이_없으면_예외를_던지고_생성되던_디렉토리를_청소한다() {
+    void 인코딩_프로세스는_완료되었으나_결과_파편_파일이_없으면_예외를_던지고_생성되던_디렉토리를_청소한다() throws IOException {
         Long lectureId = 1L;
         String targetDirName = UUID.randomUUID().toString();
 
-        MockMultipartFile corruptedVideoFile = new MockMultipartFile(
-                "file",
-                "corrupted.mp4",
-                "video/mp4",
-                "invalid video content data format headers".getBytes()
-        );
+        File corruptedVideoFile = Files.createTempFile("corrupted-video-", ".mp4").toFile();
+        Files.write(corruptedVideoFile.toPath(), "invalid video content data format headers".getBytes());
 
         assertThatThrownBy(() -> localVideoEncodingService.encodeToHls(corruptedVideoFile, targetDirName, lectureId))
                 .isInstanceOf(CustomException.class);
@@ -111,5 +104,15 @@ class LocalVideoEncodingServiceTest {
         assertThat(Files.exists(targetWorkspace)).isFalse();
 
         verifyNoInteractions(encodingResultHandler);
+    }
+
+    private boolean isFfmpegAvailable() {
+        try {
+            Process process = new ProcessBuilder("ffmpeg", "-version").start();
+            process.destroy();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

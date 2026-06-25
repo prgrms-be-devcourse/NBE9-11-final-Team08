@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -30,44 +29,38 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
 
     @Override
     @Async("videoEncodingExecutor")
-    public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
+    public void encodeToHls(File file, String targetDirName, Long lectureId) {
         executePipeline(file, targetDirName, lectureId, EncodingPurpose.CREATE, null, null);
     }
 
     @Override
     @Async("videoEncodingExecutor")
-    public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
+    public void encodeModificationToHls(File file, String targetDirName, Long lectureId, String description, Long instructorId) {
         executePipeline(file, targetDirName, lectureId, EncodingPurpose.MODIFY, description, instructorId);
     }
 
     @Override
-    protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
+    protected File prepareSourceFile(File file, String targetDirName, Long lectureId) {
         String s3SourceKey = "videos/temp/" + targetDirName + ".mp4";
-        File tempMultipartFile = null;
 
         try {
-            Path tempMultipartPath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "s3-upload-tmp-", ".mp4");
-            tempMultipartFile = tempMultipartPath.toFile();
-            file.transferTo(tempMultipartFile);
-            s3FileStorageService.uploadFile(tempMultipartFile, s3SourceKey);
+            s3FileStorageService.uploadFile(file, s3SourceKey);
         } catch (Exception e) {
             log.error("Failed to upload original video to S3 temp path. lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
-        } finally {
-            if (tempMultipartFile != null && tempMultipartFile.exists()) {
-                if (!tempMultipartFile.delete()) {
-                    log.warn("Failed to delete temp multipart file: {}", tempMultipartFile.getAbsolutePath());
-                }
-            }
         }
 
+        File localSourceFile = null;
         try {
             Path localSourcePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "s3-source-tmp-", ".mp4");
-            File localSourceFile = localSourcePath.toFile();
+            localSourceFile = localSourcePath.toFile();
             s3FileStorageService.downloadFile(s3SourceKey, localSourceFile);
             return localSourceFile;
         } catch (Exception e) {
             log.error("Failed to download original video from S3 temp path. lectureId: {}", lectureId, e);
+            if (localSourceFile != null && localSourceFile.exists()) {
+                localSourceFile.delete();
+            }
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
             s3FileStorageService.deleteFile(s3SourceKey);

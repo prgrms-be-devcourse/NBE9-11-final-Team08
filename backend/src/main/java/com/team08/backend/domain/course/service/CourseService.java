@@ -33,6 +33,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.web.multipart.MultipartFile;
 
 import static java.util.UUID.randomUUID;
@@ -97,8 +101,9 @@ public class CourseService {
 
     @Transactional
     public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request, MultipartFile thumbnailFile) {
-        Course course = courseRepository.findById(courseId)
+        Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        courseRepository.findChaptersWithLecturesAsc(courseId);
 
         course.validateOwner(instructorId);
 
@@ -243,7 +248,20 @@ public class CourseService {
 
         String targetDirName = randomUUID().toString();
 
-        mediaEncodingService.encodeToHls(file, targetDirName, lectureId);
+        File tempFile = null;
+        try {
+            Path tempPath = Files.createTempFile("lecture-temp-upload-", ".mp4");
+            tempFile = tempPath.toFile();
+            file.transferTo(tempFile);
+        } catch (IOException e) {
+            log.error("Failed to write multipart file to temp file", e);
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
+            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+        }
+
+        mediaEncodingService.encodeToHls(tempFile, targetDirName, lectureId);
     }
 
     @Component

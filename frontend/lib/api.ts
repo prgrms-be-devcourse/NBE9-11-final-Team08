@@ -25,7 +25,6 @@ import type {
   UserProfile,
   SignupRequest,
   LoginRequest,
-  LoginResponse,
   StudySummaryResponse,
   StudyActivityResponse,
   AiFeedbackResponse,
@@ -42,36 +41,120 @@ import type {
   LearningEventResponse,
   QnaQuestionResponse,
   StudyReportResponse,
+  AdminOverview,
+  DailySessionPoint,
+  CourseStatRow,
+  LectureStatRow,
+  EnrolleeRow,
+  LearningEventRow,
+  AnomalyResponse,
+  AuditResponse,
+  FeedCursor,
+  FeedCursorResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
+const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+const REFRESH_EXCLUDED_PATHS = new Set([
+  '/api/auth/csrf',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/auth/signup',
+])
+
+let refreshAuthPromise: Promise<boolean> | null = null
+
+const decodeCookieValue = (value: string): string => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+const getCookieValue = async (name: string): Promise<string | undefined> => {
+  if (typeof window !== 'undefined') {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+    return match ? decodeCookieValue(match[1]) : undefined
+  }
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const value = cookieStore.get(name)?.value
+    return value ? decodeCookieValue(value) : undefined
+  } catch {
+    return undefined
+  }
+}
 
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  let token = ''
   if (typeof window !== 'undefined') {
-    token = localStorage.getItem('accessToken') || ''
-    if (!token) {
-      const match = document.cookie.match(/(^| )accessToken=([^;]+)/)
-      if (match) token = match[2]
-    }
-  } else {
-    try {
-      const { cookies } = await import('next/headers')
-      const cookieStore = cookies()
-      const store = cookieStore instanceof Promise ? await cookieStore : cookieStore
-      token = store.get('accessToken')?.value || ''
-    } catch (e) { }
+    return {}
   }
-  return token ? { Authorization: `Bearer ${token}` } : {}
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+
+    return cookieHeader ? { Cookie: cookieHeader } : {}
+  } catch {
+    return {}
+  }
+}
+
+const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record<string, string>> => {
+  if (!includeCredentials) {
+    return {}
+  }
+
+  return getAuthHeaders()
+}
+
+const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
+  return includeCredentials ? 'include' : 'same-origin'
+}
+
+const toIsoLocalDateTime = (value: string | number[]): string => {
+  if (!Array.isArray(value)) {
+    return value
+  }
+
+  const [year, month = 1, day = 1, hour = 0, minute = 0, second = 0, nano = 0] = value
+  const millisecond = Math.floor(nano / 1_000_000)
+  const pad = (num: number, length = 2) => String(num).padStart(length, '0')
+
+  return `${pad(year, 4)}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${pad(millisecond, 3)}`
+}
+
+const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | undefined> => {
+  if (!includeCredentials || !BASE_URL) {
+    return undefined
+  }
+
+  const currentToken = await getCookieValue(CSRF_COOKIE_NAME)
+  if (currentToken) {
+    return currentToken
+  }
+
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  await fetch(`${BASE_URL}/api/auth/csrf`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  }).catch(() => undefined)
+
+  return getCookieValue(CSRF_COOKIE_NAME)
 }
 
 const handleUnauthorized = () => {
   if (typeof window !== 'undefined') {
-    const hasToken = !!localStorage.getItem('accessToken') || document.cookie.includes('accessToken')
-
-    localStorage.removeItem('accessToken')
-    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-
     const pathname = window.location.pathname
     const isPublicRoute =
       pathname === '/' ||
@@ -84,10 +167,44 @@ const handleUnauthorized = () => {
 
     if (!isPublicRoute) {
       window.location.href = '/login'
-    } else if (hasToken) {
-      window.location.reload()
     }
   }
+}
+
+const shouldAttemptTokenRefresh = (path: string, includeCredentials: boolean, status: number): boolean => {
+  return status === 401
+    && includeCredentials
+    && typeof window !== 'undefined'
+    && !REFRESH_EXCLUDED_PATHS.has(path)
+}
+
+const refreshAuthTokens = async (): Promise<boolean> => {
+  if (!BASE_URL || typeof window === 'undefined') {
+    return false
+  }
+
+  if (!refreshAuthPromise) {
+    refreshAuthPromise = (async () => {
+      const headers: Record<string, string> = {}
+      const csrfToken = await ensureCsrfToken(true)
+      if (csrfToken) {
+        headers[CSRF_HEADER_NAME] = csrfToken
+      }
+
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => null)
+
+      return res?.ok ?? false
+    })().finally(() => {
+      refreshAuthPromise = null
+    })
+  }
+
+  return refreshAuthPromise
 }
 
 async function request<T>(
@@ -98,14 +215,22 @@ async function request<T>(
 ): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
-    const authHeaders = includeAuth ? await getAuthHeaders() : {}
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      cache: 'no-store',
-    })
+    const fetchRequest = async () => {
+      const authHeaders = await getCredentialHeaders(includeAuth)
+      return fetch(`${BASE_URL}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        credentials: getCredentialsMode(includeAuth),
+        cache: 'no-store',
+      })
+    }
+
+    let res = await fetchRequest()
+    if (shouldAttemptTokenRefresh(path, includeAuth, res.status) && await refreshAuthTokens()) {
+      res = await fetchRequest()
+    }
 
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
@@ -123,18 +248,29 @@ async function request<T>(
   }
 }
 
-async function mutate<T>(path: string, method: string, body?: any, isMultipart = false): Promise<T> {
+async function mutate<T>(
+  path: string,
+  method: string,
+  body?: any,
+  isMultipart = false,
+  includeCredentials = true,
+): Promise<T> {
   if (!BASE_URL) throw new Error('API BASE_URL is not defined')
 
-  const headers = await getAuthHeaders()
+  const headers = await getCredentialHeaders(includeCredentials)
   if (!isMultipart) {
     headers['Content-Type'] = 'application/json'
+  }
+  const csrfToken = await ensureCsrfToken(includeCredentials)
+  if (csrfToken) {
+    headers[CSRF_HEADER_NAME] = csrfToken
   }
 
   const options: RequestInit = {
     method,
     headers,
   }
+  options.credentials = getCredentialsMode(includeCredentials)
   if (body) {
     options.body = isMultipart ? body : JSON.stringify(body)
   }
@@ -149,16 +285,29 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      handleUnauthorized()
+    if (shouldAttemptTokenRefresh(path, includeCredentials, res.status) && await refreshAuthTokens()) {
+      res = await fetch(`${BASE_URL}${path}`, options)
     }
-    const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        handleUnauthorized()
+      }
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+    }
   }
-  if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
+  if (res.status === 204 || res.status === 202) {
     return {} as T
   }
-  return await res.json() as T
+  if (res.status === 201 && res.headers.get('content-length') === '0') {
+    return {} as T
+  }
+  const text = await res.text()
+  if (!text.trim()) {
+    return {} as T
+  }
+  return JSON.parse(text) as T
 }
 
 const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
@@ -206,6 +355,8 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       chapterId: ch.id.toString(),
       durationSeconds: lec.durationSeconds,
       m3u8Path: lec.m3u8Path ?? null,
+      summary: lec.summary ?? '',
+      hasVideo: lec.hasVideo ?? false,
     })) || [],
   })) || [],
   status: detail.status,
@@ -221,7 +372,7 @@ const mapStudyDetailToStudy = (
   intro: detail.description,
   status: detail.status as Study['status'],
   ownerName: detail.ownerNickname,
-  myRole: detail.myRole.toLowerCase() as Study['myRole'],
+  myRole: (detail.myRole?.toLowerCase() ?? 'viewer') as Study['myRole'],
   progress: 0,
   members: [
     {
@@ -535,6 +686,19 @@ const saveCourseDraft = (id: string | number, data: any) => {
   }
 }
 
+const removeCourseDraft = (id: string | number) => {
+  if (typeof window !== 'undefined') {
+    const cookieName = `course_draft_${id}`
+    document.cookie = `${cookieName}=; path=/; max-age=0`
+    try {
+      localStorage.removeItem(cookieName)
+      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]')
+      const nextDraftIds = draftIds.filter((dId: string) => dId !== String(id))
+      localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
+    } catch (e) { }
+  }
+}
+
 const formatWatchTime = (totalSeconds: number): string => {
   if (!totalSeconds || totalSeconds <= 0) return '0분'
   const hours = Math.floor(totalSeconds / 3600)
@@ -589,20 +753,8 @@ const mapStudyReportToDisplay = (
 
 const getCurrentUserId = async (): Promise<number> => {
   try {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return 1
-    const payloadPart = token.split('.')[1]
-    if (!payloadPart) return 1
-    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-    const rawPayload = typeof window !== 'undefined'
-      ? atob(base64)
-      : Buffer.from(base64, 'base64').toString('utf8')
-    const jsonPayload = typeof window !== 'undefined'
-      ? decodeURIComponent(escape(rawPayload))
-      : rawPayload
-    const claims = JSON.parse(jsonPayload)
-    return Number(claims.sub || 1)
+    const profile = await api.getProfile()
+    return Number(profile?.id || 1)
   } catch (e) {
     return 1
   }
@@ -610,14 +762,10 @@ const getCurrentUserId = async (): Promise<number> => {
 
 export const api = {
   // Auth
-  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
-  login: (data: LoginRequest) => mutate<LoginResponse>('/api/auth/login', 'POST', data),
+  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
+  login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    }
-    return mutate<void>('/api/auth/logout', 'POST')
+    return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
   },
 
   // Courses
@@ -646,22 +794,12 @@ export const api = {
     )
     if (detail && detail.id) return mapCourseDetailToCourse(detail)
 
-    let chapters: ChapterInfoResponse[] = []
-    try {
-      const authHeaders = await getAuthHeaders()
-      const chaptersRes = await fetch(`${BASE_URL}/api/courses/${id}/chapters`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        cache: 'no-store',
-      })
-      if (chaptersRes.ok) {
-        chapters = await chaptersRes.json()
-      }
-    } catch (e) {
-      console.error('Failed to fetch chapters for course:', e)
-    }
+    const chapters = await request<ChapterInfoResponse[]>(
+      `/api/courses/${id}/chapters`,
+      [],
+      true,
+      false,
+    )
 
     let generalInfo = SEEDED_COURSES[Number(id)]
     if (!generalInfo) {
@@ -716,43 +854,63 @@ export const api = {
     return mapCourseDetailToCourse(detailResponse)
   },
 
-  createCourse: async (data: CourseCreateRequest) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', data)
+  createCourse: async (formData: FormData) => {
+    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
+
+      const requestBlob = formData.get('request') as Blob
+      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+
       saveCourseDraft(courseId, {
         instructorId,
-        categoryId: data.categoryId,
-        title: data.title,
-        description: data.description,
-        thumbnail: data.thumbnail || '',
-        price: data.price,
+        categoryId: Number(requestData.categoryId),
+        title: requestData.title || '',
+        description: requestData.description || '',
+        thumbnail: requestData.thumbnail || '',
+        price: Number(requestData.price),
         status: 'DRAFT'
       })
     }
     return courseId
   },
 
-  updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
+  updateCourse: async (courseId: string | number, formData: FormData) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
+
+    const requestBlob = formData.get('request') as Blob
+    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+
     saveCourseDraft(courseId, {
       instructorId,
-      categoryId: data.categoryId,
-      title: data.title,
-      description: data.description,
-      thumbnail: data.thumbnail || '',
-      price: data.price,
+      categoryId: Number(requestData.categoryId),
+      title: requestData.title || '',
+      description: requestData.description || '',
+      thumbnail: requestData.thumbnail || '',
+      price: Number(requestData.price),
       status: 'DRAFT'
     })
     return res
   },
 
-  requestCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'POST'),
+  requestCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'POST')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'IN_REVIEW' })
+    }
+    return res
+  },
 
-  cancelCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE'),
+  cancelCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
 
   closeCourse: (courseId: string | number) =>
     mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
@@ -767,8 +925,15 @@ export const api = {
   },
 
   // Lecture enter / progress / last-watched
-  enterLecture: (lectureId: string | number) =>
-    request<LectureEnterResponse | null>(`/api/lectures/${lectureId}/enter`, null),
+  enterLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<LectureEnterResponse | null>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/enter`,
+      null,
+    ),
 
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
@@ -867,17 +1032,16 @@ export const api = {
       if (detail?.status === 'CLOSED') {
         status = '완료' // Map 'CLOSED' from backend to '완료' for frontend display
       }
-      // Note: progress, totalLectures, and completedLectures cannot be accurately
-      // populated from StudySummaryResponse or StudyDetailResponse without
-      // further backend changes, so they remain hardcoded to 0.
+      // 진행도/강의 수는 백엔드 StudySummaryResponse 에서 집계해 내려준다.
       return {
         id: study.studyId.toString(),
+        courseId: detail?.courseId?.toString(),
         title: study.title,
         instructor: study.ownerNickname,
         thumbnailUrl: '/placeholder.svg',
-        progress: 0,
-        totalLectures: 0,
-        completedLectures: 0,
+        progress: study.progressRate ?? 0,
+        totalLectures: study.totalLectures ?? 0,
+        completedLectures: study.completedLectures ?? 0,
         status: status,
       }
     })
@@ -890,15 +1054,38 @@ export const api = {
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
     ),
 
+  getStudyFeed: (studyId: string | number, cursor?: FeedCursor | null, size = 10) => {
+    const params = new URLSearchParams({ size: String(size) })
+    if (cursor) {
+      params.set('cursorOccurredAt', toIsoLocalDateTime(cursor.occurredAt))
+      params.set('cursorId', String(cursor.id))
+    }
+
+    return request<FeedCursorResponse>(
+      `/api/studies/${studyId}/feed?${params.toString()}`,
+      { items: [], nextCursor: null, hasNext: false },
+    )
+  },
+
   createStudyActivity: (studyId: number | string, content: string) =>
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
 
   getStudy: async (studyId: string | number): Promise<Study | undefined> => {
-    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
+    const detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
 
     if (!detail) return undefined
 
-    return mapStudyDetailToStudy(detail);
+    return mapStudyDetailToStudy(detail)
+  },
+
+  getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
+    const study = await api.getStudy(studyId)
+    if (!study) return undefined
+
+    const enrolled = await api.isCourseEnrollmentActive(study.courseId)
+    if (!enrolled) return undefined
+
+    return study
   },
 
   getStudyIdByCourseId: async (courseId: string | number): Promise<string | null> => {
@@ -969,39 +1156,12 @@ export const api = {
 
   // Coupons & Admin
   getCoupons: async () => {
-    let authHeaders = await getAuthHeaders()
-    if (!authHeaders.Authorization) {
-      try {
-        const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@test.com', password: 'Test1234!' }),
-        })
-        if (loginRes.ok) {
-          const loginData = await loginRes.json()
-          if (loginData.accessToken) {
-            authHeaders = { Authorization: `Bearer ${loginData.accessToken}` }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to log in as system admin to fetch public coupons:', e)
-      }
-    }
-
-    const res = await fetch(`${BASE_URL}/api/admin/coupons`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      console.warn(`[API 에러] ${res.status} on /api/admin/coupons`)
-      return []
-    }
-
-    const result = await res.json() as any
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
+      '/api/admin/coupons',
+      null,
+      true,
+      false,
+    )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToUserCoupon)
   },
@@ -1040,27 +1200,17 @@ export const api = {
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return null
     try {
-      const payloadPart = token.split('.')[1]
-      if (!payloadPart) return null
-      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-      const rawPayload = typeof window !== 'undefined'
-        ? atob(base64)
-        : Buffer.from(base64, 'base64').toString('utf8')
-      const jsonPayload = typeof window !== 'undefined'
-        ? decodeURIComponent(escape(rawPayload))
-        : rawPayload
-      const claims = JSON.parse(jsonPayload)
+      const claims = await request<any>('/api/auth/me', null)
+      if (!claims) return null
       return {
-        id: String(claims.sub || ''),
+        id: String(claims.id || claims.sub || ''),
         name: claims.nickname || claims.name || '',
         email: claims.email || '',
         studyCount: 0,
         courseCount: 0,
         isSeller: claims.role === 'ROLE_SELLER' || claims.role === 'ROLE_ADMIN',
+        isAdmin: claims.role === 'ROLE_ADMIN',
       }
     } catch (e) {
       console.error('Failed to decode token:', e)
@@ -1072,12 +1222,16 @@ export const api = {
       const res = await request<any>('/api/orders', { content: [] })
       const orders = Array.isArray(res) ? res : (res?.content || [])
       const enrolled: EnrolledCourse[] = []
-      orders.forEach((ord: any) => {
+      for (const ord of orders) {
         if (ord.status === 'PAID') {
-          ord.items?.forEach((item: any) => {
-            if (!enrolled.some(e => e.id === item.courseId.toString())) {
+          for (const item of ord.items ?? []) {
+            const courseId = item.courseId.toString()
+            if (!enrolled.some(e => (e.courseId ?? e.id) === courseId)) {
+              const studyId = await api.getStudyIdByCourseId(courseId)
+              if (!studyId) continue
               enrolled.push({
-                id: item.courseId.toString(),
+                id: studyId,
+                courseId,
                 title: item.courseTitle || '',
                 instructor: '강사',
                 thumbnailUrl: '/placeholder.svg',
@@ -1087,9 +1241,9 @@ export const api = {
                 status: '진행 중'
               })
             }
-          })
+          }
         }
-      })
+      }
       return enrolled
     } catch (e) {
       console.error('Failed to get purchased courses from orders:', e)
@@ -1106,24 +1260,20 @@ export const api = {
 
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
-  // 저장된 리포트 조회. 없으면 null.
-  getStudyReportRaw: (studyId: string | number) =>
-    request<StudyReportResponse | null>(`/api/studies/${studyId}/report`, null),
+  // 리포트 조회. 없으면 백엔드에서 즉시 생성한다.
+  getStudyReportRaw: (studyId: string | number, refresh = false) =>
+    request<StudyReportResponse | null>(
+      `/api/studies/${studyId}/report${refresh ? '?refresh=true' : ''}`,
+      null,
+    ),
 
-  // 학습 이벤트를 집계해 리포트를 생성/갱신한다.
+  // 학습 이벤트 재집계를 시도한다. 쿨다운 이내면 기존 리포트가 반환된다.
   generateStudyReport: (studyId: string | number) =>
-    mutate<StudyReportResponse>(`/api/studies/${studyId}/report`, 'POST'),
+    api.getStudyReportRaw(studyId, true),
 
-  // 조회 후 없으면 생성까지 시도한다.
+  // 조회 후 없으면 백엔드에서 생성까지 처리한다.
   getOrGenerateStudyReport: async (studyId: string | number): Promise<StudyReportResponse | null> => {
-    const existing = await api.getStudyReportRaw(studyId)
-    if (existing && existing.studyId) return existing
-    try {
-      return await api.generateStudyReport(studyId)
-    } catch (e) {
-      console.warn('Failed to generate study report:', e)
-      return null
-    }
+    return await api.getStudyReportRaw(studyId)
   },
 
   getStudyReport: async (_studyId: string): Promise<StudyReport> => {
@@ -1189,12 +1339,74 @@ export const api = {
   },
 
   // Admin Course APIs
-  approveCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST'),
-  rejectCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason }),
-  suspendCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason }),
-  deleteCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE'),
+  approveCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST')
+    removeCourseDraft(courseId)
+    return res
+  },
+  rejectCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
+  suspendCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'SUSPENDED' })
+    }
+    return res
+  },
+  deleteCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE')
+    removeCourseDraft(courseId)
+    return res
+  },
+
+  // ── Admin Dashboard APIs ────────────────────────────────────────────
+  getAdminOverview: () =>
+    request<AdminOverview | null>('/api/admin/dashboard/overview', null),
+  getAdminDailySessions: (from?: string, to?: string) => {
+    const qs = new URLSearchParams()
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<DailySessionPoint[]>(`/api/admin/dashboard/sessions/daily${suffix}`, [])
+  },
+  getAdminCourseStats: (page = 0, size = 20, status?: string) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (status) qs.set('status', status)
+    return request<PageResponse<CourseStatRow> | null>(
+      `/api/admin/dashboard/courses?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminLectureStats: (courseId: number) =>
+    request<LectureStatRow[]>(`/api/admin/dashboard/courses/${courseId}/lectures`, []),
+  getAdminEnrollees: (courseId: number, page = 0, size = 20) =>
+    request<PageResponse<EnrolleeRow> | null>(
+      `/api/admin/dashboard/courses/${courseId}/enrollees?page=${page}&size=${size}`,
+      null,
+    ),
+  getAdminUserTimeline: (userId: number, courseId?: number, page = 0, size = 30) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (courseId != null) qs.set('courseId', String(courseId))
+    return request<PageResponse<LearningEventRow> | null>(
+      `/api/admin/dashboard/users/${userId}/timeline?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminAnomalies: (incompletionThreshold?: number, burstThreshold?: number, windowMinutes?: number) => {
+    const qs = new URLSearchParams()
+    if (incompletionThreshold != null) qs.set('incompletionThreshold', String(incompletionThreshold))
+    if (burstThreshold != null) qs.set('burstThreshold', String(burstThreshold))
+    if (windowMinutes != null) qs.set('windowMinutes', String(windowMinutes))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<AnomalyResponse | null>(`/api/admin/dashboard/anomalies${suffix}`, null)
+  },
+  getAdminAudit: () =>
+    request<AuditResponse | null>('/api/admin/dashboard/audit/retention', null),
 }

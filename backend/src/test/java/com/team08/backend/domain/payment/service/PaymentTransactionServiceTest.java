@@ -82,6 +82,9 @@ class PaymentTransactionServiceTest {
     @Mock
     private OrderCouponUsageRepository orderCouponUsageRepository;
 
+    @Mock
+    private PaidCourseStudyMemberService paidCourseStudyMemberService;
+
     private PaymentTransactionService paymentTransactionService;
 
     @BeforeEach
@@ -94,6 +97,7 @@ class PaymentTransactionServiceTest {
                 enrollmentRepository,
                 issuedCouponService,
                 orderCouponUsageRepository,
+                paidCourseStudyMemberService,
                 FIXED_CLOCK
         );
     }

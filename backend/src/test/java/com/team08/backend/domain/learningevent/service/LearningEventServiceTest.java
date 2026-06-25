@@ -10,15 +10,18 @@ import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
+import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -48,6 +51,9 @@ class LearningEventServiceTest {
     @Mock
     private CourseRepository courseRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private LearningEventService learningEventService;
 
@@ -69,6 +75,11 @@ class LearningEventServiceTest {
         assertThat(response.eventType()).isEqualTo(LearningEventType.LECTURE_ENTER);
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.lectureId()).isEqualTo(10L);
+
+        ArgumentCaptor<LearningEventRecorded> eventCaptor = ArgumentCaptor.forClass(LearningEventRecorded.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().learningEventId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().eventType()).isEqualTo(LearningEventType.LECTURE_ENTER);
     }
 
     @Test

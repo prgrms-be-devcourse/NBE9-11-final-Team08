@@ -8,6 +8,11 @@ on:
         required: true
         default: "latest"
         type: string
+      deploy:
+        description: "Deploy to production with blue-green after publishing"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -69,3 +74,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Prepare SSH key
+        if: ${{ inputs.deploy }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.PROD_SSH_PRIVATE_KEY }}" > ~/.ssh/team08-prod
+          chmod 600 ~/.ssh/team08-prod
+
+      - name: Deploy backend blue-green
+        if: ${{ inputs.deploy }}
+        run: |
+          chmod +x infra/scripts/deploy-bluegreen.sh
+          ./infra/scripts/deploy-bluegreen.sh \
+            "${{ secrets.PROD_APP_PUBLIC_IP }}" \
+            "${{ secrets.PROD_EDGE_PUBLIC_IP }}" \
+            "$HOME/.ssh/team08-prod" \
+            "${{ inputs.image_tag }}"

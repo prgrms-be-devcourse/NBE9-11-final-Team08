@@ -49,6 +49,7 @@ public class PaymentService {
     private final PaymentTransactionService paymentTransactionService;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
+    private final PaidCourseStudyMemberService paidCourseStudyMemberService;
     private final Clock clock;
 
     @Transactional
@@ -92,6 +93,11 @@ public class PaymentService {
 
         // 결제 완료 시점과 수강권 발급 시점을 동일하게 맞춘다.
         List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, paidAt);
+        paidCourseStudyMemberService.joinAsMember(
+                userId,
+                savedEnrollments.stream().map(Enrollment::getCourseId).toList(),
+                paidAt
+        );
 
         return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
     }
@@ -298,5 +304,10 @@ public class PaymentService {
     private void cancelActiveEnrollmentsForRefund(Order order, LocalDateTime canceledAt) {
         List<Enrollment> enrollments = enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE);
         enrollments.forEach(enrollment -> enrollment.cancel(canceledAt));
+        paidCourseStudyMemberService.leaveMember(
+                order.getUserId(),
+                enrollments.stream().map(Enrollment::getCourseId).toList(),
+                canceledAt
+        );
     }
 }

@@ -14,6 +14,8 @@ export interface Lecture {
   chapterId?: string
   durationSeconds?: number
   m3u8Path?: string | null
+  summary?: string
+  hasVideo?: boolean
   lastPositionSeconds?: number
   watchedSeconds?: number
 }
@@ -65,10 +67,12 @@ export interface CategoryResponse {
 export interface LectureInfoResponse {
   id: number
   title: string
+  summary?: string
   m3u8Path: string | null
   durationSeconds: number
   orderNo: number
   isFreePreview: boolean
+  hasVideo?: boolean
 }
 
 export interface ChapterInfoResponse {
@@ -401,10 +405,12 @@ export interface UserProfile {
   studyCount: number
   courseCount: number
   isSeller: boolean
+  isAdmin: boolean
 }
 
 export interface EnrolledCourse {
   id: string
+  courseId?: string
   title: string
   instructor: string
   thumbnailUrl: string
@@ -444,6 +450,7 @@ export interface CourseCreateRequest {
 export interface LectureUpdateRequest {
   id: number | null
   title: string
+  summary?: string
   durationSeconds: number
   orderNo: number
   isFreePreview: boolean
@@ -465,12 +472,8 @@ export interface LoginRequest {
   password: string
 }
 
-export interface LoginResponse {
-  accessToken: string
-}
-
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'
-export type StudyRole = 'owner' | 'member' | 'OWNER' | 'MEMBER'
+export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 
 export interface StudyMember {
   id: string
@@ -530,6 +533,9 @@ export interface StudySummaryResponse {
   title: string
   description: string
   ownerNickname: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
 }
 
 export interface StudyDetailResponse {
@@ -539,7 +545,7 @@ export interface StudyDetailResponse {
   description: string
   status: string
   ownerNickname: string
-  myRole: string
+  myRole: string | null
 }
 
 export interface StudyIdResponse {
@@ -552,6 +558,31 @@ export interface StudyActivityResponse {
   authorId: number
   content: string
   createdAt: string
+}
+
+export type FeedItemType = 'STUDY_ACTIVITY' | 'LECTURE_ENTER' | 'LECTURE_COMPLETE'
+export type BackendDateTime = string | number[]
+
+export interface FeedItemResponse {
+  id: number
+  studyId: number
+  actorId: number
+  actorNickname: string
+  type: FeedItemType
+  sourceId: number
+  content: string
+  occurredAt: BackendDateTime
+}
+
+export interface FeedCursor {
+  occurredAt: BackendDateTime
+  id: number
+}
+
+export interface FeedCursorResponse {
+  items: FeedItemResponse[]
+  nextCursor: FeedCursor | null
+  hasNext: boolean
 }
 
 export interface StructuredFeedback {
@@ -627,4 +658,103 @@ export interface StudyReportResponse {
   dailyProgress: StudyReportDailyProgressEntry[]
   dailyActivityMap: Record<string, number>
   updatedAt: string
+  status: 'LOADED' | 'REGENERATED' | 'COOLDOWN'
+  nextRegenerableAt: string | null
+}
+
+// ── 관리자 대시보드 ────────────────────────────────────────────────────
+export interface AdminOverview {
+  totalUsers: number
+  sellerCount: number
+  regularUserCount: number
+  onSaleCourseCount: number
+  activeEnrollmentCount: number
+  totalLearningEvents: number
+  totalCompletions: number
+  todaySessions: number
+  todayActiveLearners: number
+}
+
+export interface DailySessionPoint {
+  date: string
+  sessions: number
+  distinctLearners: number
+}
+
+export interface CourseStatRow {
+  courseId: number
+  title: string
+  instructorId: number
+  status: string
+  enrollees: number
+  enterCount: number
+  completionCount: number
+  incompletionRate: number
+}
+
+export interface LectureStatRow {
+  lectureId: number
+  chapterTitle: string
+  title: string
+  enterCount: number
+  completeCount: number
+  avgWatchSeconds: number
+}
+
+export interface EnrolleeRow {
+  userId: number
+  nickname: string
+  completedLectures: number
+  totalLectures: number
+  progressRate: number
+  lastEventTime: string | null
+}
+
+export interface LearningEventRow {
+  id: number
+  userId: number
+  courseId: number | null
+  chapterId: number | null
+  lectureId: number | null
+  eventType: string
+  positionSeconds: number | null
+  eventTime: string
+}
+
+export interface DuplicateBurst {
+  userId: number
+  lectureId: number
+  eventType: string
+  bucketMinute: string
+  count: number
+}
+
+export interface AnomalyResponse {
+  incompletionThreshold: number
+  burstThreshold: number
+  windowMinutes: number
+  highIncompletionCourses: CourseStatRow[]
+  duplicateBursts: DuplicateBurst[]
+}
+
+export interface AuditResponse {
+  retention: {
+    learningEventCount: number
+    oldestEventTime: string | null
+    newestEventTime: string | null
+    courseStatusHistoryCount: number
+    lectureProgressCount: number
+  }
+  accessHistory: {
+    source: string
+    description: string
+    actorId: number | null
+    occurredAt: string | null
+  }[]
+  integrityErrors: {
+    type: string
+    description: string
+    count: number
+    sampleIds: number[]
+  }[]
 }

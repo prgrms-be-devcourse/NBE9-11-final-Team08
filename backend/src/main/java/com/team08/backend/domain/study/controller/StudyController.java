@@ -44,7 +44,9 @@ public class StudyController {
             @PathVariable Long studyId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
     ) {
-        return studyService.getStudyDetail(studyId, loginUserPrincipal.user().id());
+        Long userId = loginUserPrincipal == null ? null : loginUserPrincipal.user().id();
+
+        return studyService.getStudyDetail(studyId, userId);
     }
 
     @Operation(

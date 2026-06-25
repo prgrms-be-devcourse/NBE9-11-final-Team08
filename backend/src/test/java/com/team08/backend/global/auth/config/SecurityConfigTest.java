@@ -1,9 +1,11 @@
 package com.team08.backend.global.auth.config;
 
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import com.team08.backend.global.config.CorsProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -11,7 +13,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockCookie;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,13 +24,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SecurityConfigTest.TestController.class)
-@EnableConfigurationProperties(TokenProperties.class)
+@EnableConfigurationProperties({TokenProperties.class, AccessCookieProperties.class, CorsProperties.class})
+@TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:3000")
 @Import({
         SecurityConfig.class,
         JwtProvider.class,
@@ -56,13 +64,63 @@ class SecurityConfigTest {
 
     @Test
     void refresh_요청은_accessToken_없이_접근할_수_있다() throws Exception {
-        mockMvc.perform(post("/api/auth/refresh"))
+        mockMvc.perform(post("/api/auth/refresh")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void refresh_요청은_유효하지_않은_accessToken_쿠키가_있어도_필터를_건너뛴다() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .with(csrf())
+                        .cookie(new MockCookie("accessToken", "invalid.token.value")))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void logout_요청은_accessToken_없이_접근할_수_있다() throws Exception {
-        mockMvc.perform(post("/api/auth/logout"))
+        mockMvc.perform(post("/api/auth/logout")
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void csrf_토큰_발급_요청은_accessToken_없이_접근할_수_있고_XSRF_TOKEN_쿠키를_내려준다() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists("XSRF-TOKEN"));
+    }
+
+    @Test
+    void csrf_토큰_발급_요청은_유효하지_않은_accessToken_쿠키가_있어도_필터를_건너뛴다() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf")
+                        .cookie(new MockCookie("accessToken", "invalid.token.value")))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void login_요청은_XSRF_TOKEN_쿠키와_X_XSRF_TOKEN_헤더가_일치하면_허용된다() throws Exception {
+        String csrfToken = "test-csrf-token";
+
+        mockMvc.perform(post("/api/auth/login")
+                        .cookie(new MockCookie("XSRF-TOKEN", csrfToken))
+                        .header("X-XSRF-TOKEN", csrfToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void login_요청은_csrf_토큰이_없으면_거부된다() throws Exception {
+        mockMvc.perform(post("/api/auth/login"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void refresh_요청은_XSRF_TOKEN_쿠키와_X_XSRF_TOKEN_헤더가_일치하면_허용된다() throws Exception {
+        String csrfToken = "test-csrf-token";
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new MockCookie("XSRF-TOKEN", csrfToken))
+                        .header("X-XSRF-TOKEN", csrfToken))
                 .andExpect(status().isNoContent());
     }
 
@@ -71,6 +129,20 @@ class SecurityConfigTest {
         mockMvc.perform(get("/api/studies/by-course/{courseId}", 10L))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.studyId").value(100L));
+    }
+
+    @Test
+    void 스터디_상세_조회는_accessToken_없이_접근할_수_있다() throws Exception {
+        mockMvc.perform(get("/api/studies/{studyId}", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studyId").value(10L))
+                .andExpect(jsonPath("$.myRole").doesNotExist());
+    }
+
+    @Test
+    void 내_스터디_목록_조회는_accessToken_없이_접근할_수_없다() throws Exception {
+        mockMvc.perform(get("/api/studies/me"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -85,6 +157,38 @@ class SecurityConfigTest {
                 .andExpect(jsonPath("$.name").value(LOGIN_USER.nickname()))
                 .andExpect(jsonPath("$.role").value(LOGIN_USER.role()))
                 .andExpect(jsonPath("$.authority").value(LOGIN_USER.role()));
+    }
+
+    @Test
+    void Authorization_헤더가_없으면_accessToken_쿠키로_인증한다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(get("/test")
+                        .cookie(new MockCookie("accessToken", accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(LOGIN_USER.id()))
+                .andExpect(jsonPath("$.email").value(LOGIN_USER.email()))
+                .andExpect(jsonPath("$.name").value(LOGIN_USER.nickname()))
+                .andExpect(jsonPath("$.role").value(LOGIN_USER.role()));
+    }
+
+    @Test
+    void 쿠키_인증_상태_변경_요청은_csrf_토큰이_없으면_거부된다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(post("/test")
+                        .cookie(new MockCookie("accessToken", accessToken)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 쿠키_인증_상태_변경_요청은_csrf_토큰이_있으면_허용된다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(post("/test")
+                        .with(csrf())
+                        .cookie(new MockCookie("accessToken", accessToken)))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -152,14 +256,35 @@ class SecurityConfigTest {
         void refresh() {
         }
 
+        @PostMapping("/api/auth/login")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void login() {
+        }
+
         @PostMapping("/api/auth/logout")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void logout() {
         }
 
+        @GetMapping("/api/auth/csrf")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void csrf(CsrfToken csrfToken) {
+            csrfToken.getToken();
+        }
+
+        @PostMapping("/test")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void postTest() {
+        }
+
         @GetMapping("/api/studies/by-course/{courseId}")
         StudyIdResponse studyId(@PathVariable Long courseId) {
             return new StudyIdResponse(100L);
+        }
+
+        @GetMapping("/api/studies/{studyId}")
+        StudyDetailResponse studyDetail(@PathVariable Long studyId) {
+            return new StudyDetailResponse(studyId, null);
         }
     }
 
@@ -174,6 +299,12 @@ class SecurityConfigTest {
 
     record StudyIdResponse(
             Long studyId
+    ) {
+    }
+
+    record StudyDetailResponse(
+            Long studyId,
+            String myRole
     ) {
     }
 }
