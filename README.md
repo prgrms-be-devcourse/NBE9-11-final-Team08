@@ -11,18 +11,18 @@
 
 2. Replace every `change-me` value in `infra/compose/.env`.
 
-3. Start MySQL, the backend, and Nginx.
+3. Start MySQL and the backend.
 
    ```bash
    docker compose --env-file infra/compose/.env \
      -f infra/compose/compose.yaml up --build -d
    docker compose --env-file infra/compose/.env \
      -f infra/compose/compose.yaml ps
-   curl http://localhost/actuator/health
+   curl http://localhost:8080/actuator/health
    ```
 
-Only Nginx ports `80` and `443` are published. MySQL and the backend stay inside the
-Compose networks. Local Docker uses HTTP by default.
+MySQL and Redis stay inside the Compose network. The backend is exposed on
+`BACKEND_PORT` for local development and performance tests.
 
 ## EC2 Deployment
 
@@ -34,7 +34,13 @@ Prerequisites:
 - An external DNS domain
 - A public GHCR package for this repository
 
-Create the infrastructure:
+Create the infrastructure. Terraform creates two EC2 hosts:
+
+- edge host: t3.small, runs Nginx and Certbot
+- app host: t3.medium, runs MySQL, Redis, and Spring
+
+The app security group allows Spring port `8080` only from the edge security
+group.
 
 ```bash
 cd infra/terraform
@@ -44,21 +50,30 @@ terraform init
 terraform apply
 ```
 
-Upload the deployment files:
+Upload and start the app server first:
 
 ```bash
-./infra/scripts/deploy.sh <elastic-ip> <ssh-private-key> [image-tag]
+./infra/scripts/deploy.sh <app-public-ip> <ssh-private-key> [image-tag]
 ```
 
 The first run creates `/opt/team08/compose/.env` on the server and stops. Connect
 over SSH, fill in that file, set `IS_COOKIE_SECURE=true`, and run the deploy
-command again. Create an external DNS `A` record pointing the API domain to the
-Terraform `elastic_ip` output.
+command again.
+
+Upload and start the edge server:
+
+```bash
+./infra/scripts/deploy-edge.sh <edge-elastic-ip> <ssh-private-key>
+```
+
+On the edge server, fill `/opt/team08/compose/.env` with `DOMAIN`,
+`CERTBOT_EMAIL`, and `BACKEND_UPSTREAM=<app-private-ip>:8080`. Create an external
+DNS `A` record pointing the API domain to the Terraform `edge_elastic_ip` output.
 
 After DNS propagation, issue the certificate and start HTTPS:
 
 ```bash
-ssh -i <ssh-private-key> ubuntu@<elastic-ip>
+ssh -i <ssh-private-key> ubuntu@<edge-elastic-ip>
 cd /opt/team08
 ./scripts/bootstrap-https.sh
 ```

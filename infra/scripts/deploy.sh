@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo "Usage: $0 <elastic-ip> <ssh-private-key> [image-tag]" >&2
+  echo "Usage: $0 <app-public-ip> <ssh-private-key> [image-tag]" >&2
   exit 1
 fi
 
@@ -29,25 +29,18 @@ infra_root="$(cd "$(dirname "$0")/.." && pwd)"
 echo "Checking SSH connection to ${remote}..."
 ssh "${ssh_options[@]}" "${remote}" true
 
-echo "Uploading deployment files to ${remote}:/opt/team08/..."
+echo "Uploading app deployment files to ${remote}:/opt/team08/..."
 ssh "${ssh_options[@]}" "${remote}" \
-  "mkdir -p /opt/team08/compose /opt/team08/nginx/templates /opt/team08/scripts"
+  "mkdir -p /opt/team08/compose"
 scp "${ssh_options[@]}" \
   "${infra_root}/compose/compose.yaml" \
   "${infra_root}/compose/compose.prod.yaml" \
   "${infra_root}/compose/.env.example" \
   "${remote}:/opt/team08/compose/"
-scp "${ssh_options[@]}" \
-  "${infra_root}/nginx/templates/"*.template \
-  "${remote}:/opt/team08/nginx/templates/"
-scp "${ssh_options[@]}" \
-  "${infra_root}/scripts/"*.sh \
-  "${remote}:/opt/team08/scripts/"
 
 echo "Pulling image and starting the database and backend..."
 ssh "${ssh_options[@]}" "${remote}" \
   "cd /opt/team08 && \
-   chmod +x scripts/*.sh && \
    if [ ! -f compose/.env ]; then \
      cp compose/.env.example compose/.env; \
      chmod 600 compose/.env; \
@@ -62,5 +55,4 @@ ssh "${ssh_options[@]}" "${remote}" \
    docker compose --env-file compose/.env \
      -f compose/compose.yaml -f compose/compose.prod.yaml up -d db backend"
 
-echo "Deployment files uploaded. After DNS points to ${host}, run:"
-echo "ssh -i ${key_path} ${remote} 'cd /opt/team08 && ./scripts/bootstrap-https.sh'"
+echo "App deployment complete on ${host}. Deploy the edge server with deploy-edge.sh."
