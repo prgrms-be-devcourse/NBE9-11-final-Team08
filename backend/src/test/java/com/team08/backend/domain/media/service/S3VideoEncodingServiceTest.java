@@ -8,9 +8,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
-
+import org.junit.jupiter.api.AfterEach;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,20 +32,23 @@ class S3VideoEncodingServiceTest {
     @InjectMocks
     private S3VideoEncodingService s3VideoEncodingService;
 
-    private MockMultipartFile mockMultipartFile;
+    private File mockFile;
     private String targetDirName;
     private Long lectureId;
 
     @BeforeEach
-    void setUp() {
-        mockMultipartFile = new MockMultipartFile(
-                "file",
-                "test.mp4",
-                "video/mp4",
-                "test video content".getBytes()
-        );
+    void setUp() throws IOException {
+        mockFile = File.createTempFile("s3-test-video-", ".mp4");
+        Files.write(mockFile.toPath(), "test video content".getBytes());
         targetDirName = "test-uuid";
         lectureId = 1L;
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (mockFile != null && mockFile.exists()) {
+            mockFile.delete();
+        }
     }
 
     @Test
@@ -54,7 +58,7 @@ class S3VideoEncodingServiceTest {
                 .uploadFile(any(File.class), anyString());
 
         assertThrows(CustomException.class, () ->
-                s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
+                s3VideoEncodingService.encodeToHls(mockFile, targetDirName, lectureId)
         );
 
         verify(s3FileStorageService, never()).deleteFile(anyString());
@@ -68,7 +72,7 @@ class S3VideoEncodingServiceTest {
                 .downloadFile(anyString(), any(File.class));
 
         assertThrows(CustomException.class, () ->
-                s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
+                s3VideoEncodingService.encodeToHls(mockFile, targetDirName, lectureId)
         );
 
         verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
@@ -80,7 +84,7 @@ class S3VideoEncodingServiceTest {
         given(s3FileStorageService.downloadFile(anyString(), any(File.class))).willReturn(mock(File.class));
 
         assertThrows(CustomException.class, () ->
-                s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
+                s3VideoEncodingService.encodeToHls(mockFile, targetDirName, lectureId)
         );
 
         verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));
@@ -92,7 +96,7 @@ class S3VideoEncodingServiceTest {
         given(s3FileStorageService.downloadFile(anyString(), any(File.class))).willReturn(mock(File.class));
 
         assertThrows(CustomException.class, () ->
-                s3VideoEncodingService.encodeToHls(mockMultipartFile, targetDirName, lectureId)
+                s3VideoEncodingService.encodeToHls(mockFile, targetDirName, lectureId)
         );
 
         verify(s3FileStorageService, times(1)).deleteFile(eq("videos/temp/" + targetDirName + ".mp4"));

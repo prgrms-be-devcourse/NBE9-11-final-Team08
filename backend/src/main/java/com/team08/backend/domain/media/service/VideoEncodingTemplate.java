@@ -6,7 +6,6 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,13 +22,14 @@ public abstract class VideoEncodingTemplate {
 
     private final EncodingResultHandler resultHandler;
 
-    protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId,
+    protected void executePipeline(File file, String targetDirName, Long lectureId,
                                    EncodingPurpose purpose, String description, Long instructorId) {
-        File sourceFile = prepareSourceFile(file, targetDirName, lectureId);
+        File sourceFile = null;
         Path localWorkspacePath = null;
         Process process = null;
 
         try {
+            sourceFile = prepareSourceFile(file, targetDirName, lectureId);
             localWorkspacePath = Files.createTempDirectory(Paths.get(System.getProperty("java.io.tmpdir")), "hls-work-");
 
             String outputM3u8 = localWorkspacePath.resolve("output.m3u8").toString();
@@ -52,7 +52,7 @@ public abstract class VideoEncodingTemplate {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
-            cleanupTemporaryResources(process, sourceFile, localWorkspacePath);
+            cleanupTemporaryResources(process, file, sourceFile, localWorkspacePath);
         }
     }
 
@@ -83,9 +83,12 @@ public abstract class VideoEncodingTemplate {
         }
     }
 
-    private void cleanupTemporaryResources(Process process, File sourceFile, Path localWorkspacePath) {
+    private void cleanupTemporaryResources(Process process, File originFile, File sourceFile, Path localWorkspacePath) {
         if (process != null && process.isAlive()) {
             process.destroyForcibly();
+        }
+        if (originFile != null && originFile.exists()) {
+            originFile.delete();
         }
         if (sourceFile != null && sourceFile.exists()) {
             sourceFile.delete();
@@ -106,7 +109,7 @@ public abstract class VideoEncodingTemplate {
         }
     }
 
-    protected abstract File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId);
+    protected abstract File prepareSourceFile(File file, String targetDirName, Long lectureId);
 
     protected abstract void handleGeneratedFiles(Path workspacePath, String targetDirName, Long lectureId);
 

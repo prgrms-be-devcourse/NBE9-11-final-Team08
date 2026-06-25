@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,27 +45,19 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
 
     @Override
     @Async("videoEncodingExecutor")
-    public void encodeToHls(MultipartFile file, String targetDirName, Long lectureId) {
+    public void encodeToHls(File file, String targetDirName, Long lectureId) {
         executePipeline(file, targetDirName, lectureId, EncodingPurpose.CREATE, null, null);
     }
 
     @Override
     @Async("videoEncodingExecutor")
-    public void encodeModificationToHls(MultipartFile file, String targetDirName, Long lectureId, String description, Long instructorId) {
+    public void encodeModificationToHls(File file, String targetDirName, Long lectureId, String description, Long instructorId) {
         executePipeline(file, targetDirName, lectureId, EncodingPurpose.MODIFY, description, instructorId);
     }
 
     @Override
-    protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
-        try {
-            Path tempFilePath = Files.createTempFile(Paths.get(System.getProperty("java.io.tmpdir")), "lecture-local-tmp-", ".mp4");
-            File sourceFile = tempFilePath.toFile();
-            file.transferTo(sourceFile);
-            return sourceFile;
-        } catch (Exception e) {
-            log.error("Failed to create temporary file for local encoding. lectureId: {}", lectureId, e);
-            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
-        }
+    protected File prepareSourceFile(File file, String targetDirName, Long lectureId) {
+        return file;
     }
 
     @Override

@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useLearningSession } from '@/lib/hooks/use-learning-session'
 import type { Course, Lecture, QnaQuestionResponse } from '@/lib/types'
+import Hls from 'hls.js'
 
 interface StudyViewProps {
   course: Course
@@ -104,6 +105,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const [playing, setPlaying] = useState(false)
   const positionRef = useRef(0)
   positionRef.current = position
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   // 강의 입장 권한 상태: enterLecture(수강권 검사) 실패 시 true → 재생/작성 차단
   const [accessDenied, setAccessDenied] = useState(false)
