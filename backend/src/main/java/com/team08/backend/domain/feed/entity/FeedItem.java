@@ -56,4 +56,15 @@ public class FeedItem {
     public static FeedItem createStudyActivity(Long studyId, Long authorId, Long activityId, String contentSummary, LocalDateTime occurredAt) {
         return new FeedItem(studyId, authorId, FeedItemType.STUDY_ACTIVITY, activityId, contentSummary, occurredAt);
     }
+
+    public static FeedItem createLearningEvent(
+            Long studyId,
+            Long actorId,
+            FeedItemType type,
+            Long learningEventId,
+            String content,
+            LocalDateTime occurredAt
+    ) {
+        return new FeedItem(studyId, actorId, type, learningEventId, content, occurredAt);
+    }
 }

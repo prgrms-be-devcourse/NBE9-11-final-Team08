@@ -559,7 +559,7 @@ export interface StudyActivityResponse {
   createdAt: string
 }
 
-export type FeedItemType = 'STUDY_ACTIVITY'
+export type FeedItemType = 'STUDY_ACTIVITY' | 'LECTURE_ENTER' | 'LECTURE_COMPLETE'
 export type BackendDateTime = string | number[]
 
 export interface FeedItemResponse {

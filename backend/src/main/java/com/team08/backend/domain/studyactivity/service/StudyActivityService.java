@@ -1,15 +1,16 @@
 package com.team08.backend.domain.studyactivity.service;
 
 import com.team08.backend.domain.aifeedback.service.AiFeedbackInvalidator;
-import com.team08.backend.domain.feed.outbox.FeedOutboxService;
 import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
 import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,8 +24,8 @@ public class StudyActivityService {
 
     private final StudyActivityRepository studyActivityRepository;
     private final AiFeedbackInvalidator aiFeedbackInvalidator;
-    private final FeedOutboxService feedOutboxService;
     private final StudyAccessAuthorizer studyAccessAuthorizer;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
@@ -33,7 +34,7 @@ public class StudyActivityService {
         StudyActivity activity = StudyActivity.create(studyId, userId, content);
         StudyActivity savedActivity = studyActivityRepository.save(activity);
 
-        feedOutboxService.createStudyActivityCreatedEvent(savedActivity);
+        eventPublisher.publishEvent(StudyActivityCreated.from(savedActivity));
 
         return StudyActivityResponse.from(savedActivity);
     }
