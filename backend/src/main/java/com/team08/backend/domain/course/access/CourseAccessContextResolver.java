@@ -8,9 +8,12 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -49,12 +52,23 @@ public class CourseAccessContextResolver {
                 userId, courseId, EnrollmentStatus.ACTIVE);
         boolean hasFreePreview = lectureRepository.existsByChapterCourseIdAndIsFreePreviewTrue(courseId);
 
+        boolean isAdmin = determineAdminStatus();
+
         return new CourseAccessContext(
                 userId,
                 course.getStatus(),
                 hasActiveEnrollment,
                 course.getInstructorId().equals(userId),
-                hasFreePreview
+                hasFreePreview,
+                isAdmin
         );
+    }
+
+    private boolean determineAdminStatus() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof LoginUserPrincipal principal) {
+            return "ROLE_ADMIN".equals(principal.user().role());
+        }
+        return false;
     }
 }

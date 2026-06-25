@@ -1093,8 +1093,13 @@ export const api = {
     const study = await api.getStudy(studyId)
     if (!study) return undefined
 
-    const enrolled = await api.isCourseEnrollmentActive(study.courseId)
-    if (!enrolled) return undefined
+    const profile = await api.getProfile()
+    const isAdmin = profile ? profile.isAdmin : false
+
+    if (!isAdmin) {
+      const enrolled = await api.isCourseEnrollmentActive(study.courseId)
+      if (!enrolled) return undefined
+    }
 
     return study
   },
