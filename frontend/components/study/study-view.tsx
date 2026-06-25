@@ -98,7 +98,16 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const [question, setQuestion] = useState('')
 
   const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
-  const durationSeconds = active?.durationSeconds ?? 0
+  const durationSeconds = active?.durationSeconds ?? 0;
+
+const [lectureInfo, setLectureInfo] = useState<any>(null);
+
+// Determine video source URL using fetched lectureInfo or fallback to active lecture
+const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
+  ? ((lectureInfo?.m3u8Path ?? active?.m3u8Path).startsWith('http')
+    ? lectureInfo?.m3u8Path ?? active?.m3u8Path
+    : `http://localhost:8080/videos-local/${lectureInfo?.m3u8Path ?? active?.m3u8Path}`)
+  : null;
 
   // 재생 시뮬레이션 상태
   const [position, setPosition] = useState(0)
@@ -106,10 +115,35 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const positionRef = useRef(0)
   positionRef.current = position
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const lastBeatPositionRef = useRef(0)
+  const pendingStartPosRef = useRef<number | null>(null)
 
   // 강의 입장 권한 상태: enterLecture(수강권 검사) 실패 시 true → 재생/작성 차단
   const [accessDenied, setAccessDenied] = useState(false)
   const [entering, setEntering] = useState(true)
+  // duplicate lectureInfo removed
+
+  // HLS 비디오 스트리밍 로드 및 해제
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    let hls: Hls | null = null;
+
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(videoUrl);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = videoUrl;
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy();
+      }
+    };
+  }, [videoUrl]);
 
   const chapterIdOf = useCallback(
     (lectureId?: string) => lectures.find((l) => l.id === lectureId)?.chapterId,
@@ -165,6 +199,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     setPosition(0)
     setAccessDenied(false)
     setEntering(true)
+    pendingStartPosRef.current = null
 
     session
       .enter(lectureId)
@@ -177,8 +212,13 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
           return
         }
         entered = true
+        setLectureInfo(res)
         const startPos = res.progress?.lastPositionSeconds ?? 0
         setPosition(startPos)
+        positionRef.current = startPos
+        lastBeatPositionRef.current = startPos
+        pendingStartPosRef.current = startPos
+
         if (res.progress) {
           setProgressMap((m) => ({
             ...m,
@@ -205,25 +245,24 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
 
-  // 재생 중 하트비트: 재생 시작 즉시 1회 + 일정 간격으로 진행 시간을 누적해
-  // 전용 PATCH /api/lectures/{lectureId}/progress 로 보고(learning_events에는 쓰지 않음).
+  // 재생 시작 및 강의 변경 시 lastBeatPositionRef 초기화
+  useEffect(() => {
+    lastBeatPositionRef.current = position
+  }, [playing, active?.id])
+
+  // 재생 중 하트비트: 일정 간격(HEARTBEAT_SECONDS)으로 실제 시청한 진행분을 누적해 보고
   useEffect(() => {
     const lectureId = active?.id
     if (!playing || !lectureId) return
 
-    // 한 박자(HEARTBEAT_SECONDS)만큼 진행분을 누적·보고한다.
-    // 네트워크 호출은 setState 업데이터 밖에서 실행한다 — StrictMode가 업데이터를
-    // 이중 호출해도 PATCH가 두 번 나가지 않도록 positionRef로 직접 계산한다.
     const beat = () => {
-      const prev = positionRef.current
-      const cap = durationSeconds || prev + HEARTBEAT_SECONDS
-      const next = Math.min(prev + HEARTBEAT_SECONDS, cap)
-      const delta = next - prev
+      const current = positionRef.current
+      const prev = lastBeatPositionRef.current
+      const delta = Math.max(0, current - prev)
       if (delta <= 0) return
 
-      positionRef.current = next
-      setPosition(next)
-      session.beat(lectureId, next, delta).then((res) => {
+      lastBeatPositionRef.current = current
+      session.beat(lectureId, current, delta).then((res) => {
         if (res) {
           setProgressMap((m) => ({
             ...m,
@@ -231,18 +270,56 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
           }))
         }
       })
-      if (durationSeconds && next >= durationSeconds) {
-        setPlaying(false)
-      }
     }
 
-    // 첫 하트비트는 간격을 기다리지 않고 즉시 보낸다(시청 시작을 바로 반영).
     beat()
     const timer = setInterval(beat, HEARTBEAT_SECONDS * 1000)
 
     return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, active?.id, durationSeconds])
+  }, [playing, active?.id])
+
+  const handlePlay = () => {
+    if (!active?.id) return
+    setPlaying(true)
+    session.play(active.id, positionRef.current)
+  }
+
+  const handlePause = () => {
+    if (!active?.id) return
+    setPlaying(false)
+    session.pause(active.id, positionRef.current)
+  }
+
+  const handleEnded = () => {
+    if (!active?.id) return
+    setPlaying(false)
+    session.pause(active.id, positionRef.current)
+    markComplete()
+  }
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const current = videoRef.current.currentTime
+      setPosition(current)
+      positionRef.current = current
+    }
+  }
+
+  const handleSeeked = () => {
+    if (videoRef.current) {
+      const current = videoRef.current.currentTime
+      lastBeatPositionRef.current = current
+    }
+  }
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current && pendingStartPosRef.current !== null) {
+      videoRef.current.currentTime = pendingStartPosRef.current
+      lastBeatPositionRef.current = pendingStartPosRef.current
+      pendingStartPosRef.current = null
+    }
+  }
 
   const togglePlay = () => {
     if (!active?.id) return
@@ -250,14 +327,17 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
       toast.error('수강권이 없어 이 강의를 재생할 수 없습니다.')
       return
     }
-    const next = !playing
-    // 이미 끝까지 본 강의를 다시 재생하면 처음부터 — 그래야 하트비트가 진행분(delta>0)을 보고할 수 있다.
-    if (next && durationSeconds && positionRef.current >= durationSeconds) {
-      setPosition(0)
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.paused) {
+      if (durationSeconds && video.currentTime >= durationSeconds) {
+        video.currentTime = 0
+      }
+      video.play().catch(() => {})
+    } else {
+      video.pause()
     }
-    setPlaying(next)
-    if (next) session.play(active.id, positionRef.current)
-    else session.pause(active.id, positionRef.current)
   }
 
   const markComplete = async () => {
@@ -342,7 +422,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card px-4">
         <Button asChild variant="ghost" size="icon" aria-label="스터디로 돌아가기">
-          <Link href={`/study/${course.id}`}>
+          <Link href={`/study/${studyId ?? course.id}/course`}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -410,39 +490,35 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
         </aside>
 
         <main className="order-1 lg:order-2">
-          <div className="relative aspect-video w-full bg-foreground">
+          <div className="relative aspect-video w-full bg-black flex items-center justify-center">
             {accessDenied ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-background">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white bg-black/80 z-20">
                 <Lock className="h-12 w-12 opacity-80" />
                 <p className="text-sm font-medium">이 강의에 입장할 수 없습니다</p>
-                <p className="text-xs text-background/60">
+                <p className="text-xs text-white/60">
                   수강권이 없거나 만료되었어요. 강좌를 수강 신청한 뒤 다시 시도해주세요.
                 </p>
               </div>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-background">
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  disabled={entering}
-                  aria-label={playing ? '일시정지' : '재생'}
-                  className="rounded-full bg-background/10 p-3 transition hover:bg-background/20 disabled:opacity-50"
-                >
-                  {playing ? (
-                    <Pause className="h-12 w-12 opacity-90" />
-                  ) : (
-                    <PlayCircle className="h-12 w-12 opacity-90" />
-                  )}
-                </button>
-                <p className="text-sm text-background/70">{active?.title}</p>
-                {playing && (
-                  <span className="text-xs text-background/60">시청 시뮬레이션 진행 중…</span>
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain"
+                  controls
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onEnded={handleEnded}
+                  onTimeUpdate={handleTimeUpdate}
+                  onSeeked={handleSeeked}
+                  onLoadedMetadata={handleLoadedMetadata}
+                />
+                {entering && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10 text-white text-sm">
+                    동영상 정보를 불러오는 중입니다...
+                  </div>
                 )}
-              </div>
+              </>
             )}
-            <span className="absolute bottom-3 right-3 rounded bg-background/15 px-2 py-0.5 text-xs text-background">
-              {formatClock(position)} / {active?.duration}
-            </span>
           </div>
 
           {/* 재생 컨트롤 + 진행 바 (실제 영상 없이 진행/이벤트를 시뮬레이션) */}

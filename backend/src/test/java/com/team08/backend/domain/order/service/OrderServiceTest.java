@@ -5,7 +5,6 @@ import com.team08.backend.domain.cart.repository.CartRepository;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
 import com.team08.backend.domain.order.entity.Order;
@@ -96,9 +95,8 @@ class OrderServiceTest {
 
         given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubOrderSave();
@@ -147,15 +145,14 @@ class OrderServiceTest {
     }
 
     @Test
-    void activeEnrollmentCannotCreateOrder() {
+    void existingEnrollmentCannotCreateOrder() {
         Cart cart = cart(CART_ID, USER_ID, COURSE_ID);
         Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
 
         given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(course));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of(COURSE_ID));
 
@@ -171,9 +168,8 @@ class OrderServiceTest {
         Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
 
         given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubOrderSave();
@@ -194,16 +190,15 @@ class OrderServiceTest {
     }
 
     @Test
-    void cartOrderChecksActiveEnrollmentsWithSingleCourseIdLookup() {
+    void cartOrderChecksExistingEnrollmentsWithSingleCourseIdLookup() {
         Cart cart = cart(CART_ID, USER_ID, COURSE_ID, COURSE_ID + 1);
         Course firstCourse = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
         Course secondCourse = course(COURSE_ID + 1, "JPA", 20_000, CourseStatus.ON_SALE);
 
         given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(firstCourse, secondCourse));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubOrderSave();
@@ -211,9 +206,8 @@ class OrderServiceTest {
         orderService.createOrderFromCart(USER_ID);
 
         ArgumentCaptor<List<Long>> courseIdsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(enrollmentRepository).findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        verify(enrollmentRepository).findCourseIdsByUserIdAndCourseIdIn(
                 eq(USER_ID),
-                eq(EnrollmentStatus.ACTIVE),
                 courseIdsCaptor.capture()
         );
         assertThat(courseIdsCaptor.getValue()).containsExactly(COURSE_ID, COURSE_ID + 1);

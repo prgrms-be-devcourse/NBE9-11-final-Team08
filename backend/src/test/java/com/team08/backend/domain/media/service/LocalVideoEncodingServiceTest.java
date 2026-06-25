@@ -6,6 +6,7 @@ import com.team08.backend.domain.media.dto.EncodingContext;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+@Disabled("실제 외부 ffmpeg 프로세스를 구동하여 인코딩하는 무거운 테스트이므로 평소에는 비활성화합니다.")
 @ExtendWith(MockitoExtension.class)
 class LocalVideoEncodingServiceTest {
 

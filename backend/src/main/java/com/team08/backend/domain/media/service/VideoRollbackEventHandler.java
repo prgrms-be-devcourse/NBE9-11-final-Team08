@@ -1,5 +1,6 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,12 +20,12 @@ public class VideoRollbackEventHandler {
 
     @Async("videoEncodingExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void cleanUpLeftoverVideos(VideoRollbackEvent event) {
+    public void cleanUpOldVideos(VideoCleanUpEvent event) {
         for (MediaEncodingService service : mediaEncodingServices) {
             try {
                 service.deleteEncodedFolder(event.targetDirName(), event.lectureId());
             } catch (Exception e) {
-                log.error("Failed to clean up leftover video folder for service: {}", service.getClass().getSimpleName(), e);
+                log.error("Failed to clean up old video folder for service: {}", service.getClass().getSimpleName(), e);
             }
         }
     }

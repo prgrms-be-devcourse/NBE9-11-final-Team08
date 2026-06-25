@@ -935,6 +935,17 @@ export const api = {
       null,
     ),
 
+  // New API to fetch lecture details directly (including m3u8Path)
+  getLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<any>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}`,
+      null,
+    ),
+
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
 
@@ -990,19 +1001,34 @@ export const api = {
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
   cancelOrder: (orderId: number | string) => mutate<OrderDetailResponse>(`/api/orders/${orderId}/cancel`, 'PATCH'),
-  confirmMockPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
+  confirmMockPayment: (
+    orderId: number,
+    paymentKey: string,
+    method: string,
+    amount: number,
+    issuedCouponId?: number | null,
+    idempotencyKey?: string | null,
+  ) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
       paymentKey,
       method,
       amount,
       issuedCouponId,
+      idempotencyKey,
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
-  confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
-    api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId),
+  confirmPayment: (
+    orderId: number,
+    paymentKey: string,
+    method: string,
+    amount: number,
+    issuedCouponId?: number | null,
+    idempotencyKey?: string | null,
+  ) =>
+    api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId, idempotencyKey),
 
   // Studies
   getMyStudies: async (): Promise<EnrolledCourse[]> => {
