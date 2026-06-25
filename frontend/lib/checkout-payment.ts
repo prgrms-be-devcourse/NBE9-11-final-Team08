@@ -10,6 +10,7 @@ export interface PendingPayment {
   provider: PaymentProvider
   fromCart: boolean
   issuedCouponId: number | null
+  idempotencyKey?: string
   createdAt: string
 }
 
@@ -24,6 +25,14 @@ export function getOrderName(order: OrderDetailResponse) {
   const items = order.items ?? []
   const firstTitle = items[0]?.courseTitle || '강의'
   return items.length > 1 ? `${firstTitle} 외 ${items.length - 1}건` : firstTitle
+}
+
+export function createPaymentIdempotencyKey(serviceOrderId: number | string, provider: PaymentProvider) {
+  const randomPart = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+  return `${provider}-${serviceOrderId}-${randomPart}`
 }
 
 export function savePendingPayment(payment: PendingPayment) {

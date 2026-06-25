@@ -180,6 +180,7 @@ export interface ConfirmTossPaymentRequest {
   method: string
   amount: number
   issuedCouponId?: number | null
+  idempotencyKey?: string | null
 }
 
 export interface PaymentResponse {

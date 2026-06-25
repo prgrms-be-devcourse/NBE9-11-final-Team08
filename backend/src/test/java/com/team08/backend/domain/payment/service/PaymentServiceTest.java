@@ -123,9 +123,8 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave();
@@ -180,9 +179,8 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
 
@@ -255,16 +253,15 @@ class PaymentServiceTest {
     }
 
     @Test
-    void activeEnrollmentPreventsConfirm() {
+    void existingEnrollmentPreventsConfirm() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
 
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of(COURSE_ID));
 
@@ -287,9 +284,8 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubPaymentSave();
@@ -342,9 +338,8 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(declinedPayment));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave();
@@ -485,9 +480,8 @@ class PaymentServiceTest {
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(declinedPayment));
         given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-2")).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave();
@@ -536,7 +530,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void confirmChecksActiveEnrollmentsWithSingleCourseIdLookup() {
+    void confirmChecksExistingEnrollmentsWithSingleCourseIdLookup() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         OrderItem firstItem = orderItem(1L, COURSE_ID, 30_000);
         OrderItem secondItem = orderItem(2L, COURSE_ID + 1, 20_000);
@@ -544,9 +538,8 @@ class PaymentServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(firstItem, secondItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubPaymentSave();
@@ -555,9 +548,8 @@ class PaymentServiceTest {
         paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
         ArgumentCaptor<List<Long>> courseIdsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(enrollmentRepository).findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        verify(enrollmentRepository).findCourseIdsByUserIdAndCourseIdIn(
                 eq(USER_ID),
-                eq(EnrollmentStatus.ACTIVE),
                 courseIdsCaptor.capture()
         );
         assertThat(courseIdsCaptor.getValue()).containsExactly(COURSE_ID, COURSE_ID + 1);
