@@ -7,6 +7,7 @@ import com.team08.backend.domain.course.access.CourseAction;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
+import com.team08.backend.domain.lecture.dto.LectureDetailResponse;
 import com.team08.backend.domain.lecture.dto.LectureEnterResponse;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
@@ -54,6 +55,19 @@ public class LectureService {
         }
 
         return LectureEnterResponse.of(lecture, progress);
+    }
+
+    @Transactional(readOnly = true)
+    public LectureDetailResponse getLectureDetail(Long courseId, Long chapterId, Long lectureId, Long userId) {
+        Lecture lecture = lectureAccessValidator.validateForEnter(courseId, chapterId, lectureId, userId);
+        return new LectureDetailResponse(
+                lecture.getId(),
+                lecture.getTitle(),
+                lecture.getM3u8Path(),
+                lecture.getDurationSeconds(),
+                lecture.getChapter().getId(),
+                lecture.getChapter().getCourse().getId()
+        );
     }
 
     @Transactional
