@@ -45,7 +45,10 @@ services:
     image: ${BACKEND_IMAGE:-team08-backend}:${IMAGE_TAG:-local}
     restart: unless-stopped
     env_file:
-      - .env
+      # 활성 env-file을 따라간다: dev/perf 는 .env.dev(BACKEND_ENV_FILE=.env.dev),
+      # prod 는 미정의라 기본 .env. (--env-file 은 보간에만 쓰여 컨테이너 env_file 을 바꾸지 않으므로
+      #  이 변수가 없으면 백엔드만 .env 를 읽어 db(.env.dev)와 자격증명이 어긋난다)
+      - ${BACKEND_ENV_FILE:-.env}
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       DB_HOST: db
