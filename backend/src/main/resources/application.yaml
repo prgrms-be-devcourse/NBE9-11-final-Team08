@@ -25,6 +25,10 @@ spring:
           batch_size: 50
         order_updates: true
         order_inserts: true
+  servlet:
+    multipart:
+      max-file-size: 2048MB
+      max-request-size: 2048MB
 
 springdoc:
   api-docs:
@@ -44,6 +48,9 @@ management:
 server:
   shutdown: graceful
   forward-headers-strategy: framework
+  tomcat:
+    max-swallow-size: -1
+    max-http-form-post-size: -1
 
 app:
   jwt:
