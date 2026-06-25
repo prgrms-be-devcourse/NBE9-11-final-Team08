@@ -155,10 +155,17 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
     const errorData = await res.json().catch(() => ({}))
     throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
   }
-  if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
+  if (res.status === 204 || res.status === 202) {
     return {} as T
   }
-  return await res.json() as T
+  if (res.status === 201 && res.headers.get('content-length') === '0') {
+    return {} as T
+  }
+  const text = await res.text()
+  if (!text.trim()) {
+    return {} as T
+  }
+  return JSON.parse(text) as T
 }
 
 const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
@@ -206,6 +213,8 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       chapterId: ch.id.toString(),
       durationSeconds: lec.durationSeconds,
       m3u8Path: lec.m3u8Path ?? null,
+      summary: lec.summary ?? '',
+      hasVideo: lec.hasVideo ?? false,
     })) || [],
   })) || [],
   status: detail.status,
