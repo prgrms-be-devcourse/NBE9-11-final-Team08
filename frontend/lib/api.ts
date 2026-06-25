@@ -544,6 +544,19 @@ const saveCourseDraft = (id: string | number, data: any) => {
   }
 }
 
+const removeCourseDraft = (id: string | number) => {
+  if (typeof window !== 'undefined') {
+    const cookieName = `course_draft_${id}`
+    document.cookie = `${cookieName}=; path=/; max-age=0`
+    try {
+      localStorage.removeItem(cookieName)
+      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]')
+      const nextDraftIds = draftIds.filter((dId: string) => dId !== String(id))
+      localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
+    } catch (e) { }
+  }
+}
+
 const formatWatchTime = (totalSeconds: number): string => {
   if (!totalSeconds || totalSeconds <= 0) return '0분'
   const hours = Math.floor(totalSeconds / 3600)
@@ -765,11 +778,23 @@ export const api = {
     return res
   },
 
-  requestCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'POST'),
+  requestCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'POST')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'IN_REVIEW' })
+    }
+    return res
+  },
 
-  cancelCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE'),
+  cancelCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
 
   closeCourse: (courseId: string | number) =>
     mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
@@ -1207,12 +1232,30 @@ export const api = {
   },
 
   // Admin Course APIs
-  approveCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST'),
-  rejectCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason }),
-  suspendCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason }),
-  deleteCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE'),
+  approveCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST')
+    removeCourseDraft(courseId)
+    return res
+  },
+  rejectCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
+  suspendCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'SUSPENDED' })
+    }
+    return res
+  },
+  deleteCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE')
+    removeCourseDraft(courseId)
+    return res
+  },
 }
