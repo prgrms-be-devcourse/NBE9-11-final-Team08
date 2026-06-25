@@ -31,21 +31,34 @@ export function CourseDetail({ course }: { course: Course }) {
   const [isPurchased, setIsPurchased] = useState(false)
   const [hasStudyAccess, setHasStudyAccess] = useState(false)
   const [studyId, setStudyId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
   const inCart = has(course.id)
-  const canPurchase = !(isLoggedIn && isPurchased)
+  const canPurchase = !(isLoggedIn && isPurchased) && !isAdmin
 
   useEffect(() => {
     const fetchAccess = async () => {
       try {
         const profile = await api.getProfile()
         setIsLoggedIn(!!profile)
+        const nextIsAdmin = profile ? profile.isAdmin : false
+        setIsAdmin(nextIsAdmin)
+        
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
-        const active = profile ? await api.isCourseEnrollmentActive(course.id) : false
+        
+        let active = false
+        if (profile && !nextIsAdmin) {
+          try {
+            active = await api.isCourseEnrollmentActive(course.id)
+          } catch (err) {
+            console.error('Failed to check active enrollment:', err)
+          }
+        }
+        
         setIsPurchased(active)
-        setHasStudyAccess(active && !!nextStudyId)
+        setHasStudyAccess((active || nextIsAdmin) && !!nextStudyId)
         setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
@@ -250,6 +263,10 @@ export function CourseDetail({ course }: { course: Course }) {
                 {hasStudyAccess && studyId ? (
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
+                  </Button>
+                ) : (isAdmin || isPurchased) ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    스터디 미개설
                   </Button>
                 ) : null}
 

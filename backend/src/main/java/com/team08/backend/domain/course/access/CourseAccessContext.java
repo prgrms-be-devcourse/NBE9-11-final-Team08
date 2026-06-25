@@ -7,7 +7,8 @@ public record CourseAccessContext(
         CourseStatus courseStatus,
         boolean hasActiveEnrollment,
         boolean isOwner,
-        boolean hasFreePreview
+        boolean hasFreePreview,
+        boolean isAdmin
 ) {
     public boolean isReadableCourse() {
         return courseStatus == CourseStatus.ON_SALE ||

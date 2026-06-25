@@ -14,6 +14,9 @@ public class CourseAccessPolicy {
     }
 
     private boolean isAllowed(CourseAccessContext context, CourseAction action) {
+        if (context.isAdmin()) {
+            return true;
+        }
         return switch (action) {
             case VIEW_CONTENT ->
                     (context.isReadableCourse() && context.hasActiveEnrollment()) || context.isOwner();
