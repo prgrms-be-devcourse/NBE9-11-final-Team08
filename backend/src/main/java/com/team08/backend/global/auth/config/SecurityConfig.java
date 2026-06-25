@@ -79,6 +79,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/by-course/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories").permitAll()
+            .requestMatchers(org.springframework.http.HttpMethod.GET, "/videos-local/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

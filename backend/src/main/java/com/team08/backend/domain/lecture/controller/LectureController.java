@@ -1,6 +1,7 @@
 package com.team08.backend.domain.lecture.controller;
 
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
+import com.team08.backend.domain.lecture.dto.LectureDetailResponse;
 import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.domain.lecture.service.LectureService;
 import com.team08.backend.domain.media.service.VideoAccessService;
@@ -27,7 +28,6 @@ public class LectureController {
             @PathVariable Long chapterId,
             @AuthenticationPrincipal LoginUserPrincipal principal,
             @Valid @RequestBody LectureCreateRequest request) {
-
         return lectureService.createLecture(courseId, chapterId, principal.user().id(), request);
     }
 
@@ -35,11 +35,19 @@ public class LectureController {
     public ResponseEntity<String> getVideoStreamUrl(
             @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-
         VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
-
         return ResponseEntity.ok()
                 .headers(streamResponse.asHttpHeaders())
                 .body(streamResponse.path());
+    }
+
+    // New endpoint for lecture detail
+    @GetMapping("/{lectureId}")
+    public LectureDetailResponse getLectureDetail(
+            @PathVariable Long courseId,
+            @PathVariable Long chapterId,
+            @PathVariable Long lectureId,
+            @AuthenticationPrincipal LoginUserPrincipal principal) {
+        return lectureService.getLectureDetail(courseId, chapterId, lectureId, principal.user().id());
     }
 }

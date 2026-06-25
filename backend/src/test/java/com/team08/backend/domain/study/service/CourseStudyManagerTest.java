@@ -90,7 +90,7 @@ public class CourseStudyManagerTest {
 
         assertThat(savedStudy.getCourse().getId()).isEqualTo(courseId);
         assertThat(savedStudy.getOwner().getId()).isEqualTo(ownerId);
-        assertThat(savedStudy.getStatus()).isEqualTo(StudyStatus.DRAFT);
+        assertThat(savedStudy.getStatus()).isEqualTo(StudyStatus.ACTIVE);
 
         assertThat(savedMember.getUser().getId()).isEqualTo(ownerId);
         assertThat(savedMember.getRole()).isEqualTo(StudyMemberRole.OWNER);

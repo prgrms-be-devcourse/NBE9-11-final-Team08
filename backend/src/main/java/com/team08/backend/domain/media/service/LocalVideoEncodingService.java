@@ -33,9 +33,12 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     @PostConstruct
     public void init() {
         try {
-            Path path = Paths.get(uploadDir);
+            Path path = Paths.get(uploadDir).toAbsolutePath();
+            log.info("=== [VIDEO] upload-dir 설정값: '{}' ===", uploadDir);
+            log.info("=== [VIDEO] upload-dir 절대경로: '{}' ===", path);
             if (!Files.exists(path)) {
                 Files.createDirectories(path);
+                log.info("=== [VIDEO] upload-dir 폴더 생성 완료 ===");
             }
         } catch (Exception e) {
             log.error("Failed to initialize upload directory: {}", uploadDir, e);
@@ -63,8 +66,11 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
     @Override
     protected void handleGeneratedFiles(Path workspacePath, String targetDirName, Long lectureId) {
         Path targetPath = Paths.get(uploadDir, targetDirName);
+        log.info("=== [VIDEO] 복사 시작 - 원본: '{}', 대상: '{}' (절대경로: '{}') ===", 
+                workspacePath, targetPath, targetPath.toAbsolutePath());
         try {
             Files.createDirectories(targetPath);
+            log.info("=== [VIDEO] 대상 디렉터리 생성 완료: '{}' ===", targetPath.toAbsolutePath());
             try (var stream = Files.walk(workspacePath)) {
                 stream.forEach(path -> {
                     try {
@@ -72,14 +78,17 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
                             Path targetFile = targetPath.resolve(workspacePath.relativize(path));
                             Files.createDirectories(targetFile.getParent());
                             Files.copy(path, targetFile);
+                            log.info("=== [VIDEO] 파일 복사 완료: '{}' -> '{}' ===", path.getFileName(), targetFile.toAbsolutePath());
                         }
                     } catch (IOException e) {
+                        log.error("=== [VIDEO] 파일 복사 실패: '{}', 에러: {} ===", path, e.getMessage());
                         throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
                     }
                 });
             }
+            log.info("=== [VIDEO] 모든 파일 복사 완료! lectureId: {} ===", lectureId);
         } catch (Exception e) {
-            log.error("Failed to copy generated HLS files to local upload directory. lectureId: {}", lectureId, e);
+            log.error("=== [VIDEO] HLS 파일 복사 실패! lectureId: {}, 에러: {} ===", lectureId, e.getMessage(), e);
             if (Files.exists(targetPath)) {
                 try (var stream = Files.walk(targetPath)) {
                     stream.sorted(reverseOrder())

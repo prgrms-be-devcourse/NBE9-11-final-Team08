@@ -2,6 +2,7 @@ package com.team08.backend.domain.lecture.service;
 
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -25,9 +26,16 @@ public class LectureDbService {
 
         Lecture lecture = lectureRepository.findById(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+
+        String oldVideoUuid = lecture.getVideoUuid();
+
         lecture.updateM3u8Path(dbSavePath, targetDirName);
 
         eventPublisher.publishEvent(new VideoRollbackEvent(lectureId, targetDirName));
+
+        if (oldVideoUuid != null && !oldVideoUuid.isBlank()) {
+            eventPublisher.publishEvent(new VideoCleanUpEvent(lectureId, oldVideoUuid));
+        }
     }
 
     private void validateTargetDirName(String targetDirName) {
