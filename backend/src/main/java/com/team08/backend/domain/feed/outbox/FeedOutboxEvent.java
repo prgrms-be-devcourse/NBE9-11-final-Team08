@@ -1,6 +1,7 @@
 package com.team08.backend.domain.feed.outbox;
 
 import com.team08.backend.global.common.BaseTimeEntity;
+import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -26,6 +27,9 @@ public class FeedOutboxEvent extends BaseTimeEntity {
 
     public static final String FEED_ITEM_CREATED_EVENT = "feed-item.created";
     public static final String STUDY_ACTIVITY_CREATED_EVENT = "study-activity.created";
+    public static final String LECTURE_ENTER_EVENT = "learning-event.lecture-entered";
+    public static final String LECTURE_EXIT_EVENT = "learning-event.lecture-exited";
+    public static final String LECTURE_COMPLETE_EVENT = "learning-event.lecture-completed";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -72,6 +76,24 @@ public class FeedOutboxEvent extends BaseTimeEntity {
 
     public static FeedOutboxEvent studyActivityCreated(Long studyId, Long studyActivityId, String payload) {
         return new FeedOutboxEvent(studyId, studyActivityId, STUDY_ACTIVITY_CREATED_EVENT, payload);
+    }
+
+    public static FeedOutboxEvent learningEventRecorded(
+            Long studyId,
+            Long learningEventId,
+            LearningEventType learningEventType,
+            String payload
+    ) {
+        return new FeedOutboxEvent(studyId, learningEventId, feedEventType(learningEventType), payload);
+    }
+
+    private static String feedEventType(LearningEventType learningEventType) {
+        return switch (learningEventType) {
+            case LECTURE_ENTER -> LECTURE_ENTER_EVENT;
+            case LECTURE_EXIT -> LECTURE_EXIT_EVENT;
+            case LECTURE_COMPLETE -> LECTURE_COMPLETE_EVENT;
+            default -> throw new IllegalArgumentException("Unsupported learning event type for feed: " + learningEventType);
+        };
     }
 
     public void markPublished(Long feedItemId, String payload, LocalDateTime publishedAt) {

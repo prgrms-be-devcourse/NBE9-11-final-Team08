@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
  * 영속 엔티티 대신 값만 담는다(AFTER_COMMIT 리스너에서 detach/lazy 문제를 피하기 위함).
  */
 public record LearningEventRecorded(
+        Long learningEventId,
         Long userId,
         Long courseId,
         Long chapterId,
@@ -25,6 +26,7 @@ public record LearningEventRecorded(
 ) {
     public static LearningEventRecorded from(LearningEvent e) {
         return new LearningEventRecorded(
+                e.getId(),
                 e.getUserId(),
                 e.getCourseId(),
                 e.getChapterId(),
