@@ -1,7 +1,6 @@
 package com.team08.backend.domain.studyreport.service;
 
 import com.team08.backend.domain.course.entity.Course;
-import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
@@ -10,6 +9,7 @@ import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studyreport.dto.ReportStatus;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.studyreport.repository.StudyDailyStatRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
@@ -44,7 +44,7 @@ class StudyReportServiceTest {
 
     @Mock StudyReportRepository studyReportRepository;
     @Mock StudyRepository studyRepository;
-    @Mock LearningEventRepository learningEventRepository;
+    @Mock StudyDailyStatRepository studyDailyStatRepository;
     @Mock LectureProgressRepository lectureProgressRepository;
     @Mock LectureRepository lectureRepository;
     @Mock QnaQuestionRepository qnaQuestionRepository;
@@ -126,7 +126,7 @@ class StudyReportServiceTest {
         Long studyId = 10L;
 
         StudyReport recent = StudyReport.create(userId, studyId);
-        recent.update(1234, 5, BigDecimal.valueOf(50.00), 3, "[]", "[]", "{}");
+        recent.update(1234, 5, 0, 0, 3, "[]", "[]", "{}");
         ReflectionTestUtils.setField(recent, "id", 7L);
         LocalDateTime updatedAt = LocalDateTime.now().minusMinutes(10);
         ReflectionTestUtils.setField(recent, "updatedAt", updatedAt);
@@ -151,7 +151,8 @@ class StudyReportServiceTest {
         Long studyId = 10L;
 
         StudyReport report = StudyReport.create(userId, studyId);
-        report.update(5000, 4, BigDecimal.valueOf(75.00), 10, "[]", "[]", "{}");
+        // progressRate(75.00)는 completed/total(3/4)에서 파생된다.
+        report.update(5000, 4, 3, 4, 10, "[]", "[]", "{}");
         ReflectionTestUtils.setField(report, "id", 1L);
         ReflectionTestUtils.setField(report, "updatedAt", LocalDateTime.now().minusDays(3)); // 쿨다운 지났어도 조회만
         given(studyReportRepository.findByUserIdAndStudyId(userId, studyId)).willReturn(Optional.of(report));
@@ -207,12 +208,11 @@ class StudyReportServiceTest {
         given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(lectureIds);
 
-        given(learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId)).willReturn(5);
-
         given(lectureProgressRepository.findTop3ByUserIdAndLectureIdInOrderByWatchedSecondsDesc(userId, lectureIds))
                 .willReturn(List.of());
-        given(learningEventRepository.findDailyCompletionCounts(userId, courseId)).willReturn(List.of());
-        given(learningEventRepository.findDailyActivityCounts(userId, courseId)).willReturn(List.of());
+        // 일별 진도/활동/학습일수는 롤업에서 읽는다.
+        given(studyDailyStatRepository.findByUserIdAndCourseIdOrderByActivityDateAsc(userId, courseId))
+                .willReturn(List.of());
         given(lectureRepository.findIdAndTitleByIdIn(any())).willReturn(List.of());
     }
 

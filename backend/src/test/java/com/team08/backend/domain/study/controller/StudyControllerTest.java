@@ -43,8 +43,8 @@ public class StudyControllerTest {
         Long userId = 1L;
 
         List<StudySummaryResponse> response = List.of(
-                new StudySummaryResponse(1L, "스터디1", "스터디1", "강사1"),
-                new StudySummaryResponse(2L, "스터디2", "스터디2", "강사2")
+                new StudySummaryResponse(1L, "스터디1", "스터디1", "강사1", 80, 8, 10),
+                new StudySummaryResponse(2L, "스터디2", "스터디2", "강사2", 0, 0, 0)
         );
 
         given(studyService.getMyStudies(userId)).willReturn(response);

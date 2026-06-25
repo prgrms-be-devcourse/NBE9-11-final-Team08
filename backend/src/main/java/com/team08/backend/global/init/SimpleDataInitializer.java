@@ -23,8 +23,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class SimpleDataInitializer {
 
-    /** 강사 5 · 강좌 10(5x2) · 챕터 4 · 영상 3 · 수강생 20 · 쿠폰정책 5 */
-    private static final SeedConfig CONFIG = new SeedConfig(5, 2, 4, 3, 20, 5, 500);
+    /** 강사 6 · 강좌 18(6x3) · 챕터 4 · 영상 3 · 수강생 80 · 쿠폰정책 5 (강좌당 수강생 다수 → 대시보드/리포트 가시성) */
+    private static final SeedConfig CONFIG = new SeedConfig(6, 3, 4, 3, 80, 5, 500);
 
     private final DataSeeder dataSeeder;
     private final JdbcTemplate jdbcTemplate;

@@ -1,7 +1,6 @@
 package com.team08.backend.domain.studyreport.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -13,7 +12,9 @@ import com.team08.backend.domain.studyreport.dto.DailyProgressEntry;
 import com.team08.backend.domain.studyreport.dto.ReportStatus;
 import com.team08.backend.domain.studyreport.dto.StudyReportResponse;
 import com.team08.backend.domain.studyreport.dto.TopLectureEntry;
+import com.team08.backend.domain.studyreport.entity.StudyDailyStat;
 import com.team08.backend.domain.studyreport.entity.StudyReport;
+import com.team08.backend.domain.studyreport.repository.StudyDailyStatRepository;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.studyreport.util.StudyReportJson;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -40,7 +40,7 @@ public class StudyReportService {
 
     private final StudyReportRepository studyReportRepository;
     private final StudyRepository studyRepository;
-    private final LearningEventRepository learningEventRepository;
+    private final StudyDailyStatRepository studyDailyStatRepository;
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
     private final QnaQuestionRepository qnaQuestionRepository;
@@ -90,31 +90,47 @@ public class StudyReportService {
         int totalWatchTime = lectureIds.isEmpty() ? 0
                 : lectureProgressRepository.sumWatchedSecondsByUserIdAndLectureIdIn(userId, lectureIds);
 
-        // 학습한 일 수: 날짜 이력이 필요하므로 learning_events 에서 집계
-        int studyDays = learningEventRepository.countStudyDaysByUserIdAndCourseId(userId, courseId);
-
         long completedCount = totalLectureCount == 0 ? 0
                 : lectureProgressRepository.countByUserIdAndLectureIdInAndCompleted(userId, lectureIds, true);
-        BigDecimal progressRate = totalLectureCount == 0 ? BigDecimal.ZERO
-                : BigDecimal.valueOf(completedCount)
-                        .divide(BigDecimal.valueOf(totalLectureCount), 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))
-                        .setScale(2, RoundingMode.HALF_UP); // 강좌 진행 률 집계
 
         int totalQnaCount = lectureIds.isEmpty() ? 0                  //총 질문 수 집계
                 : (int) qnaQuestionRepository.countByUserIdAndLectureIdIn(userId, lectureIds);
 
         String topLecturesJson = buildTopLecturesJson(userId, lectureIds);    //최고 많이 들었던 강의 집계
-        String dailyProgressJson = buildDailyProgressJson(userId, courseId, totalLectureCount); //하루 학습량
-        String dailyActivityMapJson = buildDailyActivityMapJson(userId, courseId);  //맵 제작
+
+        // 학습일수·일별진도·일별활동맵은 learning_events 스캔/GROUP BY 대신
+        // 사전 집계된 일별 롤업(learning_daily_stats)을 한 번 읽어 만든다.
+        List<StudyDailyStat> dailyStats = studyDailyStatRepository
+                .findByUserIdAndCourseIdOrderByActivityDateAsc(userId, courseId);
+        int studyDays = dailyStats.size(); // 행 1개 = 활동한 날짜 1일
+        String dailyProgressJson = buildDailyProgressJson(dailyStats, totalLectureCount);
+        String dailyActivityMapJson = buildDailyActivityMapJson(dailyStats);
 
         StudyReport report = existing != null ? existing
                 : studyReportRepository.save(StudyReport.create(userId, studyId));
 
-        report.update(totalWatchTime, totalQnaCount, progressRate, studyDays,
+        report.update(totalWatchTime, totalQnaCount,
+                (int) completedCount, totalLectureCount, studyDays,
                 topLecturesJson, dailyProgressJson, dailyActivityMapJson);
 
         return report;
+    }
+
+    /**
+     * 강의 완료 이벤트 시 해당 유저·스터디 리포트를 재집계한다.
+     * 완료는 강의당 1회뿐인 희귀 이벤트라, 쿨다운 없이 매번 재집계해도 비용이 제한적이다.
+     * (하트비트 같은 고빈도 경로에서는 호출하지 않는다.)
+     */
+    @Transactional
+    public void refreshOnLectureCompletion(Long userId, Long courseId) {
+        Study study = studyRepository.findByCourseIdWithCourse(courseId).orElse(null);
+        if (study == null) {
+            return; // 스터디가 없는 강좌면 집계할 리포트도 없다.
+        }
+        StudyReport existing = studyReportRepository
+                .findByUserIdAndStudyId(userId, study.getId())
+                .orElse(null);
+        regenerate(userId, study.getId(), existing);
     }
 
     private boolean isWithinCooldown(StudyReport report) {
@@ -158,32 +174,28 @@ public class StudyReportService {
         return studyReportJson.write(result);
     }
 
-    // TODO: 이 아래 함수들은 비싼함수이기 때문에 최적화가 시급
-    private String buildDailyProgressJson(Long userId, Long courseId, int totalLectureCount) {
+    /** 일별 롤업의 누적 완료수 / 총 강의수 × 100 → 날짜별 진도 시계열. (롤업은 날짜 오름차순 전제) */
+    private String buildDailyProgressJson(List<StudyDailyStat> dailyStats, int totalLectureCount) {
         if (totalLectureCount == 0) return studyReportJson.write(List.of());
 
-        List<Object[]> rows = learningEventRepository.findDailyCompletionCounts(userId, courseId);
         List<DailyProgressEntry> entries = new ArrayList<>();
         long accumulated = 0;
-
-        for (Object[] row : rows) {
-            LocalDate date = ((java.sql.Date) row[0]).toLocalDate();
-            accumulated += ((Number) row[1]).longValue();
+        for (StudyDailyStat stat : dailyStats) {
+            accumulated += stat.getCompletedCount();
             BigDecimal rate = BigDecimal.valueOf(accumulated)
                     .divide(BigDecimal.valueOf(totalLectureCount), 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(2, RoundingMode.HALF_UP);
-            entries.add(new DailyProgressEntry(date, rate));
+            entries.add(new DailyProgressEntry(stat.getActivityDate(), rate));
         }
-
         return studyReportJson.write(entries);
     }
 
-    private String buildDailyActivityMapJson(Long userId, Long courseId) {
-        List<Object[]> rows = learningEventRepository.findDailyActivityCounts(userId, courseId);
+    /** 일별 롤업의 날짜별 이벤트 수 → 캘린더 잔디용 맵. */
+    private String buildDailyActivityMapJson(List<StudyDailyStat> dailyStats) {
         Map<String, Integer> map = new LinkedHashMap<>();
-        for (Object[] row : rows) {
-            map.put(row[0].toString(), ((Number) row[1]).intValue());
+        for (StudyDailyStat stat : dailyStats) {
+            map.put(stat.getActivityDate().toString(), stat.getEventCount());
         }
         return studyReportJson.write(map);
     }
