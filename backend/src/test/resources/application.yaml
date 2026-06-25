@@ -79,6 +79,14 @@ app:
     secret: test-secret-key-test-secret-key-test-secret-key
     expiration-millis: 3600000
     refresh-expiration-millis: 1209600000
+    access-cookie:
+      name: accessToken
+      secure: false
+      same-site: Lax
+    refresh-cookie:
+      name: refreshToken
+      secure: false
+      same-site: Lax
 
 file:
   upload-dir: src/test/resources/test-uploads

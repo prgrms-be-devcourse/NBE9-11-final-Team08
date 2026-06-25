@@ -25,7 +25,6 @@ import type {
   UserProfile,
   SignupRequest,
   LoginRequest,
-  LoginResponse,
   StudySummaryResponse,
   StudyActivityResponse,
   AiFeedbackResponse,
@@ -47,31 +46,11 @@ import type {
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  let token = ''
-  if (typeof window !== 'undefined') {
-    token = localStorage.getItem('accessToken') || ''
-    if (!token) {
-      const match = document.cookie.match(/(^| )accessToken=([^;]+)/)
-      if (match) token = match[2]
-    }
-  } else {
-    try {
-      const { cookies } = await import('next/headers')
-      const cookieStore = cookies()
-      const store = cookieStore instanceof Promise ? await cookieStore : cookieStore
-      token = store.get('accessToken')?.value || ''
-    } catch (e) { }
-  }
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return {}
 }
 
 const handleUnauthorized = () => {
   if (typeof window !== 'undefined') {
-    const hasToken = !!localStorage.getItem('accessToken') || document.cookie.includes('accessToken')
-
-    localStorage.removeItem('accessToken')
-    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-
     const pathname = window.location.pathname
     const isPublicRoute =
       pathname === '/' ||
@@ -84,8 +63,6 @@ const handleUnauthorized = () => {
 
     if (!isPublicRoute) {
       window.location.href = '/login'
-    } else if (hasToken) {
-      window.location.reload()
     }
   }
 }
@@ -104,6 +81,7 @@ async function request<T>(
         'Content-Type': 'application/json',
         ...authHeaders,
       },
+      credentials: includeAuth ? 'include' : 'same-origin',
       cache: 'no-store',
     })
 
@@ -123,7 +101,13 @@ async function request<T>(
   }
 }
 
-async function mutate<T>(path: string, method: string, body?: any, isMultipart = false): Promise<T> {
+async function mutate<T>(
+  path: string,
+  method: string,
+  body?: any,
+  isMultipart = false,
+  includeCredentials = true,
+): Promise<T> {
   if (!BASE_URL) throw new Error('API BASE_URL is not defined')
 
   const headers = await getAuthHeaders()
@@ -134,6 +118,9 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
   const options: RequestInit = {
     method,
     headers,
+  }
+  if (includeCredentials || !!headers.Authorization) {
+    options.credentials = 'include'
   }
   if (body) {
     options.body = isMultipart ? body : JSON.stringify(body)
@@ -589,20 +576,8 @@ const mapStudyReportToDisplay = (
 
 const getCurrentUserId = async (): Promise<number> => {
   try {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return 1
-    const payloadPart = token.split('.')[1]
-    if (!payloadPart) return 1
-    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-    const rawPayload = typeof window !== 'undefined'
-      ? atob(base64)
-      : Buffer.from(base64, 'base64').toString('utf8')
-    const jsonPayload = typeof window !== 'undefined'
-      ? decodeURIComponent(escape(rawPayload))
-      : rawPayload
-    const claims = JSON.parse(jsonPayload)
-    return Number(claims.sub || 1)
+    const profile = await api.getProfile()
+    return Number(profile?.id || 1)
   } catch (e) {
     return 1
   }
@@ -610,14 +585,10 @@ const getCurrentUserId = async (): Promise<number> => {
 
 export const api = {
   // Auth
-  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
-  login: (data: LoginRequest) => mutate<LoginResponse>('/api/auth/login', 'POST', data),
+  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, false),
+  login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    }
-    return mutate<void>('/api/auth/logout', 'POST')
+    return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
   },
 
   // Courses
@@ -646,22 +617,12 @@ export const api = {
     )
     if (detail && detail.id) return mapCourseDetailToCourse(detail)
 
-    let chapters: ChapterInfoResponse[] = []
-    try {
-      const authHeaders = await getAuthHeaders()
-      const chaptersRes = await fetch(`${BASE_URL}/api/courses/${id}/chapters`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        cache: 'no-store',
-      })
-      if (chaptersRes.ok) {
-        chapters = await chaptersRes.json()
-      }
-    } catch (e) {
-      console.error('Failed to fetch chapters for course:', e)
-    }
+    const chapters = await request<ChapterInfoResponse[]>(
+      `/api/courses/${id}/chapters`,
+      [],
+      true,
+      false,
+    )
 
     let generalInfo = SEEDED_COURSES[Number(id)]
     if (!generalInfo) {
@@ -978,39 +939,12 @@ export const api = {
 
   // Coupons & Admin
   getCoupons: async () => {
-    let authHeaders = await getAuthHeaders()
-    if (!authHeaders.Authorization) {
-      try {
-        const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@test.com', password: 'Test1234!' }),
-        })
-        if (loginRes.ok) {
-          const loginData = await loginRes.json()
-          if (loginData.accessToken) {
-            authHeaders = { Authorization: `Bearer ${loginData.accessToken}` }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to log in as system admin to fetch public coupons:', e)
-      }
-    }
-
-    const res = await fetch(`${BASE_URL}/api/admin/coupons`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      console.warn(`[API 에러] ${res.status} on /api/admin/coupons`)
-      return []
-    }
-
-    const result = await res.json() as any
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
+      '/api/admin/coupons',
+      null,
+      true,
+      false,
+    )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToUserCoupon)
   },
@@ -1049,22 +983,11 @@ export const api = {
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return null
     try {
-      const payloadPart = token.split('.')[1]
-      if (!payloadPart) return null
-      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-      const rawPayload = typeof window !== 'undefined'
-        ? atob(base64)
-        : Buffer.from(base64, 'base64').toString('utf8')
-      const jsonPayload = typeof window !== 'undefined'
-        ? decodeURIComponent(escape(rawPayload))
-        : rawPayload
-      const claims = JSON.parse(jsonPayload)
+      const claims = await request<any>('/api/auth/me', null)
+      if (!claims) return null
       return {
-        id: String(claims.sub || ''),
+        id: String(claims.id || claims.sub || ''),
         name: claims.nickname || claims.name || '',
         email: claims.email || '',
         studyCount: 0,

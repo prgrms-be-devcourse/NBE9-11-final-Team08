@@ -43,15 +43,6 @@ function CouponCard({
   const isUpcoming = coupon.status === 'SCHEDULED'
 
   const handleDownload = async () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
-    if (!token) {
-      toast.error('로그인이 필요한 기능입니다. 로그인 페이지로 이동합니다.')
-      setTimeout(() => {
-        window.location.href = '/login'
-      }, 1000)
-      return
-    }
-
     setLoading(true)
     try {
       await api.downloadCoupon(Number(coupon.id))
@@ -61,7 +52,14 @@ function CouponCard({
       }
       toast.success('쿠폰이 발급되었습니다.')
     } catch (e: any) {
-      toast.error(e.message || '쿠폰 발급에 실패했습니다.')
+      if (e.message?.includes('401')) {
+        toast.error('로그인이 필요한 기능입니다. 로그인 페이지로 이동합니다.')
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 1000)
+      } else {
+        toast.error(e.message || '쿠폰 발급에 실패했습니다.')
+      }
     } finally {
       setLoading(false)
     }

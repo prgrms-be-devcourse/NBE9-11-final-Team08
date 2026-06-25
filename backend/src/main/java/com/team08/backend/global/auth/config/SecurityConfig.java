@@ -1,6 +1,7 @@
 package com.team08.backend.global.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.team08.backend.global.auth.handler.JwtAuthenticationEntryPoint;
@@ -59,9 +60,10 @@ public class SecurityConfig {
     @Bean
     JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtProvider jwtProvider,
+            AccessCookieProperties accessCookieProperties,
             JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint
     ) {
-        return new JwtAuthenticationFilter(jwtProvider, jwtAuthenticationEntryPoint);
+        return new JwtAuthenticationFilter(jwtProvider, accessCookieProperties, jwtAuthenticationEntryPoint);
     }
 
     @Bean

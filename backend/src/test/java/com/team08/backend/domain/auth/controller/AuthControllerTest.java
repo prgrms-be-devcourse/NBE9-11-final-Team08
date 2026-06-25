@@ -4,20 +4,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.auth.dto.request.LoginRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRole;
-import com.team08.backend.domain.auth.dto.response.LoginResponse;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
+import com.team08.backend.domain.auth.token.AccessTokenCookieFactory;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.global.config.CorsProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.mock.web.MockCookie;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -32,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@EnableConfigurationProperties(CorsProperties.class)
+@TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:3000")
 public class AuthControllerTest {
 
     @Autowired
@@ -44,13 +49,16 @@ public class AuthControllerTest {
     AuthService authService;
 
     @MockitoBean
+    AccessTokenCookieFactory accessTokenCookieFactory;
+
+    @MockitoBean
     RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @MockitoBean
     TokenProperties tokenProperties;
 
     @Test
-    void 로그인에_성공하면_accessToken을_응답하고_refreshToken을_쿠키로_내려준다() throws Exception {
+    void 로그인에_성공하면_토큰들을_쿠키로_내려주고_본문은_반환하지_않는다() throws Exception {
         // given
         LoginRequest request = new LoginRequest("test@email.com", "password");
         TokenPair tokenPair = new TokenPair("access-token", "refresh-token");
@@ -58,21 +66,26 @@ public class AuthControllerTest {
         given(authService.login(request.email(), request.password()))
                 .willReturn(tokenPair);
 
+        given(accessTokenCookieFactory.create(eq("access-token"), any(Duration.class)))
+                .willReturn(ResponseCookie.from("accessToken", "access-token")
+                        .httpOnly(true)
+                        .path("/")
+                        .build());
         given(refreshTokenCookieFactory.create(eq("refresh-token"), any(Duration.class)))
                 .willReturn(ResponseCookie.from("refreshToken", "refresh-token")
                         .httpOnly(true)
                         .path("/")
                         .build());
 
-        LoginResponse expected = new LoginResponse("access-token");
-
         // when & then
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(expected)))
+                .andExpect(status().isNoContent())
                 .andExpect(header().exists(HttpHeaders.SET_COOKIE))
+                .andExpect(cookie().value("accessToken", "access-token"))
+                .andExpect(cookie().httpOnly("accessToken", true))
+                .andExpect(cookie().path("accessToken", "/"))
                 .andExpect(cookie().value("refreshToken", "refresh-token"))
                 .andExpect(cookie().httpOnly("refreshToken", true))
                 .andExpect(cookie().path("refreshToken", "/"));
@@ -117,10 +130,15 @@ public class AuthControllerTest {
     }
 
     @Test
-    void refreshToken으로_토큰을_재발급하면_accessToken과_새_refreshToken을_반환한다() throws Exception {
+    void refreshToken으로_토큰을_재발급하면_새_토큰들을_쿠키로_내려주고_본문은_반환하지_않는다() throws Exception {
         TokenPair tokenPair = new TokenPair("new-access-token", "new-refresh-token");
 
         given(authService.refresh("old-refresh-token")).willReturn(tokenPair);
+        given(accessTokenCookieFactory.create(eq("new-access-token"), any(Duration.class)))
+                .willReturn(ResponseCookie.from("accessToken", "new-access-token")
+                        .httpOnly(true)
+                        .path("/")
+                        .build());
         given(refreshTokenCookieFactory.create(eq("new-refresh-token"), any(Duration.class)))
                 .willReturn(ResponseCookie.from("refreshToken", "new-refresh-token")
                         .httpOnly(true)
@@ -129,8 +147,9 @@ public class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/refresh")
                         .cookie(new MockCookie("refreshToken", "old-refresh-token")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().value("accessToken", "new-access-token"))
+                .andExpect(cookie().httpOnly("accessToken", true))
                 .andExpect(cookie().value("refreshToken", "new-refresh-token"))
                 .andExpect(cookie().httpOnly("refreshToken", true));
 
@@ -141,6 +160,12 @@ public class AuthControllerTest {
     void 유효하지_않은_refreshToken이면_401과_삭제_쿠키를_반환한다() throws Exception {
         given(authService.refresh("invalid-refresh-token"))
                 .willThrow(new InvalidRefreshTokenException());
+        given(accessTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("accessToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
         given(refreshTokenCookieFactory.delete())
                 .willReturn(ResponseCookie.from("refreshToken", "")
                         .httpOnly(true)
@@ -152,11 +177,18 @@ public class AuthControllerTest {
                         .cookie(new MockCookie("refreshToken", "invalid-refresh-token")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_005"))
+                .andExpect(cookie().maxAge("accessToken", 0))
                 .andExpect(cookie().maxAge("refreshToken", 0));
     }
 
     @Test
     void refreshToken_쿠키가_없으면_401과_삭제_쿠키를_반환한다() throws Exception {
+        given(accessTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("accessToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
         given(refreshTokenCookieFactory.delete())
                 .willReturn(ResponseCookie.from("refreshToken", "")
                         .httpOnly(true)
@@ -167,6 +199,7 @@ public class AuthControllerTest {
         mockMvc.perform(post("/api/auth/refresh"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("AUTH_005"))
+                .andExpect(cookie().maxAge("accessToken", 0))
                 .andExpect(cookie().maxAge("refreshToken", 0));
 
         then(authService).shouldHaveNoInteractions();
@@ -174,6 +207,12 @@ public class AuthControllerTest {
 
     @Test
     void 로그아웃하면_refreshToken을_폐기하고_쿠키를_삭제한다() throws Exception {
+        given(accessTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("accessToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
         given(refreshTokenCookieFactory.delete())
                 .willReturn(ResponseCookie.from("refreshToken", "")
                         .httpOnly(true)
@@ -182,8 +221,9 @@ public class AuthControllerTest {
                         .build());
 
         mockMvc.perform(post("/api/auth/logout")
-                        .cookie(new MockCookie("refreshToken", "refresh-token")))
+                .cookie(new MockCookie("refreshToken", "refresh-token")))
                 .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("accessToken", 0))
                 .andExpect(cookie().maxAge("refreshToken", 0));
 
         then(authService).should().logout("refresh-token");
@@ -191,6 +231,12 @@ public class AuthControllerTest {
 
     @Test
     void refreshToken_쿠키가_없어도_로그아웃은_성공하고_쿠키를_삭제한다() throws Exception {
+        given(accessTokenCookieFactory.delete())
+                .willReturn(ResponseCookie.from("accessToken", "")
+                        .httpOnly(true)
+                        .path("/")
+                        .maxAge(Duration.ZERO)
+                        .build());
         given(refreshTokenCookieFactory.delete())
                 .willReturn(ResponseCookie.from("refreshToken", "")
                         .httpOnly(true)
@@ -200,6 +246,7 @@ public class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isNoContent())
+                .andExpect(cookie().maxAge("accessToken", 0))
                 .andExpect(cookie().maxAge("refreshToken", 0));
 
         then(authService).should().logout(null);

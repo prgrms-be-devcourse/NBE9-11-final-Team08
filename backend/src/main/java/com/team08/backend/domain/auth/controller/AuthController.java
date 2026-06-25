@@ -2,12 +2,14 @@ package com.team08.backend.domain.auth.controller;
 
 import com.team08.backend.domain.auth.dto.request.LoginRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
-import com.team08.backend.domain.auth.dto.response.LoginResponse;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
+import com.team08.backend.domain.auth.token.AccessTokenCookieFactory;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.response.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -33,6 +36,8 @@ public class AuthController {
 
     private final TokenProperties tokenProperties;
 
+    private final AccessTokenCookieFactory accessTokenCookieFactory;
+
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     @Operation(
@@ -41,17 +46,21 @@ public class AuthController {
     )
     @SecurityRequirements
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<Void> login(@Valid @RequestBody LoginRequest request) {
         TokenPair tokenPair = authService.login(request.email(), request.password());
 
-        ResponseCookie cookie = refreshTokenCookieFactory.create(
+        ResponseCookie accessCookie = accessTokenCookieFactory.create(
+                tokenPair.accessToken(),
+                Duration.ofMillis(tokenProperties.expirationMillis())
+        );
+        ResponseCookie refreshCookie = refreshTokenCookieFactory.create(
                 tokenPair.refreshToken(),
                 Duration.ofMillis(tokenProperties.refreshExpirationMillis())
         );
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(LoginResponse.from(tokenPair));
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString(), refreshCookie.toString())
+                .build();
     }
 
     @Operation(
@@ -71,7 +80,7 @@ public class AuthController {
     )
     @SecurityRequirements
     @PostMapping("/refresh")
-    public ResponseEntity<LoginResponse> refresh(
+    public ResponseEntity<Void> refresh(
             @CookieValue(name = "${app.jwt.refresh-cookie.name:refreshToken}", required = false)
             String refreshToken
     ) {
@@ -80,14 +89,27 @@ public class AuthController {
         }
 
         TokenPair tokenPair = authService.refresh(refreshToken);
-        ResponseCookie cookie = refreshTokenCookieFactory.create(
+        ResponseCookie accessCookie = accessTokenCookieFactory.create(
+                tokenPair.accessToken(),
+                Duration.ofMillis(tokenProperties.expirationMillis())
+        );
+        ResponseCookie refreshCookie = refreshTokenCookieFactory.create(
                 tokenPair.refreshToken(),
                 Duration.ofMillis(tokenProperties.refreshExpirationMillis())
         );
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(LoginResponse.from(tokenPair));
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, accessCookie.toString(), refreshCookie.toString())
+                .build();
+    }
+
+    @Operation(
+            summary = "내 인증 정보 조회",
+            description = "현재 인증된 사용자의 JWT 클레임 기반 정보를 반환합니다."
+    )
+    @GetMapping("/me")
+    public LoginUserDto me(@AuthenticationPrincipal LoginUserPrincipal principal) {
+        return principal.user();
     }
 
     @Operation(
@@ -101,10 +123,11 @@ public class AuthController {
             String refreshToken
     ) {
         authService.logout(refreshToken);
-        ResponseCookie deleteCookie = refreshTokenCookieFactory.delete();
+        ResponseCookie deleteAccessCookie = accessTokenCookieFactory.delete();
+        ResponseCookie deleteRefreshCookie = refreshTokenCookieFactory.delete();
 
         return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, deleteAccessCookie.toString(), deleteRefreshCookie.toString())
                 .build();
     }
 
@@ -113,11 +136,12 @@ public class AuthController {
             InvalidRefreshTokenException exception
     ) {
         ErrorCode errorCode = exception.getErrorCode();
-        ResponseCookie deleteCookie = refreshTokenCookieFactory.delete();
+        ResponseCookie deleteAccessCookie = accessTokenCookieFactory.delete();
+        ResponseCookie deleteRefreshCookie = refreshTokenCookieFactory.delete();
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .header(HttpHeaders.SET_COOKIE, deleteCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, deleteAccessCookie.toString(), deleteRefreshCookie.toString())
                 .body(ErrorResponse.from(errorCode));
     }
 }

@@ -465,10 +465,6 @@ export interface LoginRequest {
   password: string
 }
 
-export interface LoginResponse {
-  accessToken: string
-}
-
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'
 export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 
