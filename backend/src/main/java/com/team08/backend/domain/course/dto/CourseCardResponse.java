@@ -1,6 +1,7 @@
 package com.team08.backend.domain.course.dto;
 
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.global.util.FileUrlFormatter;
 
 public record CourseCardResponse(
         Long id,
@@ -11,13 +12,13 @@ public record CourseCardResponse(
         int price,
         int viewCount
 ) {
-    public static CourseCardResponse from(Course course) {
+    public static CourseCardResponse from(Course course, FileUrlFormatter fileUrlFormatter) {
         return new CourseCardResponse(
                 course.getId(),
                 course.getInstructorId(),
                 course.getCategoryId(),
                 course.getTitle(),
-                course.getThumbnail(),
+                fileUrlFormatter.formatThumbnailUrl(course.getThumbnail()),
                 course.getPrice(),
                 course.getViewCount()
         );
