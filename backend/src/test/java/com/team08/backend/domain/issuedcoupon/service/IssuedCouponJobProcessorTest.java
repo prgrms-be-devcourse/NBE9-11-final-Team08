@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcouponjob.service;
+package com.team08.backend.domain.issuedcoupon.service;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

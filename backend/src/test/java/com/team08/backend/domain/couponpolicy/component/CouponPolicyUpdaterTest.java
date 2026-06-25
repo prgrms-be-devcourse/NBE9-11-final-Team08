@@ -1,12 +1,12 @@
 package com.team08.backend.domain.couponpolicy.component;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicyCategory;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicyCourse;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
-import com.team08.backend.domain.couponpolicycategory.entity.CouponPolicyCategory;
-import com.team08.backend.domain.couponpolicycourse.entity.CouponPolicyCourse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

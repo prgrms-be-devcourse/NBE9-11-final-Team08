@@ -27,6 +27,20 @@ class PaymentAttemptTest {
     }
 
     @Test
+    void requestedAttemptCanStoreIdempotencyKey() {
+        LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
+        PaymentAttempt attempt = PaymentAttempt.requested(
+                payment(),
+                PaymentProviderType.TOSS,
+                30_000,
+                "idem-1",
+                requestedAt
+        );
+
+        assertThat(attempt.getIdempotencyKey()).isEqualTo("idem-1");
+    }
+
+    @Test
     void requestedAttemptCanBeDeclined() {
         LocalDateTime requestedAt = LocalDateTime.parse("2026-06-18T12:00:00");
         LocalDateTime completedAt = requestedAt.plusSeconds(3);

@@ -20,10 +20,11 @@ export default function StudyPostPage() {
     const load = async () => {
       try {
         const [studyData, profile] = await Promise.all([
-          api.getStudy(id),
+          api.getStudyForEntry(id),
           api.getProfile(),
         ])
         if (!studyData) { setNotFound(true); return }
+        if (studyData.myRole === 'viewer') { setNotFound(true); return }
 
         const postData = await api.getBoardPost(studyData.id, postId)
         if (!postData) { setNotFound(true); return }

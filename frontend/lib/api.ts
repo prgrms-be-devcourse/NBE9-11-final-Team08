@@ -20,6 +20,7 @@ import type {
   QnaPost,
   Study,
   StudyDetailResponse,
+  StudyIdResponse,
   StudyReport,
   UserProfile,
   SignupRequest,
@@ -220,7 +221,7 @@ const mapStudyDetailToStudy = (
   intro: detail.description,
   status: detail.status as Study['status'],
   ownerName: detail.ownerNickname,
-  myRole: detail.myRole.toLowerCase() as Study['myRole'],
+  myRole: (detail.myRole?.toLowerCase() ?? 'viewer') as Study['myRole'],
   progress: 0,
   members: [
     {
@@ -715,33 +716,41 @@ export const api = {
     return mapCourseDetailToCourse(detailResponse)
   },
 
-  createCourse: async (data: CourseCreateRequest) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', data)
+  createCourse: async (formData: FormData) => {
+    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
+      
+      const requestBlob = formData.get('request') as Blob
+      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+      
       saveCourseDraft(courseId, {
         instructorId,
-        categoryId: data.categoryId,
-        title: data.title,
-        description: data.description,
-        thumbnail: data.thumbnail || '',
-        price: data.price,
+        categoryId: Number(requestData.categoryId),
+        title: requestData.title || '',
+        description: requestData.description || '',
+        thumbnail: requestData.thumbnail || '',
+        price: Number(requestData.price),
         status: 'DRAFT'
       })
     }
     return courseId
   },
 
-  updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
+  updateCourse: async (courseId: string | number, formData: FormData) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
+    
+    const requestBlob = formData.get('request') as Blob
+    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+    
     saveCourseDraft(courseId, {
       instructorId,
-      categoryId: data.categoryId,
-      title: data.title,
-      description: data.description,
-      thumbnail: data.thumbnail || '',
-      price: data.price,
+      categoryId: Number(requestData.categoryId),
+      title: requestData.title || '',
+      description: requestData.description || '',
+      thumbnail: requestData.thumbnail || '',
+      price: Number(requestData.price),
       status: 'DRAFT'
     })
     return res
@@ -766,8 +775,15 @@ export const api = {
   },
 
   // Lecture enter / progress / last-watched
-  enterLecture: (lectureId: string | number) =>
-    request<LectureEnterResponse | null>(`/api/lectures/${lectureId}/enter`, null),
+  enterLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<LectureEnterResponse | null>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/enter`,
+      null,
+    ),
 
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
@@ -851,17 +867,16 @@ export const api = {
       if (detail?.status === 'CLOSED') {
         status = '완료' // Map 'CLOSED' from backend to '완료' for frontend display
       }
-      // Note: progress, totalLectures, and completedLectures cannot be accurately
-      // populated from StudySummaryResponse or StudyDetailResponse without
-      // further backend changes, so they remain hardcoded to 0.
+      // 진행도/강의 수는 백엔드 StudySummaryResponse 에서 집계해 내려준다.
       return {
         id: study.studyId.toString(),
+        courseId: detail?.courseId?.toString(),
         title: study.title,
         instructor: study.ownerNickname,
         thumbnailUrl: '/placeholder.svg',
-        progress: 0,
-        totalLectures: 0,
-        completedLectures: 0,
+        progress: study.progressRate ?? 0,
+        totalLectures: study.totalLectures ?? 0,
+        completedLectures: study.completedLectures ?? 0,
         status: status,
       }
     })
@@ -878,15 +893,27 @@ export const api = {
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
 
   getStudy: async (studyId: string | number): Promise<Study | undefined> => {
-    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
+    const detail = await request<StudyDetailResponse | undefined>(`/api/studies/${studyId}`, undefined)
 
     if (!detail) return undefined
+
+    return mapStudyDetailToStudy(detail)
   },
 
-  getStudyByCourseId: async (courseId: string | number): Promise<Study | undefined> => {
-    let detail = await request<StudyDetailResponse | undefined>(`/api/studies/by-course/${courseId}`, undefined)
+  getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
+    const study = await api.getStudy(studyId)
+    if (!study) return undefined
 
-    if (!detail) return undefined
+    const enrolled = await api.isCourseEnrollmentActive(study.courseId)
+    if (!enrolled) return undefined
+
+    return study
+  },
+
+  getStudyIdByCourseId: async (courseId: string | number): Promise<string | null> => {
+    const res = await request<StudyIdResponse | null>(`/api/studies/by-course/${courseId}`, null)
+
+    return res?.studyId ? res.studyId.toString() : null
   },
 
   getBoardPosts: async (studyId: string | number): Promise<StudyActivityResponse[]> => {
@@ -1054,12 +1081,16 @@ export const api = {
       const res = await request<any>('/api/orders', { content: [] })
       const orders = Array.isArray(res) ? res : (res?.content || [])
       const enrolled: EnrolledCourse[] = []
-      orders.forEach((ord: any) => {
+      for (const ord of orders) {
         if (ord.status === 'PAID') {
-          ord.items?.forEach((item: any) => {
-            if (!enrolled.some(e => e.id === item.courseId.toString())) {
+          for (const item of ord.items ?? []) {
+            const courseId = item.courseId.toString()
+            if (!enrolled.some(e => (e.courseId ?? e.id) === courseId)) {
+              const studyId = await api.getStudyIdByCourseId(courseId)
+              if (!studyId) continue
               enrolled.push({
-                id: item.courseId.toString(),
+                id: studyId,
+                courseId,
                 title: item.courseTitle || '',
                 instructor: '강사',
                 thumbnailUrl: '/placeholder.svg',
@@ -1069,9 +1100,9 @@ export const api = {
                 status: '진행 중'
               })
             }
-          })
+          }
         }
-      })
+      }
       return enrolled
     } catch (e) {
       console.error('Failed to get purchased courses from orders:', e)
@@ -1088,24 +1119,20 @@ export const api = {
 
   getOrder: async (id: string) => request<OrderDetailResponse | undefined>(`/api/orders/${id}`, undefined),
 
-  // 저장된 리포트 조회. 없으면 null.
-  getStudyReportRaw: (studyId: string | number) =>
-    request<StudyReportResponse | null>(`/api/studies/${studyId}/report`, null),
+  // 리포트 조회. 없으면 백엔드에서 즉시 생성한다.
+  getStudyReportRaw: (studyId: string | number, refresh = false) =>
+    request<StudyReportResponse | null>(
+      `/api/studies/${studyId}/report${refresh ? '?refresh=true' : ''}`,
+      null,
+    ),
 
-  // 학습 이벤트를 집계해 리포트를 생성/갱신한다.
+  // 학습 이벤트 재집계를 시도한다. 쿨다운 이내면 기존 리포트가 반환된다.
   generateStudyReport: (studyId: string | number) =>
-    mutate<StudyReportResponse>(`/api/studies/${studyId}/report`, 'POST'),
+    api.getStudyReportRaw(studyId, true),
 
-  // 조회 후 없으면 생성까지 시도한다.
+  // 조회 후 없으면 백엔드에서 생성까지 처리한다.
   getOrGenerateStudyReport: async (studyId: string | number): Promise<StudyReportResponse | null> => {
-    const existing = await api.getStudyReportRaw(studyId)
-    if (existing && existing.studyId) return existing
-    try {
-      return await api.generateStudyReport(studyId)
-    } catch (e) {
-      console.warn('Failed to generate study report:', e)
-      return null
-    }
+    return await api.getStudyReportRaw(studyId)
   },
 
   getStudyReport: async (_studyId: string): Promise<StudyReport> => {

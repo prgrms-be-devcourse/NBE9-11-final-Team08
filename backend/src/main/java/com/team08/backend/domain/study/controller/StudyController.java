@@ -1,6 +1,7 @@
 package com.team08.backend.domain.study.controller;
 
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyIdResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.service.StudyService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -43,18 +44,19 @@ public class StudyController {
             @PathVariable Long studyId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
     ) {
-        return studyService.getStudyDetail(studyId, loginUserPrincipal.user().id());
+        Long userId = loginUserPrincipal == null ? null : loginUserPrincipal.user().id();
+
+        return studyService.getStudyDetail(studyId, userId);
     }
 
     @Operation(
-            summary = "강좌별 스터디 상세 조회",
-            description = "강좌 ID에 연결된 DRAFT가 아닌 스터디의 상세 정보를 조회합니다."
+            summary = "강좌별 스터디 ID 조회",
+            description = "강좌 ID에 연결된 DRAFT가 아닌 스터디의 ID를 조회합니다."
     )
     @GetMapping("/by-course/{courseId}")
-    public StudyDetailResponse getStudyDetailByCourseId(
-            @PathVariable Long courseId,
-            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
-    ) {
-        return studyService.getStudyDetailByCourseId(courseId, loginUserPrincipal.user().id());
+    public StudyIdResponse getStudyIdByCourseId(@PathVariable Long courseId) {
+        return new StudyIdResponse(
+                studyService.getStudyIdByCourseId(courseId)
+        );
     }
 }
