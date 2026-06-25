@@ -205,8 +205,7 @@ public class FeedOutboxPublisher {
 
     private String learningEventContent(LearningEventFeedOutboxPayload event) {
         return switch (event.eventType()) {
-            case LECTURE_ENTER -> "강의에 입장했어요: " + event.lectureTitle();
-            case LECTURE_COMPLETE -> "강의를 완료했어요: " + event.lectureTitle();
+            case LECTURE_ENTER, LECTURE_COMPLETE -> event.lectureTitle();
             default -> throw new IllegalStateException("Unsupported learning event type for feed: " + event.eventType());
         };
     }

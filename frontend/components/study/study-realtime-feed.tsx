@@ -237,7 +237,7 @@ function getFeedMessage(item: FeedItemResponse) {
 
   switch (item.type) {
     case 'STUDY_ACTIVITY':
-      return `${item.actorNickname}가 학습활동을 작성하였습니다.`
+      return `${item.actorNickname}님이 학습활동을 작성하였습니다.`
     case 'LECTURE_ENTER':
       return `${item.actorNickname}님이 ${lectureTitle} 수강을 시작했어요.`
     case 'LECTURE_COMPLETE':
