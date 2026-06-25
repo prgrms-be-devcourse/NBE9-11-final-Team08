@@ -11,6 +11,9 @@ spring:
 springdoc:
   api-docs:
     enabled: true
+  swagger-ui:
+    csrf:
+      enabled: true
 
 app:
   cors:

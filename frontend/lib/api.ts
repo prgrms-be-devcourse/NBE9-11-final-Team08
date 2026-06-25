@@ -49,6 +49,8 @@ import type {
   LearningEventRow,
   AnomalyResponse,
   AuditResponse,
+  FeedCursor,
+  FeedCursorResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -114,6 +116,18 @@ const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record
 
 const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
   return includeCredentials ? 'include' : 'same-origin'
+}
+
+const toIsoLocalDateTime = (value: string | number[]): string => {
+  if (!Array.isArray(value)) {
+    return value
+  }
+
+  const [year, month = 1, day = 1, hour = 0, minute = 0, second = 0, nano = 0] = value
+  const millisecond = Math.floor(nano / 1_000_000)
+  const pad = (num: number, length = 2) => String(num).padStart(length, '0')
+
+  return `${pad(year, 4)}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${pad(millisecond, 3)}`
 }
 
 const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | undefined> => {
@@ -844,10 +858,10 @@ export const api = {
     const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
-      
+
       const requestBlob = formData.get('request') as Blob
       const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-      
+
       saveCourseDraft(courseId, {
         instructorId,
         categoryId: Number(requestData.categoryId),
@@ -864,10 +878,10 @@ export const api = {
   updateCourse: async (courseId: string | number, formData: FormData) => {
     const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
-    
+
     const requestBlob = formData.get('request') as Blob
     const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-    
+
     saveCourseDraft(courseId, {
       instructorId,
       categoryId: Number(requestData.categoryId),
@@ -1024,6 +1038,19 @@ export const api = {
       `/api/studies/${studyId}/activities?page=${page}&size=${size}`,
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
     ),
+
+  getStudyFeed: (studyId: string | number, cursor?: FeedCursor | null, size = 10) => {
+    const params = new URLSearchParams({ size: String(size) })
+    if (cursor) {
+      params.set('cursorOccurredAt', toIsoLocalDateTime(cursor.occurredAt))
+      params.set('cursorId', String(cursor.id))
+    }
+
+    return request<FeedCursorResponse>(
+      `/api/studies/${studyId}/feed?${params.toString()}`,
+      { items: [], nextCursor: null, hasNext: false },
+    )
+  },
 
   createStudyActivity: (studyId: number | string, content: string) =>
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
