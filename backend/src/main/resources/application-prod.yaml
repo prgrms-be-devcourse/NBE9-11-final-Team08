@@ -23,5 +23,3 @@ app:
   ai:
     model: ${OPENAI_MODEL:gpt-4.1-mini}
     prompt-version: v1
-  s3:
-    upload-fallback-enabled: false # 실제 배포 서버에서는 업로드 실패 시 무조건 예외 발생시켜 에러 차단

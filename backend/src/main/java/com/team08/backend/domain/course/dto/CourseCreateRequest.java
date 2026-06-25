@@ -17,7 +17,7 @@ public record CourseCreateRequest(
         @Min(value = 0, message = "가격은 0원 이상이어야 합니다.")
         int price,
 
-        @NotBlank(message = "썸네일 이미지 경로는 필수입니다.")
+        // @NotBlank(message = "썸네일 이미지 경로는 필수입니다.")
         String thumbnail
 ) {
     public Course toEntity(Long instructorId) {
