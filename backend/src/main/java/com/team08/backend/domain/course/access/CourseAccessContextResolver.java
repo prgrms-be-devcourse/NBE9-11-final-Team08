@@ -8,9 +8,6 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
-import com.team08.backend.domain.user.entity.User;
-import com.team08.backend.domain.user.entity.UserRole;
-import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -27,7 +24,6 @@ public class CourseAccessContextResolver {
     private final ChapterRepository chapterRepository;
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final UserRepository userRepository;
 
     public CourseAccessContext fromCourseId(Long courseId, Long userId) {
         Course course = courseRepository.findById(courseId)
@@ -56,7 +52,7 @@ public class CourseAccessContextResolver {
                 userId, courseId, EnrollmentStatus.ACTIVE);
         boolean hasFreePreview = lectureRepository.existsByChapterCourseIdAndIsFreePreviewTrue(courseId);
 
-        boolean isAdmin = determineAdminStatus(userId);
+        boolean isAdmin = determineAdminStatus();
 
         return new CourseAccessContext(
                 userId,
@@ -68,20 +64,11 @@ public class CourseAccessContextResolver {
         );
     }
 
-    private boolean determineAdminStatus(Long userId) {
-        if (userId == null) {
-            return false;
-        }
-
+    private boolean determineAdminStatus() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof LoginUserPrincipal principal) {
-            if (userId.equals(principal.user().id())) {
-                return "ROLE_ADMIN".equals(principal.user().role());
-            }
+            return "ROLE_ADMIN".equals(principal.user().role());
         }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-        return user.getRole() == UserRole.ROLE_ADMIN;
+        return false;
     }
 }

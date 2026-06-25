@@ -12,11 +12,7 @@ import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
-import com.team08.backend.domain.user.entity.User;
-import com.team08.backend.domain.user.entity.UserRole;
-import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.support.TestEntityFactory;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -52,19 +48,8 @@ public class CourseAccessContextResolverTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
-    @Mock
-    private UserRepository userRepository;
-
     @InjectMocks
     private CourseAccessContextResolver resolver;
-
-    @BeforeEach
-    void setUp() {
-        User defaultUser = User.createUser("user@test.com", "password", "유저", null);
-        ReflectionTestUtils.setField(defaultUser, "id", USER_ID);
-        org.mockito.Mockito.lenient().when(userRepository.findById(USER_ID))
-                .thenReturn(Optional.of(defaultUser));
-    }
 
     @Test
     void chapterId로_course를_찾아_권한_context를_생성한다() {
@@ -92,16 +77,25 @@ public class CourseAccessContextResolverTest {
     @Test
     void 어드민인_경우_isAdmin이_true인_context를_생성한다() {
         Chapter chapter = chapter();
-        User adminUser = User.createAdmin("admin@test.com", "password", "어드민", null);
-        ReflectionTestUtils.setField(adminUser, "id", USER_ID);
-
         given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
-        given(userRepository.findById(USER_ID)).willReturn(Optional.of(adminUser));
 
-        CourseAccessContext context = resolver.fromChapterId(CHAPTER_ID, USER_ID);
+        LoginUserDto loginUserDto = new LoginUserDto(USER_ID, "admin@test.com", "관리자", "ROLE_ADMIN");
+        LoginUserPrincipal principal = LoginUserPrincipal.from(loginUserDto);
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+        
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
 
-        assertContext(context, CourseStatus.ON_SALE, false, true, false, true);
+        try {
+            CourseAccessContext resultContext = resolver.fromChapterId(CHAPTER_ID, USER_ID);
+
+            assertContext(resultContext, CourseStatus.ON_SALE, false, true, false, true);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     @Test
@@ -135,31 +129,6 @@ public class CourseAccessContextResolverTest {
                 () -> resolver.fromLectureId(LECTURE_ID, USER_ID),
                 ErrorCode.LECTURE_NOT_FOUND
         );
-    }
-
-    @Test
-    void SecurityContext가_존재하고_userId가_일치하면_DB_조회없이_isAdmin을_설정한다() {
-        Chapter chapter = chapter();
-        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
-
-        LoginUserDto loginUserDto = new LoginUserDto(USER_ID, "admin@test.com", "관리자", "ROLE_ADMIN");
-        LoginUserPrincipal principal = LoginUserPrincipal.from(loginUserDto);
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
-        
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-
-        try {
-            CourseAccessContext resultContext = resolver.fromChapterId(CHAPTER_ID, USER_ID);
-
-            assertContext(resultContext, CourseStatus.ON_SALE, false, true, false, true);
-            org.mockito.Mockito.verify(userRepository, org.mockito.Mockito.never()).findById(USER_ID);
-        } finally {
-            SecurityContextHolder.clearContext();
-        }
     }
 
     private Chapter chapter() {
