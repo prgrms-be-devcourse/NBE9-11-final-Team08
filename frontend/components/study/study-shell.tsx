@@ -29,12 +29,13 @@ interface NavItem {
   label: string
   icon: LucideIcon
   ownerOnly?: boolean
+  memberOnly?: boolean
 }
 
 const NAV: NavItem[] = [
   { segment: '', label: '대시보드', icon: LayoutDashboard },
   { segment: 'course', label: '강좌', icon: BookOpen },
-  { segment: 'board', label: '게시판', icon: MessageSquare },
+  { segment: 'board', label: '게시판', icon: MessageSquare, memberOnly: true },
   { segment: 'report', label: '리포트', icon: BarChart3 },
   { segment: 'settings', label: '설정', icon: Settings, ownerOnly: true },
 ]
@@ -59,7 +60,7 @@ export function StudyShell({
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="ghost" size="icon" aria-label="내 스터디 목록으로">
-          <Link href="/studies">
+          <Link href="/mypage">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
@@ -89,7 +90,11 @@ export function StudyShell({
         {/* Sidebar nav */}
         <aside className="lg:sticky lg:top-20 lg:self-start">
           <nav className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-2 lg:flex-col lg:overflow-visible">
-            {NAV.filter((n) => !n.ownerOnly || study.myRole === 'owner').map(
+            {NAV.filter((n) => {
+              if (n.memberOnly && study.myRole === 'viewer') return false
+              if (n.ownerOnly) return study.myRole === 'owner'
+              return true
+            }).map(
               (item) => {
                 const href = item.segment ? `${base}/${item.segment}` : base
                 const active = isActive(item.segment)

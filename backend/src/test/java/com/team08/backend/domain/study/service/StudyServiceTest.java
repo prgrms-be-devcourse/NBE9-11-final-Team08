@@ -1,7 +1,5 @@
 package com.team08.backend.domain.study.service;
 
-import com.team08.backend.domain.study.access.StudyAccessAuthorizer;
-import com.team08.backend.domain.study.access.StudyAction;
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.Study;
@@ -10,7 +8,9 @@ import com.team08.backend.domain.study.fixture.StudyFixture;
 import com.team08.backend.domain.study.repository.StudyRepository;
 import com.team08.backend.domain.studymember.entity.StudyMember;
 import com.team08.backend.domain.studymember.entity.StudyMemberRole;
+import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
+import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +37,7 @@ public class StudyServiceTest {
     private StudyMemberRepository studyMemberRepository;
 
     @Mock
-    private StudyAccessAuthorizer studyAccessAuthorizer;
+    private StudyReportRepository studyReportRepository;
 
     @InjectMocks
     private StudyService studyService;
@@ -71,7 +70,11 @@ public class StudyServiceTest {
 
         given(studyRepository.findByIdWithCourse(study.getId()))
                 .willReturn(Optional.of(study));
-        given(studyMemberRepository.findByStudyIdAndUserId(study.getId(), userId))
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(
+                study.getId(),
+                userId,
+                StudyMemberStatus.ACTIVE
+        ))
                 .willReturn(Optional.of(member));
 
         StudyDetailResponse result = studyService.getStudyDetail(study.getId(), userId);
@@ -81,32 +84,59 @@ public class StudyServiceTest {
         assertThat(result.status()).isEqualTo(StudyStatus.ACTIVE);
         assertThat(result.myRole()).isEqualTo(StudyMemberRole.MEMBER);
 
-        verify(studyAccessAuthorizer)
-                .authorizeByStudyId(study.getId(), userId, StudyAction.VIEW_STUDY_CONTENT);
+        verify(studyMemberRepository).findByStudyIdAndUserIdAndStatus(
+                study.getId(),
+                userId,
+                StudyMemberStatus.ACTIVE
+        );
     }
 
     @Test
-    void courseId로_조회_가능한_스터디_상세를_조회한다() {
+    void studyId로_조회_가능한_스터디_상세는_비멤버에게_null_role을_반환한다() {
         Long userId = 1L;
         Study study = StudyFixture.activeStudy();
-        ReflectionTestUtils.setField(study, "status", StudyStatus.READONLY);
-        StudyMember member = member(StudyMemberRole.OWNER);
+
+        given(studyRepository.findByIdWithCourse(study.getId()))
+                .willReturn(Optional.of(study));
+        given(studyMemberRepository.findByStudyIdAndUserIdAndStatus(
+                study.getId(),
+                userId,
+                StudyMemberStatus.ACTIVE
+        )).willReturn(Optional.empty());
+
+        StudyDetailResponse result = studyService.getStudyDetail(study.getId(), userId);
+
+        assertThat(result.studyId()).isEqualTo(study.getId());
+        assertThat(result.myRole()).isNull();
+    }
+
+    @Test
+    void studyId로_조회_가능한_스터디_상세는_비로그인_사용자에게_null_role을_반환한다() {
+        Study study = StudyFixture.activeStudy();
+
+        given(studyRepository.findByIdWithCourse(study.getId()))
+                .willReturn(Optional.of(study));
+
+        StudyDetailResponse result = studyService.getStudyDetail(study.getId(), null);
+
+        assertThat(result.studyId()).isEqualTo(study.getId());
+        assertThat(result.myRole()).isNull();
+
+        verifyNoInteractions(studyMemberRepository);
+    }
+
+    @Test
+    void courseId로_조회_가능한_스터디_id를_조회한다() {
+        Study study = StudyFixture.activeStudy();
 
         given(studyRepository.findByCourseIdWithCourse(study.getCourse().getId()))
                 .willReturn(Optional.of(study));
-        given(studyMemberRepository.findByStudyIdAndUserId(study.getId(), userId))
-                .willReturn(Optional.of(member));
 
-        StudyDetailResponse result = studyService.getStudyDetailByCourseId(
-                study.getCourse().getId(), userId
-        );
+        Long result = studyService.getStudyIdByCourseId(study.getCourse().getId());
 
-        assertThat(result.studyId()).isEqualTo(study.getId());
-        assertThat(result.status()).isEqualTo(StudyStatus.READONLY);
-        assertThat(result.myRole()).isEqualTo(StudyMemberRole.OWNER);
+        assertThat(result).isEqualTo(study.getId());
 
-        verify(studyAccessAuthorizer)
-                .authorizeByCourseId(study.getCourse().getId(), userId, StudyAction.VIEW_STUDY_CONTENT);
+        verifyNoInteractions(studyMemberRepository);
     }
 
     @Test

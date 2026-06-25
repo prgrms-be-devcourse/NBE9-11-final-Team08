@@ -8,7 +8,7 @@ import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
 import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
-import com.team08.backend.domain.learningevent.event.LectureExitedEvent;
+import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -55,18 +55,10 @@ public class LearningEventService {
 
         LearningEvent saved = learningEventRepository.save(event);
 
-        //2. 이벤트 따라 작업 분기 (publisher)
-            // 퇴장은 단일 출처·비가역이라 이벤트 적재가 1급(반드시 커밋).
-            // lecture_progresses 마지막 위치 flush 는 하트비트로 다중화된 best-effort 보정이라
-            // 이벤트 커밋 후(AFTER_COMMIT) 별도 트랜잭션에서 처리해 이벤트를 롤백시키지 않는다.
-        if (saved.getEventType() == LearningEventType.LECTURE_EXIT) {
-            eventPublisher.publishEvent(new LectureExitedEvent(
-                    saved.getUserId(),
-                    saved.getLectureId(),
-                    saved.getPositionSeconds(),
-                    saved.getEventTime()
-            ));
-        }
+        //2. 적재된 이벤트를 단일 도메인 이벤트로 발행한다.
+        //   "그래서 무엇을 할지"(progress flush, 알림 등)는 각 리스너가 자기 타입만 필터링해
+        //   소유한다 — 새 반응은 리스너만 추가하면 되고 이 서비스는 수정하지 않는다(개방-폐쇄).
+        eventPublisher.publishEvent(LearningEventRecorded.from(saved));
 
         return LearningEventResponse.from(saved);
     }

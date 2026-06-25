@@ -33,8 +33,8 @@ public class LearningEventController {
     public LearningEventResponse recordEvent(
             @Valid @RequestBody RecordLearningEventRequest request,
             @AuthenticationPrincipal LoginUserPrincipal principal
-            // LECTURE_EXIT 시 진행상황 마지막 위치 flush 는 이벤트 커밋 후
-            // LectureExitedEventListener 가 best-effort 로 처리한다.
+            // 적재 후 LearningEventRecorded 가 발행되고, 각 반응 리스너가 자기 타입만 처리한다.
+            // 예: LECTURE_EXIT 시 ExitProgressFlushListener 가 커밋 후 best-effort 로 위치를 flush.
     ) {
         return learningEventService.recordEvent(principal.user().id(), request);
     }
