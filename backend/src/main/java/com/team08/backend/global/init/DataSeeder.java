@@ -13,6 +13,7 @@ import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.couponpolicy.entity.*;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
@@ -894,8 +895,16 @@ public class DataSeeder {
         studyMemberRepository.save(StudyMember.owner(rOwner, inactive));
         inactive.changeToInactive(); // DRAFT → INACTIVE
 
-        // 신규: DRAFT 강좌(course9) → DRAFT 스터디 (생성자/관리자만 조회 가능)
-        Course draftCourse = courses.get(9);
+        Set<Long> studyCourseIds = studies.stream()
+                .map(study -> study.getCourse().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        // 신규: DRAFT 강좌 → DRAFT 스터디 (생성자/관리자만 조회 가능)
+        Course draftCourse = courses.stream()
+                .filter(course -> course.getStatus() == CourseStatus.DRAFT)
+                .filter(course -> !studyCourseIds.contains(course.getId()))
+                .findFirst()
+                .orElseThrow();
         User dOwner = usersById.get(draftCourse.getInstructorId());
         Study draft = studyRepository.save(
                 Study.createForCourse(dOwner, draftCourse, "작성중 스터디", "DRAFT 강좌에 연결된 스터디"));
