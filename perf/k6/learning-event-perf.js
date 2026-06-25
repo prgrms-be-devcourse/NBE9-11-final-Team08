@@ -306,14 +306,19 @@ export function setup() {
             }
         );
 
-        if (res.status !== 200) {
+        if (res.status !== 200 && res.status !== 204) {
             throw new Error(
-                `[setup] 로그인 실패 (${email})`
+                `[setup] 로그인 실패 (${email}) status=${res.status}`
             );
         }
 
+        // 로그인 응답은 204 + HttpOnly 쿠키(accessToken)로 토큰을 내려준다(본문 없음).
+        const cookie = res.cookies['accessToken'];
         const token =
-            JSON.parse(res.body).accessToken;
+            cookie && cookie[0] ? cookie[0].value : null;
+        if (!token) {
+            throw new Error(`[setup] accessToken 쿠키 없음 (${email})`);
+        }
 
         console.log(
             `[setup] 로그인 성공: ${email}`

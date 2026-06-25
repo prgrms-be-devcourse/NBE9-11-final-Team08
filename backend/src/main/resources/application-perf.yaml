@@ -1,0 +1,49 @@
+spring:
+  ai:
+    model:
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
+
+springdoc:
+  api-docs:
+    enabled: false
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+  ai:
+    model: stub
+    prompt-version: v1
+  jwt:
+    secret: ${JWT_SECRET}
+    access-cookie:
+      secure: false
+      same-site: Lax
+      domain:
+  data-init:
+    mode: ${APP_DATA_INIT_MODE:bulk}
+
+cloud:
+  aws:
+    cloudfront:
+      enabled: false
+
+file:
+  upload-dir: ${LOCAL_UPLOAD_DIR:/tmp/videos-local}
+
+# 부하 테스트 환경에서는 CSRF 비활성화
+# k6는 브라우저가 아니므로 CSRF 보호가 의미 없고, 토큰 취득 흐름이 부하 측정을 왜곡한다.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      show-details: always

@@ -7,6 +7,7 @@ import com.team08.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.team08.backend.global.auth.handler.JwtAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -32,7 +33,49 @@ import java.util.function.Supplier;
 @EnableWebSecurity
 @EnableMethodSecurity // @PreAuthorize(예: 관리자 전용 엔드포인트)를 실제로 강제한다
 public class SecurityConfig {
+
+    // ── perf 프로파일: CSRF 비활성화 (k6 부하 테스트용) ──
     @Bean
+    @Profile("perf")
+    SecurityFilterChain perfSecurityFilterChain(
+            HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint
+    ) throws Exception {
+        return http
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                )
+                .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/prometheus",
+                                "/api/auth/login",
+                                "/api/auth/signup",
+                                "/api/auth/refresh",
+                                "/api/auth/logout",
+                                "/error"
+                        ).permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/me").authenticated()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/by-course/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    // ── 기본 프로파일 (dev/prod): CSRF 활성화 ──
+    @Bean
+    @Profile("!perf")
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             AccessCookieProperties accessCookieProperties,
@@ -67,6 +110,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",
+                                "/actuator/prometheus",
                                 "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/signup",

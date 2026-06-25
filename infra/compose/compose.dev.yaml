@@ -76,8 +76,33 @@ services:
     networks:
       - dev
 
+  # 평소엔 뜨지 않음. --profile monitor 로만 기동.
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: [ "monitor" ]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - dev
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: [ "monitor" ]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana   # named 볼륨 — 컨테이너 재생성에도 상태 보존
+    networks:
+      - dev
+
 volumes:
   mysql_data:
+  grafana_data:
 
 networks:
   dev:

@@ -43,3 +43,15 @@ cloud:
 
 file:
   upload-dir: ${LOCAL_UPLOAD_DIR:./videos-local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, prometheus, info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
