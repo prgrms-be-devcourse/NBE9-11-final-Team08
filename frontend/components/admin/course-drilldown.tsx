@@ -38,7 +38,7 @@ function fmtTime(iso: string | null) {
   })
 }
 
-function dropoutBadge(rate: number) {
+function incompletionBadge(rate: number) {
   const variant = rate >= 70 ? 'destructive' : rate >= 40 ? 'secondary' : 'outline'
   return <Badge variant={variant as any}>{rate.toFixed(1)}%</Badge>
 }
@@ -99,7 +99,7 @@ export function CourseDrilldown({ initialCourses }: { initialCourses: CourseStat
               <TableHead className="text-right">수강자</TableHead>
               <TableHead className="text-right">입장</TableHead>
               <TableHead className="text-right">완강</TableHead>
-              <TableHead className="text-right">이탈률</TableHead>
+              <TableHead className="text-right">미완강률</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -122,7 +122,7 @@ export function CourseDrilldown({ initialCourses }: { initialCourses: CourseStat
                 <TableCell className="text-right">{c.enrollees.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{c.enterCount.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{c.completionCount.toLocaleString()}</TableCell>
-                <TableCell className="text-right">{dropoutBadge(c.dropoutRate)}</TableCell>
+                <TableCell className="text-right">{incompletionBadge(c.incompletionRate)}</TableCell>
                 <TableCell>
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </TableCell>

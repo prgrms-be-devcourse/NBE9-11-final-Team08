@@ -1249,9 +1249,9 @@ export const api = {
       null,
     )
   },
-  getAdminAnomalies: (dropoutThreshold?: number, burstThreshold?: number, windowMinutes?: number) => {
+  getAdminAnomalies: (incompletionThreshold?: number, burstThreshold?: number, windowMinutes?: number) => {
     const qs = new URLSearchParams()
-    if (dropoutThreshold != null) qs.set('dropoutThreshold', String(dropoutThreshold))
+    if (incompletionThreshold != null) qs.set('incompletionThreshold', String(incompletionThreshold))
     if (burstThreshold != null) qs.set('burstThreshold', String(burstThreshold))
     if (windowMinutes != null) qs.set('windowMinutes', String(windowMinutes))
     const suffix = qs.toString() ? `?${qs.toString()}` : ''

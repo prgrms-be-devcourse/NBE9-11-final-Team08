@@ -35,10 +35,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 관리자 대시보드 집계 API 통합 테스트(Testcontainers MySQL).
- * 결정적인 소규모 시드로 KPI/이탈률/진행률을 검증하고, 비관리자 접근이 막히는지 확인한다.
+ * 결정적인 소규모 시드로 KPI/미완강률/진행률을 검증하고, 비관리자 접근이 막히는지 확인한다.
  *
  * <p>시드 구성: 강사(SELLER) 1, 수강생(USER) 2, 관리자(ADMIN) 1, ON_SALE 강좌 1(강의 2개).
- * 수강생1은 두 강의 모두 완료(완강), 수강생2는 한 강의만 완료 → 이탈률 50%.
+ * 수강생1은 두 강의 모두 완료(완강), 수강생2는 한 강의만 완료 → 미완강률 50%.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -91,7 +91,7 @@ class AdminDashboardIntegrationTest {
         // 수강생1: 두 강의 모두 완료 → 완강
         completeProgress(learner1.getId(), lecture1Id);
         completeProgress(learner1.getId(), lecture2Id);
-        // 수강생2: 한 강의만 완료 → 미완강(이탈 집계 대상)
+        // 수강생2: 한 강의만 완료 → 미완강(미완강 집계 대상)
         completeProgress(learner2.getId(), lecture1Id);
 
         // 오늘 학습 이벤트: 입장(세션) 3, 완료 3, 순 학습자 2
@@ -138,8 +138,8 @@ class AdminDashboardIntegrationTest {
 
     @Test
     @WithMockLoginUser(role = "ROLE_ADMIN")
-    @DisplayName("courses: 이탈률을 단일 쿼리로 계산한다(완강 1/2 → 50%)")
-    void courseStatsDropoutRate() throws Exception {
+    @DisplayName("courses: 미완강률을 단일 쿼리로 계산한다(완강 1/2 → 50%)")
+    void courseStatsIncompletionRate() throws Exception {
         mockMvc.perform(get("/api/admin/dashboard/courses"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
@@ -147,7 +147,7 @@ class AdminDashboardIntegrationTest {
                 .andExpect(jsonPath("$.content[0].enrollees").value(2))
                 .andExpect(jsonPath("$.content[0].enterCount").value(3))
                 .andExpect(jsonPath("$.content[0].completionCount").value(3))
-                .andExpect(jsonPath("$.content[0].dropoutRate").value(50.0));
+                .andExpect(jsonPath("$.content[0].incompletionRate").value(50.0));
     }
 
     @Test

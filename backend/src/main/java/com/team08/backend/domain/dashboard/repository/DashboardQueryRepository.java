@@ -62,8 +62,8 @@ public class DashboardQueryRepository {
         return result;
     }
 
-    // ── 드릴다운 1: 강좌별 집계 (dropoutRate 포함, 단일 쿼리) ────────────────
-    // 이탈률까지 한 번의 쿼리에서 계산한다. 강좌별로 별도 쿼리를 돌리던 N+1
+    // ── 드릴다운 1: 강좌별 집계 (incompletionRate 포함, 단일 쿼리) ────────────────
+    // 미완강률까지 한 번의 쿼리에서 계산한다. 강좌별로 별도 쿼리를 돌리던 N+1
     // (강좌당 totalLectures + countFullyCompletedEnrollees 2회)을 제거했다.
     // fullyCompleted = ACTIVE 수강자 중 (완료 강의 수 ≥ 전체 강의 수)인 인원.
     public List<CourseStatRow> courseBaseRows(String status, int limit, int offset) {
@@ -93,7 +93,7 @@ public class DashboardQueryRepository {
 
         String sql = "SELECT id, title, instructorId, status, enrollees, enterCount, completionCount, "
                 + " CASE WHEN enrollees = 0 THEN 0 "
-                + "      ELSE ROUND((enrollees - fullyCompleted) * 100.0 / enrollees, 1) END AS dropoutRate "
+                + "      ELSE ROUND((enrollees - fullyCompleted) * 100.0 / enrollees, 1) END AS incompletionRate "
                 + " FROM ( " + inner + " ) sub ORDER BY enrollees DESC, id DESC";
 
         Query q = em.createNativeQuery(sql)

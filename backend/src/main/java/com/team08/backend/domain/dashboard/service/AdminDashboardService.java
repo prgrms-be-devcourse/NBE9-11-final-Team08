@@ -42,7 +42,7 @@ public class AdminDashboardService {
 
     private static final int INTEGRITY_SCAN_LIMIT = 201; // 200건 초과 여부 판별용
     private static final int INTEGRITY_SAMPLE_LIMIT = 5;
-    private static final int HIGH_DROPOUT_SCAN_LIMIT = 200;
+    private static final int HIGH_INCOMPLETION_SCAN_LIMIT = 200;
 
     private final DashboardQueryRepository dashboardQueryRepository;
     private final UserRepository userRepository;
@@ -125,22 +125,22 @@ public class AdminDashboardService {
     }
 
     // ── ③ 이상 탐지 ─────────────────────────────────────────────────────
-    public AnomalyResponse getAnomalies(String requesterRole, Double dropoutThreshold, Integer burstThreshold, Integer windowMinutes) {
+    public AnomalyResponse getAnomalies(String requesterRole, Double incompletionThreshold, Integer burstThreshold, Integer windowMinutes) {
         requireAdmin(requesterRole);
 
-        double dropout = (dropoutThreshold != null) ? dropoutThreshold : 50.0;
+        double incompletion = (incompletionThreshold != null) ? incompletionThreshold : 50.0;
         int burst = (burstThreshold != null) ? burstThreshold : 10;
         int window = (windowMinutes != null && windowMinutes > 0) ? windowMinutes : 1;
 
-        List<CourseStatRow> highDropout = dashboardQueryRepository.courseBaseRows(null, HIGH_DROPOUT_SCAN_LIMIT, 0).stream()
+        List<CourseStatRow> highIncompletion = dashboardQueryRepository.courseBaseRows(null, HIGH_INCOMPLETION_SCAN_LIMIT, 0).stream()
                 .filter(r -> r.enrollees() > 0)
-                .filter(r -> r.dropoutRate() > dropout)
-                .sorted(Comparator.comparingDouble(CourseStatRow::dropoutRate).reversed())
+                .filter(r -> r.incompletionRate() > incompletion)
+                .sorted(Comparator.comparingDouble(CourseStatRow::incompletionRate).reversed())
                 .toList();
 
         List<AnomalyResponse.DuplicateBurst> bursts = dashboardQueryRepository.duplicateBursts(burst, window);
 
-        return new AnomalyResponse(dropout, burst, window, highDropout, bursts);
+        return new AnomalyResponse(incompletion, burst, window, highIncompletion, bursts);
     }
 
     // ── ④ 보존 감사 ─────────────────────────────────────────────────────

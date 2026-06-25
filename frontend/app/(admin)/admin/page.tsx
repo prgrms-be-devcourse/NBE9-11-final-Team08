@@ -105,7 +105,7 @@ export default async function AdminDashboardPage() {
         >
           <div>
             <h3 className="font-semibold">이상 데이터 탐지</h3>
-            <p className="text-sm text-muted-foreground">이탈률 임계값·중복 이벤트 다발 탐지</p>
+            <p className="text-sm text-muted-foreground">미완강률 임계값·중복 이벤트 다발 탐지</p>
           </div>
           <ArrowRight className="h-5 w-5 text-muted-foreground" />
         </Link>

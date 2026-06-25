@@ -17,7 +17,7 @@ import {
 import type { AnomalyResponse } from '@/lib/types'
 
 export function AnomalyPanel() {
-  const [dropoutThreshold, setDropoutThreshold] = useState(50)
+  const [incompletionThreshold, setIncompletionThreshold] = useState(50)
   const [burstThreshold, setBurstThreshold] = useState(10)
   const [windowMinutes, setWindowMinutes] = useState(1)
   const [data, setData] = useState<AnomalyResponse | null>(null)
@@ -25,7 +25,7 @@ export function AnomalyPanel() {
 
   async function run() {
     setLoading(true)
-    const res = await api.getAdminAnomalies(dropoutThreshold, burstThreshold, windowMinutes)
+    const res = await api.getAdminAnomalies(incompletionThreshold, burstThreshold, windowMinutes)
     setData(res)
     setLoading(false)
   }
@@ -42,13 +42,13 @@ export function AnomalyPanel() {
         <h2 className="font-semibold">탐지 임계값</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <label className="space-y-1.5 text-sm">
-            <span className="text-muted-foreground">이탈률 임계값 (%)</span>
+            <span className="text-muted-foreground">미완강률 임계값 (%)</span>
             <Input
               type="number"
               min={0}
               max={100}
-              value={dropoutThreshold}
-              onChange={(e) => setDropoutThreshold(Number(e.target.value))}
+              value={incompletionThreshold}
+              onChange={(e) => setIncompletionThreshold(Number(e.target.value))}
             />
           </label>
           <label className="space-y-1.5 text-sm">
@@ -80,16 +80,16 @@ export function AnomalyPanel() {
         </Button>
       </div>
 
-      {/* 고이탈 강좌 */}
+      {/* 고미완강 강좌 */}
       <div className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 border-b px-5 py-3">
           <TrendingDown className="h-4 w-4 text-destructive" />
-          <h2 className="font-semibold">이탈률 초과 강좌</h2>
+          <h2 className="font-semibold">미완강률 초과 강좌</h2>
           <Badge variant="secondary" className="ml-auto">
-            {data?.highDropoutCourses.length ?? 0}건
+            {data?.highIncompletionCourses.length ?? 0}건
           </Badge>
         </div>
-        {!data || data.highDropoutCourses.length === 0 ? (
+        {!data || data.highIncompletionCourses.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             임계값을 초과한 강좌가 없습니다.
           </p>
@@ -100,11 +100,11 @@ export function AnomalyPanel() {
                 <TableHead>강좌</TableHead>
                 <TableHead className="text-right">수강자</TableHead>
                 <TableHead className="text-right">완강</TableHead>
-                <TableHead className="text-right">이탈률</TableHead>
+                <TableHead className="text-right">미완강률</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.highDropoutCourses.map((c) => (
+              {data.highIncompletionCourses.map((c) => (
                 <TableRow key={c.courseId}>
                   <TableCell className="font-medium">
                     <span className="text-muted-foreground">#{c.courseId}</span> {c.title}
@@ -112,7 +112,7 @@ export function AnomalyPanel() {
                   <TableCell className="text-right">{c.enrollees.toLocaleString()}</TableCell>
                   <TableCell className="text-right">{c.completionCount.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
-                    <Badge variant="destructive">{c.dropoutRate.toFixed(1)}%</Badge>
+                    <Badge variant="destructive">{c.incompletionRate.toFixed(1)}%</Badge>
                   </TableCell>
                 </TableRow>
               ))}

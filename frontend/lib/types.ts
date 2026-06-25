@@ -662,7 +662,7 @@ export interface CourseStatRow {
   enrollees: number
   enterCount: number
   completionCount: number
-  dropoutRate: number
+  incompletionRate: number
 }
 
 export interface LectureStatRow {
@@ -703,10 +703,10 @@ export interface DuplicateBurst {
 }
 
 export interface AnomalyResponse {
-  dropoutThreshold: number
+  incompletionThreshold: number
   burstThreshold: number
   windowMinutes: number
-  highDropoutCourses: CourseStatRow[]
+  highIncompletionCourses: CourseStatRow[]
   duplicateBursts: DuplicateBurst[]
 }
 

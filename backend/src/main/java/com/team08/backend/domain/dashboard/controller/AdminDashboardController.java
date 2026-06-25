@@ -95,14 +95,14 @@ public class AdminDashboardController {
 
     // ── ③ 이상 탐지 ─────────────────────────────────────────────────────
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "이상 데이터 탐지", description = "이탈률 임계값 초과 강좌 + 중복 이벤트 다발(분 단위 버킷) 탐지.")
+    @Operation(summary = "이상 데이터 탐지", description = "미완강률 임계값 초과 강좌 + 중복 이벤트 다발(분 단위 버킷) 탐지.")
     @GetMapping("/anomalies")
     public AnomalyResponse getAnomalies(
-            @RequestParam(required = false) Double dropoutThreshold,
+            @RequestParam(required = false) Double incompletionThreshold,
             @RequestParam(required = false) Integer burstThreshold,
             @RequestParam(required = false) Integer windowMinutes,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return adminDashboardService.getAnomalies(principal.user().role(), dropoutThreshold, burstThreshold, windowMinutes);
+        return adminDashboardService.getAnomalies(principal.user().role(), incompletionThreshold, burstThreshold, windowMinutes);
     }
 
     // ── ④ 보존 감사 ─────────────────────────────────────────────────────
