@@ -29,6 +29,7 @@ import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.util.FileUrlFormatter;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +85,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseThumbnailService courseThumbnailService;
+
+    @Mock
+    private FileUrlFormatter fileUrlFormatter;
 
     @InjectMocks
     private CourseService courseService;

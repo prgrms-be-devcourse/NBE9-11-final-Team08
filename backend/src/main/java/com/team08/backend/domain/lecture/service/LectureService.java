@@ -15,6 +15,7 @@ import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.service.LectureProgressService;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.util.FileUrlFormatter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,7 @@ public class LectureService {
     private final LastWatchedLectureService lastWatchedLectureService;
     private final LectureAccessValidator lectureAccessValidator;
     private final CourseAccessAuthorizer courseAccessAuthorizer;
+    private final FileUrlFormatter fileUrlFormatter;
 
     /**
      * 특정 강의 러닝 스페이스 입장 — 강의 메타데이터 + 학습 진행 정보를 반환한다.
@@ -63,7 +65,7 @@ public class LectureService {
         return new LectureDetailResponse(
                 lecture.getId(),
                 lecture.getTitle(),
-                lecture.getM3u8Path(),
+                fileUrlFormatter.formatVideoUrl(lecture.getM3u8Path()),
                 lecture.getDurationSeconds(),
                 lecture.getChapter().getId(),
                 lecture.getChapter().getCourse().getId()

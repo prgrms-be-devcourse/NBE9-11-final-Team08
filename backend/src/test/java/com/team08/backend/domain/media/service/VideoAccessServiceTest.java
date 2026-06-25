@@ -8,12 +8,14 @@ import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseCookie;
+import com.team08.backend.global.util.FileUrlFormatter;
 
 import java.util.Optional;
 
@@ -27,6 +29,15 @@ class VideoAccessServiceTest {
 
     @InjectMocks
     private VideoAccessService videoAccessService;
+
+    @Mock(lenient = true)
+    private FileUrlFormatter fileUrlFormatter;
+
+    @BeforeEach
+    void setUp() {
+        given(fileUrlFormatter.formatVideoUrl(any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Mock
     private LectureRepository lectureRepository;
