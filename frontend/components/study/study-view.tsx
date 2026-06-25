@@ -98,7 +98,16 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const [question, setQuestion] = useState('')
 
   const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
-  const durationSeconds = active?.durationSeconds ?? 0
+  const durationSeconds = active?.durationSeconds ?? 0;
+
+const [lectureInfo, setLectureInfo] = useState<any>(null);
+
+// Determine video source URL using fetched lectureInfo or fallback to active lecture
+const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
+  ? ((lectureInfo?.m3u8Path ?? active?.m3u8Path).startsWith('http')
+    ? lectureInfo?.m3u8Path ?? active?.m3u8Path
+    : `http://localhost:8080/videos-local/${lectureInfo?.m3u8Path ?? active?.m3u8Path}`)
+  : null;
 
   // 재생 시뮬레이션 상태
   const [position, setPosition] = useState(0)
@@ -112,32 +121,29 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   // 강의 입장 권한 상태: enterLecture(수강권 검사) 실패 시 true → 재생/작성 차단
   const [accessDenied, setAccessDenied] = useState(false)
   const [entering, setEntering] = useState(true)
+  // duplicate lectureInfo removed
 
   // HLS 비디오 스트리밍 로드 및 해제
   useEffect(() => {
-    const video = videoRef.current
-    if (!video || !active?.m3u8Path) return
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
 
-    const videoUrl = active.m3u8Path.startsWith('http')
-      ? active.m3u8Path
-      : `http://localhost:8080/videos-local/${active.m3u8Path}`
-
-    let hls: Hls | null = null
+    let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
-      hls = new Hls()
-      hls.loadSource(videoUrl)
-      hls.attachMedia(video)
+      hls = new Hls();
+      hls.loadSource(videoUrl);
+      hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = videoUrl
+      video.src = videoUrl;
     }
 
     return () => {
       if (hls) {
-        hls.destroy()
+        hls.destroy();
       }
-    }
-  }, [active?.m3u8Path])
+    };
+  }, [videoUrl]);
 
   const chapterIdOf = useCallback(
     (lectureId?: string) => lectures.find((l) => l.id === lectureId)?.chapterId,
@@ -206,6 +212,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
           return
         }
         entered = true
+        setLectureInfo(res)
         const startPos = res.progress?.lastPositionSeconds ?? 0
         setPosition(startPos)
         positionRef.current = startPos
@@ -415,7 +422,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card px-4">
         <Button asChild variant="ghost" size="icon" aria-label="스터디로 돌아가기">
-          <Link href={`/study/${course.id}`}>
+          <Link href={`/study/${studyId ?? course.id}/course`}>
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>

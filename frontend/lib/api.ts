@@ -935,6 +935,17 @@ export const api = {
       null,
     ),
 
+  // New API to fetch lecture details directly (including m3u8Path)
+  getLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<any>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}`,
+      null,
+    ),
+
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
 

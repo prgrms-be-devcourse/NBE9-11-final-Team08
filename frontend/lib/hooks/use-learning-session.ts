@@ -46,8 +46,8 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
 
   // 입장: 메타/진행 정보 로드 + LECTURE_ENTER 기록. null 이면 입장 불가(수강권 없음).
   const enter = useCallback(
-    async (lectureId: string): Promise<LectureEnterResponse | null> => {
-      const res = await api.enterLecture(courseId, chapterIdOf(lectureId) ?? '', lectureId)
+    async (lectureId: string): Promise<any | null> => {
+      const res = await api.getLecture(courseId, chapterIdOf(lectureId) ?? '', lectureId)
       if (res) record(lectureId, 'LECTURE_ENTER', 0)
       return res
     },
