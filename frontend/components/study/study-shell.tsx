@@ -60,7 +60,7 @@ export function StudyShell({
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Button asChild variant="ghost" size="icon" aria-label="내 스터디 목록으로">
-          <Link href="/studies">
+          <Link href="/mypage">
             <ArrowLeft className="h-5 w-5" />
           </Link>
         </Button>
