@@ -11,9 +11,12 @@ import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
 import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -55,9 +58,20 @@ public class CourseAccessContextResolver {
 
         boolean isAdmin = false;
         if (userId != null) {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-            isAdmin = user.getRole() == UserRole.ROLE_ADMIN;
+            boolean checked = false;
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof LoginUserPrincipal principal) {
+                if (userId.equals(principal.user().id())) {
+                    isAdmin = "ROLE_ADMIN".equals(principal.user().role());
+                    checked = true;
+                }
+            }
+
+            if (!checked) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+                isAdmin = user.getRole() == UserRole.ROLE_ADMIN;
+            }
         }
 
         return new CourseAccessContext(

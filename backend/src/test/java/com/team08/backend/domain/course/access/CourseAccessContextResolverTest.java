@@ -23,6 +23,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.team08.backend.domain.user.dto.LoginUserDto;
+import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 
 import java.util.Optional;
 
@@ -130,6 +135,31 @@ public class CourseAccessContextResolverTest {
                 () -> resolver.fromLectureId(LECTURE_ID, USER_ID),
                 ErrorCode.LECTURE_NOT_FOUND
         );
+    }
+
+    @Test
+    void SecurityContext가_존재하고_userId가_일치하면_DB_조회없이_isAdmin을_설정한다() {
+        Chapter chapter = chapter();
+        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        LoginUserDto loginUserDto = new LoginUserDto(USER_ID, "admin@test.com", "관리자", "ROLE_ADMIN");
+        LoginUserPrincipal principal = LoginUserPrincipal.from(loginUserDto);
+        UsernamePasswordAuthenticationToken authentication =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
+        
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+
+        try {
+            CourseAccessContext resultContext = resolver.fromChapterId(CHAPTER_ID, USER_ID);
+
+            assertContext(resultContext, CourseStatus.ON_SALE, false, true, false, true);
+            org.mockito.Mockito.verify(userRepository, org.mockito.Mockito.never()).findById(USER_ID);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private Chapter chapter() {
