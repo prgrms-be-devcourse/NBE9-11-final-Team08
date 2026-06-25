@@ -45,10 +45,20 @@ export function CourseDetail({ course }: { course: Course }) {
         setIsLoggedIn(!!profile)
         const nextIsAdmin = profile ? profile.isAdmin : false
         setIsAdmin(nextIsAdmin)
+        
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
-        const active = profile ? await api.isCourseEnrollmentActive(course.id) : false
+        
+        let active = false
+        if (profile && !nextIsAdmin) {
+          try {
+            active = await api.isCourseEnrollmentActive(course.id)
+          } catch (err) {
+            console.error('Failed to check active enrollment:', err)
+          }
+        }
+        
         setIsPurchased(active)
-        setHasStudyAccess(active && !!nextStudyId)
+        setHasStudyAccess((active || nextIsAdmin) && !!nextStudyId)
         setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
@@ -250,7 +260,7 @@ export function CourseDetail({ course }: { course: Course }) {
                     </Button>
                   </>
                 ) : null}
-                {(hasStudyAccess || isAdmin) && studyId ? (
+                {hasStudyAccess && studyId ? (
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
