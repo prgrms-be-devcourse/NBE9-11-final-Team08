@@ -56,23 +56,7 @@ public class CourseAccessContextResolver {
                 userId, courseId, EnrollmentStatus.ACTIVE);
         boolean hasFreePreview = lectureRepository.existsByChapterCourseIdAndIsFreePreviewTrue(courseId);
 
-        boolean isAdmin = false;
-        if (userId != null) {
-            boolean checked = false;
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.getPrincipal() instanceof LoginUserPrincipal principal) {
-                if (userId.equals(principal.user().id())) {
-                    isAdmin = "ROLE_ADMIN".equals(principal.user().role());
-                    checked = true;
-                }
-            }
-
-            if (!checked) {
-                User user = userRepository.findById(userId)
-                        .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-                isAdmin = user.getRole() == UserRole.ROLE_ADMIN;
-            }
-        }
+        boolean isAdmin = determineAdminStatus(userId);
 
         return new CourseAccessContext(
                 userId,
@@ -82,5 +66,22 @@ public class CourseAccessContextResolver {
                 hasFreePreview,
                 isAdmin
         );
+    }
+
+    private boolean determineAdminStatus(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof LoginUserPrincipal principal) {
+            if (userId.equals(principal.user().id())) {
+                return "ROLE_ADMIN".equals(principal.user().role());
+            }
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        return user.getRole() == UserRole.ROLE_ADMIN;
     }
 }
