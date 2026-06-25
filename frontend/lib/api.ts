@@ -46,6 +46,15 @@ import type {
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+const REFRESH_EXCLUDED_PATHS = new Set([
+  '/api/auth/csrf',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/auth/signup',
+])
+
+let refreshAuthPromise: Promise<boolean> | null = null
 
 const decodeCookieValue = (value: string): string => {
   try {
@@ -140,6 +149,42 @@ const handleUnauthorized = () => {
   }
 }
 
+const shouldAttemptTokenRefresh = (path: string, includeCredentials: boolean, status: number): boolean => {
+  return status === 401
+    && includeCredentials
+    && typeof window !== 'undefined'
+    && !REFRESH_EXCLUDED_PATHS.has(path)
+}
+
+const refreshAuthTokens = async (): Promise<boolean> => {
+  if (!BASE_URL || typeof window === 'undefined') {
+    return false
+  }
+
+  if (!refreshAuthPromise) {
+    refreshAuthPromise = (async () => {
+      const headers: Record<string, string> = {}
+      const csrfToken = await ensureCsrfToken(true)
+      if (csrfToken) {
+        headers[CSRF_HEADER_NAME] = csrfToken
+      }
+
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => null)
+
+      return res?.ok ?? false
+    })().finally(() => {
+      refreshAuthPromise = null
+    })
+  }
+
+  return refreshAuthPromise
+}
+
 async function request<T>(
   path: string,
   defaultData: T,
@@ -148,15 +193,22 @@ async function request<T>(
 ): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
-    const authHeaders = await getCredentialHeaders(includeAuth)
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      credentials: getCredentialsMode(includeAuth),
-      cache: 'no-store',
-    })
+    const fetchRequest = async () => {
+      const authHeaders = await getCredentialHeaders(includeAuth)
+      return fetch(`${BASE_URL}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        credentials: getCredentialsMode(includeAuth),
+        cache: 'no-store',
+      })
+    }
+
+    let res = await fetchRequest()
+    if (shouldAttemptTokenRefresh(path, includeAuth, res.status) && await refreshAuthTokens()) {
+      res = await fetchRequest()
+    }
 
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
@@ -211,11 +263,17 @@ async function mutate<T>(
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      handleUnauthorized()
+    if (shouldAttemptTokenRefresh(path, includeCredentials, res.status) && await refreshAuthTokens()) {
+      res = await fetch(`${BASE_URL}${path}`, options)
     }
-    const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        handleUnauthorized()
+      }
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+    }
   }
   if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
     return {} as T
