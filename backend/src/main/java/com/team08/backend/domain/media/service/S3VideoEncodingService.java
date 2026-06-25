@@ -48,12 +48,6 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
         } catch (Exception e) {
             log.error("Failed to upload original video to S3 temp path. lectureId: {}", lectureId, e);
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
-        } finally {
-            if (file != null && file.exists()) {
-                if (!file.delete()) {
-                    log.warn("Failed to delete temp multipart file: {}", file.getAbsolutePath());
-                }
-            }
         }
 
         File localSourceFile = null;

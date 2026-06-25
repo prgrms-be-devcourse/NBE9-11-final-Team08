@@ -11,6 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 @Service
@@ -29,12 +33,15 @@ public class LectureModificationRequestService {
 
         String targetDirName = UUID.randomUUID().toString();
 
-        java.io.File tempFile;
+        File tempFile = null;
         try {
-            java.nio.file.Path tempPath = java.nio.file.Files.createTempFile("lecture-mod-temp-upload-", ".mp4");
+            Path tempPath = Files.createTempFile("lecture-mod-temp-upload-", ".mp4");
             tempFile = tempPath.toFile();
             videoFile.transferTo(tempFile);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
         }
 

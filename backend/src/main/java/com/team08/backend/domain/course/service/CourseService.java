@@ -33,6 +33,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.web.multipart.MultipartFile;
 
 import static java.util.UUID.randomUUID;
@@ -244,13 +248,16 @@ public class CourseService {
 
         String targetDirName = randomUUID().toString();
 
-        java.io.File tempFile;
+        File tempFile = null;
         try {
-            java.nio.file.Path tempPath = java.nio.file.Files.createTempFile("lecture-temp-upload-", ".mp4");
+            Path tempPath = Files.createTempFile("lecture-temp-upload-", ".mp4");
             tempFile = tempPath.toFile();
             file.transferTo(tempFile);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             log.error("Failed to write multipart file to temp file", e);
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
             throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
         }
 
