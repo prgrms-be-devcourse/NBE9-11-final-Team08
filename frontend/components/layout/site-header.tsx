@@ -44,17 +44,16 @@ export function SiteHeader() {
 
   useEffect(() => {
     setMounted(true)
-    const token = localStorage.getItem('accessToken')
-    setIsLoggedIn(!!token)
-
-    if (!token) {
-      setUserName('')
-      return
-    }
 
     api.getProfile()
-      .then((profile) => setUserName(profile?.name || '마이'))
-      .catch(() => setUserName('마이'))
+      .then((profile) => {
+        setIsLoggedIn(!!profile)
+        setUserName(profile?.name || '')
+      })
+      .catch(() => {
+        setIsLoggedIn(false)
+        setUserName('')
+      })
   }, [pathname])
 
   const handleLogout = async () => {
@@ -63,7 +62,6 @@ export function SiteHeader() {
     } catch (e) {
       // Even if backend logout fails, we clear local state
     }
-    localStorage.removeItem('accessToken')
     setIsLoggedIn(false)
     setUserName('')
     toast.success('로그아웃되었습니다.')

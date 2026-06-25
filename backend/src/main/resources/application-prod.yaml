@@ -20,6 +20,8 @@ spring:
           temperature: 0.2
 
 app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
   ai:
     model: ${OPENAI_MODEL:gpt-4.1-mini}
     prompt-version: v1
