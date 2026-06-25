@@ -264,6 +264,10 @@ export function CourseDetail({ course }: { course: Course }) {
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
+                ) : (isAdmin || isPurchased) ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    스터디 미개설
+                  </Button>
                 ) : null}
 
                 <Separator />
