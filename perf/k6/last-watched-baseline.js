@@ -155,10 +155,16 @@ export function setup() {
             JSON.stringify({ email, password }),
             { headers: { 'Content-Type': 'application/json' } }
         );
-        if (res.status !== 200) {
+        if (res.status !== 200 && res.status !== 204) {
             throw new Error(`[setup] 로그인 실패 (${email}) status=${res.status}`);
         }
-        return JSON.parse(res.body).accessToken;
+        // 로그인 응답은 204 + HttpOnly 쿠키(accessToken)로 토큰을 내려준다(본문 없음).
+        // k6에서 다중 Set-Cookie는 res.cookies 로 안전하게 읽는다.
+        const cookie = res.cookies['accessToken'];
+        if (!cookie || !cookie[0]) {
+            throw new Error(`[setup] accessToken 쿠키 없음 (${email}) status=${res.status}`);
+        }
+        return cookie[0].value;
     }
 
     const pairs = [];

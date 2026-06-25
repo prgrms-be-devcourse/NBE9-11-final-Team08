@@ -1,0 +1,10 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus          # 고정 uid — 프로비저닝 대시보드가 이 값으로 패널을 바인딩한다
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

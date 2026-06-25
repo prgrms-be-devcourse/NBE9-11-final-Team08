@@ -8,33 +8,26 @@ spring:
       audio:
         speech: none
         transcription: none
+
 springdoc:
   api-docs:
-    enabled: true
-  swagger-ui:
-    csrf:
-      enabled: true
+    enabled: false
 
 app:
   cors:
     allowed-origins:
       - http://localhost:3000
-      - http://127.0.0.1:3000
   ai:
     model: stub
     prompt-version: v1
-  data-init:
-    mode: ${APP_DATA_INIT_MODE:none}  # none:더미데이터 필요 x | simple: 더미데이터 소량생성 | bulk : 더미데이터 대량생성
   jwt:
-    secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
+    secret: ${JWT_SECRET}
     access-cookie:
       secure: false
       same-site: Lax
       domain:
-    refresh-cookie:
-      secure: false
-      same-site: Lax
-      domain:
+  data-init:
+    mode: ${APP_DATA_INIT_MODE:bulk}
 
 cloud:
   aws:
@@ -42,23 +35,24 @@ cloud:
       enabled: false
 
 file:
-  upload-dir: ${LOCAL_UPLOAD_DIR:./videos-local}
+  upload-dir: ${LOCAL_UPLOAD_DIR:/tmp/videos-local}
 
+# 부하 테스트 환경에서는 CSRF 비활성화
+# k6는 브라우저가 아니므로 CSRF 보호가 의미 없고, 토큰 취득 흐름이 부하 측정을 왜곡한다.
 management:
   endpoints:
     web:
       exposure:
-        include: health, metrics, prometheus, info
+        include: health, prometheus
   endpoint:
     health:
       show-details: always
   metrics:
-    tags:
-      application: ${spring.application.name}
     distribution:
       # http.server.requests를 히스토그램으로 게시 → Prometheus가 p50/p95/p99 산출 가능
       percentiles-histogram:
         http.server.requests: true
+      # SLO 경계 버킷(부하 테스트용 관심 구간) — 버킷 해상도 향상
       slo:
         http.server.requests: 50ms,100ms,200ms,500ms,1s,2s
       minimum-expected-value:

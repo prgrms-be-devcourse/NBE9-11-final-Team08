@@ -37,7 +37,7 @@ define run-perf
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-server-t3small perf-server-t3small-down perf-server-t3small-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
+.PHONY: help dev dev-down dev-logs dev-reset monitor monitor-down monitor-logs perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-server-t3small perf-server-t3small-down perf-server-t3small-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
 
 ## ─────────────── 개발 (DB/Redis만) ───────────────
 
@@ -66,6 +66,23 @@ dev-reset: ## [개발] DB/Redis 완전 초기화 (DB 볼륨 삭제 + Redis FLUSH
 		$(call run,$(DEV) up -d db redis --wait); \
 		echo "✅ DB 초기화 및 Redis 재기동 완료. Flyway 마이그레이션 + dev 더미데이터가 백엔드 기동 시 다시 생성됩니다."; \
 	fi
+
+## ─────────────── 모니터링 (Prometheus + Grafana) ───────────────
+# 사전 조건: application-dev.yaml에 actuator prometheus 엔드포인트 열기
+#   IntelliJ에서 Spring Boot 기동 후 make monitor 실행
+
+monitor: ## [모니터링] Prometheus + Grafana + node-exporter 기동 (localhost:9090, localhost:3001)
+	$(call run,$(DEV) --profile monitor up -d prometheus grafana node-exporter --wait)
+	@echo "✅ 모니터링 기동 완료"
+	@echo "   Prometheus → http://localhost:9090"
+	@echo "   Grafana    → http://localhost:3001  (admin / admin)"
+	@echo "   대시보드(자동 프로비저닝): 'Load Test — Bottleneck Finder', 'Service Health — Team08'"
+
+monitor-down: ## [모니터링] 모니터링 스택 내리기 (데이터 유지)
+	$(call run,$(DEV) --profile monitor stop prometheus grafana node-exporter)
+
+monitor-logs: ## [모니터링] 모니터링 스택 로그 보기
+	$(call run,$(DEV) --profile monitor logs -f prometheus grafana node-exporter)
 
 ## ─────────────── 부하 테스트 (k6) ───────────────
 # 측정 대상 서버는 별도로 띄운다 (8080 노출, 셋 중 하나만 선택):
