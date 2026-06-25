@@ -84,10 +84,9 @@ public class AdminDashboardService {
         requireAdmin(requesterRole);
 
         int offset = page * size;
-        List<CourseStatRow> base = dashboardQueryRepository.courseBaseRows(status, size, offset);
+        List<CourseStatRow> rows = dashboardQueryRepository.courseBaseRows(status, size, offset);
         long total = dashboardQueryRepository.countCourses(status);
 
-        List<CourseStatRow> rows = base.stream().map(this::withDropoutRate).toList();
         return new PageImpl<>(rows, PageRequest.of(page, size), total);
     }
 
@@ -135,7 +134,6 @@ public class AdminDashboardService {
 
         List<CourseStatRow> highDropout = dashboardQueryRepository.courseBaseRows(null, HIGH_DROPOUT_SCAN_LIMIT, 0).stream()
                 .filter(r -> r.enrollees() > 0)
-                .map(this::withDropoutRate)
                 .filter(r -> r.dropoutRate() > dropout)
                 .sorted(Comparator.comparingDouble(CourseStatRow::dropoutRate).reversed())
                 .toList();
@@ -191,20 +189,6 @@ public class AdminDashboardService {
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
-    private CourseStatRow withDropoutRate(CourseStatRow row) {
-        double dropoutRate = 0.0;
-        if (row.enrollees() > 0) {
-            long totalLectures = dashboardQueryRepository.totalLectures(row.courseId());
-            if (totalLectures > 0) {
-                long completedEnrollees = dashboardQueryRepository.countFullyCompletedEnrollees(row.courseId(), totalLectures);
-                dropoutRate = round1((row.enrollees() - completedEnrollees) * 100.0 / row.enrollees());
-            }
-        }
-        return new CourseStatRow(
-                row.courseId(), row.title(), row.instructorId(), row.status(),
-                row.enrollees(), row.enterCount(), row.completionCount(), dropoutRate);
-    }
-
     private AuditResponse.IntegrityError integrity(String type, String description, List<Long> ids) {
         long count = ids.size();
         String desc = (count >= INTEGRITY_SCAN_LIMIT) ? description + " (200건 이상)" : description;

@@ -400,6 +400,7 @@ export interface UserProfile {
   studyCount: number
   courseCount: number
   isSeller: boolean
+  isAdmin: boolean
 }
 
 export interface EnrolledCourse {

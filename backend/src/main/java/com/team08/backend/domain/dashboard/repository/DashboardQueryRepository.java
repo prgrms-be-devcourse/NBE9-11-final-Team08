@@ -62,22 +62,41 @@ public class DashboardQueryRepository {
         return result;
     }
 
-    // ── 드릴다운 1: 강좌별 집계 기본 행 (dropoutRate 는 서비스에서 채움) ──
+    // ── 드릴다운 1: 강좌별 집계 (dropoutRate 포함, 단일 쿼리) ────────────────
+    // 이탈률까지 한 번의 쿼리에서 계산한다. 강좌별로 별도 쿼리를 돌리던 N+1
+    // (강좌당 totalLectures + countFullyCompletedEnrollees 2회)을 제거했다.
+    // fullyCompleted = ACTIVE 수강자 중 (완료 강의 수 ≥ 전체 강의 수)인 인원.
     public List<CourseStatRow> courseBaseRows(String status, int limit, int offset) {
-        StringBuilder sql = new StringBuilder("""
-                SELECT c.id, c.title, c.instructor_id, c.status,
+        StringBuilder inner = new StringBuilder("""
+                SELECT c.id AS id, c.title AS title, c.instructor_id AS instructorId, c.status AS status,
                   (SELECT COUNT(*) FROM enrollments e WHERE e.course_id=c.id AND e.status='ACTIVE') AS enrollees,
                   (SELECT COUNT(*) FROM learning_events le WHERE le.course_id=c.id AND le.event_type='LECTURE_ENTER') AS enterCount,
-                  (SELECT COUNT(*) FROM learning_events le WHERE le.course_id=c.id AND le.event_type='LECTURE_COMPLETE') AS completionCount
+                  (SELECT COUNT(*) FROM learning_events le WHERE le.course_id=c.id AND le.event_type='LECTURE_COMPLETE') AS completionCount,
+                  (SELECT COUNT(*) FROM enrollments en
+                     WHERE en.course_id=c.id AND en.status='ACTIVE'
+                       AND (SELECT COUNT(*) FROM lecture_progresses lp
+                              JOIN lectures l ON lp.lecture_id=l.id
+                              JOIN chapters ch ON l.chapter_id=ch.id
+                            WHERE ch.course_id=c.id AND lp.user_id=en.user_id
+                              AND lp.completed=true AND l.deleted_at IS NULL)
+                           >= (SELECT COUNT(*) FROM lectures l2
+                                 JOIN chapters ch2 ON l2.chapter_id=ch2.id
+                               WHERE ch2.course_id=c.id AND l2.deleted_at IS NULL)
+                  ) AS fullyCompleted
                 FROM courses c
                 WHERE c.deleted_at IS NULL
                 """);
         if (status != null) {
-            sql.append(" AND c.status = :status ");
+            inner.append(" AND c.status = :status ");
         }
-        sql.append(" ORDER BY enrollees DESC, c.id DESC LIMIT :limit OFFSET :offset ");
+        inner.append(" ORDER BY enrollees DESC, c.id DESC LIMIT :limit OFFSET :offset ");
 
-        Query q = em.createNativeQuery(sql.toString())
+        String sql = "SELECT id, title, instructorId, status, enrollees, enterCount, completionCount, "
+                + " CASE WHEN enrollees = 0 THEN 0 "
+                + "      ELSE ROUND((enrollees - fullyCompleted) * 100.0 / enrollees, 1) END AS dropoutRate "
+                + " FROM ( " + inner + " ) sub ORDER BY enrollees DESC, id DESC";
+
+        Query q = em.createNativeQuery(sql)
                 .setParameter("limit", limit)
                 .setParameter("offset", offset);
         if (status != null) {
@@ -90,7 +109,7 @@ public class DashboardQueryRepository {
         for (Object[] r : rows) {
             result.add(new CourseStatRow(
                     toLong(r[0]), String.valueOf(r[1]), toLong(r[2]), String.valueOf(r[3]),
-                    toLong(r[4]), toLong(r[5]), toLong(r[6]), 0.0)); // dropoutRate 는 서비스에서 계산
+                    toLong(r[4]), toLong(r[5]), toLong(r[6]), ((Number) r[7]).doubleValue()));
         }
         return result;
     }
@@ -114,28 +133,6 @@ public class DashboardQueryRepository {
                 JOIN chapters c ON l.chapter_id = c.id
                 WHERE c.course_id = :courseId AND l.deleted_at IS NULL
                 """).setParameter("courseId", courseId).getSingleResult());
-    }
-
-    /** 강좌의 ACTIVE 수강자 중 모든 강의를 완료(완강)한 인원 수 */
-    public long countFullyCompletedEnrollees(Long courseId, long totalLectures) {
-        if (totalLectures == 0) {
-            return 0;
-        }
-        return toLong(em.createNativeQuery("""
-                SELECT COUNT(*) FROM (
-                  SELECT e.user_id
-                  FROM enrollments e
-                  WHERE e.course_id = :courseId AND e.status='ACTIVE'
-                    AND (SELECT COUNT(*) FROM lecture_progresses lp
-                           JOIN lectures l ON lp.lecture_id = l.id
-                           JOIN chapters c ON l.chapter_id = c.id
-                         WHERE c.course_id = :courseId AND lp.user_id = e.user_id
-                           AND lp.completed = true AND l.deleted_at IS NULL) >= :totalLectures
-                ) t
-                """)
-                .setParameter("courseId", courseId)
-                .setParameter("totalLectures", totalLectures)
-                .getSingleResult());
     }
 
     // ── 드릴다운 2: 강의별 집계 ─────────────────────────────────────────

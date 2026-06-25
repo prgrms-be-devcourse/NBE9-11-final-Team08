@@ -18,7 +18,7 @@ import { OverviewCharts } from '@/components/admin/overview-charts'
 export default async function AdminDashboardPage() {
   const userProfile = await api.getProfile()
 
-  if (!userProfile || !userProfile.isSeller) {
+  if (!userProfile || !userProfile.isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <h1 className="text-3xl font-bold">접근 권한 없음</h1>
