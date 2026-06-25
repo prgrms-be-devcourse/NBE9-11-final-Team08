@@ -27,9 +27,11 @@ app:
     access-cookie:
       secure: false
       same-site: Lax
+      domain:
     refresh-cookie:
       secure: false
       same-site: Lax
+      domain:
 
 cloud:
   aws:

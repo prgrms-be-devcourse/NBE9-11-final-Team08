@@ -83,10 +83,12 @@ app:
       name: accessToken
       secure: false
       same-site: Lax
+      domain:
     refresh-cookie:
       name: refreshToken
       secure: false
       same-site: Lax
+      domain:
 
 file:
   upload-dir: src/test/resources/test-uploads

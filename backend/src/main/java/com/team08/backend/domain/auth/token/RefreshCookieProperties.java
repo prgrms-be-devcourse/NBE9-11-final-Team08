@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record RefreshCookieProperties(
         String name,
         boolean secure,
-        String sameSite
+        String sameSite,
+        String domain
 ) {
 }

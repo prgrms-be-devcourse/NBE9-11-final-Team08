@@ -46,7 +46,31 @@ import type {
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  return {}
+  if (typeof window !== 'undefined') {
+    return {}
+  }
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+
+    return cookieHeader ? { Cookie: cookieHeader } : {}
+  } catch {
+    return {}
+  }
+}
+
+const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record<string, string>> => {
+  if (!includeCredentials) {
+    return {}
+  }
+
+  return getAuthHeaders()
+}
+
+const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
+  return includeCredentials ? 'include' : 'same-origin'
 }
 
 const handleUnauthorized = () => {
@@ -75,13 +99,13 @@ async function request<T>(
 ): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
-    const authHeaders = includeAuth ? await getAuthHeaders() : {}
+    const authHeaders = await getCredentialHeaders(includeAuth)
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: {
         'Content-Type': 'application/json',
         ...authHeaders,
       },
-      credentials: includeAuth ? 'include' : 'same-origin',
+      credentials: getCredentialsMode(includeAuth),
       cache: 'no-store',
     })
 
@@ -110,7 +134,7 @@ async function mutate<T>(
 ): Promise<T> {
   if (!BASE_URL) throw new Error('API BASE_URL is not defined')
 
-  const headers = await getAuthHeaders()
+  const headers = await getCredentialHeaders(includeCredentials)
   if (!isMultipart) {
     headers['Content-Type'] = 'application/json'
   }
@@ -119,9 +143,7 @@ async function mutate<T>(
     method,
     headers,
   }
-  if (includeCredentials || !!headers.Authorization) {
-    options.credentials = 'include'
-  }
+  options.credentials = getCredentialsMode(includeCredentials)
   if (body) {
     options.body = isMultipart ? body : JSON.stringify(body)
   }

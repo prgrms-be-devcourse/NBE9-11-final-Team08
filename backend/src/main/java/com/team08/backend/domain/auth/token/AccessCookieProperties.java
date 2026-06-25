@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record AccessCookieProperties(
         String name,
         boolean secure,
-        String sameSite
+        String sameSite,
+        String domain
 ) {
 }
