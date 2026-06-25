@@ -8,6 +8,7 @@ import com.team08.backend.domain.media.dto.VideoStreamResponse;
 import com.team08.backend.global.auth.util.CloudFrontCookieSigner;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.util.FileUrlFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseCookie;
@@ -25,13 +26,14 @@ public class VideoAccessService {
     private final LectureRepository lectureRepository;
     private final CloudFrontCookieSigner cloudFrontCookieSigner;
     private final CourseAccessAuthorizer courseAccessAuthorizer;
+    private final FileUrlFormatter fileUrlFormatter;
 
     @Transactional(readOnly = true)
     public VideoStreamResponse verifyAndGenerateStreamCookies(Long lectureId, Long userId) {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
-        String m3u8Path = lecture.getM3u8Path();
+        String m3u8Path = fileUrlFormatter.formatVideoUrl(lecture.getM3u8Path());
 
         if (lecture.isFreePreview()) {
             return new VideoStreamResponse(m3u8Path, List.of());
