@@ -47,3 +47,21 @@ management:
   endpoint:
     health:
       show-details: always
+  metrics:
+    distribution:
+      # http.server.requests를 히스토그램으로 게시 → Prometheus가 p50/p95/p99 산출 가능
+      percentiles-histogram:
+        http.server.requests: true
+      # SLO 경계 버킷(부하 테스트용 관심 구간) — 버킷 해상도 향상
+      slo:
+        http.server.requests: 50ms,100ms,200ms,500ms,1s,2s
+      minimum-expected-value:
+        http.server.requests: 5ms
+      maximum-expected-value:
+        http.server.requests: 5s
+
+server:
+  tomcat:
+    # Tomcat 스레드 풀/커넥션 메트릭(tomcat_threads_busy 등) 노출 → 스레드 풀 포화 병목 식별
+    mbeanregistry:
+      enabled: true

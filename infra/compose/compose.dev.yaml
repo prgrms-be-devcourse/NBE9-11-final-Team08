@@ -100,6 +100,26 @@ services:
     networks:
       - dev
 
+  # 호스트 시스템 메모리/CPU 메트릭(node_memory_*, node_cpu_*) 노출.
+  # 주의(macOS): Docker Desktop의 리눅스 VM 기준 값이라 Mac 실호스트와 다를 수 있다.
+  #   Mac 실측이 필요하면 `brew install node_exporter`로 네이티브 기동 후
+  #   prometheus.yml의 node job 타깃을 host.docker.internal:9100 으로 바꿔 스크랩한다.
+  node-exporter:
+    image: prom/node-exporter:latest
+    profiles: [ "monitor" ]
+    pid: host
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - dev
+
 volumes:
   mysql_data:
   grafana_data:

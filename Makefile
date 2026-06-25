@@ -71,18 +71,18 @@ dev-reset: ## [개발] DB/Redis 완전 초기화 (DB 볼륨 삭제 + Redis FLUSH
 # 사전 조건: application-dev.yaml에 actuator prometheus 엔드포인트 열기
 #   IntelliJ에서 Spring Boot 기동 후 make monitor 실행
 
-monitor: ## [모니터링] Prometheus + Grafana 기동 (localhost:9090, localhost:3001)
-	$(call run,$(DEV) --profile monitor up -d prometheus grafana --wait)
+monitor: ## [모니터링] Prometheus + Grafana + node-exporter 기동 (localhost:9090, localhost:3001)
+	$(call run,$(DEV) --profile monitor up -d prometheus grafana node-exporter --wait)
 	@echo "✅ 모니터링 기동 완료"
 	@echo "   Prometheus → http://localhost:9090"
 	@echo "   Grafana    → http://localhost:3001  (admin / admin)"
-	@echo "   대시보드 import: Grafana → Dashboards → Import → ID 4701 (JVM Micrometer)"
+	@echo "   대시보드(자동 프로비저닝): 'Load Test — Bottleneck Finder', 'Service Health — Team08'"
 
-monitor-down: ## [모니터링] Prometheus + Grafana 내리기 (데이터 유지)
-	$(call run,$(DEV) --profile monitor stop prometheus grafana)
+monitor-down: ## [모니터링] 모니터링 스택 내리기 (데이터 유지)
+	$(call run,$(DEV) --profile monitor stop prometheus grafana node-exporter)
 
-monitor-logs: ## [모니터링] Prometheus + Grafana 로그 보기
-	$(call run,$(DEV) --profile monitor logs -f prometheus grafana)
+monitor-logs: ## [모니터링] 모니터링 스택 로그 보기
+	$(call run,$(DEV) --profile monitor logs -f prometheus grafana node-exporter)
 
 ## ─────────────── 부하 테스트 (k6) ───────────────
 # 측정 대상 서버는 별도로 띄운다 (8080 노출, 셋 중 하나만 선택):
