@@ -8,8 +8,10 @@ import type { BackendDateTime, FeedCursor, FeedItemResponse } from '@/lib/types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
 const PAGE_SIZE = 10
+const MAX_RECONNECT_ATTEMPTS = 5
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000]
 
-type ConnectionState = 'connecting' | 'open' | 'error'
+type ConnectionState = 'connecting' | 'open' | 'error' | 'closed'
 
 export function StudyRealtimeFeed({ studyId }: { studyId: string }) {
   const [items, setItems] = useState<FeedItemResponse[]>([])
@@ -72,33 +74,73 @@ export function StudyRealtimeFeed({ studyId }: { studyId: string }) {
   }, [studyId])
 
   useEffect(() => {
-    const source = new EventSource(`${BASE_URL}/api/studies/${studyId}/feed/stream`, {
-      withCredentials: true,
-    })
+    let source: EventSource | null = null
+    let reconnectAttempts = 0
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let closed = false
 
-    source.onopen = () => setConnectionState('open')
-    source.onerror = () => setConnectionState('error')
+    function closeSource() {
+      source?.close()
+      source = null
+    }
 
-    source.addEventListener('feed-item.created', (event) => {
-      try {
-        const item = JSON.parse(event.data) as FeedItemResponse
-        mergeItems([item], 'start')
-        setConnectionState('open')
-      } catch (error) {
-        console.error('피드 이벤트 파싱 실패:', error)
+    function scheduleReconnect() {
+      closeSource()
+
+      if (closed) return
+
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        setConnectionState('closed')
+        return
       }
-    })
 
-    source.addEventListener('server-draining', () => {
+      const delay = RECONNECT_DELAYS_MS[reconnectAttempts] ?? RECONNECT_DELAYS_MS.at(-1) ?? 15000
+      reconnectAttempts += 1
+      setConnectionState('error')
+      reconnectTimer = setTimeout(connect, delay)
+    }
+
+    function connect() {
+      if (closed) return
+
       setConnectionState('connecting')
-    })
+      source = new EventSource(`${BASE_URL}/api/studies/${studyId}/feed/stream`, {
+        withCredentials: true,
+      })
 
-    source.addEventListener('connected', () => {
-      setConnectionState('open')
-    })
+      source.onopen = () => {
+        setConnectionState('open')
+      }
+
+      source.onerror = scheduleReconnect
+
+      source.addEventListener('feed-item.created', (event) => {
+        try {
+          const item = JSON.parse(event.data) as FeedItemResponse
+          mergeItems([item], 'start')
+          reconnectAttempts = 0
+          setConnectionState('open')
+        } catch (error) {
+          console.error('피드 이벤트 파싱 실패:', error)
+        }
+      })
+
+      source.addEventListener('server-draining', () => {
+        setConnectionState('connecting')
+      })
+
+      source.addEventListener('connected', () => {
+        reconnectAttempts = 0
+        setConnectionState('open')
+      })
+    }
+
+    connect()
 
     return () => {
-      source.close()
+      closed = true
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      closeSource()
     }
   }, [mergeItems, studyId])
 
@@ -173,7 +215,14 @@ export function StudyRealtimeFeed({ studyId }: { studyId: string }) {
 }
 
 function ConnectionBadge({ state }: { state: ConnectionState }) {
-  const label = state === 'open' ? '실시간' : state === 'connecting' ? '연결 중' : '재연결 중'
+  const label =
+    state === 'open'
+      ? '실시간'
+      : state === 'connecting'
+        ? '연결 중'
+        : state === 'closed'
+          ? '연결 끊김'
+          : '재연결 중'
 
   return (
     <Badge variant={state === 'open' ? 'secondary' : 'outline'} className="ml-auto gap-1">
@@ -184,9 +233,15 @@ function ConnectionBadge({ state }: { state: ConnectionState }) {
 }
 
 function getFeedMessage(item: FeedItemResponse) {
+  const lectureTitle = item.content || '강의'
+
   switch (item.type) {
     case 'STUDY_ACTIVITY':
       return `${item.actorNickname}가 학습활동을 작성하였습니다.`
+    case 'LECTURE_ENTER':
+      return `${item.actorNickname}님이 ${lectureTitle} 수강을 시작했어요.`
+    case 'LECTURE_COMPLETE':
+      return `${item.actorNickname}님이 ${lectureTitle} 수강을 마쳤어요.`
     default:
       return `${item.actorNickname}의 새 활동이 있습니다.`
   }
