@@ -5,6 +5,7 @@ import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.AccessTokenCookieFactory;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
@@ -23,6 +24,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -40,6 +42,8 @@ public class AuthController {
     private final AccessTokenCookieFactory accessTokenCookieFactory;
 
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
+
+    private final AccessCookieProperties accessCookieProperties;
 
     @Operation(
             summary = "로그인",
@@ -71,8 +75,22 @@ public class AuthController {
     @SecurityRequirements
     @GetMapping("/csrf")
     public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
-        csrfToken.getToken();
-        return ResponseEntity.noContent().build();
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken.getToken());
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
+                .build();
+    }
+
+    private ResponseCookie buildCsrfCookie(String token) {
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("XSRF-TOKEN", token)
+                .httpOnly(false)
+                .secure(accessCookieProperties.secure())
+                .sameSite(accessCookieProperties.sameSite())
+                .path("/");
+        if (StringUtils.hasText(accessCookieProperties.domain())) {
+            builder.domain(accessCookieProperties.domain());
+        }
+        return builder.build();
     }
 
     @Operation(
