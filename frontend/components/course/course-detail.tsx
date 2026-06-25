@@ -38,13 +38,12 @@ export function CourseDetail({ course }: { course: Course }) {
   const canPurchase = !(isLoggedIn && isPurchased)
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
-    setIsLoggedIn(!!token)
-
     const fetchAccess = async () => {
       try {
+        const profile = await api.getProfile()
+        setIsLoggedIn(!!profile)
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
-        const active = token ? await api.isCourseEnrollmentActive(course.id) : false
+        const active = profile ? await api.isCourseEnrollmentActive(course.id) : false
         setIsPurchased(active)
         setHasStudyAccess(active && !!nextStudyId)
         setStudyId(nextStudyId)
