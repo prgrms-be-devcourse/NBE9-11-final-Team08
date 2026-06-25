@@ -36,7 +36,12 @@ export function StudyReportView({
         toast.success('학습 이벤트를 다시 집계했어요.')
       }
       else if(response.status=='COOLDOWN'){
-        toast.info('1일 1회만 집계가능합니다.')
+        const [year, month, day, hour, minute] = response.updatedAt;
+        const formatted =
+            `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')} ` +
+            `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+
+        toast.info(`1일 1회만 집계 가능합니다.${formatted}`);
       }
       router.refresh()
     } catch {
