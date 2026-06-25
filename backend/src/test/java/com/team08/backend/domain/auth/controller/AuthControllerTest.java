@@ -7,6 +7,7 @@ import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.AccessTokenCookieFactory;
 import com.team08.backend.domain.auth.token.RefreshTokenCookieFactory;
 import com.team08.backend.domain.auth.token.TokenProperties;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({CorsProperties.class, AccessCookieProperties.class})
 @TestPropertySource(properties = "app.cors.allowed-origins=http://localhost:3000")
 public class AuthControllerTest {
 
