@@ -99,7 +99,7 @@ class CourseControllerTest {
         Long courseId = 100L;
 
         LectureInfoResponse lectureResponse = new LectureInfoResponse(
-                10L, "무료 맛보기 강의", "videos/free.m3u8", UUID.randomUUID().toString(), 600, 1, true
+                10L, "무료 맛보기 강의", "맛보기 요약", "videos/free.m3u8", UUID.randomUUID().toString(), 600, 1, true, true
         );
         ChapterInfoResponse chapterResponse = new ChapterInfoResponse(
                 1L, "첫 번째 챕터", 1, List.of(lectureResponse)
@@ -204,7 +204,7 @@ class CourseControllerTest {
     @WithMockLoginUser(id = 1L, role = "ROLE_SELLER")
     void 인증된_판매자가_유효한_데이터로_강좌_일반_정보_수정_요청_시_204_상태코드를_반환한다() throws Exception {
         Long courseId = 100L;
-        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
+        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", "요약", 400, 1, true);
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
 

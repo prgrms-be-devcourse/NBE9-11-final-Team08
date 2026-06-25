@@ -47,6 +47,8 @@ public record CourseUpdateRequest(
             @Size(max = 255, message = "강의 제목은 255자 이하로 입력해주세요.")
             String title,
 
+            String summary,
+
             @Min(value = 0, message = "영상 길이는 0초 이상이어야 합니다.")
             int durationSeconds,
 
