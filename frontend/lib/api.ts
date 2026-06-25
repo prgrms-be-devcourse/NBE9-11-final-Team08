@@ -206,7 +206,6 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       chapterId: ch.id.toString(),
       durationSeconds: lec.durationSeconds,
       m3u8Path: lec.m3u8Path ?? null,
-      isFreePreview: lec.isFreePreview,
     })) || [],
   })) || [],
   status: detail.status,
@@ -898,12 +897,6 @@ export const api = {
   getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
     const study = await api.getStudy(studyId)
     if (!study) return undefined
-
-    const course = await api.getCourse(study.courseId)
-    const hasFreePreview = course?.chapters.some((chapter) =>
-      chapter.lectures.some((lecture) => lecture.isFreePreview),
-    ) ?? false
-    if (hasFreePreview) return study
 
     const enrolled = await api.isCourseEnrollmentActive(study.courseId)
     if (!enrolled) return undefined

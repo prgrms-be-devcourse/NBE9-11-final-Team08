@@ -34,9 +34,6 @@ export function CourseDetail({ course }: { course: Course }) {
 
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
-  const hasFreePreview = course.chapters.some((chapter) =>
-    chapter.lectures.some((lecture) => lecture.isFreePreview),
-  )
   const inCart = has(course.id)
   const canPurchase = !(isLoggedIn && isPurchased)
 
@@ -49,7 +46,7 @@ export function CourseDetail({ course }: { course: Course }) {
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
         const active = token ? await api.isCourseEnrollmentActive(course.id) : false
         setIsPurchased(active)
-        setHasStudyAccess((active || hasFreePreview) && !!nextStudyId)
+        setHasStudyAccess(active && !!nextStudyId)
         setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
@@ -59,7 +56,7 @@ export function CourseDetail({ course }: { course: Course }) {
       }
     }
     fetchAccess()
-  }, [course.id, hasFreePreview])
+  }, [course.id])
 
   const handleAdd = async () => {
     if (!isLoggedIn) {
@@ -255,18 +252,7 @@ export function CourseDetail({ course }: { course: Course }) {
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
-                ) : !isLoggedIn ? (
-                  <Button onClick={() => {
-                    toast.error('로그인이 필요한 서비스입니다.')
-                    router.push('/login')
-                  }} variant="outline" className="w-full">
-                    스터디 입장
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="w-full" disabled>
-                    스터디 입장
-                  </Button>
-                )}
+                ) : null}
 
                 <Separator />
                 <ul className="space-y-2 text-sm text-muted-foreground">

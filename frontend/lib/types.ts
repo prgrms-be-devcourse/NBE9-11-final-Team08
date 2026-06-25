@@ -14,7 +14,6 @@ export interface Lecture {
   chapterId?: string
   durationSeconds?: number
   m3u8Path?: string | null
-  isFreePreview?: boolean
   lastPositionSeconds?: number
   watchedSeconds?: number
 }
