@@ -193,7 +193,7 @@ class FeedOutboxPublisherTest {
         assertThat(savedFeedItem.getActorId()).isEqualTo(actorId);
         assertThat(savedFeedItem.getType()).isEqualTo(FeedItemType.LECTURE_COMPLETE);
         assertThat(savedFeedItem.getSourceId()).isEqualTo(learningEventId);
-        assertThat(savedFeedItem.getContent()).isEqualTo("강의를 완료했어요: 스프링 이벤트 기초");
+        assertThat(savedFeedItem.getContent()).isEqualTo("스프링 이벤트 기초");
 
         assertThat(outboxEvent.getFeedItemId()).isEqualTo(201L);
         assertThat(outboxEvent.sseEventName()).isEqualTo(FeedOutboxEvent.FEED_ITEM_CREATED_EVENT);
