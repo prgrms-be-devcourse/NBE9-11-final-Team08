@@ -1,0 +1,35 @@
+# Edge 서버 전용 compose — nginx와 certbot만 실행한다.
+# BACKEND_UPSTREAM에는 app 서버의 private IP와 Spring 포트를 넣는다.
+# 예: BACKEND_UPSTREAM=10.0.1.123:8081
+name: nbe9-11-final-team08-edge
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/templates/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certbot_www:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  certbot:
+    image: certbot/certbot:v3.3.0
+    profiles: ["certbot"]
+    volumes:
+      - certbot_www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+volumes:
+  certbot_www:
+  letsencrypt:

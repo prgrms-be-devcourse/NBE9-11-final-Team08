@@ -24,15 +24,16 @@ read_env_value() {
 
 DOMAIN="$(read_env_value DOMAIN)"
 CERTBOT_EMAIL="$(read_env_value CERTBOT_EMAIL)"
+BACKEND_UPSTREAM="$(read_env_value BACKEND_UPSTREAM)"
 
 : "${DOMAIN:?DOMAIN is required in .env}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL is required in .env}"
+: "${BACKEND_UPSTREAM:?BACKEND_UPSTREAM is required in .env}"
 
 compose=(
   docker compose
   --env-file "${env_file}"
-  -f "${compose_dir}/compose.yaml"
-  -f "${compose_dir}/compose.prod.yaml"
+  -f "${compose_dir}/compose.edge.yaml"
 )
 
 echo "Creating a temporary certificate for ${DOMAIN}..."
@@ -43,7 +44,7 @@ echo "Creating a temporary certificate for ${DOMAIN}..."
    -out /etc/letsencrypt/live/${DOMAIN}/fullchain.pem \
    -subj '/CN=localhost'"
 
-"${compose[@]}" up -d db backend nginx
+"${compose[@]}" up -d nginx
 
 echo "Removing the temporary certificate..."
 "${compose[@]}" run --rm --entrypoint sh certbot -c \
