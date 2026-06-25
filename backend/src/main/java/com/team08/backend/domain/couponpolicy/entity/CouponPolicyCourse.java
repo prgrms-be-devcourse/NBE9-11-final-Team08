@@ -1,4 +1,4 @@
-package com.team08.backend.domain.couponpolicycategory.entity;
+package com.team08.backend.domain.couponpolicy.entity;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import jakarta.persistence.*;
@@ -7,14 +7,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "coupon_policy_categories",
+@Table(name = "coupon_policy_courses",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_coupon_policy_category",
-                columnNames = {"coupon_policy_id", "category_id"}
+                name = "uk_coupon_policy_course",
+                columnNames = {"coupon_policy_id", "course_id"}
         ))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class CouponPolicyCategory {
+public class CouponPolicyCourse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,10 +25,10 @@ public class CouponPolicyCategory {
     private CouponPolicy couponPolicy;
 
     @Column(nullable = false)
-    private Long categoryId;
+    private Long courseId;
 
-    public CouponPolicyCategory(CouponPolicy couponPolicy, Long categoryId) {
+    public CouponPolicyCourse(CouponPolicy couponPolicy, Long courseId) {
         this.couponPolicy = couponPolicy;
-        this.categoryId = categoryId;
+        this.courseId = courseId;
     }
 }
