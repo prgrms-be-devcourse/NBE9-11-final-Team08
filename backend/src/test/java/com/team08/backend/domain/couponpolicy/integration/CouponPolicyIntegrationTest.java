@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -74,6 +75,7 @@ class CouponPolicyIntegrationTest {
 
         // when
         mockMvc.perform(post("/api/admin/coupons")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -139,6 +141,7 @@ class CouponPolicyIntegrationTest {
 
         // when
         mockMvc.perform(put("/api/admin/coupons/" + policy.getId())
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -167,6 +170,7 @@ class CouponPolicyIntegrationTest {
 
         // when & then
         mockMvc.perform(put("/api/admin/coupons/" + policy.getId())
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isBadRequest())
@@ -183,7 +187,8 @@ class CouponPolicyIntegrationTest {
         ));
 
         // when
-        mockMvc.perform(patch("/api/admin/coupons/" + policy.getId() + "/terminate"))
+        mockMvc.perform(patch("/api/admin/coupons/" + policy.getId() + "/terminate")
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
 
         // then
@@ -206,7 +211,8 @@ class CouponPolicyIntegrationTest {
         em.clear();
 
         // when
-        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId()))
+        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId())
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
 
         em.flush();
@@ -228,7 +234,8 @@ class CouponPolicyIntegrationTest {
         issuedCouponRepository.save(IssuedCoupon.create(policy, 1L, LocalDateTime.now()));
 
         // when & then
-        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId()))
+        mockMvc.perform(delete("/api/admin/coupons/" + policy.getId())
+                        .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COUPON_011"));
     }

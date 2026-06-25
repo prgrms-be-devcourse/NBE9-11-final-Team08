@@ -97,8 +97,9 @@ public class CourseService {
 
     @Transactional
     public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request, MultipartFile thumbnailFile) {
-        Course course = courseRepository.findById(courseId)
+        Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+        courseRepository.findChaptersWithLecturesAsc(courseId);
 
         course.validateOwner(instructorId);
 

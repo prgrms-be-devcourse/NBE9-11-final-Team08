@@ -1,8 +1,10 @@
 package com.team08.backend.global.auth.filter;
 
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,9 +22,20 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
-
+    private static final String AUTH_PREFIX = "/api/auth/";
     private final JwtProvider jwtProvider;
+    private final AccessCookieProperties accessCookieProperties;
     private final AuthenticationEntryPoint authenticationEntryPoint;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return (AUTH_PREFIX + "csrf").equals(path)
+                || (AUTH_PREFIX + "login").equals(path)
+                || (AUTH_PREFIX + "signup").equals(path)
+                || (AUTH_PREFIX + "refresh").equals(path)
+                || (AUTH_PREFIX + "logout").equals(path);
+    }
 
     @Override
     protected void doFilterInternal(
@@ -30,15 +43,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-        if (authorization == null) {
+        String accessToken = resolveAccessToken(request);
+        if (accessToken == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String accessToken = extractBearerToken(authorization);
-        if (accessToken == null || !jwtProvider.validateAccessToken(accessToken)) {
+        if (!jwtProvider.validateAccessToken(accessToken)) {
             authenticationEntryPoint.commence(request, response, null);
             return;
         }
@@ -71,5 +82,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = authorization.substring(BEARER_PREFIX.length());
         return token.isBlank() ? null : token;
+    }
+
+    private String resolveAccessToken(HttpServletRequest request) {
+        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (authorization != null) {
+            return extractBearerToken(authorization);
+        }
+
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if (accessCookieProperties.name().equals(cookie.getName()) && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }

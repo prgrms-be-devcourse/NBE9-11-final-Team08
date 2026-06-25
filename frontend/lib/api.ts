@@ -25,7 +25,6 @@ import type {
   UserProfile,
   SignupRequest,
   LoginRequest,
-  LoginResponse,
   StudySummaryResponse,
   StudyActivityResponse,
   AiFeedbackResponse,
@@ -53,33 +52,95 @@ import type {
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
+const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+const REFRESH_EXCLUDED_PATHS = new Set([
+  '/api/auth/csrf',
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/auth/signup',
+])
+
+let refreshAuthPromise: Promise<boolean> | null = null
+
+const decodeCookieValue = (value: string): string => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+const getCookieValue = async (name: string): Promise<string | undefined> => {
+  if (typeof window !== 'undefined') {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+    return match ? decodeCookieValue(match[1]) : undefined
+  }
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const value = cookieStore.get(name)?.value
+    return value ? decodeCookieValue(value) : undefined
+  } catch {
+    return undefined
+  }
+}
 
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  let token = ''
   if (typeof window !== 'undefined') {
-    token = localStorage.getItem('accessToken') || ''
-    if (!token) {
-      const match = document.cookie.match(/(^| )accessToken=([^;]+)/)
-      if (match) token = match[2]
-    }
-  } else {
-    try {
-      const { cookies } = await import('next/headers')
-      const cookieStore = cookies()
-      const store = cookieStore instanceof Promise ? await cookieStore : cookieStore
-      token = store.get('accessToken')?.value || ''
-    } catch (e) { }
+    return {}
   }
-  return token ? { Authorization: `Bearer ${token}` } : {}
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const cookieHeader = cookieStore.toString()
+
+    return cookieHeader ? { Cookie: cookieHeader } : {}
+  } catch {
+    return {}
+  }
+}
+
+const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record<string, string>> => {
+  if (!includeCredentials) {
+    return {}
+  }
+
+  return getAuthHeaders()
+}
+
+const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
+  return includeCredentials ? 'include' : 'same-origin'
+}
+
+const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | undefined> => {
+  if (!includeCredentials || !BASE_URL) {
+    return undefined
+  }
+
+  const currentToken = await getCookieValue(CSRF_COOKIE_NAME)
+  if (currentToken) {
+    return currentToken
+  }
+
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  await fetch(`${BASE_URL}/api/auth/csrf`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  }).catch(() => undefined)
+
+  return getCookieValue(CSRF_COOKIE_NAME)
 }
 
 const handleUnauthorized = () => {
   if (typeof window !== 'undefined') {
-    const hasToken = !!localStorage.getItem('accessToken') || document.cookie.includes('accessToken')
-
-    localStorage.removeItem('accessToken')
-    document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-
     const pathname = window.location.pathname
     const isPublicRoute =
       pathname === '/' ||
@@ -92,10 +153,44 @@ const handleUnauthorized = () => {
 
     if (!isPublicRoute) {
       window.location.href = '/login'
-    } else if (hasToken) {
-      window.location.reload()
     }
   }
+}
+
+const shouldAttemptTokenRefresh = (path: string, includeCredentials: boolean, status: number): boolean => {
+  return status === 401
+    && includeCredentials
+    && typeof window !== 'undefined'
+    && !REFRESH_EXCLUDED_PATHS.has(path)
+}
+
+const refreshAuthTokens = async (): Promise<boolean> => {
+  if (!BASE_URL || typeof window === 'undefined') {
+    return false
+  }
+
+  if (!refreshAuthPromise) {
+    refreshAuthPromise = (async () => {
+      const headers: Record<string, string> = {}
+      const csrfToken = await ensureCsrfToken(true)
+      if (csrfToken) {
+        headers[CSRF_HEADER_NAME] = csrfToken
+      }
+
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => null)
+
+      return res?.ok ?? false
+    })().finally(() => {
+      refreshAuthPromise = null
+    })
+  }
+
+  return refreshAuthPromise
 }
 
 async function request<T>(
@@ -106,14 +201,22 @@ async function request<T>(
 ): Promise<T> {
   if (!BASE_URL) return defaultData
   try {
-    const authHeaders = includeAuth ? await getAuthHeaders() : {}
-    const res = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      cache: 'no-store',
-    })
+    const fetchRequest = async () => {
+      const authHeaders = await getCredentialHeaders(includeAuth)
+      return fetch(`${BASE_URL}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        credentials: getCredentialsMode(includeAuth),
+        cache: 'no-store',
+      })
+    }
+
+    let res = await fetchRequest()
+    if (shouldAttemptTokenRefresh(path, includeAuth, res.status) && await refreshAuthTokens()) {
+      res = await fetchRequest()
+    }
 
     if (!res.ok) {
       console.warn(`[API 에러] ${res.status} on ${path}`)
@@ -131,18 +234,29 @@ async function request<T>(
   }
 }
 
-async function mutate<T>(path: string, method: string, body?: any, isMultipart = false): Promise<T> {
+async function mutate<T>(
+  path: string,
+  method: string,
+  body?: any,
+  isMultipart = false,
+  includeCredentials = true,
+): Promise<T> {
   if (!BASE_URL) throw new Error('API BASE_URL is not defined')
 
-  const headers = await getAuthHeaders()
+  const headers = await getCredentialHeaders(includeCredentials)
   if (!isMultipart) {
     headers['Content-Type'] = 'application/json'
+  }
+  const csrfToken = await ensureCsrfToken(includeCredentials)
+  if (csrfToken) {
+    headers[CSRF_HEADER_NAME] = csrfToken
   }
 
   const options: RequestInit = {
     method,
     headers,
   }
+  options.credentials = getCredentialsMode(includeCredentials)
   if (body) {
     options.body = isMultipart ? body : JSON.stringify(body)
   }
@@ -157,16 +271,29 @@ async function mutate<T>(path: string, method: string, body?: any, isMultipart =
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      handleUnauthorized()
+    if (shouldAttemptTokenRefresh(path, includeCredentials, res.status) && await refreshAuthTokens()) {
+      res = await fetch(`${BASE_URL}${path}`, options)
     }
-    const errorData = await res.json().catch(() => ({}))
-    throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        handleUnauthorized()
+      }
+      const errorData = await res.json().catch(() => ({}))
+      throw new Error(errorData.message || errorData.detail || errorData.error || `Error ${res.status}`)
+    }
   }
-  if (res.status === 204 || (res.status === 201 && res.headers.get('content-length') === '0')) {
+  if (res.status === 204 || res.status === 202) {
     return {} as T
   }
-  return await res.json() as T
+  if (res.status === 201 && res.headers.get('content-length') === '0') {
+    return {} as T
+  }
+  const text = await res.text()
+  if (!text.trim()) {
+    return {} as T
+  }
+  return JSON.parse(text) as T
 }
 
 const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
@@ -214,6 +341,8 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       chapterId: ch.id.toString(),
       durationSeconds: lec.durationSeconds,
       m3u8Path: lec.m3u8Path ?? null,
+      summary: lec.summary ?? '',
+      hasVideo: lec.hasVideo ?? false,
     })) || [],
   })) || [],
   status: detail.status,
@@ -543,6 +672,19 @@ const saveCourseDraft = (id: string | number, data: any) => {
   }
 }
 
+const removeCourseDraft = (id: string | number) => {
+  if (typeof window !== 'undefined') {
+    const cookieName = `course_draft_${id}`
+    document.cookie = `${cookieName}=; path=/; max-age=0`
+    try {
+      localStorage.removeItem(cookieName)
+      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]')
+      const nextDraftIds = draftIds.filter((dId: string) => dId !== String(id))
+      localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
+    } catch (e) { }
+  }
+}
+
 const formatWatchTime = (totalSeconds: number): string => {
   if (!totalSeconds || totalSeconds <= 0) return '0분'
   const hours = Math.floor(totalSeconds / 3600)
@@ -597,20 +739,8 @@ const mapStudyReportToDisplay = (
 
 const getCurrentUserId = async (): Promise<number> => {
   try {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return 1
-    const payloadPart = token.split('.')[1]
-    if (!payloadPart) return 1
-    const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-    const rawPayload = typeof window !== 'undefined'
-      ? atob(base64)
-      : Buffer.from(base64, 'base64').toString('utf8')
-    const jsonPayload = typeof window !== 'undefined'
-      ? decodeURIComponent(escape(rawPayload))
-      : rawPayload
-    const claims = JSON.parse(jsonPayload)
-    return Number(claims.sub || 1)
+    const profile = await api.getProfile()
+    return Number(profile?.id || 1)
   } catch (e) {
     return 1
   }
@@ -618,14 +748,10 @@ const getCurrentUserId = async (): Promise<number> => {
 
 export const api = {
   // Auth
-  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data),
-  login: (data: LoginRequest) => mutate<LoginResponse>('/api/auth/login', 'POST', data),
+  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
+  login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken')
-      document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    }
-    return mutate<void>('/api/auth/logout', 'POST')
+    return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
   },
 
   // Courses
@@ -654,22 +780,12 @@ export const api = {
     )
     if (detail && detail.id) return mapCourseDetailToCourse(detail)
 
-    let chapters: ChapterInfoResponse[] = []
-    try {
-      const authHeaders = await getAuthHeaders()
-      const chaptersRes = await fetch(`${BASE_URL}/api/courses/${id}/chapters`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        cache: 'no-store',
-      })
-      if (chaptersRes.ok) {
-        chapters = await chaptersRes.json()
-      }
-    } catch (e) {
-      console.error('Failed to fetch chapters for course:', e)
-    }
+    const chapters = await request<ChapterInfoResponse[]>(
+      `/api/courses/${id}/chapters`,
+      [],
+      true,
+      false,
+    )
 
     let generalInfo = SEEDED_COURSES[Number(id)]
     if (!generalInfo) {
@@ -764,11 +880,23 @@ export const api = {
     return res
   },
 
-  requestCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'POST'),
+  requestCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'POST')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'IN_REVIEW' })
+    }
+    return res
+  },
 
-  cancelCourseReview: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE'),
+  cancelCourseReview: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'DELETE')
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
 
   closeCourse: (courseId: string | number) =>
     mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
@@ -986,39 +1114,12 @@ export const api = {
 
   // Coupons & Admin
   getCoupons: async () => {
-    let authHeaders = await getAuthHeaders()
-    if (!authHeaders.Authorization) {
-      try {
-        const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: 'admin@test.com', password: 'Test1234!' }),
-        })
-        if (loginRes.ok) {
-          const loginData = await loginRes.json()
-          if (loginData.accessToken) {
-            authHeaders = { Authorization: `Bearer ${loginData.accessToken}` }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to log in as system admin to fetch public coupons:', e)
-      }
-    }
-
-    const res = await fetch(`${BASE_URL}/api/admin/coupons`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-      },
-      cache: 'no-store',
-    })
-
-    if (!res.ok) {
-      console.warn(`[API 에러] ${res.status} on /api/admin/coupons`)
-      return []
-    }
-
-    const result = await res.json() as any
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
+      '/api/admin/coupons',
+      null,
+      true,
+      false,
+    )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToUserCoupon)
   },
@@ -1057,28 +1158,16 @@ export const api = {
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
-    const authHeaders = await getAuthHeaders()
-    const token = authHeaders.Authorization?.split(' ')[1]
-    if (!token) return null
     try {
-      const payloadPart = token.split('.')[1]
-      if (!payloadPart) return null
-      const base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/')
-      const rawPayload = typeof window !== 'undefined'
-        ? atob(base64)
-        : Buffer.from(base64, 'base64').toString('utf8')
-      const jsonPayload = typeof window !== 'undefined'
-        ? decodeURIComponent(escape(rawPayload))
-        : rawPayload
-      const claims = JSON.parse(jsonPayload)
+      const claims = await request<any>('/api/auth/me', null)
+      if (!claims) return null
       return {
-        id: String(claims.sub || ''),
+        id: String(claims.id || claims.sub || ''),
         name: claims.nickname || claims.name || '',
         email: claims.email || '',
         studyCount: 0,
         courseCount: 0,
         isSeller: claims.role === 'ROLE_SELLER' || claims.role === 'ROLE_ADMIN',
-        isAdmin: claims.role === 'ROLE_ADMIN',
       }
     } catch (e) {
       console.error('Failed to decode token:', e)
@@ -1207,14 +1296,32 @@ export const api = {
   },
 
   // Admin Course APIs
-  approveCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST'),
-  rejectCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason }),
-  suspendCourseByAdmin: (courseId: number | string, reason: string) =>
-    mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason }),
-  deleteCourseByAdmin: (courseId: number | string) =>
-    mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE'),
+  approveCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/approve`, 'POST')
+    removeCourseDraft(courseId)
+    return res
+  },
+  rejectCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/reject`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'DRAFT' })
+    }
+    return res
+  },
+  suspendCourseByAdmin: async (courseId: number | string, reason: string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}/suspension`, 'POST', { reason })
+    const draft = await getCourseDraftFromCookies(courseId)
+    if (draft) {
+      saveCourseDraft(courseId, { ...draft, status: 'SUSPENDED' })
+    }
+    return res
+  },
+  deleteCourseByAdmin: async (courseId: number | string) => {
+    const res = await mutate<void>(`/api/admin/courses/${courseId}`, 'DELETE')
+    removeCourseDraft(courseId)
+    return res
+  },
 
   // ── Admin Dashboard APIs ────────────────────────────────────────────
   getAdminOverview: () =>

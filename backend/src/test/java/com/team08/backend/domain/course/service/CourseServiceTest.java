@@ -264,7 +264,7 @@ class CourseServiceTest {
         CourseUpdateRequest request = new CourseUpdateRequest("제목", "설명", 2L, 20000, "thumb.png", List.of());
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request, mockFile))
                 .isInstanceOf(CustomException.class)
@@ -286,7 +286,8 @@ class CourseServiceTest {
         CourseUpdateRequest request = new CourseUpdateRequest("변경 제목", "변경 설명", 3L, 20000, "new.png", List.of());
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findChaptersWithLecturesAsc(courseId)).willReturn(List.of());
 
         assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request, mockFile))
                 .isInstanceOf(CustomException.class)
@@ -326,13 +327,14 @@ class CourseServiceTest {
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
-        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
-        CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", 500, 2, false);
+        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", "요약", 400, 1, true);
+        CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", "", 500, 2, false);
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate, lectureNew));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findChaptersWithLecturesAsc(courseId)).willReturn(List.of(chapter));
         given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
         courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
