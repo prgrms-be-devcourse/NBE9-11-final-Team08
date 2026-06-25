@@ -142,6 +142,9 @@ public class PaymentTransactionService {
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
         }
 
+        List<OrderItem> orderItems = findOrderItems(order);
+        validateDuplicateEnrollment(context.userId(), orderItems);
+
         attempt.succeed(tossResponse.paymentKey(), completedAt);
         payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
         Payment savedPayment = paymentRepository.save(payment);
@@ -157,7 +160,6 @@ public class PaymentTransactionService {
         }
 
         markOrderPaid(order, completedAt);
-        List<OrderItem> orderItems = findOrderItems(order);
         List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(
                 context.userId(),
                 order,
@@ -331,12 +333,11 @@ public class PaymentTransactionService {
                 .distinct()
                 .toList();
 
-        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        List<Long> existingCourseIds = enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 userId,
-                EnrollmentStatus.ACTIVE,
                 courseIds
         );
-        if (!activeCourseIds.isEmpty()) {
+        if (!existingCourseIds.isEmpty()) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
     }
@@ -396,8 +397,9 @@ public class PaymentTransactionService {
         paymentRepository.save(payment);
 
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
-            markOrderPaid(order, recoveredAt);
             List<OrderItem> orderItems = findOrderItems(order);
+            validateDuplicateEnrollment(order.getUserId(), orderItems);
+            markOrderPaid(order, recoveredAt);
             issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
         }
     }

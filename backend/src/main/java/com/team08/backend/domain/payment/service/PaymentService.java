@@ -75,14 +75,14 @@ public class PaymentService {
 
         validatePaymentAmount(order, request.amount(), expectedDiscount);
 
+        List<OrderItem> orderItems = findOrderItems(order);
+        validateDuplicateEnrollment(userId, orderItems);
+
         if (request.issuedCouponId() != null) {
             int actualDiscount = issuedCouponService.useCouponForOrder(userId, request.issuedCouponId(), order.getTotalPrice());
             order.applyDiscount(actualDiscount);
             orderCouponUsageRepository.save(new OrderCouponUsage(order.getId(), request.issuedCouponId(), actualDiscount));
         }
-
-        List<OrderItem> orderItems = findOrderItems(order);
-        validateDuplicateEnrollment(userId, orderItems);
 
         LocalDateTime paidAt = LocalDateTime.now(clock);
         Payment savedPayment = processSuccessfulPayment(order, existingPayment, request, paidAt);
@@ -223,12 +223,11 @@ public class PaymentService {
                 .distinct()
                 .toList();
 
-        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        List<Long> existingCourseIds = enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 userId,
-                EnrollmentStatus.ACTIVE,
                 courseIds
         );
-        if (!activeCourseIds.isEmpty()) {
+        if (!existingCourseIds.isEmpty()) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
     }
