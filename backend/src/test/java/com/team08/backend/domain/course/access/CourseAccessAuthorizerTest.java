@@ -53,6 +53,7 @@ public class CourseAccessAuthorizerTest {
                 CourseStatus.ON_SALE,
                 true,
                 false,
+                false,
                 false
         );
     }

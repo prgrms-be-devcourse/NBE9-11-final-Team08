@@ -12,7 +12,11 @@ import com.team08.backend.domain.lecture.fixture.LectureFixture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.entity.UserRole;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.support.TestEntityFactory;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -43,8 +47,19 @@ public class CourseAccessContextResolverTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private CourseAccessContextResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        User defaultUser = User.createUser("user@test.com", "password", "유저", null);
+        ReflectionTestUtils.setField(defaultUser, "id", USER_ID);
+        org.mockito.Mockito.lenient().when(userRepository.findById(USER_ID))
+                .thenReturn(Optional.of(defaultUser));
+    }
 
     @Test
     void chapterId로_course를_찾아_권한_context를_생성한다() {
@@ -54,7 +69,7 @@ public class CourseAccessContextResolverTest {
 
         CourseAccessContext context = resolver.fromChapterId(CHAPTER_ID, USER_ID);
 
-        assertContext(context, CourseStatus.ON_SALE, false, true, false);
+        assertContext(context, CourseStatus.ON_SALE, false, true, false, false);
     }
 
     @Test
@@ -66,7 +81,34 @@ public class CourseAccessContextResolverTest {
 
         CourseAccessContext context = resolver.fromLectureId(LECTURE_ID, USER_ID);
 
-        assertContext(context, CourseStatus.ON_SALE, false, true, false);
+        assertContext(context, CourseStatus.ON_SALE, false, true, false, false);
+    }
+
+    @Test
+    void 어드민인_경우_isAdmin이_true인_context를_생성한다() {
+        Chapter chapter = chapter();
+        User adminUser = User.createAdmin("admin@test.com", "password", "어드민", null);
+        ReflectionTestUtils.setField(adminUser, "id", USER_ID);
+
+        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
+        given(userRepository.findById(USER_ID)).willReturn(Optional.of(adminUser));
+
+        CourseAccessContext context = resolver.fromChapterId(CHAPTER_ID, USER_ID);
+
+        assertContext(context, CourseStatus.ON_SALE, false, true, false, true);
+    }
+
+    @Test
+    void 비로그인인_경우_isAdmin이_false인_context를_생성한다() {
+        Chapter chapter = chapter();
+        given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(null, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        CourseAccessContext context = resolver.fromChapterId(CHAPTER_ID, null);
+
+        assertThat(context.userId()).isNull();
+        assertThat(context.isAdmin()).isFalse();
     }
 
     @Test
@@ -114,13 +156,15 @@ public class CourseAccessContextResolverTest {
             CourseStatus courseStatus,
             boolean hasActiveEnrollment,
             boolean isOwner,
-            boolean hasFreePreview
+            boolean hasFreePreview,
+            boolean isAdmin
     ) {
         assertThat(context.userId()).isEqualTo(USER_ID);
         assertThat(context.courseStatus()).isEqualTo(courseStatus);
         assertThat(context.hasActiveEnrollment()).isEqualTo(hasActiveEnrollment);
         assertThat(context.isOwner()).isEqualTo(isOwner);
         assertThat(context.hasFreePreview()).isEqualTo(hasFreePreview);
+        assertThat(context.isAdmin()).isEqualTo(isAdmin);
     }
 
     private void assertErrorCode(Runnable action, ErrorCode errorCode) {
