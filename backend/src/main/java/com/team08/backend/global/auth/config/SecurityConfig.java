@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -28,6 +29,7 @@ import java.util.function.Supplier;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // @PreAuthorize(예: 관리자 전용 엔드포인트)를 실제로 강제한다
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(

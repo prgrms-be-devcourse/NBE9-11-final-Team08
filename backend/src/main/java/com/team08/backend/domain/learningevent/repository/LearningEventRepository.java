@@ -27,6 +27,9 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 사용자별 활동 조회 ────────────────────────────────────────────
     Page<LearningEvent> findByUserId(Long userId, Pageable pageable);
 
+    // ── 사용자+강좌별 활동 조회 (관리자 타임라인) ─────────────────────
+    Page<LearningEvent> findByUserIdAndCourseId(Long userId, Long courseId, Pageable pageable);
+
     // ── 수강일 수 (서로 다른 학습 날짜 수) ──────────────────────────
     // 총 시청 시간 / TOP3 강의는 lecture_progresses 에서 집계한다(이벤트 중복 합산 방지).
     @Query(value = """
