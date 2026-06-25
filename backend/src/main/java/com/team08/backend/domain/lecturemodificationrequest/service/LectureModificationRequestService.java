@@ -29,7 +29,16 @@ public class LectureModificationRequestService {
 
         String targetDirName = UUID.randomUUID().toString();
 
-        mediaEncodingService.encodeModificationToHls(videoFile, targetDirName, dto.lectureId(), dto.description(), instructorId);
+        java.io.File tempFile;
+        try {
+            java.nio.file.Path tempPath = java.nio.file.Files.createTempFile("lecture-mod-temp-upload-", ".mp4");
+            tempFile = tempPath.toFile();
+            videoFile.transferTo(tempFile);
+        } catch (java.io.IOException e) {
+            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+        }
+
+        mediaEncodingService.encodeModificationToHls(tempFile, targetDirName, dto.lectureId(), dto.description(), instructorId);
     }
 
     private void validateCourseOwnership(Lecture lecture, Long instructorId) {

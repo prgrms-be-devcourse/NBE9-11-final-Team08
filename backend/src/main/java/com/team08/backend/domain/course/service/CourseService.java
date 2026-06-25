@@ -244,7 +244,17 @@ public class CourseService {
 
         String targetDirName = randomUUID().toString();
 
-        mediaEncodingService.encodeToHls(file, targetDirName, lectureId);
+        java.io.File tempFile;
+        try {
+            java.nio.file.Path tempPath = java.nio.file.Files.createTempFile("lecture-temp-upload-", ".mp4");
+            tempFile = tempPath.toFile();
+            file.transferTo(tempFile);
+        } catch (java.io.IOException e) {
+            log.error("Failed to write multipart file to temp file", e);
+            throw new CustomException(ErrorCode.VIDEO_UPLOAD_FAILED);
+        }
+
+        mediaEncodingService.encodeToHls(tempFile, targetDirName, lectureId);
     }
 
     @Component

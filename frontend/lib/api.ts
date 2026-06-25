@@ -1168,6 +1168,7 @@ export const api = {
         studyCount: 0,
         courseCount: 0,
         isSeller: claims.role === 'ROLE_SELLER' || claims.role === 'ROLE_ADMIN',
+        isAdmin: claims.role === 'ROLE_ADMIN',
       }
     } catch (e) {
       console.error('Failed to decode token:', e)

@@ -6,7 +6,6 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,7 +22,7 @@ public abstract class VideoEncodingTemplate {
 
     private final EncodingResultHandler resultHandler;
 
-    protected void executePipeline(MultipartFile file, String targetDirName, Long lectureId,
+    protected void executePipeline(File file, String targetDirName, Long lectureId,
                                    EncodingPurpose purpose, String description, Long instructorId) {
         File sourceFile = prepareSourceFile(file, targetDirName, lectureId);
         Path localWorkspacePath = null;
@@ -106,7 +105,7 @@ public abstract class VideoEncodingTemplate {
         }
     }
 
-    protected abstract File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId);
+    protected abstract File prepareSourceFile(File file, String targetDirName, Long lectureId);
 
     protected abstract void handleGeneratedFiles(Path workspacePath, String targetDirName, Long lectureId);
 
