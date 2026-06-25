@@ -213,7 +213,8 @@ public class DataSeeder {
                         categories.get(idx % categoryCount).getId(),
                         "강의 " + idx + " - " + categories.get(idx % categoryCount).getName(),
                         "강의 " + idx + "에 대한 설명입니다.",
-                        "thumb" + idx + ".jpg",
+//                        "thumb" + idx + ".jpg",
+                        "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop",
                         (idx % 5 + 1) * 10000
                 ));
             }
@@ -802,7 +803,10 @@ public class DataSeeder {
     /** 챕터 2개 × 강의 2개(1강은 무료 미리보기)를 가진 강좌를 만들어 저장한다. */
     private Course buildShowcaseCourse(User seller, Long categoryId, String title, int price) {
         Course course = Course.createDraft(seller.getId(), categoryId, title,
-                title + " 강좌입니다.", "thumb-demo.jpg", price);
+                title + " 강좌입니다.",
+//                "thumb-demo.jpg",
+                "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop",
+                price);
         for (int ch = 1; ch <= 2; ch++) {
             Chapter chapter = Chapter.create(ch + "장", ch, course);
             course.addChapter(chapter);
