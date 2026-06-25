@@ -14,6 +14,8 @@ export interface Lecture {
   chapterId?: string
   durationSeconds?: number
   m3u8Path?: string | null
+  summary?: string
+  hasVideo?: boolean
   lastPositionSeconds?: number
   watchedSeconds?: number
 }
@@ -65,10 +67,12 @@ export interface CategoryResponse {
 export interface LectureInfoResponse {
   id: number
   title: string
+  summary?: string
   m3u8Path: string | null
   durationSeconds: number
   orderNo: number
   isFreePreview: boolean
+  hasVideo?: boolean
 }
 
 export interface ChapterInfoResponse {
@@ -444,6 +448,7 @@ export interface CourseCreateRequest {
 export interface LectureUpdateRequest {
   id: number | null
   title: string
+  summary?: string
   durationSeconds: number
   orderNo: number
   isFreePreview: boolean
@@ -463,10 +468,6 @@ export interface CourseUpdateRequest extends CourseCreateRequest {
 export interface LoginRequest {
   email: string
   password: string
-}
-
-export interface LoginResponse {
-  accessToken: string
 }
 
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'

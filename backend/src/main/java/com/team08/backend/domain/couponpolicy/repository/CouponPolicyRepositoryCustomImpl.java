@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.team08.backend.domain.couponpolicy.entity.QCouponPolicy.couponPolicy;
-import static com.team08.backend.domain.couponpolicycategory.entity.QCouponPolicyCategory.couponPolicyCategory;
+import static com.team08.backend.domain.couponpolicy.entity.QCouponPolicyCategory.couponPolicyCategory;
 
 @Repository
 public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryCustom {

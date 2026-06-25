@@ -9,10 +9,10 @@ import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobStreamPublisher;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobStreamWorker;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponWriter;
-import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
-import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamWorker;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
@@ -36,6 +36,7 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -89,7 +90,8 @@ class IssuedCouponIntegrationTest {
         CouponPolicy policy = savePolicy("일반 할인 쿠폰", CouponType.NORMAL);
 
         // when
-        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
+        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download")
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
                 .andExpect(jsonPath("$.jobStatus").value("ISSUED"));
@@ -107,7 +109,8 @@ class IssuedCouponIntegrationTest {
         CouponPolicy policy = savePolicy("선착순 100명 쿠폰", CouponType.FCFS);
 
         // when
-        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download"))
+        mockMvc.perform(post("/api/coupons/" + policy.getId() + "/download")
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.policyId").value(policy.getId()))
                 .andExpect(jsonPath("$.jobStatus").value("REQUESTED"));

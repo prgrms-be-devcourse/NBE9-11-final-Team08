@@ -23,15 +23,12 @@ export function AttendanceView() {
   const [checkedDays, setCheckedDays] = useState<number[]>([])
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken') || document.cookie.match(/(^| )accessToken=([^;]+)/)?.[2]
-    if (!token) {
-      router.replace('/login?redirect=/attendance')
-      return
-    }
-
     api.getAttendance()
       .then((res) => {
-        if (!res) return
+        if (!res) {
+          router.replace('/login?redirect=/attendance')
+          return
+        }
         setMonthTotal(res.monthlyTotalDays)
         setStreak(res.consecutiveDays)
         setCheckedToday(res.checkedToday)

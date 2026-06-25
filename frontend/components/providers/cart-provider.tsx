@@ -40,14 +40,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (token) {
-      refreshCart()
-    } else {
-      setItems([])
-      setTotal(0)
-      setLoading(false)
-    }
+    refreshCart()
   }, [pathname])
 
   const addItem = async (course: Course) => {

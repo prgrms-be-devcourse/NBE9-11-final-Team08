@@ -9,12 +9,16 @@ import java.time.Duration;
 
 @Component
 @RequiredArgsConstructor
-public class RefreshTokenCookieFactory {
+public class AccessTokenCookieFactory {
 
-    private final RefreshCookieProperties properties;
+    private final AccessCookieProperties properties;
 
-    public ResponseCookie create(String refreshToken, Duration maxAge) {
-        return baseCookie(refreshToken)
+    public String name() {
+        return properties.name();
+    }
+
+    public ResponseCookie create(String accessToken, Duration maxAge) {
+        return baseCookie(accessToken)
                 .httpOnly(true)
                 .secure(properties.secure())
                 .sameSite(properties.sameSite())
