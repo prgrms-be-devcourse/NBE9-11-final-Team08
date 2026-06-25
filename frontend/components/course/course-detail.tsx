@@ -248,23 +248,11 @@ export function CourseDetail({ course }: { course: Course }) {
                     </Button>
                   </>
                 ) : null}
-                {/* TODO: 코스에 무료 미리보기가 있으면 비로그인 또는 미구매 상태에서도 스터디 입장이 가능해야 한다. */}
-                {!isLoggedIn ? (
-                  <Button onClick={() => {
-                    toast.error('로그인이 필요한 서비스입니다.')
-                    router.push('/login')
-                  }} variant="outline" className="w-full">
-                    스터디 입장
-                  </Button>
-                ) : hasStudyAccess && studyId ? (
+                {hasStudyAccess && studyId ? (
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
-                ) : (
-                  <Button variant="outline" className="w-full" disabled>
-                    스터디 입장
-                  </Button>
-                )}
+                ) : null}
 
                 <Separator />
                 <ul className="space-y-2 text-sm text-muted-foreground">

@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcouponjob.service;
+package com.team08.backend.domain.issuedcoupon.service;
 
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;

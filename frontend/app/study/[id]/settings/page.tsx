@@ -9,7 +9,7 @@ export default async function StudySettingsPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const study = await api.getStudy(id)
+  const study = await api.getStudyForEntry(id)
   if (!study) notFound()
   // 설정은 운영자만 접근할 수 있다.
   if (study.myRole !== 'owner') redirect(`/study/${id}`)

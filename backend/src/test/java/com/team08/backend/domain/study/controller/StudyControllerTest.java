@@ -43,8 +43,8 @@ public class StudyControllerTest {
         Long userId = 1L;
 
         List<StudySummaryResponse> response = List.of(
-                new StudySummaryResponse(1L, "스터디1", "스터디1", "강사1"),
-                new StudySummaryResponse(2L, "스터디2", "스터디2", "강사2")
+                new StudySummaryResponse(1L, "스터디1", "스터디1", "강사1", 80, 8, 10),
+                new StudySummaryResponse(2L, "스터디2", "스터디2", "강사2", 0, 0, 0)
         );
 
         given(studyService.getMyStudies(userId)).willReturn(response);
@@ -81,6 +81,28 @@ public class StudyControllerTest {
                 .andExpect(content().json(objectMapper.writeValueAsString(response)));
 
         then(studyService).should().getStudyDetail(studyId, userId);
+    }
+
+    @Test
+    void 비로그인_사용자도_studyId로_스터디_상세를_조회한다() throws Exception {
+        Long studyId = 10L;
+        StudyDetailResponse response = new StudyDetailResponse(
+                studyId,
+                20L,
+                "스터디 제목",
+                "스터디 설명",
+                StudyStatus.ACTIVE,
+                "스터디장",
+                null
+        );
+
+        given(studyService.getStudyDetail(studyId, null)).willReturn(response);
+
+        mockMvc.perform(get("/api/studies/{studyId}", studyId))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+
+        then(studyService).should().getStudyDetail(studyId, null);
     }
 
     @Test

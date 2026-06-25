@@ -4,10 +4,12 @@ import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
+import com.team08.backend.domain.lectureprogress.event.LectureCompletedEvent;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +27,7 @@ public class LectureProgressService {
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
     private final EnrollmentQueryService enrollmentQueryService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public LectureProgress applyHeartbeat(Long userId, Long lectureId, int positionSeconds,
@@ -66,6 +69,7 @@ public class LectureProgressService {
                 .orElse(null);
 
         LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
+        boolean wasCompleted = progress != null && Boolean.TRUE.equals(progress.getCompleted());
 
         if (progress == null) {
             if (!canStartProgress(userId, lecture)) {
@@ -76,7 +80,19 @@ public class LectureProgressService {
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
         progress.applyProgress(positionSeconds, effectiveDelta, lecture.getDurationSeconds(), eventTime);
-        return lectureProgressRepository.save(progress);
+        LectureProgress saved = lectureProgressRepository.save(progress);
+
+        // completed 가 false→true 로 처음 전이된 경우에만 완료 이벤트를 발행한다.
+        // (하트비트마다가 아니라, 진행률을 실제로 움직이는 완료 시점에만 리포트가 갱신됨)
+        if (!wasCompleted && Boolean.TRUE.equals(saved.getCompleted())) {
+            eventPublisher.publishEvent(new LectureCompletedEvent(
+                    userId,
+                    lecture.getChapter().getCourse().getId(),
+                    lectureId,
+                    eventTime
+            ));
+        }
+        return saved;
     }
 
     private boolean canStartProgress(Long userId, Lecture lecture) {

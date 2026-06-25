@@ -18,11 +18,13 @@ import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
+import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,6 +41,12 @@ public class PaymentTransactionService {
 
     private static final String TOSS_PAYMENT_MISMATCH = "TOSS_PAYMENT_MISMATCH";
     private static final String TOSS_NOT_DONE = "TOSS_NOT_DONE";
+    private static final String TOSS_PAYMENT_NOT_FOUND = "TOSS_PAYMENT_NOT_FOUND";
+    private static final String TOSS_PAYMENT_LOOKUP_UNKNOWN = "TOSS_PAYMENT_LOOKUP_UNKNOWN";
+    private static final List<PaymentStatus> RECOVERABLE_PAYMENT_STATUSES = List.of(
+            PaymentStatus.PROCESSING,
+            PaymentStatus.UNKNOWN
+    );
 
     private final PaymentRepository paymentRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
@@ -48,6 +56,24 @@ public class PaymentTransactionService {
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final Clock clock;
+
+    @Transactional(readOnly = true)
+    public List<TossPaymentRecoveryTarget> findTossRecoveryTargets(LocalDateTime threshold, int limit) {
+        return paymentRepository.findRecoverablePayments(
+                        PaymentProviderType.TOSS,
+                        RECOVERABLE_PAYMENT_STATUSES,
+                        threshold,
+                        PageRequest.of(0, limit)
+                ).stream()
+                .map(payment -> new TossPaymentRecoveryTarget(
+                        payment.getId(),
+                        payment.getOrder().getId(),
+                        payment.getOrder().getUserId(),
+                        payment.getOrder().getOrderNumber(),
+                        payment.getAmount()
+                ))
+                .toList();
+    }
 
     @Transactional
     public TossPaymentProcessingContext prepareTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
@@ -179,6 +205,62 @@ public class PaymentTransactionService {
         return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
     }
 
+    @Transactional
+    public boolean recoverTossPayment(TossPaymentRecoveryTarget target, TossPaymentResponse tossResponse) {
+        Order order = findMyPaymentOrderForUpdate(target.userId(), target.orderId());
+        Payment payment = findPayment(target.paymentId());
+        if (!isRecoverable(payment)) {
+            return false;
+        }
+
+        LocalDateTime recoveredAt = approvedAtOrNow(tossResponse.approvedAt());
+        if (!isValidRecoveredTossPayment(tossResponse, target)) {
+            recoverUnknown(payment, TOSS_PAYMENT_MISMATCH, "Toss Payments 조회 응답이 주문 정보와 일치하지 않습니다.", recoveredAt);
+            return true;
+        }
+
+        if (isDoneTossPayment(tossResponse)) {
+            recoverSuccess(order, payment, tossResponse, recoveredAt);
+            return true;
+        }
+
+        if (isDeclinedTossPayment(tossResponse)) {
+            recoverDecline(payment, tossResponse, recoveredAt);
+            return true;
+        }
+
+        recoverUnknown(payment, TOSS_PAYMENT_LOOKUP_UNKNOWN, "Toss Payments 조회 결과를 확정할 수 없습니다.", recoveredAt);
+        return true;
+    }
+
+    @Transactional
+    public boolean recoverTossPaymentNotFound(TossPaymentRecoveryTarget target) {
+        findMyPaymentOrderForUpdate(target.userId(), target.orderId());
+        Payment payment = findPayment(target.paymentId());
+        if (!isRecoverable(payment)) {
+            return false;
+        }
+
+        LocalDateTime recoveredAt = LocalDateTime.now(clock);
+        payment.recoverReady(TOSS_PAYMENT_NOT_FOUND, "Toss Payments 결제 내역이 없어 재시도 가능한 상태로 복구합니다.", recoveredAt);
+        findLatestAttempt(payment.getId())
+                .ifPresent(attempt -> attempt.recoverUnknown(TOSS_PAYMENT_NOT_FOUND, "Toss Payments 결제 내역이 없습니다.", recoveredAt));
+        return true;
+    }
+
+    @Transactional
+    public boolean keepTossPaymentUnknown(TossPaymentRecoveryTarget target, String failureCode, String failureMessage) {
+        findMyPaymentOrderForUpdate(target.userId(), target.orderId());
+        Payment payment = findPayment(target.paymentId());
+        if (!isRecoverable(payment)) {
+            return false;
+        }
+
+        LocalDateTime recoveredAt = LocalDateTime.now(clock);
+        recoverUnknown(payment, failureCode, failureMessage, recoveredAt);
+        return true;
+    }
+
     private Order findMyPaymentOrderForUpdate(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
@@ -279,13 +361,65 @@ public class PaymentTransactionService {
                 .orElseThrow(() -> new CustomException(ErrorCode.PAYMENT_NOT_FOUND));
     }
 
+    private Optional<PaymentAttempt> findLatestAttempt(Long paymentId) {
+        return paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(paymentId);
+    }
+
     private boolean isDoneTossPayment(TossPaymentResponse response) {
         return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
+    }
+
+    private boolean isDeclinedTossPayment(TossPaymentResponse response) {
+        return "CANCELED".equals(response.status())
+                || "ABORTED".equals(response.status())
+                || "EXPIRED".equals(response.status());
     }
 
     private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order, int expectedDiscount) {
         return order.getOrderNumber().equals(response.orderId())
                 && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
+    }
+
+    private boolean isValidRecoveredTossPayment(TossPaymentResponse response, TossPaymentRecoveryTarget target) {
+        return target.orderNumber().equals(response.orderId())
+                && target.amount() == response.totalAmount();
+    }
+
+    private boolean isRecoverable(Payment payment) {
+        return payment.getStatus() == PaymentStatus.PROCESSING || payment.getStatus() == PaymentStatus.UNKNOWN;
+    }
+
+    private void recoverSuccess(Order order, Payment payment, TossPaymentResponse tossResponse, LocalDateTime recoveredAt) {
+        payment.recoverSucceed(tossResponse.paymentKey(), tossResponse.method(), recoveredAt);
+        findLatestAttempt(payment.getId())
+                .ifPresent(attempt -> attempt.recoverSucceed(tossResponse.paymentKey(), recoveredAt));
+        paymentRepository.save(payment);
+
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            markOrderPaid(order, recoveredAt);
+            List<OrderItem> orderItems = findOrderItems(order);
+            issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
+        }
+    }
+
+    private void recoverDecline(Payment payment, TossPaymentResponse tossResponse, LocalDateTime recoveredAt) {
+        payment.recoverDecline(
+                tossResponse.paymentKey(),
+                tossResponse.method(),
+                TOSS_NOT_DONE,
+                "Toss Payments 조회 결과 결제가 완료되지 않았습니다.",
+                recoveredAt
+        );
+        findLatestAttempt(payment.getId())
+                .ifPresent(attempt -> attempt.recoverDecline(TOSS_NOT_DONE, "Toss Payments 조회 결과 결제가 완료되지 않았습니다.", recoveredAt));
+        paymentRepository.save(payment);
+    }
+
+    private void recoverUnknown(Payment payment, String failureCode, String failureMessage, LocalDateTime recoveredAt) {
+        payment.recoverUnknown(failureCode, failureMessage, recoveredAt);
+        findLatestAttempt(payment.getId())
+                .ifPresent(attempt -> attempt.recoverUnknown(failureCode, failureMessage, recoveredAt));
+        paymentRepository.save(payment);
     }
 
     private LocalDateTime approvedAtOrNow(OffsetDateTime approvedAt) {
@@ -353,5 +487,14 @@ public class PaymentTransactionService {
         public boolean isIdempotentReplay() {
             return idempotentResponse != null;
         }
+    }
+
+    public record TossPaymentRecoveryTarget(
+            Long paymentId,
+            Long orderId,
+            Long userId,
+            String orderNumber,
+            int amount
+    ) {
     }
 }

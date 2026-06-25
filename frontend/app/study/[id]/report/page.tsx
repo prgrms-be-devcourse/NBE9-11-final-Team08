@@ -13,8 +13,9 @@ export default async function StudyReportPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const study = await api.getStudy(id)
+  const study = await api.getStudyForEntry(id)
   if (!study) notFound()
+  if (study.myRole === 'viewer') notFound()
 
   const report = await api.getStudyReport(study.id)
 

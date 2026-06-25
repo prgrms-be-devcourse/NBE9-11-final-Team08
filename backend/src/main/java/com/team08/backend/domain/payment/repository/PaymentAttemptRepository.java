@@ -10,4 +10,6 @@ public interface PaymentAttemptRepository extends JpaRepository<PaymentAttempt, 
     List<PaymentAttempt> findAllByPayment_IdOrderByCreatedAtAsc(Long paymentId);
 
     Optional<PaymentAttempt> findByPayment_IdAndIdempotencyKey(Long paymentId, String idempotencyKey);
+
+    Optional<PaymentAttempt> findFirstByPayment_IdOrderByCreatedAtDesc(Long paymentId);
 }

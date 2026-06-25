@@ -24,8 +24,16 @@ export function StudyReportView({
   const refresh = async () => {
     setLoading(true)
     try {
-      await api.generateStudyReport(studyId)
-      toast.success('학습 이벤트를 다시 집계했어요.')
+      const response = await api.generateStudyReport(studyId)
+      if(response.status=='LOADED'){
+        toast.success('당일 집계 내용입니다.')
+      }
+      else if(response.status=='REGENERATED') {
+        toast.success('학습 이벤트를 다시 집계했어요.')
+      }
+      else if('COOLDOWN'){
+        toast.info('1일 1회만 집계가능합니다.')
+      }
       router.refresh()
     } catch {
       toast.error('리포트 갱신에 실패했습니다.')

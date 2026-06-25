@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { ArrowLeft, ImagePlus, ListChecks, Sparkles, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -40,6 +40,10 @@ export function CourseForm({ course }: { course?: Course }) {
     course?.category ? [course.category] : [],
   )
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string>(course?.thumbnailUrl || '')
+
   const isInReview = course && (course.status === 'IN_REVIEW' || course.status === 'REVIEW')
   const isOnSale = course && (course.status === 'ON_SALE' || course.status === 'PUBLISHED')
   const isDraft = !course || course.status === 'DRAFT'
@@ -73,6 +77,18 @@ export function CourseForm({ course }: { course?: Course }) {
     const v = tagInput.trim()
     if (v && !tags.includes(v)) setTags((p) => [...p, v])
     setTagInput('')
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('파일 크기는 최대 10MB를 초과할 수 없습니다.')
+        return
+      }
+      setThumbnailFile(file)
+      setPreviewUrl(URL.createObjectURL(file))
+    }
   }
 
   const handleDelete = async () => {
@@ -126,17 +142,16 @@ export function CourseForm({ course }: { course?: Course }) {
 
     setLoading(true)
     try {
-      const payload = {
-        title,
-        description,
-        categoryId,
-        price: Number(price),
-        thumbnail: course?.thumbnailUrl || 'https://via.placeholder.com/800x450',
-      }
-
       if (editing && course) {
-        await api.updateCourse(course.id, {
-          ...payload,
+        const formData = new FormData()
+
+        // 💡 수정 정보용 Multipart 데이터 조립 구조 패킹
+        const requestData = {
+          title,
+          description,
+          categoryId,
+          price: Number(price),
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
           chapters: course.chapters.map((chapter, chapterIndex) => ({
             id: Number(chapter.id),
             title: chapter.title,
@@ -149,7 +164,22 @@ export function CourseForm({ course }: { course?: Course }) {
               isFreePreview: false,
             })),
           })),
-        })
+        }
+
+        const requestBlob = new Blob(
+          [JSON.stringify(requestData)], 
+          { type: 'application/json' }
+        )
+        
+        formData.append('request', requestBlob)
+
+        if (thumbnailFile) {
+          formData.append('thumbnail', thumbnailFile)
+        }
+
+        // 💡 기존 객체 전송 방식에서 FormData 파이프라인 구조로 전환 호출
+        await api.updateCourse(course.id, formData)
+
         if (status === 'REVIEW') {
           await api.requestCourseReview(course.id)
           toast.success('검수 요청이 접수되었습니다.')
@@ -159,7 +189,28 @@ export function CourseForm({ course }: { course?: Course }) {
           router.refresh()
         }
       } else {
-        const courseId = await api.createCourse(payload)
+        const formData = new FormData()
+
+        const requestData = {
+          title,
+          description,
+          categoryId,
+          price: Number(price),
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
+        }
+
+        const requestBlob = new Blob(
+          [JSON.stringify(requestData)], 
+          { type: 'application/json' }
+        )
+        
+        formData.append('request', requestBlob)
+
+        if (thumbnailFile) {
+          formData.append('thumbnail', thumbnailFile)
+        }
+
+        const courseId = await api.createCourse(formData)
         if (status === 'REVIEW') {
           toast.success('강의 기본정보가 저장되었습니다. 커리큘럼 등록 후 검수 요청해주세요.')
           router.push(`/instructor/courses/${courseId}/curriculum`)
@@ -333,20 +384,35 @@ export function CourseForm({ course }: { course?: Course }) {
         <div className="space-y-6">
           <section className="rounded-xl border bg-card p-5">
             <Label>커버 이미지</Label>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/jpeg, image/png" 
+              onChange={handleFileChange}
+              disabled={isReadOnly || loading}
+            />
             <button
               type="button"
               onClick={() => {
                 if (isReadOnly) return
-                toast.info('이미지 업로드는 데모에서 비활성화되어 있습니다.')
+                fileInputRef.current?.click()
               }}
               disabled={isReadOnly || loading}
-              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden relative bg-muted"
             >
-              <ImagePlus className="h-7 w-7" />
-              <span className="text-xs">
-                파일을 드래그하거나 클릭해 업로드
-              </span>
-              <span className="text-[11px]">최대 10MB · JPG, PNG</span>
+              {previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewUrl} alt="Thumbnail preview" className="w-full h-full object-cover" />
+              ) : (
+                <>
+                  <ImagePlus className="h-7 w-7" />
+                  <span className="text-xs">
+                    파일을 드래그하거나 클릭해 업로드
+                  </span>
+                  <span className="text-[11px]">최대 10MB · JPG, PNG</span>
+                </>
+              )}
             </button>
           </section>
 

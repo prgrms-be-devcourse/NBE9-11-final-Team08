@@ -9,8 +9,9 @@ export default async function StudyBoardPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const study = await api.getStudy(id)
+  const study = await api.getStudyForEntry(id)
   if (!study) notFound()
+  if (study.myRole === 'viewer') notFound()
 
   const posts = await api.getBoardPosts(study.id)
 

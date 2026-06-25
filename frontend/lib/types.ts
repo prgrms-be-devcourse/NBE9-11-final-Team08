@@ -404,6 +404,7 @@ export interface UserProfile {
 
 export interface EnrolledCourse {
   id: string
+  courseId?: string
   title: string
   instructor: string
   thumbnailUrl: string
@@ -469,7 +470,7 @@ export interface LoginResponse {
 }
 
 export type StudyStatus = 'DRAFT' | 'ACTIVE' | 'READONLY' | 'INACTIVE'
-export type StudyRole = 'owner' | 'member' | 'OWNER' | 'MEMBER'
+export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 
 export interface StudyMember {
   id: string
@@ -529,6 +530,9 @@ export interface StudySummaryResponse {
   title: string
   description: string
   ownerNickname: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
 }
 
 export interface StudyDetailResponse {
@@ -538,7 +542,7 @@ export interface StudyDetailResponse {
   description: string
   status: string
   ownerNickname: string
-  myRole: string
+  myRole: string | null
 }
 
 export interface StudyIdResponse {
@@ -626,4 +630,6 @@ export interface StudyReportResponse {
   dailyProgress: StudyReportDailyProgressEntry[]
   dailyActivityMap: Record<string, number>
   updatedAt: string
+  status: 'LOADED' | 'REGENERATED' | 'COOLDOWN'
+  nextRegenerableAt: string | null
 }
