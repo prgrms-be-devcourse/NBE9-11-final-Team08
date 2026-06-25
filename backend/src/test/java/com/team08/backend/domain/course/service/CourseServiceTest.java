@@ -799,7 +799,7 @@ class CourseServiceTest {
                 .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
 
         verify(courseRepository, never()).findByLectureId(any(Long.class));
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -816,7 +816,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -835,7 +835,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -853,7 +853,13 @@ class CourseServiceTest {
         courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
 
         verify(courseRepository).findByLectureId(lectureId);
-        verify(mediaEncodingService).encodeToHls(eq(mockFile), any(String.class), eq(lectureId));
+
+        ArgumentCaptor<java.io.File> fileCaptor = ArgumentCaptor.forClass(java.io.File.class);
+        verify(mediaEncodingService).encodeToHls(fileCaptor.capture(), any(String.class), eq(lectureId));
+
+        java.io.File tempFile = fileCaptor.getValue();
+        assertThat(tempFile).exists();
+        tempFile.delete();
     }
 
     @Test
@@ -868,6 +874,6 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 }

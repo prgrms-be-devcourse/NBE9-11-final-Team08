@@ -173,13 +173,29 @@ export function CurriculumBuilder({
 
   // 💡 비디오 파일 감지 및 로컬 큐(Queue) 상태 스태킹 전환
   const handleVideoSelect = (lectureId: string, file: File) => {
-    // 임시 ID 상태여도 튕구지 않고, 상태 배열창에 가볍게 안착시킵니다.
-    updateLecture(active.id, lectureId, { 
-      videoFile: file, 
-      videoName: file.name,
-      hasVideo: false,
-    })
-    toast.info(`${file.name} 영상이 대기열에 추가되었습니다. 커리큘럼 저장 시 일괄 업로드됩니다.`)
+    // 비디오 파일에서 실제 재생 시간(duration)을 감지합니다.
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src)
+      const duration = Math.floor(video.duration)
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        durationSeconds: duration,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다. 재생 시간(${duration}초) 감지 완료.`)
+    }
+    video.onerror = () => {
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다.`)
+    }
+    video.src = URL.createObjectURL(file)
   }
 
   const handleSave = async () => {
