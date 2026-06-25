@@ -63,7 +63,6 @@ public class FeedOutboxEventListener {
 
     private boolean isFeedTarget(LearningEventType eventType) {
         return eventType == LearningEventType.LECTURE_ENTER
-                || eventType == LearningEventType.LECTURE_EXIT
                 || eventType == LearningEventType.LECTURE_COMPLETE;
     }
 

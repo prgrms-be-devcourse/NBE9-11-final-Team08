@@ -192,14 +192,12 @@ public class FeedOutboxPublisher {
 
     private boolean isLearningEvent(FeedOutboxEvent event) {
         return FeedOutboxEvent.LECTURE_ENTER_EVENT.equals(event.getEventType())
-                || FeedOutboxEvent.LECTURE_EXIT_EVENT.equals(event.getEventType())
                 || FeedOutboxEvent.LECTURE_COMPLETE_EVENT.equals(event.getEventType());
     }
 
     private FeedItemType feedItemType(com.team08.backend.domain.learningevent.entity.LearningEventType eventType) {
         return switch (eventType) {
             case LECTURE_ENTER -> FeedItemType.LECTURE_ENTER;
-            case LECTURE_EXIT -> FeedItemType.LECTURE_EXIT;
             case LECTURE_COMPLETE -> FeedItemType.LECTURE_COMPLETE;
             default -> throw new IllegalStateException("Unsupported learning event type for feed: " + eventType);
         };
@@ -208,7 +206,6 @@ public class FeedOutboxPublisher {
     private String learningEventContent(LearningEventFeedOutboxPayload event) {
         return switch (event.eventType()) {
             case LECTURE_ENTER -> "강의에 입장했어요: " + event.lectureTitle();
-            case LECTURE_EXIT -> "강의에서 나갔어요: " + event.lectureTitle();
             case LECTURE_COMPLETE -> "강의를 완료했어요: " + event.lectureTitle();
             default -> throw new IllegalStateException("Unsupported learning event type for feed: " + event.eventType());
         };
