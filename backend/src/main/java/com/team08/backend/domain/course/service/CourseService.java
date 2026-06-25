@@ -23,6 +23,7 @@ import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.util.FileUrlFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -56,6 +57,7 @@ public class CourseService {
     private final MediaEncodingService mediaEncodingService;
     private final LectureRepository lectureRepository;
     private final CourseThumbnailService courseThumbnailService;
+    private final FileUrlFormatter fileUrlFormatter;
 
     @Transactional
     public Long createCourse(Long instructorId, CourseCreateRequest request, MultipartFile thumbnailFile) {
@@ -85,18 +87,18 @@ public class CourseService {
             log.error("Failed to increase course view count for courseId: {}", courseId, e);
         }
 
-        return CourseDetailResponse.from(course);
+        return CourseDetailResponse.from(course, fileUrlFormatter);
     }
 
     public Page<CourseCardResponse> getCourses(CourseSortType sortType, Pageable pageable) {
         Pageable pagedWithSort = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sortType.getSort());
         return courseRepository.findAllByStatus(CourseStatus.ON_SALE, pagedWithSort)
-                .map(CourseCardResponse::from);
+                .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
     }
 
     public Page<CourseCardResponse> getCoursesByInstructor(Long instructorId, CourseStatus status, Pageable pageable) {
         return courseRepository.findAllByInstructorIdAndStatus(instructorId, status, pageable)
-                .map(CourseCardResponse::from);
+                .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
     }
 
     @Transactional
