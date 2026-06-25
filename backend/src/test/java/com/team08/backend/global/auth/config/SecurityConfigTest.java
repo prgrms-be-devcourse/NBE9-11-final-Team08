@@ -16,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockCookie;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,8 +24,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,21 +64,31 @@ class SecurityConfigTest {
 
     @Test
     void refresh_요청은_accessToken_없이_접근할_수_있다() throws Exception {
-        mockMvc.perform(post("/api/auth/refresh"))
+        mockMvc.perform(post("/api/auth/refresh")
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void refresh_요청은_유효하지_않은_accessToken_쿠키가_있어도_필터를_건너뛴다() throws Exception {
         mockMvc.perform(post("/api/auth/refresh")
+                        .with(csrf())
                         .cookie(new MockCookie("accessToken", "invalid.token.value")))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void logout_요청은_accessToken_없이_접근할_수_있다() throws Exception {
-        mockMvc.perform(post("/api/auth/logout"))
+        mockMvc.perform(post("/api/auth/logout")
+                        .with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void csrf_토큰_발급_요청은_accessToken_없이_접근할_수_있고_XSRF_TOKEN_쿠키를_내려준다() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf"))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().exists("XSRF-TOKEN"));
     }
 
     @Test
@@ -124,6 +137,25 @@ class SecurityConfigTest {
                 .andExpect(jsonPath("$.email").value(LOGIN_USER.email()))
                 .andExpect(jsonPath("$.name").value(LOGIN_USER.nickname()))
                 .andExpect(jsonPath("$.role").value(LOGIN_USER.role()));
+    }
+
+    @Test
+    void 쿠키_인증_상태_변경_요청은_csrf_토큰이_없으면_거부된다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(post("/test")
+                        .cookie(new MockCookie("accessToken", accessToken)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void 쿠키_인증_상태_변경_요청은_csrf_토큰이_있으면_허용된다() throws Exception {
+        String accessToken = jwtProvider.generateAccessToken(LOGIN_USER);
+
+        mockMvc.perform(post("/test")
+                        .with(csrf())
+                        .cookie(new MockCookie("accessToken", accessToken)))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -194,6 +226,17 @@ class SecurityConfigTest {
         @PostMapping("/api/auth/logout")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void logout() {
+        }
+
+        @GetMapping("/api/auth/csrf")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void csrf(CsrfToken csrfToken) {
+            csrfToken.getToken();
+        }
+
+        @PostMapping("/test")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void postTest() {
         }
 
         @GetMapping("/api/studies/by-course/{courseId}")

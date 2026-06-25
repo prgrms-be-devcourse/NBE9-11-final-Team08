@@ -44,6 +44,32 @@ import type {
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
+const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+
+const decodeCookieValue = (value: string): string => {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+const getCookieValue = async (name: string): Promise<string | undefined> => {
+  if (typeof window !== 'undefined') {
+    const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
+    return match ? decodeCookieValue(match[1]) : undefined
+  }
+
+  try {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const value = cookieStore.get(name)?.value
+    return value ? decodeCookieValue(value) : undefined
+  } catch {
+    return undefined
+  }
+}
 
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
   if (typeof window !== 'undefined') {
@@ -71,6 +97,29 @@ const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record
 
 const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
   return includeCredentials ? 'include' : 'same-origin'
+}
+
+const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | undefined> => {
+  if (!includeCredentials || !BASE_URL) {
+    return undefined
+  }
+
+  const currentToken = await getCookieValue(CSRF_COOKIE_NAME)
+  if (currentToken) {
+    return currentToken
+  }
+
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  await fetch(`${BASE_URL}/api/auth/csrf`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  }).catch(() => undefined)
+
+  return getCookieValue(CSRF_COOKIE_NAME)
 }
 
 const handleUnauthorized = () => {
@@ -137,6 +186,10 @@ async function mutate<T>(
   const headers = await getCredentialHeaders(includeCredentials)
   if (!isMultipart) {
     headers['Content-Type'] = 'application/json'
+  }
+  const csrfToken = await ensureCsrfToken(includeCredentials)
+  if (csrfToken) {
+    headers[CSRF_HEADER_NAME] = csrfToken
   }
 
   const options: RequestInit = {
@@ -607,7 +660,7 @@ const getCurrentUserId = async (): Promise<number> => {
 
 export const api = {
   // Auth
-  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, false),
+  signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
   login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
     return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
