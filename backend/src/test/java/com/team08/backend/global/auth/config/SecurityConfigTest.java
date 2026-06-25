@@ -92,6 +92,39 @@ class SecurityConfigTest {
     }
 
     @Test
+    void csrf_토큰_발급_요청은_유효하지_않은_accessToken_쿠키가_있어도_필터를_건너뛴다() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf")
+                        .cookie(new MockCookie("accessToken", "invalid.token.value")))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void login_요청은_XSRF_TOKEN_쿠키와_X_XSRF_TOKEN_헤더가_일치하면_허용된다() throws Exception {
+        String csrfToken = "test-csrf-token";
+
+        mockMvc.perform(post("/api/auth/login")
+                        .cookie(new MockCookie("XSRF-TOKEN", csrfToken))
+                        .header("X-XSRF-TOKEN", csrfToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void login_요청은_csrf_토큰이_없으면_거부된다() throws Exception {
+        mockMvc.perform(post("/api/auth/login"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void refresh_요청은_XSRF_TOKEN_쿠키와_X_XSRF_TOKEN_헤더가_일치하면_허용된다() throws Exception {
+        String csrfToken = "test-csrf-token";
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new MockCookie("XSRF-TOKEN", csrfToken))
+                        .header("X-XSRF-TOKEN", csrfToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void 강좌별_스터디_ID_조회는_accessToken_없이_접근할_수_있다() throws Exception {
         mockMvc.perform(get("/api/studies/by-course/{courseId}", 10L))
                 .andExpect(status().isOk())
@@ -221,6 +254,11 @@ class SecurityConfigTest {
         @PostMapping("/api/auth/refresh")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         void refresh() {
+        }
+
+        @PostMapping("/api/auth/login")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        void login() {
         }
 
         @PostMapping("/api/auth/logout")
