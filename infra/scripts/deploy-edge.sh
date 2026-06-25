@@ -37,6 +37,7 @@ scp "${ssh_options[@]}" \
   "${infra_root}/scripts/bootstrap-https.sh" \
   "${infra_root}/scripts/install-certbot-cron.sh" \
   "${infra_root}/scripts/renew-certificates.sh" \
+  "${infra_root}/scripts/switch-edge-upstream.sh" \
   "${remote}:/opt/team08/scripts/"
 
 ssh "${ssh_options[@]}" "${remote}" \

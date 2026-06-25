@@ -1,6 +1,6 @@
 # Edge 서버 전용 compose — nginx와 certbot만 실행한다.
 # BACKEND_UPSTREAM에는 app 서버의 private IP와 Spring 포트를 넣는다.
-# 예: BACKEND_UPSTREAM=10.0.1.123:8080
+# 예: BACKEND_UPSTREAM=10.0.1.123:8081
 name: nbe9-11-final-team08-edge
 
 services:

@@ -24,7 +24,7 @@ output "app_public_ip" {
 }
 
 output "app_private_ip" {
-  description = "Private IP of the Spring application host. Use this as BACKEND_UPSTREAM with :8080 on the edge server."
+  description = "Private IP of the Spring application host. Use this as BACKEND_UPSTREAM with :8081 or :8082 on the edge server."
   value       = aws_instance.app.private_ip
 }
 

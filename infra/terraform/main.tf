@@ -134,9 +134,9 @@ resource "aws_security_group" "app" {
   }
 
   ingress {
-    description     = "Spring backend from edge"
+    description     = "Spring backend ports from edge"
     from_port       = 8080
-    to_port         = 8080
+    to_port         = 8082
     protocol        = "tcp"
     security_groups = [aws_security_group.edge.id]
   }

@@ -39,8 +39,8 @@ Create the infrastructure. Terraform creates two EC2 hosts:
 - edge host: t3.small, runs Nginx and Certbot
 - app host: t3.medium, runs MySQL, Redis, and Spring
 
-The app security group allows Spring port `8080` only from the edge security
-group.
+The app security group allows Spring ports `8080` through `8082` only from the
+edge security group.
 
 ```bash
 cd infra/terraform
@@ -67,7 +67,7 @@ Upload and start the edge server:
 ```
 
 On the edge server, fill `/opt/team08/compose/.env` with `DOMAIN`,
-`CERTBOT_EMAIL`, and `BACKEND_UPSTREAM=<app-private-ip>:8080`. Create an external
+`CERTBOT_EMAIL`, and `BACKEND_UPSTREAM=<app-private-ip>:8081`. Create an external
 DNS `A` record pointing the API domain to the Terraform `edge_elastic_ip` output.
 
 After DNS propagation, issue the certificate and start HTTPS:
@@ -80,3 +80,24 @@ cd /opt/team08
 
 The bootstrap installs a twice-daily Certbot renewal cron job. Terraform state and
 production secrets remain local and are not committed.
+
+## Blue-Green Deployment
+
+The app host runs Spring as `backend-blue` on `8081` and `backend-green` on
+`8082`. Deploying a new image starts the inactive color, waits for
+`/actuator/health`, switches the edge Nginx upstream, then records the active
+color.
+
+Manual blue-green deployment:
+
+```bash
+./infra/scripts/deploy-bluegreen.sh \
+  <app-public-ip> <edge-elastic-ip> <ssh-private-key> <image-tag>
+```
+
+GitHub Actions can do the same from the `Backend Image` workflow by setting
+`deploy=true`. Configure these repository secrets first:
+
+- `PROD_APP_PUBLIC_IP`
+- `PROD_EDGE_PUBLIC_IP`
+- `PROD_SSH_PRIVATE_KEY`
