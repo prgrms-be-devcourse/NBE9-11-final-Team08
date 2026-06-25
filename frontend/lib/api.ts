@@ -716,33 +716,41 @@ export const api = {
     return mapCourseDetailToCourse(detailResponse)
   },
 
-  createCourse: async (data: CourseCreateRequest) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', data)
+  createCourse: async (formData: FormData) => {
+    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
+      
+      const requestBlob = formData.get('request') as Blob
+      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+      
       saveCourseDraft(courseId, {
         instructorId,
-        categoryId: data.categoryId,
-        title: data.title,
-        description: data.description,
-        thumbnail: data.thumbnail || '',
-        price: data.price,
+        categoryId: Number(requestData.categoryId),
+        title: requestData.title || '',
+        description: requestData.description || '',
+        thumbnail: requestData.thumbnail || '',
+        price: Number(requestData.price),
         status: 'DRAFT'
       })
     }
     return courseId
   },
 
-  updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
+  updateCourse: async (courseId: string | number, formData: FormData) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
+    
+    const requestBlob = formData.get('request') as Blob
+    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+    
     saveCourseDraft(courseId, {
       instructorId,
-      categoryId: data.categoryId,
-      title: data.title,
-      description: data.description,
-      thumbnail: data.thumbnail || '',
-      price: data.price,
+      categoryId: Number(requestData.categoryId),
+      title: requestData.title || '',
+      description: requestData.description || '',
+      thumbnail: requestData.thumbnail || '',
+      price: Number(requestData.price),
       status: 'DRAFT'
     })
     return res

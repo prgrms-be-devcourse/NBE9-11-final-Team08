@@ -14,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.contains;
@@ -49,17 +48,15 @@ class CourseThumbnailServiceImplTest {
     }
 
     @Test
-    void 썸네일_파일이_비어있거나_null이면_예외가_발생한다() {
+    void 썸네일_파일이_비어있거나_null이면_예외를_던지지_않고_null을_반환한다() {
         Long courseId = 100L;
         MultipartFile emptyFile = new MockMultipartFile("thumbnail", "", "image/png", new byte[0]);
 
-        assertThatThrownBy(() -> courseThumbnailService.uploadThumbnail(courseId, null))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.INVALID_INPUT_VALUE.getMessage());
+        String resultNull = courseThumbnailService.uploadThumbnail(courseId, null);
+        String resultEmpty = courseThumbnailService.uploadThumbnail(courseId, emptyFile);
 
-        assertThatThrownBy(() -> courseThumbnailService.uploadThumbnail(courseId, emptyFile))
-                .isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.INVALID_INPUT_VALUE.getMessage());
+        assertThat(resultNull).isNull();
+        assertThat(resultEmpty).isNull();
 
         verify(s3FileStorageService, never()).uploadFile(any(InputStream.class), any(String.class));
     }
