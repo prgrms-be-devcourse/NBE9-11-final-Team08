@@ -720,29 +720,37 @@ export const api = {
     const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
+      
+      const requestBlob = formData.get('request') as Blob
+      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+      
       saveCourseDraft(courseId, {
         instructorId,
-        categoryId: Number(formData.get('categoryId')),
-        title: formData.get('title') as string,
-        description: formData.get('description') as string,
-        thumbnail: (formData.get('thumbnail') as string) || '',
-        price: Number(formData.get('price')),
+        categoryId: Number(requestData.categoryId),
+        title: requestData.title || '',
+        description: requestData.description || '',
+        thumbnail: requestData.thumbnail || '',
+        price: Number(requestData.price),
         status: 'DRAFT'
       })
     }
     return courseId
   },
 
-  updateCourse: async (courseId: string | number, data: CourseUpdateRequest) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', data)
+  updateCourse: async (courseId: string | number, formData: FormData) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
+    
+    const requestBlob = formData.get('request') as Blob
+    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+    
     saveCourseDraft(courseId, {
       instructorId,
-      categoryId: data.categoryId,
-      title: data.title,
-      description: data.description,
-      thumbnail: data.thumbnail || '',
-      price: data.price,
+      categoryId: Number(requestData.categoryId),
+      title: requestData.title || '',
+      description: requestData.description || '',
+      thumbnail: requestData.thumbnail || '',
+      price: Number(requestData.price),
       status: 'DRAFT'
     })
     return res

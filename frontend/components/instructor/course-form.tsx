@@ -140,23 +140,18 @@ export function CourseForm({ course }: { course?: Course }) {
       return
     }
 
-    if (!editing && !thumbnailFile) {
-      toast.error('새 강의 등록 시 커버 이미지는 필수 항목입니다.')
-      return
-    }
-
     setLoading(true)
     try {
       if (editing && course) {
-        const payload = {
+        const formData = new FormData()
+
+        // 💡 수정 정보용 Multipart 데이터 조립 구조 패킹
+        const requestData = {
           title,
           description,
           categoryId,
           price: Number(price),
-          thumbnail: previewUrl || 'https://via.placeholder.com/800x450',
-        }
-        await api.updateCourse(course.id, {
-          ...payload,
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
           chapters: course.chapters.map((chapter, chapterIndex) => ({
             id: Number(chapter.id),
             title: chapter.title,
@@ -169,7 +164,22 @@ export function CourseForm({ course }: { course?: Course }) {
               isFreePreview: false,
             })),
           })),
-        })
+        }
+
+        const requestBlob = new Blob(
+          [JSON.stringify(requestData)], 
+          { type: 'application/json' }
+        )
+        
+        formData.append('request', requestBlob)
+
+        if (thumbnailFile) {
+          formData.append('thumbnail', thumbnailFile)
+        }
+
+        // 💡 기존 객체 전송 방식에서 FormData 파이프라인 구조로 전환 호출
+        await api.updateCourse(course.id, formData)
+
         if (status === 'REVIEW') {
           await api.requestCourseReview(course.id)
           toast.success('검수 요청이 접수되었습니다.')
@@ -186,7 +196,7 @@ export function CourseForm({ course }: { course?: Course }) {
           description,
           categoryId,
           price: Number(price),
-          thumbnail: 'PENDING_S3_UPLOAD',
+          thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
         }
 
         const requestBlob = new Blob(
