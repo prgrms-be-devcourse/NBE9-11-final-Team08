@@ -96,3 +96,9 @@ CREATE TABLE BATCH_JOB_SEQ (
 ) ENGINE=InnoDB;
 
 INSERT INTO BATCH_JOB_SEQ (ID, UNIQUE_KEY) select * from (select 0 as ID, '0' as UNIQUE_KEY) as tmp where not exists(select * from BATCH_JOB_SEQ);
+
+CREATE INDEX idx_issued_coupons_status_expired_id
+	ON issued_coupons (status, expired_at, id);
+
+CREATE INDEX idx_issued_coupons_user_expired
+	ON issued_coupons (user_id, expired_at);

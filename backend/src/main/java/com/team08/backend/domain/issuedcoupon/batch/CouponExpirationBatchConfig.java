@@ -1,31 +1,26 @@
 package com.team08.backend.domain.issuedcoupon.batch;
 
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
-import org.springframework.batch.core.configuration.annotation.JobScope;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
-import org.springframework.batch.item.ItemProcessor;
-import org.springframework.batch.item.database.JpaItemWriter;
-import org.springframework.batch.item.database.JpaPagingItemReader;
-import org.springframework.batch.item.database.builder.JpaItemWriterBuilder;
-import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
+import org.springframework.batch.core.step.tasklet.Tasklet;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Configuration
@@ -35,7 +30,7 @@ public class CouponExpirationBatchConfig {
     private static final int CHUNK_SIZE = 1000;
     private final JobRepository jobRepository;
     private final PlatformTransactionManager transactionManager;
-    private final EntityManagerFactory entityManagerFactory;
+    private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
 
     @Bean
@@ -46,52 +41,48 @@ public class CouponExpirationBatchConfig {
     }
 
     @Bean
-    @JobScope
     public Step couponExpirationStep() {
         return new StepBuilder("couponExpirationStep", jobRepository)
-                .<IssuedCoupon, IssuedCoupon>chunk(CHUNK_SIZE, transactionManager)
-                .reader(couponExpirationReader(null))
-                .processor(couponExpirationProcessor())
-                .writer(couponExpirationWriter())
+                .tasklet(couponExpirationTasklet(null), transactionManager)
                 .build();
     }
 
     @Bean
     @StepScope
-    public JpaPagingItemReader<IssuedCoupon> couponExpirationReader(
+    public Tasklet couponExpirationTasklet(
             @Value("#{jobParameters['now']}") String nowStr
     ) {
         LocalDateTime now = (nowStr != null && !nowStr.isEmpty())
                 ? LocalDateTime.parse(nowStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 : LocalDateTime.now(clock);
 
-        log.info("couponExpirationReader initialized with now = {}", now);
+        AtomicInteger totalUpdated = new AtomicInteger();
+        log.info("couponExpirationTasklet initialized with now = {}", now);
 
-        return new JpaPagingItemReaderBuilder<IssuedCoupon>()
-                .name("couponExpirationReader")
-                .entityManagerFactory(entityManagerFactory)
-                .pageSize(CHUNK_SIZE)
-                .queryString("SELECT c FROM IssuedCoupon c WHERE c.status = :status AND c.expiredAt < :now")
-                .parameterValues(Map.of(
-                        "status", CouponStatus.ISSUED,
-                        "now", now
-                ))
-                .build();
-    }
+        return (contribution, chunkContext) -> {
+            int updated = jdbcTemplate.update("""
+                            UPDATE issued_coupons
+                            SET status = ?
+                            WHERE status = ?
+                              AND expired_at < ?
+                            ORDER BY id
+                            LIMIT ?
+                            """,
+                    CouponStatus.EXPIRED.name(),
+                    CouponStatus.ISSUED.name(),
+                    now,
+                    CHUNK_SIZE
+            );
 
-    @Bean
-    public ItemProcessor<IssuedCoupon, IssuedCoupon> couponExpirationProcessor() {
-        return coupon -> {
-            coupon.expire();
-            log.debug("Coupon {} expired.", coupon.getId());
-            return coupon;
+            contribution.incrementWriteCount(updated);
+            if (updated == 0) {
+                log.info("[Batch] 쿠폰 만료 처리 완료. totalUpdated={}", totalUpdated.get());
+                return RepeatStatus.FINISHED;
+            }
+
+            int total = totalUpdated.addAndGet(updated);
+            log.debug("[Batch] 쿠폰 {}건 EXPIRED 처리 완료. totalUpdated={}", updated, total);
+            return RepeatStatus.CONTINUABLE;
         };
-    }
-
-    @Bean
-    public JpaItemWriter<IssuedCoupon> couponExpirationWriter() {
-        return new JpaItemWriterBuilder<IssuedCoupon>()
-                .entityManagerFactory(entityManagerFactory)
-                .build();
     }
 }
