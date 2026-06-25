@@ -8,6 +8,7 @@ import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
 import com.team08.backend.domain.feed.sse.FeedSseConnectionManager;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -86,7 +87,7 @@ class FeedOutboxPublisherTest {
         StudyActivity activity = StudyActivity.create(studyId, authorId, "긴 활동 내용");
         ReflectionTestUtils.setField(activity, "id", activityId);
         ReflectionTestUtils.setField(activity, "createdAt", createdAt);
-        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(activity);
+        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(StudyActivityCreated.from(activity));
         FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
                 studyId,
                 activityId,
@@ -199,7 +200,7 @@ class FeedOutboxPublisherTest {
         StudyActivity activity = StudyActivity.create(studyId, authorId, "긴 활동 내용");
         ReflectionTestUtils.setField(activity, "id", activityId);
         ReflectionTestUtils.setField(activity, "createdAt", createdAt);
-        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(activity);
+        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(StudyActivityCreated.from(activity));
         FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
                 studyId,
                 activityId,
