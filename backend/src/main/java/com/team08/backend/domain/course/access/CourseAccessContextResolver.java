@@ -8,6 +8,9 @@ import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.entity.UserRole;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ public class CourseAccessContextResolver {
     private final ChapterRepository chapterRepository;
     private final LectureRepository lectureRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final UserRepository userRepository;
 
     public CourseAccessContext fromCourseId(Long courseId, Long userId) {
         Course course = courseRepository.findById(courseId)
@@ -49,12 +53,20 @@ public class CourseAccessContextResolver {
                 userId, courseId, EnrollmentStatus.ACTIVE);
         boolean hasFreePreview = lectureRepository.existsByChapterCourseIdAndIsFreePreviewTrue(courseId);
 
+        boolean isAdmin = false;
+        if (userId != null) {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+            isAdmin = user.getRole() == UserRole.ROLE_ADMIN;
+        }
+
         return new CourseAccessContext(
                 userId,
                 course.getStatus(),
                 hasActiveEnrollment,
                 course.getInstructorId().equals(userId),
-                hasFreePreview
+                hasFreePreview,
+                isAdmin
         );
     }
 }
