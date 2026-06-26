@@ -77,6 +77,27 @@ class PaymentControllerTest {
     }
 
     @Test
+    void missingConfiguredSecretRejectsWebhookWithoutProcessing() {
+        TossPaymentWebhookRequest request = webhookRequest();
+        PaymentController controllerWithoutSecret = new PaymentController(
+                paymentService,
+                tossPaymentWebhookService,
+                new TossPaymentProperties(
+                        "https://api.tosspayments.com",
+                        "test-secret-key",
+                        "",
+                        null,
+                        null
+                )
+        );
+
+        ResponseEntity<Void> response = controllerWithoutSecret.handleTossWebhook(WEBHOOK_SECRET, null, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        verify(tossPaymentWebhookService, never()).handle(request);
+    }
+
+    @Test
     void retryableFailureReturnsServiceUnavailable() {
         TossPaymentWebhookRequest request = webhookRequest();
         given(tossPaymentWebhookService.handle(request)).willReturn(TossPaymentWebhookResult.RETRYABLE_FAILURE);

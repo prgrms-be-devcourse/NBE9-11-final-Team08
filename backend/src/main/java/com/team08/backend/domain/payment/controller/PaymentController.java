@@ -104,8 +104,8 @@ public class PaymentController {
     private boolean isValidWebhookSecret(String headerSecret, String token) {
         String configuredSecret = tossPaymentProperties.webhookSecret();
         if (!StringUtils.hasText(configuredSecret)) {
-            log.warn("Toss webhook secret is not configured. Webhook endpoint is not protected.");
-            return true;
+            log.error("Toss webhook secret is not configured. Webhook request is rejected.");
+            return false;
         }
 
         return constantTimeEquals(configuredSecret, headerSecret)
@@ -114,6 +114,9 @@ public class PaymentController {
 
     private boolean constantTimeEquals(String expected, String actual) {
         if (!StringUtils.hasText(actual)) {
+            return false;
+        }
+        if (expected.length() != actual.length()) {
             return false;
         }
         return MessageDigest.isEqual(
