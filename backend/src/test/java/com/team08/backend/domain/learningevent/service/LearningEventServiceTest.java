@@ -105,11 +105,11 @@ class LearningEventServiceTest {
     }
 
 
-    // ──── 이벤트 시각 검증·보정 (skew clamp / KST 변환) ─────────────────────────
+    // ──── 이벤트 시각 검증 (skew → 발행 여부 / KST 변환) ─────────────────────────
 
     @Test
-    @DisplayName("입장 이벤트 - 클라이언트 시각이 허용 오차를 크게 벗어나면 서버 수신 시각으로 보정")
-    void recordEvent_lectureEnter_largeSkew_clampedToServerNow() {
+    @DisplayName("입장 이벤트 - 허용 오차를 크게 벗어나면 적재만 하고 도메인 이벤트는 발행하지 않는다")
+    void recordEvent_lectureEnter_largeSkew_recordedButNotPublished() {
         Long userId = 1L;
         OffsetDateTime farPast = OffsetDateTime.now(KST_OFFSET).minusDays(1); // 5분 초과
         RecordLearningEventRequest request = new RecordLearningEventRequest(
@@ -118,19 +118,20 @@ class LearningEventServiceTest {
         given(learningEventRepository.existsByUniqueEventKey("enter-skew")).willReturn(false);
         given(learningEventRepository.save(any())).willReturn(savedEvent(1L, userId, request));
 
-        LocalDateTime before = LocalDateTime.now(KST).minusMinutes(1);
         learningEventService.recordEvent(userId, request);
-        LocalDateTime after = LocalDateTime.now(KST).plusMinutes(1);
 
+        // 적재는 하되 시각은 보정하지 않고 클라이언트 원본(KST 변환)을 그대로 저장한다.
         ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
         verify(learningEventRepository).save(captor.capture());
-        // 클라이언트의 하루 전 시각이 아니라 서버 수신 시각으로 보정됐다.
-        assertThat(captor.getValue().getEventTime()).isBetween(before, after);
+        LocalDateTime expectedKst = farPast.atZoneSameInstant(KST).toLocalDateTime();
+        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
+        // 도메인 이벤트는 발행하지 않는다(후속 반응 차단).
+        verify(eventPublisher, never()).publishEvent(any(LearningEventRecorded.class));
     }
 
     @Test
-    @DisplayName("퇴장 이벤트 - 클라이언트 시각이 허용 오차를 크게 벗어나면 서버 수신 시각으로 보정")
-    void recordEvent_lectureExit_largeSkew_clampedToServerNow() {
+    @DisplayName("퇴장 이벤트 - 허용 오차를 크게 벗어나면 적재만 하고 도메인 이벤트는 발행하지 않는다")
+    void recordEvent_lectureExit_largeSkew_recordedButNotPublished() {
         Long userId = 1L;
         OffsetDateTime farFuture = OffsetDateTime.now(KST_OFFSET).plusDays(1); // 미래로 조작
         RecordLearningEventRequest request = new RecordLearningEventRequest(
@@ -139,18 +140,18 @@ class LearningEventServiceTest {
         given(learningEventRepository.existsByUniqueEventKey("exit-skew")).willReturn(false);
         given(learningEventRepository.save(any())).willReturn(savedEvent(1L, userId, request));
 
-        LocalDateTime before = LocalDateTime.now(KST).minusMinutes(1);
         learningEventService.recordEvent(userId, request);
-        LocalDateTime after = LocalDateTime.now(KST).plusMinutes(1);
 
         ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
         verify(learningEventRepository).save(captor.capture());
-        assertThat(captor.getValue().getEventTime()).isBetween(before, after);
+        LocalDateTime expectedKst = farFuture.atZoneSameInstant(KST).toLocalDateTime();
+        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
+        verify(eventPublisher, never()).publishEvent(any(LearningEventRecorded.class));
     }
 
     @Test
-    @DisplayName("입장 이벤트 - 허용 오차 이내면 클라이언트 시각을 KST 로 변환해 그대로 사용")
-    void recordEvent_lectureEnter_withinSkew_keepsClientTime() {
+    @DisplayName("입장 이벤트 - 허용 오차 이내면 KST 변환 후 그대로 적재하고 발행한다")
+    void recordEvent_lectureEnter_withinSkew_keepsClientTimeAndPublishes() {
         Long userId = 1L;
         OffsetDateTime nowUtc = OffsetDateTime.now(ZoneOffset.UTC); // 현재 시각, UTC 오프셋
         RecordLearningEventRequest request = new RecordLearningEventRequest(
@@ -163,14 +164,16 @@ class LearningEventServiceTest {
 
         ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
         verify(learningEventRepository).save(captor.capture());
-        // 보정되지 않고, UTC 입력이 KST(+9h) 로 변환된 값이 그대로 저장된다.
+        // UTC 입력이 KST(+9h) 로 변환된 값이 그대로 저장된다.
         LocalDateTime expectedKst = nowUtc.atZoneSameInstant(KST).toLocalDateTime();
         assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
+        // 신뢰 범위 안이므로 도메인 이벤트도 발행된다.
+        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
     }
 
     @Test
-    @DisplayName("입장/퇴장 외 이벤트 - 오차가 커도 보정하지 않고 KST 변환만 한다")
-    void recordEvent_videoStart_largeSkew_notClamped() {
+    @DisplayName("입장/퇴장 외 이벤트 - 오차가 커도 KST 변환만 하고 항상 발행한다")
+    void recordEvent_videoStart_largeSkew_alwaysPublished() {
         Long userId = 2L;
         OffsetDateTime farPastUtc = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
         RecordLearningEventRequest request = new RecordLearningEventRequest(
@@ -183,9 +186,10 @@ class LearningEventServiceTest {
 
         ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
         verify(learningEventRepository).save(captor.capture());
-        // VIDEO_START 는 clamp 대상이 아니므로 하루 전 시각이 보존된다(KST 변환만).
+        // VIDEO_START 는 신뢰성 판정 대상이 아니므로 하루 전 시각이 보존되고 발행된다(KST 변환만).
         LocalDateTime expectedKst = farPastUtc.atZoneSameInstant(KST).toLocalDateTime();
         assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
+        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
     }
 
 
@@ -448,7 +452,7 @@ class LearningEventServiceTest {
                 1L, 2L, lectureId,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                OffsetDateTime.of(2026, 6, 13, 10, 0, 0, 0, ZoneOffset.ofHours(9)),
+                OffsetDateTime.now(KST_OFFSET), // 허용 오차 이내 → 정상 발행 경로
                 eventKey
         );
     }
