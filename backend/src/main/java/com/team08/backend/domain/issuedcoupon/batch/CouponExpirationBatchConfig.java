@@ -20,7 +20,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Configuration
@@ -56,7 +55,6 @@ public class CouponExpirationBatchConfig {
                 ? LocalDateTime.parse(nowStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                 : LocalDateTime.now(clock);
 
-        AtomicInteger totalUpdated = new AtomicInteger();
         log.info("couponExpirationTasklet initialized with now = {}", now);
 
         return (contribution, chunkContext) -> {
@@ -76,12 +74,12 @@ public class CouponExpirationBatchConfig {
 
             contribution.incrementWriteCount(updated);
             if (updated == 0) {
-                log.info("[Batch] 쿠폰 만료 처리 완료. totalUpdated={}", totalUpdated.get());
+                log.info("[Batch] 쿠폰 만료 처리 완료. totalUpdated={}",
+                        chunkContext.getStepContext().getStepExecution().getWriteCount());
                 return RepeatStatus.FINISHED;
             }
 
-            int total = totalUpdated.addAndGet(updated);
-            log.debug("[Batch] 쿠폰 {}건 EXPIRED 처리 완료. totalUpdated={}", updated, total);
+            log.debug("[Batch] 쿠폰 {}건 EXPIRED 처리 완료.", updated);
             return RepeatStatus.CONTINUABLE;
         };
     }

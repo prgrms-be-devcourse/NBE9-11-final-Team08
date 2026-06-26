@@ -57,16 +57,21 @@ public class CouponExpirationBatchScheduler {
 
     private void runCouponExpirationJobWithLock(int retryAttempt, LocalDateTime now, String trigger) {
         jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {
-            if (!tryAcquireLock(connection)) {
-                log.info("[쿠폰 만료 배치] 다른 인스턴스에서 실행 중이므로 건너뜁니다. trigger={}, retryAttempt={}",
-                        trigger, retryAttempt);
-                return null;
-            }
+            boolean lockAcquired = false;
 
             try {
+                lockAcquired = tryAcquireLock(connection);
+                if (!lockAcquired) {
+                    log.info("[쿠폰 만료 배치] 다른 인스턴스에서 실행 중이므로 건너뜁니다. trigger={}, retryAttempt={}",
+                            trigger, retryAttempt);
+                    return null;
+                }
+
                 runCouponExpirationJob(retryAttempt, now);
             } finally {
-                releaseLock(connection);
+                if (lockAcquired) {
+                    releaseLock(connection);
+                }
             }
 
             return null;
