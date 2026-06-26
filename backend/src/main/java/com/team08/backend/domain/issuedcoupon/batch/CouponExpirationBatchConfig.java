@@ -65,7 +65,7 @@ public class CouponExpirationBatchConfig {
                             SET status = ?
                             WHERE status = ?
                               AND expired_at < ?
-                            ORDER BY id
+                            ORDER BY expired_at, id
                             LIMIT ?
                             """,
                     CouponStatus.EXPIRED.name(),
