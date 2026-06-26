@@ -89,6 +89,7 @@ app:
     toss:
       base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
       secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
+      webhook-secret: ${TOSS_PAYMENTS_WEBHOOK_SECRET:}
       connect-timeout: ${TOSS_PAYMENTS_CONNECT_TIMEOUT:3s}
       read-timeout: ${TOSS_PAYMENTS_READ_TIMEOUT:5s}
 

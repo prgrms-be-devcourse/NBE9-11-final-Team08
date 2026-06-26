@@ -6,6 +6,7 @@ import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest.TossPaymentWebhookData;
 import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentRecoveryTarget;
+import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,8 +51,9 @@ class TossPaymentWebhookServiceTest {
                 .willReturn(Optional.of(TARGET));
         given(tossPaymentClient.findByPaymentKey(PAYMENT_KEY)).willReturn(Optional.of(tossResponse));
 
-        tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.PROCESSED);
         verify(tossPaymentClient).findByPaymentKey(PAYMENT_KEY);
         verify(paymentTransactionService).recoverTossPayment(TARGET, tossResponse);
     }
@@ -64,8 +67,9 @@ class TossPaymentWebhookServiceTest {
         given(tossPaymentClient.findByPaymentKey(PAYMENT_KEY)).willReturn(Optional.of(tossResponse));
         given(paymentTransactionService.recoverTossPayment(TARGET, tossResponse)).willReturn(false);
 
-        tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.PROCESSED);
         verify(paymentTransactionService).recoverTossPayment(TARGET, tossResponse);
         verify(paymentTransactionService, never()).recoverTossPaymentNotFound(TARGET);
     }
@@ -76,8 +80,9 @@ class TossPaymentWebhookServiceTest {
 
         given(tossPaymentClient.findByPaymentKey(PAYMENT_KEY)).willThrow(exception);
 
-        tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(paymentStatusChangedWebhook("DONE"));
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.RETRYABLE_FAILURE);
         verify(paymentTransactionService, never()).keepTossPaymentUnknown(TARGET, "TOSS_TIMEOUT", "Toss timeout");
         verify(paymentTransactionService, never()).recoverTossPayment(TARGET, tossResponse("DONE"));
     }
@@ -90,8 +95,9 @@ class TossPaymentWebhookServiceTest {
                 .willReturn(Optional.of(TARGET));
         given(tossPaymentClient.findByPaymentKey(PAYMENT_KEY)).willReturn(Optional.of(tossResponse));
 
-        tossPaymentWebhookService.handle(paymentStatusChangedWebhook("CANCELED"));
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(paymentStatusChangedWebhook("CANCELED"));
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.PROCESSED);
         verify(paymentTransactionService).recoverTossPayment(TARGET, tossResponse);
     }
 
@@ -103,8 +109,9 @@ class TossPaymentWebhookServiceTest {
                 new TossPaymentWebhookData(PAYMENT_KEY, ORDER_NUMBER, "DONE", 30_000L)
         );
 
-        tossPaymentWebhookService.handle(request);
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(request);
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.IGNORED);
         verifyNoInteractions(tossPaymentClient, paymentTransactionService);
     }
 
@@ -121,8 +128,9 @@ class TossPaymentWebhookServiceTest {
                 .willReturn(Optional.of(TARGET));
         given(tossPaymentClient.findByOrderId(ORDER_NUMBER)).willReturn(Optional.of(tossResponse));
 
-        tossPaymentWebhookService.handle(request);
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(request);
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.PROCESSED);
         verify(tossPaymentClient).findByOrderId(ORDER_NUMBER);
         verify(paymentTransactionService).recoverTossPayment(TARGET, tossResponse);
     }
@@ -141,8 +149,9 @@ class TossPaymentWebhookServiceTest {
         given(paymentTransactionService.findTossRecoveryTargetByOrderNumber(ORDER_NUMBER))
                 .willReturn(Optional.of(TARGET));
 
-        tossPaymentWebhookService.handle(request);
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(request);
 
+        assertThat(result).isEqualTo(TossPaymentWebhookResult.PROCESSED);
         verify(paymentTransactionService, never()).findTossRecoveryTargetByOrderNumber(payloadOrderNumber);
         verify(paymentTransactionService).recoverTossPayment(TARGET, tossResponse);
     }

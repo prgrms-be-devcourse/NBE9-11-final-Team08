@@ -23,26 +23,26 @@ public class TossPaymentWebhookService {
     private final TossPaymentClient tossPaymentClient;
     private final PaymentTransactionService paymentTransactionService;
 
-    public void handle(TossPaymentWebhookRequest request) {
+    public TossPaymentWebhookResult handle(TossPaymentWebhookRequest request) {
         if (request == null || !PAYMENT_STATUS_CHANGED.equals(request.eventType())) {
             log.info("Ignoring Toss payment webhook event. eventType={}", request == null ? null : request.eventType());
-            return;
+            return TossPaymentWebhookResult.IGNORED;
         }
 
         TossPaymentWebhookData data = request.data();
         if (data == null || (!StringUtils.hasText(data.paymentKey()) && !StringUtils.hasText(data.orderId()))) {
             log.warn("Ignoring Toss payment webhook without payment identifier. eventType={}", request.eventType());
-            return;
+            return TossPaymentWebhookResult.IGNORED;
         }
 
         try {
             Optional<TossPaymentResponse> tossPayment = lookupTossPayment(data);
             if (tossPayment.isEmpty()) {
                 log.warn("Toss payment webhook lookup returned empty. orderId={}, paymentKey={}", data.orderId(), data.paymentKey());
-                return;
+                return TossPaymentWebhookResult.IGNORED;
             }
 
-            recoverWithVerifiedTossPayment(data, tossPayment.get());
+            return recoverWithVerifiedTossPayment(data, tossPayment.get());
         } catch (TossPaymentException e) {
             log.warn(
                     "Toss payment webhook lookup failed. orderId={}, paymentKey={}, failureCode={}",
@@ -50,6 +50,7 @@ public class TossPaymentWebhookService {
                     data.paymentKey(),
                     e.getFailureCode()
             );
+            return TossPaymentWebhookResult.RETRYABLE_FAILURE;
         }
     }
 
@@ -60,7 +61,7 @@ public class TossPaymentWebhookService {
         return tossPaymentClient.findByOrderId(data.orderId());
     }
 
-    private void recoverWithVerifiedTossPayment(
+    private TossPaymentWebhookResult recoverWithVerifiedTossPayment(
             TossPaymentWebhookData data,
             TossPaymentResponse tossPayment
     ) {
@@ -72,10 +73,11 @@ public class TossPaymentWebhookService {
                     data.orderId(),
                     tossPayment.orderId()
             );
-            return;
+            return TossPaymentWebhookResult.IGNORED;
         }
 
         paymentTransactionService.recoverTossPayment(target.get(), tossPayment);
+        return TossPaymentWebhookResult.PROCESSED;
     }
 
     private Optional<TossPaymentRecoveryTarget> findTarget(String orderNumber) {
@@ -83,5 +85,11 @@ public class TossPaymentWebhookService {
             return Optional.empty();
         }
         return paymentTransactionService.findTossRecoveryTargetByOrderNumber(orderNumber);
+    }
+
+    public enum TossPaymentWebhookResult {
+        PROCESSED,
+        IGNORED,
+        RETRYABLE_FAILURE
     }
 }
