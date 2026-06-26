@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lectureqna.controller;
 
+import com.team08.backend.domain.lectureqna.dto.MyCommentResponse;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionRequest;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
 import com.team08.backend.domain.lectureqna.service.QnaQuestionService;
@@ -16,12 +17,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "QnA")
 @RestController
 @RequiredArgsConstructor
 public class QnaQuestionController {
 
     private final QnaQuestionService qnaQuestionService;
+
+    @Operation(summary = "내가 작성한 QnA 질문(댓글) 목록 조회 - 마이페이지")
+    @GetMapping("/api/me/comments")
+    public List<MyCommentResponse> getMyComments(
+            @AuthenticationPrincipal LoginUserPrincipal principal) {
+        return qnaQuestionService.getMyComments(principal.user().id());
+    }
 
     @Operation(summary = "강의 QnA 목록 조회 (질문+답변 페이징)")
     @GetMapping("/api/lectures/{lectureId}/qna")

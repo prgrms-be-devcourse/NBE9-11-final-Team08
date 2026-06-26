@@ -22,6 +22,7 @@ import type {
   StudyDetailResponse,
   StudyIdResponse,
   StudyReport,
+  MyStudyReport,
   UserProfile,
   SignupRequest,
   LoginRequest,
@@ -804,6 +805,59 @@ const mapStudyReportToDisplay = (
   }
 }
 
+// 여러 스터디의 원본 리포트를 하나로 합산한 가상 StudyReportResponse 를 만든다.
+// 합산 의미: 총시청시간/QnA수는 단순 합, 학습일수는 날짜 합집합, 일별 활동은 날짜별 합,
+// 일별 진도는 날짜별 평균(전체 진척 추세), top 강의는 시청시간 기준 상위 5개.
+const buildAggregateReportRaw = (
+  raws: StudyReportResponse[],
+): StudyReportResponse => {
+  const dailyActivityMap: Record<string, number> = {}
+  for (const r of raws) {
+    for (const [date, count] of Object.entries(r.dailyActivityMap ?? {})) {
+      dailyActivityMap[date] = (dailyActivityMap[date] ?? 0) + (count ?? 0)
+    }
+  }
+
+  // 날짜별 진도율 평균
+  const progressSum: Record<string, { sum: number; n: number }> = {}
+  for (const r of raws) {
+    for (const d of r.dailyProgress ?? []) {
+      const key = String(d.date)
+      const acc = progressSum[key] ?? { sum: 0, n: 0 }
+      acc.sum += Number(d.progressRate ?? 0)
+      acc.n += 1
+      progressSum[key] = acc
+    }
+  }
+  const dailyProgress = Object.entries(progressSum)
+    .map(([date, { sum, n }]) => ({ date, progressRate: n > 0 ? sum / n : 0 }))
+
+  const topLectures = raws
+    .flatMap((r) => r.topLectures ?? [])
+    .sort((a, b) => (b.watchTimeSeconds ?? 0) - (a.watchTimeSeconds ?? 0))
+    .slice(0, 5)
+
+  const studyDays = Object.values(dailyActivityMap).filter((v) => v > 0).length
+  const progressValues = raws.map((r) => Number(r.progressRate ?? 0))
+  const progressRate = progressValues.length
+    ? progressValues.reduce((a, b) => a + b, 0) / progressValues.length
+    : 0
+
+  return {
+    studyId: 0,
+    totalWatchTime: raws.reduce((a, r) => a + (r.totalWatchTime ?? 0), 0),
+    totalQnaCount: raws.reduce((a, r) => a + (r.totalQnaCount ?? 0), 0),
+    progressRate,
+    studyDays,
+    topLectures,
+    dailyProgress,
+    dailyActivityMap,
+    updatedAt: raws.map((r) => r.updatedAt).sort().at(-1) ?? '',
+    status: 'LOADED',
+    nextRegenerableAt: null,
+  }
+}
+
 const getCurrentUserId = async (): Promise<number> => {
   try {
     const profile = await api.getProfile()
@@ -1413,6 +1467,66 @@ export const api = {
     }
 
     return { studyName: studyTitle, userName, ...mapStudyReportToDisplay(raw) }
+  },
+
+  // 마이페이지: 내가 참여한 모든 스터디의 리포트 + 전체 합산 리포트를 한 번에 조회.
+  getMyStudyReports: async (): Promise<{
+    reports: MyStudyReport[]
+    aggregate: MyStudyReport | null
+  }> => {
+    const myStudies = await request<StudySummaryResponse[]>('/api/studies/me', [])
+
+    let userName = '사용자'
+    try {
+      const profile = await api.getProfile()
+      if (profile?.name) userName = profile.name
+    } catch {
+      // 프로필 조회 실패는 무시하고 기본값 사용
+    }
+
+    if (!myStudies || myStudies.length === 0) {
+      return { reports: [], aggregate: null }
+    }
+
+    const entries = await Promise.all(
+      myStudies.map(async (s) => ({
+        study: s,
+        raw: await api.getOrGenerateStudyReport(s.studyId).catch(() => null),
+      })),
+    )
+
+    const emptyDisplay: Omit<StudyReport, 'studyName' | 'userName'> = {
+      period: '기능 없음',
+      totalStudyTime: '기능 없음',
+      commentCount: -1,
+      studyDays: -1,
+      progressData: [],
+      calendar: [],
+      topLectures: [],
+    }
+
+    const reports: MyStudyReport[] = entries.map(({ study, raw }) => ({
+      studyId: String(study.studyId),
+      studyName: study.title,
+      userName,
+      ...(raw ? mapStudyReportToDisplay(raw) : emptyDisplay),
+    }))
+
+    const raws = entries
+      .map((e) => e.raw)
+      .filter((r): r is StudyReportResponse => r != null)
+
+    const aggregate: MyStudyReport | null =
+      raws.length > 1
+        ? {
+            studyId: 'all',
+            studyName: `전체 ${reports.length}개 스터디`,
+            userName,
+            ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
+          }
+        : null
+
+    return { reports, aggregate }
   },
 
   // Admin Course APIs

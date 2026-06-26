@@ -1,4 +1,4 @@
-import { ReportView } from '@/components/account/report-view'
+import { MyReportsView } from '@/components/account/my-reports-view'
 import { api } from '@/lib/api'
 
 export const metadata = {
@@ -6,6 +6,6 @@ export const metadata = {
 }
 
 export default async function ReportPage() {
-  const report = await api.getStudyReport('study-1')
-  return <ReportView report={report} />
+  const { reports, aggregate } = await api.getMyStudyReports()
+  return <MyReportsView reports={reports} aggregate={aggregate} />
 }
