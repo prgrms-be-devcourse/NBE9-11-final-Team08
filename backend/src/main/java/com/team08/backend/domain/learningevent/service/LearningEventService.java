@@ -13,18 +13,34 @@ import com.team08.backend.domain.learningevent.repository.LearningEventRepositor
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LearningEventService {
+
+    /** 저장 기준 타임존. 클라이언트가 보낸 오프셋 시각을 이 기준의 벽시계로 변환해 저장한다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    /**
+     * 클라이언트 시계와 서버 수신 시각의 허용 오차.
+     * 입장/퇴장 이벤트의 eventTime 이 이 범위를 벗어나면 시계 오차·조작으로 보고
+     * 서버 수신 시각으로 보정(clamp)한다.
+     */
+    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(5);
 
     private final LearningEventRepository learningEventRepository;
     private final CourseRepository courseRepository;
@@ -41,6 +57,10 @@ public class LearningEventService {
             throw new CustomException(ErrorCode.DUPLICATE_LEARNING_EVENT);
         }
 
+        // 입장/퇴장 이벤트는 통계·순서의 기준이 되므로 클라이언트 시계를 그대로 믿지 않고
+        // 서버 수신 시각과 비교해 허용 오차를 벗어나면 보정한다.
+        LocalDateTime eventTime = resolveEventTime(request.eventType(), request.eventTime());
+
         //1. 이벤트 적재
         LearningEvent event = LearningEvent.create(
                 userId,
@@ -49,7 +69,7 @@ public class LearningEventService {
                 request.lectureId(),
                 request.eventType(),
                 request.positionSeconds(),
-                request.eventTime(),
+                eventTime,//보정된 시간 값
                 eventKey
         );
 
@@ -131,6 +151,36 @@ public class LearningEventService {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * 이벤트 발생 시각을 저장용 KST {@link LocalDateTime} 으로 정규화한다.
+     * <p>
+     * 1) 타임존: 클라이언트가 보낸 {@link OffsetDateTime}(오프셋 포함)을 KST 벽시계로 변환한다.
+     *    오프셋이 명시돼 있으므로 UTC/KST 모호성이 없다.
+     * 2) 신뢰성: 입장(LECTURE_ENTER)/퇴장(LECTURE_EXIT)은 통계·순서의 기준이라
+     *    서버 수신 시각과의 차이가 {@link #MAX_CLOCK_SKEW} 를 넘으면(시계 오차·조작)
+     *    서버 수신 시각으로 보정(clamp)한다. 범위 안이면 클라이언트 시각을 그대로 신뢰하므로
+     *    (보통 수초 이내인) 네트워크 지연의 영향을 받지 않는다.
+     *    그 외 이벤트 타입은 KST 변환만 하고 시각은 그대로 사용한다.
+     */
+    private LocalDateTime resolveEventTime(LearningEventType eventType, OffsetDateTime clientTime) {
+        LocalDateTime clientKst = clientTime.atZoneSameInstant(KST).toLocalDateTime();
+
+        if (eventType != LearningEventType.LECTURE_ENTER && eventType != LearningEventType.LECTURE_EXIT) {
+            return clientKst;
+        }
+
+        // TODO:
+        LocalDateTime serverNow = LocalDateTime.now(KST);
+        long skewSeconds = Math.abs(Duration.between(clientKst, serverNow).getSeconds());
+        if (skewSeconds > MAX_CLOCK_SKEW.getSeconds()) {
+            log.warn("학습 이벤트 시각 오차가 허용치를 초과해 서버 수신 시각으로 보정: type={}, clientTime={}, serverNow={}, skewSeconds={}",
+                    eventType, clientTime, serverNow, skewSeconds);
+            return serverNow;
+        }
+        return clientKst;
+    }
+
     private String resolveEventKey(RecordLearningEventRequest request) {
         if (request.eventKey() != null && !request.eventKey().isBlank()) {
             return request.eventKey();

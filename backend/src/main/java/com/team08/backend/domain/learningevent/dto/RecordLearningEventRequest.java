@@ -3,7 +3,7 @@ package com.team08.backend.domain.learningevent.dto;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public record RecordLearningEventRequest(
 
@@ -19,8 +19,12 @@ public record RecordLearningEventRequest(
 
         Integer positionSeconds,
 
+        /**
+         * 이벤트 발생 시각. 타임존 모호성을 없애기 위해 오프셋을 포함한 ISO-8601 로 받는다.
+         * 예: "2026-06-13T10:00:00+09:00". 서버는 이를 KST 기준으로 변환해 저장한다.
+         */
         @NotNull
-        LocalDateTime eventTime,
+        OffsetDateTime eventTime,
 
         /**
          * 클라이언트가 생성한 고유 키 (UUID 권장).

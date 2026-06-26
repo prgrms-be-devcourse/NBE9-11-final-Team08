@@ -1151,8 +1151,11 @@ export const api = {
   }) =>
     mutate<LearningEventResponse>('/api/learning-events', 'POST', {
       ...data,
-      // 백엔드 RecordLearningEventRequest 는 eventTime(@NotNull) 을 요구한다.
-      eventTime: data.eventTime ?? new Date().toISOString().slice(0, 19),
+      // 백엔드 RecordLearningEventRequest 는 eventTime(@NotNull, OffsetDateTime) 을 요구한다.
+      // 반드시 오프셋을 포함한 ISO-8601 로 보낸다. toISOString() 은 UTC(...Z = +00:00)라
+      // 서버가 타임존을 모호함 없이 KST 로 변환할 수 있다. (과거: .slice(0,19) 로 Z 를 잘라
+      // UTC 벽시계가 오프셋 없이 전송돼 서버가 KST 로 오인 → 9시간 오차 발생했음)
+      eventTime: data.eventTime ?? new Date().toISOString(),
       // 멱등 처리를 위한 클라이언트 고유 키 (중복 이벤트 방지)
       eventKey: data.eventKey ?? (typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()

@@ -21,6 +21,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -59,7 +61,7 @@ class LearningEventControllerTest {
                 1L, 2L, 10L,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                LocalDateTime.of(2026, 6, 13, 10, 0),
+                OffsetDateTime.of(2026, 6, 13, 10, 0, 0, 0, ZoneOffset.ofHours(9)),
                 "event-key-abc"
         );
         LearningEventResponse response = new LearningEventResponse(
@@ -87,7 +89,7 @@ class LearningEventControllerTest {
         String invalidBody = """
                 {
                   "lectureId": 10,
-                  "eventTime": "2026-06-13T10:00:00"
+                  "eventTime": "2026-06-13T10:00:00+09:00"
                 }
                 """;
 
