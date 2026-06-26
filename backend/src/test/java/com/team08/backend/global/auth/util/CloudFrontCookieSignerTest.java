@@ -31,6 +31,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 generatedPem,
                 true,
+                null,
                 Clock.systemDefaultZone()
         );
 
@@ -61,6 +62,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 "invalid-key-format",
                 true,
+                null,
                 Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
@@ -74,6 +76,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 "valid-key",
                 true,
+                null,
                 Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
@@ -84,6 +87,7 @@ class CloudFrontCookieSignerTest {
                 null,
                 "valid-key",
                 true,
+                null,
                 Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
@@ -97,6 +101,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 null,
                 false,
+                null,
                 Clock.systemDefaultZone()
         ))
                 .isInstanceOf(IllegalStateException.class)
@@ -119,6 +124,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 generatedPem,
                 false,
+                null,
                 Clock.systemDefaultZone()
         );
 
@@ -141,6 +147,7 @@ class CloudFrontCookieSignerTest {
                 "real-id",
                 "cloudfront-private-key",
                 false,
+                null,
                 Clock.systemDefaultZone()
         );
 
@@ -156,6 +163,28 @@ class CloudFrontCookieSignerTest {
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.isSecure()).isFalse();
             assertThat(cookie.getSameSite()).isEqualTo("Lax");
+        }
+    }
+
+    @Test
+    void 쿠키_도메인이_설정되면_쿠키_배열의_각_쿠키에_도메인이_정상_반영된다() {
+        cloudFrontCookieSigner = new CloudFrontCookieSignerImpl(
+                "cloudfront-domain",
+                "real-id",
+                "cloudfront-private-key",
+                false,
+                ".sokonyun.store",
+                Clock.systemDefaultZone()
+        );
+
+        ResponseCookie[] cookies = cloudFrontCookieSigner.createSignedCookies(
+                "/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*",
+                "/lectures/1/"
+        );
+
+        assertThat(cookies).hasSize(3);
+        for (ResponseCookie cookie : cookies) {
+            assertThat(cookie.getDomain()).isEqualTo(".sokonyun.store");
         }
     }
 }
