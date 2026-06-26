@@ -98,33 +98,31 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
 }
 
 function ActivityCard({ item }: { item: StudyActivityResponse }) {
-  // AI 피드백 기능은 현재 비활성화 상태입니다.
-  // 재활성화하려면 아래 상태/이펙트/핸들러와 하단 JSX 블록의 주석을 함께 해제하세요.
-  // const [feedback, setFeedback] = useState<StructuredFeedback | null>(null)
-  // const [loading, setLoading] = useState(false)
-  //
-  // useEffect(() => {
-  //   if (item.activityId) {
-  //     api.getAiFeedback(item.studyId, item.activityId)
-  //        .then(res => setFeedback(res?.feedback ?? null))
-  //        .catch(err => console.error(err))
-  //   }
-  // }, [item.studyId, item.activityId])
-  //
-  // const requestFeedback = async () => {
-  //   setLoading(true)
-  //   try {
-  //     const res = await api.generateAiFeedback(item.studyId, item.activityId)
-  //     if (res.feedback) {
-  //       setFeedback(res.feedback)
-  //       toast.success('AI 피드백이 도착했습니다.')
-  //     }
-  //   } catch (error) {
-  //     toast.error('AI 피드백 생성에 실패했습니다.')
-  //   } finally {
-  //     setLoading(false)
-  //   }
-  // }
+  const [feedback, setFeedback] = useState<StructuredFeedback | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (item.activityId) {
+      api.getAiFeedback(item.studyId, item.activityId)
+         .then(res => setFeedback(res?.feedback ?? null))
+         .catch(err => console.error(err))
+    }
+  }, [item.studyId, item.activityId])
+
+  const requestFeedback = async () => {
+    setLoading(true)
+    try {
+      const res = await api.generateAiFeedback(item.studyId, item.activityId)
+      if (res.feedback) {
+        setFeedback(res.feedback)
+        toast.success('AI 피드백이 도착했습니다.')
+      }
+    } catch (error) {
+      toast.error('AI 피드백 생성에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''
 
@@ -143,7 +141,7 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
       </div>
       <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
 
-      {/* AI 피드백 기능 비활성화 — 재활성화 시 위 상태/핸들러 주석과 함께 이 블록을 복구하세요.
+
       {feedback ? (
         <div className="mt-3 space-y-2 rounded-lg bg-secondary/60 p-3">
           <p className="flex items-center gap-1 text-xs font-semibold text-primary">
@@ -171,8 +169,8 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
             {loading ? '피드백 생성 중…' : 'AI 피드백 요청'}
           </Button>
         </>
-      )}
-      */}
+      )
+      }
     </li>
   )
 }
