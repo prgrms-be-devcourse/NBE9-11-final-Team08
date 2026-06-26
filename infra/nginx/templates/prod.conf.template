@@ -34,6 +34,11 @@ server {
         return 200 "ok\n";
     }
 
+    # 메트릭 스크랩 엔드포인트는 외부 공개 금지. Alloy 가 Docker 내부망으로만 수집한다.
+    location /actuator/prometheus {
+        return 403;
+    }
+
     location / {
         proxy_pass http://${BACKEND_UPSTREAM};
         proxy_http_version 1.1;

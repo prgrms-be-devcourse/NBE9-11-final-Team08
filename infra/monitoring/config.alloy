@@ -1,0 +1,44 @@
+// Grafana Cloud 로 메트릭을 remote_write 하는 Grafana Alloy 설정.
+// 시크릿은 컨테이너 환경변수(sys.env)에서 읽는다 → compose .env 에 채울 것.
+
+prometheus.remote_write "grafanacloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USER")
+      password = sys.env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
+
+// Spring Boot actuator 메트릭 (blue/green 둘 다 대상).
+// 비활성 색상은 스크랩 실패(up=0)로 잡혀도 정상이다.
+prometheus.scrape "backend" {
+  targets = [
+    { "__address__" = "backend-blue:8080", "__metrics_path__" = "/actuator/prometheus", "instance" = "backend-blue" },
+    { "__address__" = "backend-green:8080", "__metrics_path__" = "/actuator/prometheus", "instance" = "backend-green" },
+  ]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// 호스트 자원(CPU/메모리/디스크/네트워크)
+prometheus.scrape "node" {
+  targets         = [{ "__address__" = "node-exporter:9100", "instance" = "host" }]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// Redis
+prometheus.scrape "redis" {
+  targets         = [{ "__address__" = "redis-exporter:9121", "instance" = "redis" }]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}
+
+// MySQL
+prometheus.scrape "mysql" {
+  targets         = [{ "__address__" = "mysqld-exporter:9104", "instance" = "mysql" }]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.grafanacloud.receiver]
+}

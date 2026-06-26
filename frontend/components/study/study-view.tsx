@@ -100,14 +100,9 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
   const durationSeconds = active?.durationSeconds ?? 0;
 
-const [lectureInfo, setLectureInfo] = useState<any>(null);
-
-// Determine video source URL using fetched lectureInfo or fallback to active lecture
-const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
-  ? ((lectureInfo?.m3u8Path ?? active?.m3u8Path).startsWith('http')
-    ? lectureInfo?.m3u8Path ?? active?.m3u8Path
-    : `http://localhost:8080/videos-local/${lectureInfo?.m3u8Path ?? active?.m3u8Path}`)
-  : null;
+  const [lectureInfo, setLectureInfo] = useState<any>(null);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [streamLoading, setStreamLoading] = useState(false);
 
   // 재생 시뮬레이션 상태
   const [position, setPosition] = useState(0)
@@ -121,21 +116,28 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
   // 강의 입장 권한 상태: enterLecture(수강권 검사) 실패 시 true → 재생/작성 차단
   const [accessDenied, setAccessDenied] = useState(false)
   const [entering, setEntering] = useState(true)
+  // 마지막으로 LECTURE_ENTER 를 적재한 강의 ID. 클린업에서 리셋하지 않아 StrictMode
+  // 이중 마운트에서도 살아남아, 같은 강의 입장 ENTER 가 중복 적재되는 것을 막는다.
+  const enterRecordedRef = useRef<string | null>(null)
   // duplicate lectureInfo removed
 
   // HLS 비디오 스트리밍 로드 및 해제
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    if (!video || !streamUrl) return;
 
     let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
-      hls = new Hls();
-      hls.loadSource(videoUrl);
+      hls = new Hls({
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true
+        }
+      });
+      hls.loadSource(streamUrl);
       hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = videoUrl;
+      video.src = streamUrl;
     }
 
     return () => {
@@ -143,7 +145,7 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
         hls.destroy();
       }
     };
-  }, [videoUrl]);
+  }, [streamUrl]);
 
   const chapterIdOf = useCallback(
     (lectureId?: string) => lectures.find((l) => l.id === lectureId)?.chapterId,
@@ -201,8 +203,13 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
     setEntering(true)
     pendingStartPosRef.current = null
 
+    // 같은 강의로의 즉시 재마운트(StrictMode)에서는 ENTER 를 다시 적재하지 않는다.
+    // 메타/진행 정보 GET 은 매 마운트마다 다시 읽어야 하므로 enter 호출 자체는 유지한다.
+    const recordEnter = enterRecordedRef.current !== lectureId
+    if (recordEnter) enterRecordedRef.current = lectureId
+
     session
-      .enter(lectureId)
+      .enter(lectureId, recordEnter)
       .then((res) => {
         if (cancelled) return
         setEntering(false)
@@ -244,6 +251,51 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id])
+
+  // 강의가 변경되거나 입장 성공 후, 실제 스트리밍 주소(및 쿠키)를 백엔드로부터 가져온다.
+  useEffect(() => {
+    const lectureId = active?.id
+    if (!lectureId || accessDenied || entering) {
+      setStreamUrl(null)
+      return
+    }
+
+    let cancelled = false
+    setStreamLoading(true)
+
+    const fetchStream = async () => {
+      try {
+        const chapterId = chapterIdOf(lectureId) || ''
+        const urlText = await api.getVideoStreamUrl(courseId, chapterId, lectureId)
+        if (cancelled) return
+
+        if (urlText) {
+          const formatted = urlText.startsWith('http')
+            ? urlText
+            : `http://localhost:8080/videos-local/${urlText}`
+          setStreamUrl(formatted)
+        } else {
+          setStreamUrl(null)
+          toast.error('동영상 스트리밍 주소를 가져오지 못했습니다.')
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setStreamUrl(null)
+          toast.error('동영상 정보를 로드하는 중 에러가 발생했습니다.')
+        }
+      } finally {
+        if (!cancelled) {
+          setStreamLoading(false)
+        }
+      }
+    }
+
+    fetchStream()
+
+    return () => {
+      cancelled = true
+    }
+  }, [active?.id, entering, accessDenied, courseId, chapterIdOf])
 
   // 재생 시작 및 강의 변경 시 lastBeatPositionRef 초기화
   useEffect(() => {

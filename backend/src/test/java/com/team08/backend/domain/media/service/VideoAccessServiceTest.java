@@ -49,21 +49,31 @@ class VideoAccessServiceTest {
     private CourseAccessAuthorizer courseAccessAuthorizer;
 
     @Test
-    void 무료_미리보기_강의는_권한_검증_없이_빈_쿠키_리스트와_경로를_반환한다() {
+    void 무료_미리보기_강의는_권한_검증_없이_Signed_Cookie_리스트와_경로를_반환한다() {
         Long lectureId = 1L;
         Long userId = 100L;
         String m3u8Path = "https://cdn.com/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/index.m3u8";
+        String videoUuid = "c0a80101-1234-5678-90ab-cdef12345678";
         Lecture lecture = mock(Lecture.class);
 
         given(lectureRepository.findByIdWithChapterAndCourse(lectureId)).willReturn(Optional.of(lecture));
         given(lecture.getM3u8Path()).willReturn(m3u8Path);
         given(lecture.isFreePreview()).willReturn(true);
+        given(lecture.getVideoUuid()).willReturn(videoUuid);
+
+        ResponseCookie dummyCookie1 = ResponseCookie.from("CloudFront-Policy", "policy").build();
+        ResponseCookie dummyCookie2 = ResponseCookie.from("CloudFront-Signature", "sig").build();
+        ResponseCookie dummyCookie3 = ResponseCookie.from("CloudFront-Key-Pair-Id", "key").build();
+        ResponseCookie[] expectedCookies = new ResponseCookie[]{dummyCookie1, dummyCookie2, dummyCookie3};
+
+        given(cloudFrontCookieSigner.createSignedCookies("/lectures/1/c0a80101-1234-5678-90ab-cdef12345678/*", "/lectures/1/"))
+                .willReturn(expectedCookies);
 
         VideoStreamResponse result = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
 
         assertThat(result.path()).isEqualTo(m3u8Path);
-        assertThat(result.cookies()).isEmpty();
-        verifyNoInteractions(cloudFrontCookieSigner);
+        assertThat(result.cookies()).hasSize(3);
+        assertThat(result.cookies()).containsExactly(dummyCookie1, dummyCookie2, dummyCookie3);
         verifyNoInteractions(courseAccessAuthorizer);
     }
 
