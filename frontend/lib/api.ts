@@ -1197,13 +1197,11 @@ export const api = {
     courseId?: number
     chapterId?: number
     positionSeconds?: number
-    eventTime?: string
     eventKey?: string
   }) =>
     mutate<LearningEventResponse>('/api/learning-events', 'POST', {
       ...data,
-      // 백엔드 RecordLearningEventRequest 는 eventTime(@NotNull) 을 요구한다.
-      eventTime: data.eventTime ?? new Date().toISOString().slice(0, 19),
+      // 이벤트 발생 시각은 서버가 수신 시각으로 직접 찍는다(클라이언트는 시각을 보내지 않음).
       // 멱등 처리를 위한 클라이언트 고유 키 (중복 이벤트 방지)
       eventKey: data.eventKey ?? (typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()

@@ -1137,7 +1137,7 @@ public class DataSeeder {
         return result;
     }
 
-    /** 강의 시청 이벤트 시퀀스: ENTER → START → POSITION_SAVE → END → EXIT (완강 시 COMPLETE). */
+    /** 강의 시청 이벤트 시퀀스: ENTER → START → END → EXIT (완강 시 COMPLETE). */
     private void appendWatchEvents(List<LearningEvent> out, Long userId, Lecture lec,
                                    LocalDateTime base, boolean complete) {
         Long courseId = lec.getChapter().getCourse().getId();
@@ -1149,7 +1149,6 @@ public class DataSeeder {
 
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.POSITION_SAVE, dur / 2, base.plusMinutes(5), k + "pos"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, endPos, base.plusMinutes(8), k + "end"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, endPos, base.plusMinutes(9), k + "exit"));
         if (complete) {
