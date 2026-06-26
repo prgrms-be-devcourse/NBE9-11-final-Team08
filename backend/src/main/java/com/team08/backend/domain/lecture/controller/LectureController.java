@@ -35,7 +35,8 @@ public class LectureController {
     public ResponseEntity<String> getVideoStreamUrl(
             @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, loginUserPrincipal.user().id());
+        Long userId = loginUserPrincipal != null ? loginUserPrincipal.user().id() : null;
+        VideoStreamResponse streamResponse = videoAccessService.verifyAndGenerateStreamCookies(lectureId, userId);
         return ResponseEntity.ok()
                 .headers(streamResponse.asHttpHeaders())
                 .body(streamResponse.path());
@@ -48,6 +49,7 @@ public class LectureController {
             @PathVariable Long chapterId,
             @PathVariable Long lectureId,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return lectureService.getLectureDetail(courseId, chapterId, lectureId, principal.user().id());
+        Long userId = principal != null ? principal.user().id() : null;
+        return lectureService.getLectureDetail(courseId, chapterId, lectureId, userId);
     }
 }

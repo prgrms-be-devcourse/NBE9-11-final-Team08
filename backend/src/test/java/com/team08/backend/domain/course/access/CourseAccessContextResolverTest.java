@@ -102,7 +102,6 @@ public class CourseAccessContextResolverTest {
     void 비로그인인_경우_isAdmin이_false인_context를_생성한다() {
         Chapter chapter = chapter();
         given(chapterRepository.findByIdWithCourse(CHAPTER_ID)).willReturn(Optional.of(chapter));
-        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(null, COURSE_ID, EnrollmentStatus.ACTIVE)).willReturn(false);
 
         CourseAccessContext context = resolver.fromChapterId(CHAPTER_ID, null);
 

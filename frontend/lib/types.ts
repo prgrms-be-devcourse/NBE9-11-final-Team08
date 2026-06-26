@@ -18,6 +18,7 @@ export interface Lecture {
   hasVideo?: boolean
   lastPositionSeconds?: number
   watchedSeconds?: number
+  isFreePreview?: boolean
 }
 
 export interface Chapter {
