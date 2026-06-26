@@ -36,4 +36,28 @@ public class FeedItemTest {
         assertThat(feedItem.getContent()).isEqualTo(summaryContent);
         assertThat(feedItem.getOccurredAt()).isEqualTo(occurredAt);
     }
+
+    @Test
+    void learningEvent_정보로부터_FeedItem을_생성한다() {
+        Long learningEventId = 20L;
+        Long studyId = 1L;
+        Long actorId = 3L;
+        LocalDateTime occurredAt = LocalDateTime.of(2026, 6, 16, 10, 0);
+
+        FeedItem feedItem = FeedItem.createLearningEvent(
+                studyId,
+                actorId,
+                FeedItemType.LECTURE_ENTER,
+                learningEventId,
+                "강의에 입장했어요: 스프링 이벤트 기초",
+                occurredAt
+        );
+
+        assertThat(feedItem.getStudyId()).isEqualTo(studyId);
+        assertThat(feedItem.getActorId()).isEqualTo(actorId);
+        assertThat(feedItem.getType()).isEqualTo(FeedItemType.LECTURE_ENTER);
+        assertThat(feedItem.getSourceId()).isEqualTo(learningEventId);
+        assertThat(feedItem.getContent()).isEqualTo("강의에 입장했어요: 스프링 이벤트 기초");
+        assertThat(feedItem.getOccurredAt()).isEqualTo(occurredAt);
+    }
 }

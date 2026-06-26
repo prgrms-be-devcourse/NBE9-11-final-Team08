@@ -104,7 +104,7 @@ public class Chapter extends BaseTimeEntity {
                 Lecture existingLecture = existingLectureMap.get(lectureReq.id());
                 existingLecture.updateGeneralInfo(
                         lectureReq.title(),
-                        existingLecture.getSummary(),
+                        lectureReq.summary() != null ? lectureReq.summary() : "",
                         lectureReq.durationSeconds(),
                         lectureReq.orderNo(),
                         lectureReq.isFreePreview()
@@ -112,7 +112,7 @@ public class Chapter extends BaseTimeEntity {
             } else {
                 this.addLecture(Lecture.createDraft(
                         lectureReq.title(),
-                        "",
+                        lectureReq.summary() != null ? lectureReq.summary() : "",
                         lectureReq.durationSeconds(),
                         lectureReq.orderNo(),
                         lectureReq.isFreePreview(),

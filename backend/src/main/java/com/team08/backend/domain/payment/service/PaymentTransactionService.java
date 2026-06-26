@@ -43,6 +43,9 @@ public class PaymentTransactionService {
     private static final String TOSS_NOT_DONE = "TOSS_NOT_DONE";
     private static final String TOSS_PAYMENT_NOT_FOUND = "TOSS_PAYMENT_NOT_FOUND";
     private static final String TOSS_PAYMENT_LOOKUP_UNKNOWN = "TOSS_PAYMENT_LOOKUP_UNKNOWN";
+    private static final String TOSS_RECOVERY_DUPLICATE_ENROLLMENT = "TOSS_RECOVERY_DUPLICATE_ENROLLMENT";
+    private static final String TOSS_RECOVERY_DUPLICATE_ENROLLMENT_MESSAGE =
+            "Toss 결제는 성공으로 조회됐지만 이미 수강권이 있어 자동 복구를 완료할 수 없습니다.";
     private static final List<PaymentStatus> RECOVERABLE_PAYMENT_STATUSES = List.of(
             PaymentStatus.PROCESSING,
             PaymentStatus.UNKNOWN
@@ -55,6 +58,7 @@ public class PaymentTransactionService {
     private final EnrollmentRepository enrollmentRepository;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
+    private final PaidCourseStudyMemberService paidCourseStudyMemberService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -142,6 +146,9 @@ public class PaymentTransactionService {
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
         }
 
+        List<OrderItem> orderItems = findOrderItems(order);
+        validateDuplicateEnrollment(context.userId(), orderItems);
+
         attempt.succeed(tossResponse.paymentKey(), completedAt);
         payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
         Payment savedPayment = paymentRepository.save(payment);
@@ -157,11 +164,15 @@ public class PaymentTransactionService {
         }
 
         markOrderPaid(order, completedAt);
-        List<OrderItem> orderItems = findOrderItems(order);
         List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(
                 context.userId(),
                 order,
                 orderItems,
+                completedAt
+        );
+        paidCourseStudyMemberService.joinAsMember(
+                context.userId(),
+                savedEnrollments.stream().map(Enrollment::getCourseId).toList(),
                 completedAt
         );
 
@@ -326,19 +337,22 @@ public class PaymentTransactionService {
     }
 
     private void validateDuplicateEnrollment(Long userId, List<OrderItem> orderItems) {
+        if (hasDuplicateEnrollment(userId, orderItems)) {
+            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
+        }
+    }
+
+    private boolean hasDuplicateEnrollment(Long userId, List<OrderItem> orderItems) {
         List<Long> courseIds = orderItems.stream()
                 .map(OrderItem::getCourseId)
                 .distinct()
                 .toList();
 
-        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        List<Long> existingCourseIds = enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 userId,
-                EnrollmentStatus.ACTIVE,
                 courseIds
         );
-        if (!activeCourseIds.isEmpty()) {
-            throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
-        }
+        return !existingCourseIds.isEmpty();
     }
 
     private Payment processTossPaymentRequested(
@@ -390,6 +404,20 @@ public class PaymentTransactionService {
     }
 
     private void recoverSuccess(Order order, Payment payment, TossPaymentResponse tossResponse, LocalDateTime recoveredAt) {
+        List<OrderItem> orderItems = List.of();
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            orderItems = findOrderItems(order);
+            if (hasDuplicateEnrollment(order.getUserId(), orderItems)) {
+                recoverUnknown(
+                        payment,
+                        TOSS_RECOVERY_DUPLICATE_ENROLLMENT,
+                        TOSS_RECOVERY_DUPLICATE_ENROLLMENT_MESSAGE,
+                        recoveredAt
+                );
+                return;
+            }
+        }
+
         payment.recoverSucceed(tossResponse.paymentKey(), tossResponse.method(), recoveredAt);
         findLatestAttempt(payment.getId())
                 .ifPresent(attempt -> attempt.recoverSucceed(tossResponse.paymentKey(), recoveredAt));
@@ -397,8 +425,12 @@ public class PaymentTransactionService {
 
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             markOrderPaid(order, recoveredAt);
-            List<OrderItem> orderItems = findOrderItems(order);
-            issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
+            List<Enrollment> enrollments = issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
+            paidCourseStudyMemberService.joinAsMember(
+                    order.getUserId(),
+                    enrollments.stream().map(Enrollment::getCourseId).toList(),
+                    recoveredAt
+            );
         }
     }
 

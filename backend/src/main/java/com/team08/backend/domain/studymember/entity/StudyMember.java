@@ -38,15 +38,28 @@ public class StudyMember {
 
     private LocalDateTime kickedAt;
 
-    private StudyMember(User user, Study study, StudyMemberRole role) {
+    private StudyMember(User user, Study study, StudyMemberRole role, LocalDateTime joinedAt) {
         this.user = user;
         this.study = study;
         this.role = role;
         this.status = StudyMemberStatus.ACTIVE;
-        this.joinedAt = LocalDateTime.now();
+        this.joinedAt = joinedAt;
     }
 
     public static StudyMember owner(User user, Study study) {
-        return new StudyMember(user, study, StudyMemberRole.OWNER);
+        return new StudyMember(user, study, StudyMemberRole.OWNER, LocalDateTime.now());
+    }
+
+    public static StudyMember member(User user, Study study, LocalDateTime joinedAt) {
+        return new StudyMember(user, study, StudyMemberRole.MEMBER, joinedAt);
+    }
+
+    public void leave(LocalDateTime leftAt) {
+        if (this.status != StudyMemberStatus.ACTIVE) {
+            return;
+        }
+
+        this.status = StudyMemberStatus.LEFT;
+        this.leftAt = leftAt;
     }
 }

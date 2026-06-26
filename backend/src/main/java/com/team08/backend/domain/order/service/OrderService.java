@@ -6,7 +6,6 @@ import com.team08.backend.domain.cartitem.entity.CartItem;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
 import com.team08.backend.domain.order.dto.OrderSummaryResponse;
@@ -157,12 +156,11 @@ public class OrderService {
                 .distinct()
                 .toList();
 
-        List<Long> activeCourseIds = enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        List<Long> existingCourseIds = enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 userId,
-                EnrollmentStatus.ACTIVE,
                 courseIds
         );
-        if (!activeCourseIds.isEmpty()) {
+        if (!existingCourseIds.isEmpty()) {
             throw new CustomException(ErrorCode.LECTURE_ALREADY_ENROLLED);
         }
     }

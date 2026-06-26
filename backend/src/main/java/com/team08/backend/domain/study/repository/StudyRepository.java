@@ -19,6 +19,10 @@ public interface StudyRepository extends JpaRepository<Study, Long> {
 
     Optional<Study> findByCourseIdAndStatusNot(Long courseId, StudyStatus status);
 
+    Optional<Study> findByCourseIdAndStatusIn(Long courseId, Collection<StudyStatus> statuses);
+
+    List<Study> findByCourseIdInAndStatusIn(Collection<Long> courseIds, Collection<StudyStatus> statuses);
+
     @Query("""
         SELECT s
         FROM Study s

@@ -59,7 +59,6 @@ class LearningEventControllerTest {
                 1L, 2L, 10L,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                LocalDateTime.of(2026, 6, 13, 10, 0),
                 "event-key-abc"
         );
         LearningEventResponse response = new LearningEventResponse(
@@ -80,40 +79,13 @@ class LearningEventControllerTest {
     }
 
     @Test
-    @WithMockLoginUser(id = 2L)
-    @DisplayName("재생 위치 이벤트 - positionSeconds 포함")
-    void recordEvent_positionSave_returns201() throws Exception {
-        RecordLearningEventRequest request = new RecordLearningEventRequest(
-                1L, 2L, 10L,
-                LearningEventType.POSITION_SAVE,
-                120,
-                LocalDateTime.of(2026, 6, 13, 10, 5),
-                "pos-key"
-        );
-        LearningEventResponse response = new LearningEventResponse(
-                101L, 2L, 1L, 2L, 10L,
-                LearningEventType.POSITION_SAVE, 120,
-                LocalDateTime.of(2026, 6, 13, 10, 5)
-        );
-
-        given(learningEventService.recordEvent(eq(2L), any())).willReturn(response);
-
-        mockMvc.perform(post("/api/learning-events")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.positionSeconds").value(120));
-    }
-
-    @Test
     @WithMockLoginUser
     @DisplayName("필수 필드 누락 시 400 반환")
     void recordEvent_missingRequiredField_returns400() throws Exception {
         // eventType 누락
         String invalidBody = """
                 {
-                  "lectureId": 10,
-                  "eventTime": "2026-06-13T10:00:00"
+                  "lectureId": 10
                 }
                 """;
 

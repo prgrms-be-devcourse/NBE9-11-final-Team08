@@ -30,6 +30,12 @@ define run-prod
 	cd $(COMPOSE_DIR) && $(PROD_DC) $(1)
 endef
 
+# 부하(perf) 서버 stack 은 .env.perf 로 실행
+# (DB 1234 + 더미 AWS/CloudFront/JWT + 쓰기가능 업로드경로 + BACKEND_ENV_FILE=.env.perf)
+define run-perf
+	cd $(COMPOSE_DIR) && docker compose --env-file .env.perf $(1)
+endef
+
 .DEFAULT_GOAL := help
 .PHONY: help dev dev-down dev-logs dev-reset perf perf-down perf-reset perf-server perf-server-down perf-server-reset perf-server-t3small perf-server-t3small-down perf-server-t3small-reset perf-client perf-client-down perf-client-reset perf-all-down perf-all-reset ps all-down all-reset
 
@@ -69,27 +75,27 @@ dev-reset: ## [개발] DB/Redis 완전 초기화 (DB 볼륨 삭제 + Redis FLUSH
 # 그다음 make perf-client 가 BASE_URL 로 지정한 서버를 친다.
 
 perf-server: ## [부하] 서버 stack(db+app) 기동 — 측정 대상, 8080 노출
-	cd $(COMPOSE_DIR) && APP_DATA_INIT_MODE=bulk $(DC) $(BASE) up -d --build --wait backend
+	$(call run-perf,$(BASE) up -d --build --wait backend)
 	@echo "✅ 서버 준비됨 → http://localhost:8080"
 
 perf-server-down: ## [부하] 서버 컨테이너 내리기 (데이터 유지)
-	$(call run,$(BASE) down)
+	$(call run-perf,$(BASE) down)
 	@echo "🗑️ 서버 스택 내림 (볼륨 유지)"
 
 perf-server-reset: ## [부하] DB 컨테이너 삭제 (데이터 삭제)
-	$(call run,$(BASE) down -v)
+	$(call run-perf,$(BASE) down -v)
 	@echo "🗑️ 서버 스택 삭제 (볼륨 삭제)"
 
 perf-server-t3small: ## [부하] t3.small(2vCPU/2GiB) 제한 서버 stack(db+redis+backend) 기동 — base 머지, 8080 노출
-	$(call run,$(BASE) $(T3_OVERRIDE) up -d --build --wait)
+	$(call run-perf,$(BASE) $(T3_OVERRIDE) up -d --build --wait)
 	@echo "✅ t3.small 제한 서버 준비됨 → http://localhost:8080"
 
 perf-server-t3small-down: ## [부하] t3.small 서버 내리기 (데이터 유지)
-	$(call run,$(BASE) $(T3_OVERRIDE) down)
+	$(call run-perf,$(BASE) $(T3_OVERRIDE) down)
 	@echo "🗑️ t3.small 서버 스택 내림 (볼륨 유지)"
 
 perf-server-t3small-reset: ## [부하] t3.small 서버 삭제 (데이터 삭제)
-	$(call run,$(BASE) $(T3_OVERRIDE) down -v)
+	$(call run-perf,$(BASE) $(T3_OVERRIDE) down -v)
 	@echo "🗑️ t3.small 서버 스택 삭제 (볼륨 삭제)"
 
 perf-client: ## [부하] k6 실행 (BASE_URL 타격) + influx/grafana 기동

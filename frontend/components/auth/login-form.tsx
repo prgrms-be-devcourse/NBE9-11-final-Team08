@@ -24,18 +24,11 @@ export function LoginForm() {
     setSubmitting(true)
 
     try {
-      const response = await api.login({ email, password })
-      if (response.accessToken) {
-        // 1. 클라이언트용: localStorage 저장
-        localStorage.setItem('accessToken', response.accessToken)
-        // 2. 서버 컴포넌트(SSR)용: Cookie 에도 동일하게 저장
-        document.cookie = `accessToken=${response.accessToken}; path=/; max-age=86400; samesite=lax`
-        
-        toast.success('환영합니다! 로그인이 완료되었습니다.')
-        const redirectTo = new URLSearchParams(window.location.search).get('redirect')
-        router.push(redirectTo?.startsWith('/') ? redirectTo : '/')
-        router.refresh() // 쿠키 변경 후 서버 컴포넌트들 리렌더링
-      }
+      await api.login({ email, password })
+      toast.success('환영합니다! 로그인이 완료되었습니다.')
+      const redirectTo = new URLSearchParams(window.location.search).get('redirect')
+      router.push(redirectTo?.startsWith('/') ? redirectTo : '/')
+      router.refresh()
     } catch (err: any) {
       toast.error(err.message || '로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.')
     } finally {

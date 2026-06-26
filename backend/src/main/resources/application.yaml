@@ -28,6 +28,10 @@ spring:
           batch_size: 50
         order_updates: true
         order_inserts: true
+  servlet:
+    multipart:
+      max-file-size: 2048MB
+      max-request-size: 2048MB
 
 springdoc:
   api-docs:
@@ -47,16 +51,25 @@ management:
 server:
   shutdown: graceful
   forward-headers-strategy: framework
+  tomcat:
+    max-swallow-size: -1
+    max-http-form-post-size: -1
 
 app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-millis: ${JWT_EXPIRATION_MILLIS:3600000}
     refresh-expiration-millis: ${JWT_REFRESH_EXPIRATION_MILLIS:1209600000}
+    access-cookie:
+      name: accessToken
+      secure: ${IS_COOKIE_SECURE:true}
+      same-site: ${SAME_SITE:Lax}
+      domain: ${COOKIE_DOMAIN:}
     refresh-cookie:
       name: refreshToken
       secure: ${IS_COOKIE_SECURE:true}
       same-site: ${SAME_SITE:Lax}
+      domain: ${COOKIE_DOMAIN:}
   feed:
     outbox:
       scheduler-enabled: ${FEED_OUTBOX_SCHEDULER_ENABLED:true}

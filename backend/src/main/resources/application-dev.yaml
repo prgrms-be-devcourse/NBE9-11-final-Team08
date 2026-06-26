@@ -11,8 +11,15 @@ spring:
 springdoc:
   api-docs:
     enabled: true
+  swagger-ui:
+    csrf:
+      enabled: true
 
 app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+      - http://127.0.0.1:3000
   ai:
     model: stub
     prompt-version: v1
@@ -20,9 +27,14 @@ app:
     mode: ${APP_DATA_INIT_MODE:none}  # none:더미데이터 필요 x | simple: 더미데이터 소량생성 | bulk : 더미데이터 대량생성
   jwt:
     secret: ${JWT_SECRET:dev-secret-key-that-is-at-least-32-characters-long-for-hs256}
+    access-cookie:
+      secure: false
+      same-site: Lax
+      domain:
     refresh-cookie:
       secure: false
-      same-site: None
+      same-site: Lax
+      domain:
 
 cloud:
   aws:

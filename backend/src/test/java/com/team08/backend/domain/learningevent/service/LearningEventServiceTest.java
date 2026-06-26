@@ -10,12 +10,14 @@ import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
+import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -73,22 +75,11 @@ class LearningEventServiceTest {
         assertThat(response.eventType()).isEqualTo(LearningEventType.LECTURE_ENTER);
         assertThat(response.userId()).isEqualTo(userId);
         assertThat(response.lectureId()).isEqualTo(10L);
-    }
 
-    @Test
-    @DisplayName("재생 위치 이벤트 기록 - positionSeconds 포함")
-    void recordEvent_positionSave_withPositionSeconds() {
-        Long userId = 2L;
-        RecordLearningEventRequest request = positionSaveRequest(10L, 120, "pos-key-001");
-        LearningEvent saved = savedEvent(2L, userId, request);
-
-        given(learningEventRepository.existsByUniqueEventKey("pos-key-001")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(saved);
-
-        LearningEventResponse response = learningEventService.recordEvent(userId, request);
-
-        assertThat(response.positionSeconds()).isEqualTo(120);
-        assertThat(response.eventType()).isEqualTo(LearningEventType.POSITION_SAVE);
+        ArgumentCaptor<LearningEventRecorded> eventCaptor = ArgumentCaptor.forClass(LearningEventRecorded.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().learningEventId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().eventType()).isEqualTo(LearningEventType.LECTURE_ENTER);
     }
 
     @Test
@@ -367,17 +358,6 @@ class LearningEventServiceTest {
                 1L, 2L, lectureId,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                LocalDateTime.of(2026, 6, 13, 10, 0),
-                eventKey
-        );
-    }
-
-    private RecordLearningEventRequest positionSaveRequest(Long lectureId, int position, String eventKey) {
-        return new RecordLearningEventRequest(
-                1L, 2L, lectureId,
-                LearningEventType.POSITION_SAVE,
-                position,
-                LocalDateTime.of(2026, 6, 13, 10, 5),
                 eventKey
         );
     }
@@ -390,7 +370,7 @@ class LearningEventServiceTest {
                 req.lectureId(),
                 req.eventType(),
                 req.positionSeconds(),
-                req.eventTime(),
+                LocalDateTime.now(), // 서버가 수신 시각으로 적재
                 req.eventKey() != null ? req.eventKey() : "generated-key"
         );
         ReflectionTestUtils.setField(event, "id", id);

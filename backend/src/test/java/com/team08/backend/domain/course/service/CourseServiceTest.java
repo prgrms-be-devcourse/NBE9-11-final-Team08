@@ -29,6 +29,7 @@ import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.util.FileUrlFormatter;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +85,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseThumbnailService courseThumbnailService;
+
+    @Mock
+    private FileUrlFormatter fileUrlFormatter;
 
     @InjectMocks
     private CourseService courseService;
@@ -264,7 +268,7 @@ class CourseServiceTest {
         CourseUpdateRequest request = new CourseUpdateRequest("제목", "설명", 2L, 20000, "thumb.png", List.of());
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(invalidCourseId)).willReturn(Optional.empty());
+        given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(invalidCourseId, instructorId, request, mockFile))
                 .isInstanceOf(CustomException.class)
@@ -286,7 +290,8 @@ class CourseServiceTest {
         CourseUpdateRequest request = new CourseUpdateRequest("변경 제목", "변경 설명", 3L, 20000, "new.png", List.of());
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findChaptersWithLecturesAsc(courseId)).willReturn(List.of());
 
         assertThatThrownBy(() -> courseService.updateCourseGeneralInfo(courseId, hackerId, request, mockFile))
                 .isInstanceOf(CustomException.class)
@@ -326,13 +331,14 @@ class CourseServiceTest {
         chapter.addLecture(lecture);
         course.addChapter(chapter);
 
-        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", 400, 1, true);
-        CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", 500, 2, false);
+        CourseUpdateRequest.LectureUpdateRequest lectureUpdate = new CourseUpdateRequest.LectureUpdateRequest(20L, "수정 강의", "요약", 400, 1, true);
+        CourseUpdateRequest.LectureUpdateRequest lectureNew = new CourseUpdateRequest.LectureUpdateRequest(null, "신규 강의", "", 500, 2, false);
         CourseUpdateRequest.ChapterUpdateRequest chapterUpdate = new CourseUpdateRequest.ChapterUpdateRequest(10L, "수정 챕터", 1, List.of(lectureUpdate, lectureNew));
         CourseUpdateRequest request = new CourseUpdateRequest("수정 제목", "수정 설명", 5L, 50000, "new.png", List.of(chapterUpdate));
         MultipartFile mockFile = new MockMultipartFile("thumbnail", "test.png", "image/png", "content".getBytes());
 
-        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
+        given(courseRepository.findChaptersWithLecturesAsc(courseId)).willReturn(List.of(chapter));
         given(courseThumbnailService.uploadThumbnail(eq(courseId), any(MultipartFile.class))).willReturn("courses/thumbnails/100/new-uuid.png");
 
         courseService.updateCourseGeneralInfo(courseId, instructorId, request, mockFile);
@@ -797,7 +803,7 @@ class CourseServiceTest {
                 .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
 
         verify(courseRepository, never()).findByLectureId(any(Long.class));
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -814,7 +820,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -833,7 +839,7 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.UNAUTHORIZED_COURSE_OWNER.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 
     @Test
@@ -851,7 +857,13 @@ class CourseServiceTest {
         courseService.uploadAndEncodeLectureVideo(instructorId, lectureId, mockFile);
 
         verify(courseRepository).findByLectureId(lectureId);
-        verify(mediaEncodingService).encodeToHls(eq(mockFile), any(String.class), eq(lectureId));
+
+        ArgumentCaptor<java.io.File> fileCaptor = ArgumentCaptor.forClass(java.io.File.class);
+        verify(mediaEncodingService).encodeToHls(fileCaptor.capture(), any(String.class), eq(lectureId));
+
+        java.io.File tempFile = fileCaptor.getValue();
+        assertThat(tempFile).exists();
+        tempFile.delete();
     }
 
     @Test
@@ -866,6 +878,6 @@ class CourseServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.INVALID_VIDEO_FORMAT.getMessage());
 
-        verify(mediaEncodingService, never()).encodeToHls(any(MultipartFile.class), any(String.class), any(Long.class));
+        verify(mediaEncodingService, never()).encodeToHls(any(java.io.File.class), any(String.class), any(Long.class));
     }
 }

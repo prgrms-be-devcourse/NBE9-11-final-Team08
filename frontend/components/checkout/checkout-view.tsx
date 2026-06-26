@@ -1,14 +1,19 @@
 // frontend/components/checkout/checkout-view.tsx
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, CreditCard, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCart } from '@/components/providers/cart-provider'
 import { api } from '@/lib/api'
-import { getOrderName, savePendingPayment, type PaymentProvider } from '@/lib/checkout-payment'
+import {
+  createPaymentIdempotencyKey,
+  getOrderName,
+  savePendingPayment,
+  type PaymentProvider,
+} from '@/lib/checkout-payment'
 import { loadTossPayments } from '@/lib/toss-payments'
 import { formatKRW } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,6 +46,7 @@ type CheckoutStep = 'idle' | 'loading-order' | 'creating-order' | 'mock-confirmi
 export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const router = useRouter()
   const { items, clear } = useCart()
+  const submittingRef = useRef(false)
   const tossClientKey = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY ?? ''
   const canUseToss = tossClientKey.trim().length > 0
   const [directOrder, setDirectOrder] = useState<OrderDetailResponse | null>(null)
@@ -194,6 +200,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       provider: paymentProvider,
       fromCart: !directOrder,
       issuedCouponId: selectedCouponId,
+      idempotencyKey: createPaymentIdempotencyKey(order.orderId, paymentProvider),
       createdAt: new Date().toISOString(),
     }
     savePendingPayment(pendingPayment)
@@ -215,8 +222,10 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   }
 
   async function handleMockPay() {
+    if (submittingRef.current) return
     if (!assertReadyToPay()) return
 
+    submittingRef.current = true
     setStep('creating-order')
     try {
       const order = await createOrGetOrder()
@@ -229,6 +238,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
         'CARD',
         pendingPayment.amount,
         selectedCouponId,
+        pendingPayment.idempotencyKey,
       )
 
       if (pendingPayment.fromCart) {
@@ -244,10 +254,12 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       const message = err instanceof Error ? err.message : 'Mock 결제 처리에 실패했습니다.'
       toast.error(message)
       setStep('idle')
+      submittingRef.current = false
     }
   }
 
   async function handleTossPay() {
+    if (submittingRef.current) return
     if (!assertReadyToPay()) return
 
     if (!canUseToss) {
@@ -255,6 +267,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       return
     }
 
+    submittingRef.current = true
     setStep('creating-order')
     try {
       const order = await createOrGetOrder()
@@ -287,10 +300,13 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
           flowMode: 'DEFAULT',
         },
       })
+      setStep('idle')
+      submittingRef.current = false
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Toss 결제창 호출에 실패했습니다.'
       toast.error(message)
       setStep('idle')
+      submittingRef.current = false
     }
   }
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -16,14 +17,23 @@ interface LectureDraft {
   id: string
   title: string
   description: string
+  durationSeconds: number
   videoName?: string
-  thumbnailName?: string
+  hasVideo?: boolean
+  videoFile: File | null
+  isFreePreview?: boolean
 }
 
 interface ChapterDraft {
   id: string
   title: string
   lectures: LectureDraft[]
+}
+
+/** 백엔드 Lecture 엔티티는 durationSeconds > 0 을 요구한다. */
+const toBackendDurationSeconds = (seconds: number) => {
+  const n = Number(seconds)
+  return Number.isFinite(n) && n > 0 ? n : 1
 }
 
 export function CurriculumBuilder({
@@ -40,7 +50,11 @@ export function CurriculumBuilder({
   const [saving, setSaving] = useState(false)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
 
-  const loadCurriculum = async (shouldShowToastError = true, preferredActiveIndex?: number) => {
+  const loadCurriculum = async (
+    shouldShowToastError = true,
+    preferredActiveIndex?: number,
+    uploadedVideoNames?: Record<string, string>,
+  ) => {
     if (!courseId) {
       setLoading(false)
       return
@@ -48,23 +62,45 @@ export function CurriculumBuilder({
     try {
       const course = await api.getCourse(courseId)
       setCourse(course ?? null)
-      if (course && course.chapters) {
-        const mappedChapters = course.chapters.map(ch => ({
+      if (course) {
+        const mappedChapters = (course.chapters ?? []).map((ch) => ({
           id: ch.id.toString(),
           title: ch.title,
-          lectures: ch.lectures.map(lec => ({
-            id: lec.id.toString(),
-            title: lec.title,
-            description: '',
-          }))
+          lectures: ch.lectures.map((lec) => {
+            const videoName =
+              uploadedVideoNames?.[lec.id] ??
+              (lec.hasVideo ? '업로드된 영상' : undefined)
+            return {
+              id: lec.id.toString(),
+              title: lec.title,
+              description: lec.summary ?? '',
+              durationSeconds: lec.durationSeconds || 0,
+              videoName,
+              hasVideo: lec.hasVideo ?? !!videoName,
+              videoFile: null,
+              isFreePreview: lec.isFreePreview ?? false,
+            }
+          }),
         }))
-        setChapters(mappedChapters)
+        setChapters((prev) => {
+          if (mappedChapters.length === 0 && prev.length > 0) {
+            console.warn('[CurriculumBuilder] 서버에서 빈 커리큘럼이 반환되어 로컬 상태를 유지합니다.')
+            return prev
+          }
+          return mappedChapters
+        })
         if (mappedChapters.length > 0) {
-          if (preferredActiveIndex !== undefined && preferredActiveIndex >= 0 && preferredActiveIndex < mappedChapters.length) {
+          if (
+            preferredActiveIndex !== undefined &&
+            preferredActiveIndex >= 0 &&
+            preferredActiveIndex < mappedChapters.length
+          ) {
             setActiveId(mappedChapters[preferredActiveIndex].id)
           } else {
             setActiveId(mappedChapters[0].id)
           }
+        } else {
+          setActiveId('')
         }
       }
     } catch (e) {
@@ -112,7 +148,7 @@ export function CurriculumBuilder({
               ...c,
               lectures: [
                 ...c.lectures,
-                { id: nextId(), title: '새 강의', description: '' },
+                { id: nextId(), title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
               ],
             }
           : c,
@@ -138,21 +174,31 @@ export function CurriculumBuilder({
       ),
     )
 
-  const handleVideoUpload = async (lectureId: string, file: File) => {
-    if (lectureId.startsWith('tmp_')) {
-      toast.warning('커리큘럼을 먼저 저장해 주세요. 저장한 강의에만 영상을 업로드할 수 있습니다.')
-      return
+  // 💡 비디오 파일 감지 및 로컬 큐(Queue) 상태 스태킹 전환
+  const handleVideoSelect = (lectureId: string, file: File) => {
+    // 비디오 파일에서 실제 재생 시간(duration)을 감지합니다.
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src)
+      const duration = Math.floor(video.duration)
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        durationSeconds: duration,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다. 재생 시간(${duration}초) 감지 완료.`)
     }
-    setUploadingId(lectureId)
-    try {
-      await api.uploadLectureVideo(lectureId, file)
-      updateLecture(active.id, lectureId, { videoName: file.name })
-      toast.success(`${file.name} 강의 영상이 업로드 되었습니다. 인코딩이 시작됩니다.`)
-    } catch (e: any) {
-      toast.error(`영상 업로드 실패: ${e.message || e}`)
-    } finally {
-      setUploadingId(null)
+    video.onerror = () => {
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다.`)
     }
+    video.src = URL.createObjectURL(file)
   }
 
   const handleSave = async () => {
@@ -175,15 +221,34 @@ export function CurriculumBuilder({
       return
     }
 
+    // 💡 1. 업로드 대기 중인 비디오 파일들을 챕터 타이틀과 렉처 타이틀 기준으로 스케줄링 큐에 임시 적재합니다.
+    const pendingUploads = chapters.flatMap((chapter, chapterIndex) =>
+      chapter.lectures
+        .map((lecture, lectureIndex) => ({
+          chapterIndex,
+          lectureOrderNo: lectureIndex + 1,
+          lectureTitle: lecture.title,
+          file: lecture.videoFile,
+        }))
+        .filter((target) => target.file !== null),
+    )
+
     const activeIndex = chapters.findIndex((c) => c.id === activeId)
     setSaving(true)
     try {
-      await api.updateCourse(courseId, {
-        title: course.title,
-        description: course.description,
-        categoryId: Number(course.category),
-        price: course.price,
-        thumbnail: course.thumbnailUrl,
+      const formData = new FormData()
+
+      const rawCat = (course as any).categoryId || (course as any).categoryIdResponse || course.category;
+      const parsedCategoryId = Number(rawCat);
+      const safeCategoryId = Number.isFinite(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : 1;
+
+      // 백엔드 CourseUpdateRequest DTO 규격 일치
+      const requestData = {
+        title: course.title || '임시 강좌 제목',
+        description: course.description || '강좌 세부 커리큘럼 명세 및 강의 구성 정보 단락입니다.',
+        categoryId: safeCategoryId,
+        price: Number(course.price) || 0,
+        thumbnail: course.thumbnailUrl || (course as any).thumbnail || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
         chapters: chapters.map((chapter, chapterIndex) => ({
           id: chapter.id.startsWith('tmp_') ? null : Number(chapter.id),
           title: chapter.title.trim(),
@@ -191,16 +256,64 @@ export function CurriculumBuilder({
           lectures: chapter.lectures.map((lecture, lectureIndex) => ({
             id: lecture.id.startsWith('tmp_') ? null : Number(lecture.id),
             title: lecture.title.trim(),
-            durationSeconds: 0,
+            summary: lecture.description.trim(),
+            durationSeconds: toBackendDurationSeconds(lecture.durationSeconds),
             orderNo: lectureIndex + 1,
-            isFreePreview: false,
+            isFreePreview: lecture.isFreePreview ?? false,
           })),
         })),
-      })
-      toast.success('커리큘럼이 성공적으로 저장되었습니다.')
-      await loadCurriculum(false, activeIndex)
-    } catch (error) {
-      toast.error('커리큘럼 저장에 실패했습니다.')
+      }
+
+      const requestBlob = new Blob(
+        [JSON.stringify(requestData)], 
+        { type: 'application/json' }
+      )
+      
+      formData.append('request', requestBlob)
+
+      // 💡 2. [텍스트 커리큘럼 저장] 먼저 백엔드 DB에 영속화 시켜 진짜 PK ID 발급을 유도합니다.
+      await api.updateCourse(courseId, formData)
+
+      // 💡 3. 저장 직후 최신 백엔드 정보를 다시 sync 조회해 옵니다.
+      const refreshedCourse = await api.getCourse(courseId)
+      
+      // 💡 4. 새로 발급된 진짜 렉처 정수 ID를 역추적해서 대기 중이던 대용량 비디오 파일들을 연쇄 호출 업로드합니다.
+      let videoUploadFailed = false
+      const uploadedVideoNames: Record<string, string> = {}
+      if (refreshedCourse && refreshedCourse.chapters) {
+        for (const target of pendingUploads) {
+          const matchedChapter = refreshedCourse.chapters[target.chapterIndex]
+          const matchedLecture = matchedChapter?.lectures?.[target.lectureOrderNo - 1]
+
+          if (matchedLecture && matchedLecture.id) {
+            const lecIdStr = matchedLecture.id.toString()
+            setUploadingId(lecIdStr)
+            try {
+              toast.info(`'${target.lectureTitle}' 강의 영상 업로드를 시작합니다...`)
+              await api.uploadLectureVideo(lecIdStr, target.file!)
+              uploadedVideoNames[lecIdStr] = target.file!.name
+              toast.success(`'${target.lectureTitle}' 영상 업로드 완료. 인코딩이 시작됩니다.`)
+            } catch (videoError: unknown) {
+              videoUploadFailed = true
+              const message = videoError instanceof Error ? videoError.message : String(videoError)
+              toast.error(`'${target.lectureTitle}' 영상 업로드 실패: ${message}`)
+            }
+          }
+        }
+        setUploadingId(null)
+      }
+
+      if (videoUploadFailed) {
+        toast.warning('커리큘럼은 저장되었으나 일부 영상 업로드에 실패했습니다.')
+      } else if (pendingUploads.length > 0) {
+        toast.success('커리큘럼과 영상 업로드가 완료되었습니다.')
+      } else {
+        toast.success('커리큘럼이 저장되었습니다.')
+      }
+      await loadCurriculum(false, activeIndex, uploadedVideoNames)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(`커리큘럼 저장에 실패했습니다: ${message}`)
     } finally {
       setSaving(false)
     }
@@ -331,58 +444,44 @@ export function CurriculumBuilder({
 
                     <div className="grid gap-1.5">
                       <Label>강의 영상</Label>
-                      {lecture.id.startsWith('tmp_') ? (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id={`video-input-${lecture.id}`}
+                          accept="video/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            // 💡 임시 ID 가드를 해제하고 로컬 스케줄 큐에 안전 인서트 작동
+                            if (file) handleVideoSelect(lecture.id, file)
+                          }}
+                          disabled={saving || uploadingId !== null}
+                        />
                         <button
                           type="button"
-                          onClick={() =>
-                            toast.warning('커리큘럼을 먼저 저장해 주세요. 저장한 강의에만 영상을 업로드할 수 있습니다.')
-                          }
-                          className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary opacity-60 cursor-not-allowed"
+                          onClick={() => {
+                            document.getElementById(`video-input-${lecture.id}`)?.click()
+                          }}
+                          disabled={saving || uploadingId !== null}
+                          className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary w-full"
                         >
-                          <span className="flex items-center gap-1.5 text-sm font-medium">
-                            <FileVideo className="size-4" />
-                            영상 파일 업로드 (저장 필요)
-                          </span>
-                          <span className="text-[11px]">저장 후 영상을 업로드할 수 있습니다.</span>
-                        </button>
-                      ) : (
-                        <div className="relative">
-                          <input
-                            type="file"
-                            id={`video-input-${lecture.id}`}
-                            accept="video/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) handleVideoUpload(lecture.id, file)
-                            }}
-                            disabled={uploadingId !== null}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              document.getElementById(`video-input-${lecture.id}`)?.click()
-                            }}
-                            disabled={uploadingId !== null}
-                            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary w-full"
-                          >
-                            {uploadingId === lecture.id ? (
-                              <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
-                                <Loader2 className="size-4 animate-spin" />
-                                업로드 중...
+                          {uploadingId === lecture.id ? (
+                            <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                              <Loader2 className="size-4 animate-spin" />
+                              업로드 중...
+                            </span>
+                          ) : (
+                            <>
+                              <span className="flex items-center gap-1.5 text-sm font-medium">
+                                <FileVideo className="size-4" />
+                                {lecture.videoName ??
+                                  (lecture.hasVideo ? '업로드된 영상' : '영상 파일 업로드')}
                               </span>
-                            ) : (
-                              <>
-                                <span className="flex items-center gap-1.5 text-sm font-medium">
-                                  <FileVideo className="size-4" />
-                                  {lecture.videoName ?? '영상 파일 업로드'}
-                                </span>
-                                <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
+                              <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB · 언제든 파일 미리 대기 가능</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid gap-1.5">
@@ -398,6 +497,22 @@ export function CurriculumBuilder({
                         placeholder="강의 내용을 간략히 설명하세요."
                         className="min-h-20"
                       />
+                    </div>
+
+                    <div className="flex items-center gap-2 py-1">
+                      <Checkbox
+                        id={`free-preview-${lecture.id}`}
+                        checked={lecture.isFreePreview ?? false}
+                        onCheckedChange={(checked) =>
+                          updateLecture(active.id, lecture.id, { isFreePreview: !!checked })
+                        }
+                      />
+                      <Label
+                        htmlFor={`free-preview-${lecture.id}`}
+                        className="text-sm font-medium leading-none cursor-pointer"
+                      >
+                        무료 미리보기 강의로 설정
+                      </Label>
                     </div>
 
                     <div className="grid gap-1.5">

@@ -3,6 +3,7 @@ package com.team08.backend.domain.lecture.service;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.exception.CustomException;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,34 @@ class LectureDbServiceTest {
 
         assertThat(lecture.getM3u8Path()).isEqualTo(dbSavePath);
         verify(eventPublisher).publishEvent(new VideoRollbackEvent(lectureId, targetDirName));
+    }
+
+    @Test
+    void 기존_videoUuid가_존재하는_경우_HLS_경로가_변경되고_롤백_이벤트와_클린업_이벤트를_모두_발행한다() {
+        Long lectureId = 1L;
+        String oldVideoUuid = UUID.randomUUID().toString();
+        String targetDirName = UUID.randomUUID().toString();
+        String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
+
+        Chapter mockChapter = mock(Chapter.class);
+        Lecture lecture = Lecture.createWithStream(
+                "old-path/output.m3u8",
+                oldVideoUuid,
+                "테스트 강의",
+                "",
+                600,
+                1,
+                false,
+                mockChapter
+        );
+
+        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+
+        lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
+
+        assertThat(lecture.getM3u8Path()).isEqualTo(dbSavePath);
+        verify(eventPublisher).publishEvent(new VideoRollbackEvent(lectureId, targetDirName));
+        verify(eventPublisher).publishEvent(new VideoCleanUpEvent(lectureId, oldVideoUuid));
     }
 
     @Test

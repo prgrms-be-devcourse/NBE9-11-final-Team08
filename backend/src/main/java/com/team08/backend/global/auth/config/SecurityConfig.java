@@ -1,6 +1,7 @@
 package com.team08.backend.global.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.auth.token.AccessCookieProperties;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.global.auth.filter.JwtAuthenticationFilter;
 import com.team08.backend.global.auth.handler.JwtAuthenticationEntryPoint;
@@ -8,26 +9,52 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
+import org.springframework.util.StringUtils;
+
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.function.Supplier;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity // @PreAuthorize(예: 관리자 전용 엔드포인트)를 실제로 강제한다
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
+            AccessCookieProperties accessCookieProperties,
             JwtAuthenticationFilter jwtAuthenticationFilter,
             JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint
     ) throws Exception {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrfTokenRepository.setCookieCustomizer(cookie -> {
+            cookie.path("/")
+                    .secure(accessCookieProperties.secure())
+                    .sameSite(accessCookieProperties.sameSite());
+            if (StringUtils.hasText(accessCookieProperties.domain())) {
+                cookie.domain(accessCookieProperties.domain());
+            }
+        });
+
         return http
                 .cors(Customizer.withDefaults())
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
@@ -35,10 +62,12 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",
+                                "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/signup",
                                 "/api/auth/refresh",
@@ -50,6 +79,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/by-course/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories").permitAll()
+            .requestMatchers(org.springframework.http.HttpMethod.GET, "/videos-local/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -59,9 +89,10 @@ public class SecurityConfig {
     @Bean
     JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtProvider jwtProvider,
+            AccessCookieProperties accessCookieProperties,
             JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint
     ) {
-        return new JwtAuthenticationFilter(jwtProvider, jwtAuthenticationEntryPoint);
+        return new JwtAuthenticationFilter(jwtProvider, accessCookieProperties, jwtAuthenticationEntryPoint);
     }
 
     @Bean
@@ -72,5 +103,30 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    private static final class SpaCsrfTokenRequestHandler implements CsrfTokenRequestHandler {
+
+        private final CsrfTokenRequestHandler plain = new CsrfTokenRequestAttributeHandler();
+
+        private final CsrfTokenRequestHandler xor = new XorCsrfTokenRequestAttributeHandler();
+
+        @Override
+        public void handle(
+                HttpServletRequest request,
+                HttpServletResponse response,
+                Supplier<CsrfToken> csrfToken
+        ) {
+            xor.handle(request, response, csrfToken);
+            csrfToken.get();
+        }
+
+        @Override
+        public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken csrfToken) {
+            if (StringUtils.hasText(request.getHeader(csrfToken.getHeaderName()))) {
+                return plain.resolveCsrfTokenValue(request, csrfToken);
+            }
+            return xor.resolveCsrfTokenValue(request, csrfToken);
+        }
     }
 }

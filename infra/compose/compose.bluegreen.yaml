@@ -1,0 +1,93 @@
+# 단일 서버 blue-green 배포 전용 override.
+# db/redis는 compose.yaml의 정의를 그대로 쓰고,
+# Spring은 blue/green 두 컨테이너로 나누고 nginx가 활성 색상으로 프록시한다.
+services:
+  backend-blue:
+    image: ${BACKEND_IMAGE}:${BLUE_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ${BACKEND_ENV_FILE:-.env}
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_HOST: db
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:${BLUE_BACKEND_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - internal
+      - public
+
+  backend-green:
+    image: ${BACKEND_IMAGE}:${GREEN_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - ${BACKEND_ENV_FILE:-.env}
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_HOST: db
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:${GREEN_BACKEND_PORT:-8082}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - internal
+      - public
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend-blue:8080}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/templates/prod.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - certbot_www:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - public
+
+  certbot:
+    image: certbot/certbot:v3.3.0
+    profiles: ["certbot"]
+    volumes:
+      - certbot_www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+volumes:
+  certbot_www:
+  letsencrypt:

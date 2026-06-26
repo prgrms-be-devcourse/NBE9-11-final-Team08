@@ -92,6 +92,14 @@ resource "aws_security_group" "app" {
   }
 
   ingress {
+    description = "SSH from enhye"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.admin_cidr2]
+  }
+
+  ingress {
     description = "HTTP"
     from_port   = 80
     to_port     = 80
@@ -122,7 +130,7 @@ resource "aws_security_group" "app" {
 
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.instance_type
+  instance_type               = var.app_instance_type
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.app.id]
   key_name                    = aws_key_pair.deploy.key_name

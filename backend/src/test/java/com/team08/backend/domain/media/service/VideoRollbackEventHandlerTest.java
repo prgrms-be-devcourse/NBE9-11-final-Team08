@@ -1,5 +1,6 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
 import com.team08.backend.global.util.S3FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class VideoRollbackEventHandlerTest {
     private LocalVideoEncodingService localVideoEncodingService;
 
     private VideoRollbackEvent videoRollbackEvent;
+    private VideoCleanUpEvent videoCleanUpEvent;
     private Long lectureId;
     private String targetDirName;
 
@@ -58,11 +60,12 @@ class VideoRollbackEventHandlerTest {
         lectureId = 1L;
         targetDirName = "rollback-test-uuid";
         videoRollbackEvent = new VideoRollbackEvent(lectureId, targetDirName);
+        videoCleanUpEvent = new VideoCleanUpEvent(lectureId, targetDirName);
     }
 
     @Test
     void 커밋_완료_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_다형성_메시징으로_트리거된다() {
-        videoRollbackEventHandler.cleanUpLeftoverVideos(videoRollbackEvent);
+        videoRollbackEventHandler.cleanUpOldVideos(videoCleanUpEvent);
 
         verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
         verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
@@ -82,7 +85,7 @@ class VideoRollbackEventHandlerTest {
                 .when(s3FileStorageService)
                 .deleteDirectory(anyString());
 
-        videoRollbackEventHandler.cleanUpLeftoverVideos(videoRollbackEvent);
+        videoRollbackEventHandler.cleanUpOldVideos(videoCleanUpEvent);
 
         verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
         verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
