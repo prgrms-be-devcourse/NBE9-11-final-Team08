@@ -49,7 +49,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         this.distributionDomain = distributionDomain;
         this.keyPairId = keyPairId;
         this.enabled = enabled;
-        this.cookieDomain = cookieDomain;
+        this.cookieDomain = (cookieDomain == null || cookieDomain.isBlank()) ? null : cookieDomain;
         this.clock = clock;
         this.privateKey = parsePrivateKey(privateKeyPem);
     }
@@ -120,7 +120,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
                 .path(path)
                 .maxAge(Duration.ofHours(1));
 
-        if (cookieDomain != null && !cookieDomain.isBlank()) {
+        if (cookieDomain != null) {
             builder.domain(cookieDomain);
         }
 
