@@ -128,7 +128,9 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     }
 
     private String encodeCloudFrontBase64(byte[] bytes) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-                .replace('_', '~');
+        return Base64.getEncoder().encodeToString(bytes)
+                .replace('+', '-')
+                .replace('=', '_')
+                .replace('/', '~');
     }
 }
