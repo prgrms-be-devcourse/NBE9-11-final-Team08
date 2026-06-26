@@ -48,7 +48,7 @@ public class CourseAccessContextResolver {
 
     private CourseAccessContext build(Course course, Long userId) {
         Long courseId = course.getId();
-        boolean hasActiveEnrollment = enrollmentRepository.existsByUserIdAndCourseIdAndStatus(
+        boolean hasActiveEnrollment = userId != null && enrollmentRepository.existsByUserIdAndCourseIdAndStatus(
                 userId, courseId, EnrollmentStatus.ACTIVE);
         boolean hasFreePreview = lectureRepository.existsByChapterCourseIdAndIsFreePreviewTrue(courseId);
 
@@ -58,7 +58,7 @@ public class CourseAccessContextResolver {
                 userId,
                 course.getStatus(),
                 hasActiveEnrollment,
-                course.getInstructorId().equals(userId),
+                userId != null && course.getInstructorId().equals(userId),
                 hasFreePreview,
                 isAdmin
         );
