@@ -30,12 +30,14 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     private final PrivateKey privateKey;
     private final Clock clock;
     private final boolean enabled;
+    private final String cookieDomain;
 
     public CloudFrontCookieSignerImpl(
             @Value("${cloud.aws.cloudfront.distribution-domain}") String distributionDomain,
             @Value("${cloud.aws.cloudfront.key-pair-id}") String keyPairId,
             @Value("${cloud.aws.cloudfront.private-key}") String privateKeyPem,
             @Value("${cloud.aws.cloudfront.enabled:true}") boolean enabled,
+            @Value("${app.jwt.access-cookie.domain:}") String cookieDomain,
             Clock clock) {
 
         if (distributionDomain == null || distributionDomain.isBlank() ||
@@ -47,6 +49,7 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         this.distributionDomain = distributionDomain;
         this.keyPairId = keyPairId;
         this.enabled = enabled;
+        this.cookieDomain = cookieDomain;
         this.clock = clock;
         this.privateKey = parsePrivateKey(privateKeyPem);
     }
@@ -110,13 +113,18 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     private ResponseCookie buildCookie(String name, String value, String path) {
         String sameSiteMode = enabled ? "None" : "Lax";
 
-        return ResponseCookie.from(name, value)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
                 .httpOnly(true)
                 .secure(enabled)
                 .sameSite(sameSiteMode)
                 .path(path)
-                .maxAge(Duration.ofHours(1))
-                .build();
+                .maxAge(Duration.ofHours(1));
+
+        if (cookieDomain != null && !cookieDomain.isBlank()) {
+            builder.domain(cookieDomain);
+        }
+
+        return builder.build();
     }
 
     private String encodeCloudFrontBase64(byte[] bytes) {
