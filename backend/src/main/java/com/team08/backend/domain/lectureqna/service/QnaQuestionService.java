@@ -2,6 +2,8 @@ package com.team08.backend.domain.lectureqna.service;
 
 import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
 import com.team08.backend.domain.course.access.CourseAction;
+import com.team08.backend.domain.lectureqna.dto.MyCommentResponse;
+import com.team08.backend.domain.lectureqna.dto.MyQnaRow;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerSummary;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
 import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -89,6 +92,31 @@ public class QnaQuestionService {
                 ));
 
         return questions.map(q -> toResponse(q, answerMap.get(q.getId())));
+    }
+
+    /**
+     * 마이페이지 "작성한 댓글": 내가 작성한 QnA 질문을 전 강의에 걸쳐 최신순으로 모아준다.
+     * 각 질문의 답변 여부(answered)를 한 번의 배치 조회로 채워 N+1 을 피한다.
+     */
+    @Transactional(readOnly = true)
+    public List<MyCommentResponse> getMyComments(Long userId) {
+        List<MyQnaRow> rows = qnaQuestionRepository.findMyComments(userId);
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> questionIds = rows.stream().map(MyQnaRow::id).toList();
+        Set<Long> answeredIds = qnaAnswerRepository.findByQuestionIdIn(questionIds)
+                .stream()
+                .map(QnaAnswer::getQuestionId)
+                .collect(Collectors.toSet());
+
+        return rows.stream()
+                .map(r -> new MyCommentResponse(
+                        r.id(), r.lectureId(), r.courseTitle(), r.lectureTitle(),
+                        r.title(), r.content(), r.createdAt(),
+                        answeredIds.contains(r.id())))
+                .toList();
     }
 
     private QnaQuestionResponse toResponse(QnaQuestion q, QnaAnswerSummary answer) {

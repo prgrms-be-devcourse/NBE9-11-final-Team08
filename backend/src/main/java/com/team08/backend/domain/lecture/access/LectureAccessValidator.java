@@ -14,14 +14,12 @@ import org.springframework.stereotype.Component;
  * 강의 입장 접근 검증 전용 모듈.
  *
  * <p>StudyAccessAuthorizer 는 "스터디 접근 권한"만 본다. 강의 입장에는 그 외에
- * <b>URL 계층 정합성</b>(lecture 가 path 의 chapter·course 소속인가)과
- * <b>무료 맛보기(isFreePreview)</b> 라는 강의 도메인 고유 규칙이 더 필요하므로,
- * 이 둘을 여기서 관리하고 실제 권한 판단만 StudyAccessAuthorizer 에 위임한다.
+ * <b>URL 계층 정합성</b>(lecture 가 path 의 chapter·course 소속인가)이 더 필요하므로,
+ * 이를 여기서 관리하고 실제 권한 판단만 StudyAccessAuthorizer 에 위임한다.
  *
  * <ul>
  *   <li>404 — URL 정합성: lecture→chapter→course 가 path 값과 일치하는지</li>
- *   <li>무료 맛보기면 권한 검사를 건너뛴다(미등록자도 시청 가능)</li>
- *   <li>그 외에는 StudyAccessAuthorizer 로 위임(403)</li>
+ *   <li>그 외에는 StudyAccessAuthorizer 로 위임(403). 무료 맛보기 예외 없이 모든 강의가 권한 검사를 거친다.</li>
  * </ul>
  *
  * 검증을 통과한 Lecture(chapter·course 조인페치 완료)를 반환해 호출부의 재조회를 막는다.
@@ -39,11 +37,9 @@ public class LectureAccessValidator {
 
         validateHierarchy(lecture, courseId, chapterId);
 
-        // 무료 맛보기는 권한 검사 없이 통과. 그 외에는 스터디 접근 권한에 위임한다.
+        // 무료 맛보기 예외 없이 모든 강의가 스터디 접근 권한 검사를 거친다.
         // (courseId 가 lecture 소속임을 위에서 검증했으므로 lecture 재조회 없는 authorizeByCourseId 사용)
-        if (!lecture.isFreePreview()) {
-            courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.VIEW_CONTENT);
-        }
+        courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.VIEW_CONTENT);
 
         return lecture;
     }
