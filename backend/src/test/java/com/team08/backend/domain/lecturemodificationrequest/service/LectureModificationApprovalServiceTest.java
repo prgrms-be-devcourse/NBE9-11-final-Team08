@@ -6,6 +6,7 @@ import com.team08.backend.domain.lecturemodificationrequest.dto.LectureModificat
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.entity.RequestStatus;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -35,21 +37,26 @@ class LectureModificationApprovalServiceTest {
     @Mock
     private LectureModificationRequestRepository requestRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private Long requestId;
     private Long adminId;
     private Lecture lecture;
     private LectureModificationRequest pendingRequest;
+    private String oldVideoUuid;
 
     @BeforeEach
     void setUp() {
         requestId = 1L;
         adminId = 999L;
+        oldVideoUuid = UUID.randomUUID().toString();
 
         // 리팩토링 포인트: 빌더 제거 후 정적 팩토리 메서드(createWithStream) 주입 및 의존성 매핑
         Chapter mockChapter = mock(Chapter.class);
         lecture = Lecture.createWithStream(
                 "old-path/output.m3u8",
-                UUID.randomUUID().toString(),
+                oldVideoUuid,
                 "테스트 강의",
                 "요약",
                 600,
@@ -77,6 +84,8 @@ class LectureModificationApprovalServiceTest {
         assertThat(pendingRequest.getStatus()).isEqualTo(RequestStatus.APPROVED);
         assertThat(pendingRequest.getManagedBy()).isEqualTo(adminId);
         assertThat(lecture.getM3u8Path()).isEqualTo("new-path/output.m3u8");
+
+        verify(eventPublisher).publishEvent(new VideoCleanUpEvent(lecture.getId(), oldVideoUuid));
     }
 
     @Test
@@ -109,6 +118,8 @@ class LectureModificationApprovalServiceTest {
         assertThat(pendingRequest.getRejectedReason()).isEqualTo("부적절한 영상 사유");
         assertThat(pendingRequest.getManagedBy()).isEqualTo(adminId);
         assertThat(lecture.getM3u8Path()).isEqualTo("old-path/output.m3u8");
+
+        verify(eventPublisher).publishEvent(new VideoCleanUpEvent(lecture.getId(), pendingRequest.getAfterVideoUuid()));
     }
 
     @Test

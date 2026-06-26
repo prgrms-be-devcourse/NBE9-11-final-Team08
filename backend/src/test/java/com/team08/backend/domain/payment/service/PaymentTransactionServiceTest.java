@@ -82,6 +82,9 @@ class PaymentTransactionServiceTest {
     @Mock
     private OrderCouponUsageRepository orderCouponUsageRepository;
 
+    @Mock
+    private PaidCourseStudyMemberService paidCourseStudyMemberService;
+
     private PaymentTransactionService paymentTransactionService;
 
     @BeforeEach
@@ -94,6 +97,7 @@ class PaymentTransactionServiceTest {
                 enrollmentRepository,
                 issuedCouponService,
                 orderCouponUsageRepository,
+                paidCourseStudyMemberService,
                 FIXED_CLOCK
         );
     }
@@ -172,9 +176,8 @@ class PaymentTransactionServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave(savedPayment);
@@ -205,6 +208,29 @@ class PaymentTransactionServiceTest {
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
         verify(enrollmentRepository).saveAll(any());
+    }
+
+    @Test
+    void existingEnrollmentPreventsTossPaymentBeforePaymentAttempt() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of(COURSE_ID));
+
+        assertThatThrownBy(() -> paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest()))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LECTURE_ALREADY_ENROLLED));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(paymentRepository, never()).save(any(Payment.class));
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+        verify(enrollmentRepository, never()).saveAll(any());
     }
 
     @Test
@@ -275,6 +301,10 @@ class PaymentTransactionServiceTest {
         given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
         given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
         stubPaymentSave(new AtomicReference<>());
         stubEnrollmentSaveAll();
 
@@ -291,6 +321,38 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
+    void duplicateEnrollmentDuringRecoveryKeepsPaymentUnknownWithoutThrowing() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
+        PaymentAttempt attempt = recoverableAttempt(payment);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of(COURSE_ID));
+        stubPaymentSave(new AtomicReference<>());
+
+        boolean recovered = paymentTransactionService.recoverTossPayment(
+                recoveryTarget(order),
+                tossResponse(order.getOrderNumber(), "DONE", 30_000)
+        );
+
+        assertThat(recovered).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(payment.getFailureCode()).isEqualTo("TOSS_RECOVERY_DUPLICATE_ENROLLMENT");
+        assertThat(payment.getFailureMessage()).contains("이미 수강권");
+        assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
+        assertThat(attempt.getFailureCode()).isEqualTo("TOSS_RECOVERY_DUPLICATE_ENROLLMENT");
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
     void unknownTossPaymentRecoveredAsSuccessIssuesEnrollment() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment payment = recoverablePayment(order, PaymentStatus.UNKNOWN);
@@ -301,6 +363,10 @@ class PaymentTransactionServiceTest {
         given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(payment));
         given(paymentAttemptRepository.findFirstByPayment_IdOrderByCreatedAtDesc(PAYMENT_ID)).willReturn(Optional.of(attempt));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
         stubPaymentSave(new AtomicReference<>());
         stubEnrollmentSaveAll();
 
@@ -411,9 +477,8 @@ class PaymentTransactionServiceTest {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
-        given(enrollmentRepository.findCourseIdsByUserIdAndStatusAndCourseIdIn(
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
                 USER_ID,
-                EnrollmentStatus.ACTIVE,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave(savedPayment);

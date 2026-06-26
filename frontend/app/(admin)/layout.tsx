@@ -8,7 +8,7 @@ export default async function AdminLayout({
   children: React.ReactNode
 }) {
   const userProfile = await api.getProfile()
-  if (!userProfile || !userProfile.isSeller) {
+  if (!userProfile || !userProfile.isAdmin) {
     redirect('/login')
   }
 

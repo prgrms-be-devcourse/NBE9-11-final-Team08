@@ -84,6 +84,22 @@ public class CourseAccessPolicyTest {
         assertDenied(() -> policy.authorize(context, CourseAction.MANAGE_COURSE));
     }
 
+    @Test
+    void 어드민_권한은_모든_CourseAction에_대해_통과된다() {
+        CourseAccessContext context = new CourseAccessContext(
+                1L,
+                CourseStatus.DRAFT,
+                false,
+                false,
+                false,
+                true
+        );
+
+        for (CourseAction action : CourseAction.values()) {
+            policy.authorize(context, action);
+        }
+    }
+
     private CourseAccessContext context(
             CourseStatus courseStatus,
             boolean hasActiveEnrollment,
@@ -95,7 +111,8 @@ public class CourseAccessPolicyTest {
                 courseStatus,
                 hasActiveEnrollment,
                 isOwner,
-                hasFreePreview
+                hasFreePreview,
+                false
         );
     }
 

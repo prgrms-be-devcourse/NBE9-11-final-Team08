@@ -39,6 +39,7 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
                 .orElseThrow(() -> new CustomException(ErrorCode.INTERNAL_SERVER_ERROR));
 
         Study study = Study.createForCourse(owner, course, command.title(), command.description());
+        study.activate();
         studyRepository.save(study);
 
         StudyMember studyMember = StudyMember.owner(owner, study);

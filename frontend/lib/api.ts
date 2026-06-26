@@ -41,6 +41,16 @@ import type {
   LearningEventResponse,
   QnaQuestionResponse,
   StudyReportResponse,
+  AdminOverview,
+  DailySessionPoint,
+  CourseStatRow,
+  LectureStatRow,
+  EnrolleeRow,
+  LearningEventRow,
+  AnomalyResponse,
+  AuditResponse,
+  FeedCursor,
+  FeedCursorResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -106,6 +116,18 @@ const getCredentialHeaders = async (includeCredentials: boolean): Promise<Record
 
 const getCredentialsMode = (includeCredentials: boolean): RequestCredentials => {
   return includeCredentials ? 'include' : 'same-origin'
+}
+
+const toIsoLocalDateTime = (value: string | number[]): string => {
+  if (!Array.isArray(value)) {
+    return value
+  }
+
+  const [year, month = 1, day = 1, hour = 0, minute = 0, second = 0, nano = 0] = value
+  const millisecond = Math.floor(nano / 1_000_000)
+  const pad = (num: number, length = 2) => String(num).padStart(length, '0')
+
+  return `${pad(year, 4)}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:${pad(second)}.${pad(millisecond, 3)}`
 }
 
 const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | undefined> => {
@@ -226,6 +248,46 @@ async function request<T>(
   }
 }
 
+async function requestText(
+  path: string,
+  includeAuth = true,
+  handleAuthError = true,
+): Promise<string> {
+  if (!BASE_URL) return ''
+  try {
+    const fetchRequest = async () => {
+      const authHeaders = await getCredentialHeaders(includeAuth)
+      return fetch(`${BASE_URL}${path}`, {
+        headers: {
+          ...authHeaders,
+        },
+        credentials: getCredentialsMode(includeAuth),
+        cache: 'no-store',
+      })
+    }
+
+    let res = await fetchRequest()
+    if (shouldAttemptTokenRefresh(path, includeAuth, res.status) && await refreshAuthTokens()) {
+      res = await fetchRequest()
+    }
+
+    if (!res.ok) {
+      console.warn(`[API 에러] ${res.status} on ${path}`)
+      if (res.status === 401 && handleAuthError) {
+        handleUnauthorized()
+      }
+      return ''
+    }
+
+    return await res.text()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[API 통신 실패] ${path}: ${message}`)
+    return ''
+  }
+}
+
+
 async function mutate<T>(
   path: string,
   method: string,
@@ -335,6 +397,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       m3u8Path: lec.m3u8Path ?? null,
       summary: lec.summary ?? '',
       hasVideo: lec.hasVideo ?? false,
+      isFreePreview: lec.isFreePreview ?? false,
     })) || [],
   })) || [],
   status: detail.status,
@@ -836,10 +899,10 @@ export const api = {
     const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
     if (courseId) {
       const instructorId = await getCurrentUserId()
-      
+
       const requestBlob = formData.get('request') as Blob
       const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-      
+
       saveCourseDraft(courseId, {
         instructorId,
         categoryId: Number(requestData.categoryId),
@@ -856,10 +919,10 @@ export const api = {
   updateCourse: async (courseId: string | number, formData: FormData) => {
     const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
     const instructorId = await getCurrentUserId()
-    
+
     const requestBlob = formData.get('request') as Blob
     const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-    
+
     saveCourseDraft(courseId, {
       instructorId,
       categoryId: Number(requestData.categoryId),
@@ -911,6 +974,27 @@ export const api = {
     request<LectureEnterResponse | null>(
       `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/enter`,
       null,
+    ),
+
+  // New API to fetch lecture details directly (including m3u8Path)
+  getLecture: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    request<any>(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}`,
+      null,
+    ),
+
+  getVideoStreamUrl: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    requestText(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/stream`,
+      true,
     ),
 
   getLastWatched: (courseId: string | number) =>
@@ -968,19 +1052,34 @@ export const api = {
   createOrderFromCart: () => mutate<OrderDetailResponse>('/api/orders/cart', 'POST'),
   createDirectOrder: (courseId: number) => mutate<OrderDetailResponse>('/api/orders/direct', 'POST', { courseId }),
   cancelOrder: (orderId: number | string) => mutate<OrderDetailResponse>(`/api/orders/${orderId}/cancel`, 'PATCH'),
-  confirmMockPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
+  confirmMockPayment: (
+    orderId: number,
+    paymentKey: string,
+    method: string,
+    amount: number,
+    issuedCouponId?: number | null,
+    idempotencyKey?: string | null,
+  ) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
       paymentKey,
       method,
       amount,
       issuedCouponId,
+      idempotencyKey,
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
-  confirmPayment: (orderId: number, paymentKey: string, method: string, amount: number, issuedCouponId?: number | null) =>
-    api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId),
+  confirmPayment: (
+    orderId: number,
+    paymentKey: string,
+    method: string,
+    amount: number,
+    issuedCouponId?: number | null,
+    idempotencyKey?: string | null,
+  ) =>
+    api.confirmMockPayment(orderId, paymentKey, method, amount, issuedCouponId, idempotencyKey),
 
   // Studies
   getMyStudies: async (): Promise<EnrolledCourse[]> => {
@@ -1017,6 +1116,19 @@ export const api = {
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
     ),
 
+  getStudyFeed: (studyId: string | number, cursor?: FeedCursor | null, size = 10) => {
+    const params = new URLSearchParams({ size: String(size) })
+    if (cursor) {
+      params.set('cursorOccurredAt', toIsoLocalDateTime(cursor.occurredAt))
+      params.set('cursorId', String(cursor.id))
+    }
+
+    return request<FeedCursorResponse>(
+      `/api/studies/${studyId}/feed?${params.toString()}`,
+      { items: [], nextCursor: null, hasNext: false },
+    )
+  },
+
   createStudyActivity: (studyId: number | string, content: string) =>
     mutate<StudyActivityResponse>(`/api/studies/${studyId}/activities`, 'POST', { content }),
 
@@ -1032,8 +1144,13 @@ export const api = {
     const study = await api.getStudy(studyId)
     if (!study) return undefined
 
-    const enrolled = await api.isCourseEnrollmentActive(study.courseId)
-    if (!enrolled) return undefined
+    const profile = await api.getProfile()
+    const isAdmin = profile ? profile.isAdmin : false
+
+    if (!isAdmin) {
+      const enrolled = await api.isCourseEnrollmentActive(study.courseId)
+      if (!enrolled) return undefined
+    }
 
     return study
   },
@@ -1160,6 +1277,7 @@ export const api = {
         studyCount: 0,
         courseCount: 0,
         isSeller: claims.role === 'ROLE_SELLER' || claims.role === 'ROLE_ADMIN',
+        isAdmin: claims.role === 'ROLE_ADMIN',
       }
     } catch (e) {
       console.error('Failed to decode token:', e)
@@ -1314,4 +1432,48 @@ export const api = {
     removeCourseDraft(courseId)
     return res
   },
+
+  // ── Admin Dashboard APIs ────────────────────────────────────────────
+  getAdminOverview: () =>
+    request<AdminOverview | null>('/api/admin/dashboard/overview', null),
+  getAdminDailySessions: (from?: string, to?: string) => {
+    const qs = new URLSearchParams()
+    if (from) qs.set('from', from)
+    if (to) qs.set('to', to)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<DailySessionPoint[]>(`/api/admin/dashboard/sessions/daily${suffix}`, [])
+  },
+  getAdminCourseStats: (page = 0, size = 20, status?: string) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (status) qs.set('status', status)
+    return request<PageResponse<CourseStatRow> | null>(
+      `/api/admin/dashboard/courses?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminLectureStats: (courseId: number) =>
+    request<LectureStatRow[]>(`/api/admin/dashboard/courses/${courseId}/lectures`, []),
+  getAdminEnrollees: (courseId: number, page = 0, size = 20) =>
+    request<PageResponse<EnrolleeRow> | null>(
+      `/api/admin/dashboard/courses/${courseId}/enrollees?page=${page}&size=${size}`,
+      null,
+    ),
+  getAdminUserTimeline: (userId: number, courseId?: number, page = 0, size = 30) => {
+    const qs = new URLSearchParams({ page: String(page), size: String(size) })
+    if (courseId != null) qs.set('courseId', String(courseId))
+    return request<PageResponse<LearningEventRow> | null>(
+      `/api/admin/dashboard/users/${userId}/timeline?${qs.toString()}`,
+      null,
+    )
+  },
+  getAdminAnomalies: (incompletionThreshold?: number, burstThreshold?: number, windowMinutes?: number) => {
+    const qs = new URLSearchParams()
+    if (incompletionThreshold != null) qs.set('incompletionThreshold', String(incompletionThreshold))
+    if (burstThreshold != null) qs.set('burstThreshold', String(burstThreshold))
+    if (windowMinutes != null) qs.set('windowMinutes', String(windowMinutes))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<AnomalyResponse | null>(`/api/admin/dashboard/anomalies${suffix}`, null)
+  },
+  getAdminAudit: () =>
+    request<AuditResponse | null>('/api/admin/dashboard/audit/retention', null),
 }

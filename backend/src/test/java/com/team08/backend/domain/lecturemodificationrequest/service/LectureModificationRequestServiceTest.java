@@ -56,13 +56,17 @@ class LectureModificationRequestServiceTest {
 
         requestService.createRequest(dto, instructorId, videoFile);
 
+        org.mockito.ArgumentCaptor<java.io.File> fileCaptor = org.mockito.ArgumentCaptor.forClass(java.io.File.class);
         verify(mediaEncodingService).encodeModificationToHls(
-                eq(videoFile),
+                fileCaptor.capture(),
                 any(String.class),
                 eq(dto.lectureId()),
                 eq(dto.description()),
                 eq(instructorId)
         );
+        java.io.File tempFile = fileCaptor.getValue();
+        org.assertj.core.api.Assertions.assertThat(tempFile).exists();
+        tempFile.delete();
     }
 
     @Test

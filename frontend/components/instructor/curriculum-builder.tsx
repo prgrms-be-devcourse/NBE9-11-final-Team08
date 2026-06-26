@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -20,6 +21,7 @@ interface LectureDraft {
   videoName?: string
   hasVideo?: boolean
   videoFile: File | null
+  isFreePreview?: boolean
 }
 
 interface ChapterDraft {
@@ -76,6 +78,7 @@ export function CurriculumBuilder({
               videoName,
               hasVideo: lec.hasVideo ?? !!videoName,
               videoFile: null,
+              isFreePreview: lec.isFreePreview ?? false,
             }
           }),
         }))
@@ -145,7 +148,7 @@ export function CurriculumBuilder({
               ...c,
               lectures: [
                 ...c.lectures,
-                { id: nextId(), title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false },
+                { id: nextId(), title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
               ],
             }
           : c,
@@ -173,13 +176,29 @@ export function CurriculumBuilder({
 
   // 💡 비디오 파일 감지 및 로컬 큐(Queue) 상태 스태킹 전환
   const handleVideoSelect = (lectureId: string, file: File) => {
-    // 임시 ID 상태여도 튕구지 않고, 상태 배열창에 가볍게 안착시킵니다.
-    updateLecture(active.id, lectureId, { 
-      videoFile: file, 
-      videoName: file.name,
-      hasVideo: false,
-    })
-    toast.info(`${file.name} 영상이 대기열에 추가되었습니다. 커리큘럼 저장 시 일괄 업로드됩니다.`)
+    // 비디오 파일에서 실제 재생 시간(duration)을 감지합니다.
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src)
+      const duration = Math.floor(video.duration)
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        durationSeconds: duration,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다. 재생 시간(${duration}초) 감지 완료.`)
+    }
+    video.onerror = () => {
+      updateLecture(active.id, lectureId, { 
+        videoFile: file, 
+        videoName: file.name,
+        hasVideo: false,
+      })
+      toast.info(`${file.name} 영상이 대기열에 추가되었습니다.`)
+    }
+    video.src = URL.createObjectURL(file)
   }
 
   const handleSave = async () => {
@@ -240,7 +259,7 @@ export function CurriculumBuilder({
             summary: lecture.description.trim(),
             durationSeconds: toBackendDurationSeconds(lecture.durationSeconds),
             orderNo: lectureIndex + 1,
-            isFreePreview: false,
+            isFreePreview: lecture.isFreePreview ?? false,
           })),
         })),
       }
@@ -478,6 +497,22 @@ export function CurriculumBuilder({
                         placeholder="강의 내용을 간략히 설명하세요."
                         className="min-h-20"
                       />
+                    </div>
+
+                    <div className="flex items-center gap-2 py-1">
+                      <Checkbox
+                        id={`free-preview-${lecture.id}`}
+                        checked={lecture.isFreePreview ?? false}
+                        onCheckedChange={(checked) =>
+                          updateLecture(active.id, lecture.id, { isFreePreview: !!checked })
+                        }
+                      />
+                      <Label
+                        htmlFor={`free-preview-${lecture.id}`}
+                        className="text-sm font-medium leading-none cursor-pointer"
+                      >
+                        무료 미리보기 강의로 설정
+                      </Label>
                     </div>
 
                     <div className="grid gap-1.5">

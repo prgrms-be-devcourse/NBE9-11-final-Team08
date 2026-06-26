@@ -7,7 +7,9 @@ import com.team08.backend.domain.feed.entity.FeedItemType;
 import com.team08.backend.domain.feed.repository.FeedItemRepository;
 import com.team08.backend.domain.feed.service.FeedContentSummarizer;
 import com.team08.backend.domain.feed.sse.FeedSseConnectionManager;
+import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -86,7 +88,7 @@ class FeedOutboxPublisherTest {
         StudyActivity activity = StudyActivity.create(studyId, authorId, "긴 활동 내용");
         ReflectionTestUtils.setField(activity, "id", activityId);
         ReflectionTestUtils.setField(activity, "createdAt", createdAt);
-        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(activity);
+        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(StudyActivityCreated.from(activity));
         FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
                 studyId,
                 activityId,
@@ -135,6 +137,69 @@ class FeedOutboxPublisherTest {
         assertThat(outboxEvent.getPublishedAt()).isEqualTo(LocalDateTime.now(clock));
         assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
         assertThat(objectMapper.writeValueAsString(sourceEvent)).doesNotContain("긴 활동 내용");
+
+        verify(feedSseConnectionManager).send(outboxEvent);
+    }
+
+    @Test
+    void learning_event_outbox를_강의_제목이_담긴_feedItem으로_변환한다() throws Exception {
+        Long studyId = 1L;
+        Long learningEventId = 30L;
+        Long actorId = 3L;
+        LocalDateTime occurredAt = LocalDateTime.of(2026, 6, 21, 13, 0);
+        LearningEventFeedOutboxPayload sourceEvent = new LearningEventFeedOutboxPayload(
+                learningEventId,
+                studyId,
+                actorId,
+                10L,
+                "스프링 이벤트 기초",
+                LearningEventType.LECTURE_COMPLETE,
+                occurredAt
+        );
+        FeedOutboxEvent outboxEvent = FeedOutboxEvent.learningEventRecorded(
+                studyId,
+                learningEventId,
+                LearningEventType.LECTURE_COMPLETE,
+                objectMapper.writeValueAsString(sourceEvent)
+        );
+        ReflectionTestUtils.setField(outboxEvent, "id", 101L);
+
+        User user = User.createUser("user@test.com", "password", "테스터", null);
+        ReflectionTestUtils.setField(user, "id", actorId);
+
+        given(feedOutboxEventRepository.findRetryableForUpdateSkipLocked(
+                "PENDING",
+                "FAILED",
+                LocalDateTime.now(clock),
+                100
+        )).willReturn(List.of(outboxEvent));
+        given(feedItemRepository.findByTypeAndSourceId(FeedItemType.LECTURE_COMPLETE, learningEventId))
+                .willReturn(Optional.empty());
+        given(feedItemRepository.save(org.mockito.ArgumentMatchers.any(FeedItem.class)))
+                .willAnswer(invocation -> {
+                    FeedItem feedItem = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(feedItem, "id", 201L);
+                    return feedItem;
+                });
+        given(userRepository.findById(actorId)).willReturn(Optional.of(user));
+
+        feedOutboxPublisher.publishPending();
+
+        ArgumentCaptor<FeedItem> feedItemCaptor = ArgumentCaptor.forClass(FeedItem.class);
+        verify(feedItemRepository).save(feedItemCaptor.capture());
+
+        FeedItem savedFeedItem = feedItemCaptor.getValue();
+        assertThat(savedFeedItem.getStudyId()).isEqualTo(studyId);
+        assertThat(savedFeedItem.getActorId()).isEqualTo(actorId);
+        assertThat(savedFeedItem.getType()).isEqualTo(FeedItemType.LECTURE_COMPLETE);
+        assertThat(savedFeedItem.getSourceId()).isEqualTo(learningEventId);
+        assertThat(savedFeedItem.getContent()).isEqualTo("스프링 이벤트 기초");
+
+        assertThat(outboxEvent.getFeedItemId()).isEqualTo(201L);
+        assertThat(outboxEvent.sseEventName()).isEqualTo(FeedOutboxEvent.FEED_ITEM_CREATED_EVENT);
+        assertThat(outboxEvent.getStatus()).isEqualTo(FeedOutboxEventStatus.PUBLISHED);
+        assertThat(outboxEvent.getPayload()).contains("\"type\":\"LECTURE_COMPLETE\"");
+        assertThat(outboxEvent.getPayload()).contains("\"actorNickname\":\"테스터\"");
 
         verify(feedSseConnectionManager).send(outboxEvent);
     }
@@ -199,7 +264,7 @@ class FeedOutboxPublisherTest {
         StudyActivity activity = StudyActivity.create(studyId, authorId, "긴 활동 내용");
         ReflectionTestUtils.setField(activity, "id", activityId);
         ReflectionTestUtils.setField(activity, "createdAt", createdAt);
-        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(activity);
+        StudyActivityFeedOutboxPayload sourceEvent = StudyActivityFeedOutboxPayload.from(StudyActivityCreated.from(activity));
         FeedOutboxEvent outboxEvent = FeedOutboxEvent.studyActivityCreated(
                 studyId,
                 activityId,

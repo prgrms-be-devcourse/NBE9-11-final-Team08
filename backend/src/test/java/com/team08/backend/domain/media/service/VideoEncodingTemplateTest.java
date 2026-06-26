@@ -8,9 +8,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.File;
 import java.nio.file.Path;
 
@@ -25,7 +22,7 @@ class VideoEncodingTemplateTest {
     private LectureDbService lectureDbService;
 
     private VideoEncodingTemplate videoEncodingTemplate;
-    private MockMultipartFile mockMultipartFile;
+    private File mockFile;
     private String targetDirName;
     private Long lectureId;
     private Long instructorId;
@@ -48,7 +45,7 @@ class VideoEncodingTemplateTest {
 
         videoEncodingTemplate = new VideoEncodingTemplate(mockHandler) {
             @Override
-            protected File prepareSourceFile(MultipartFile file, String targetDirName, Long lectureId) {
+            protected File prepareSourceFile(File file, String targetDirName, Long lectureId) {
                 isPrepareCalled = true;
                 if (shouldThrowInPrepare) {
                     throw new RuntimeException();
@@ -68,12 +65,7 @@ class VideoEncodingTemplateTest {
             }
         };
 
-        mockMultipartFile = new MockMultipartFile(
-                "file",
-                "test.mp4",
-                "video/mp4",
-                "test data".getBytes()
-        );
+        mockFile = new File("dummy.mp4");
         targetDirName = "test-dir";
         lectureId = 1L;
         instructorId = 100L;
@@ -82,7 +74,7 @@ class VideoEncodingTemplateTest {
     @Test
     void 파이프라인_실행_시_정해진_추상_메서드_생명주기가_순서대로_호출된다() {
         assertThrows(CustomException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
+                videoEncodingTemplate.executePipeline(mockFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
         );
 
         assertThat(isPrepareCalled).isTrue();
@@ -93,7 +85,7 @@ class VideoEncodingTemplateTest {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
-                videoEncodingTemplate.executePipeline(mockMultipartFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
+                videoEncodingTemplate.executePipeline(mockFile, targetDirName, lectureId, EncodingPurpose.CREATE, null, instructorId)
         );
 
         assertThat(isHandleCalled).isFalse();

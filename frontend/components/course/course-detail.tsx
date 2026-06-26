@@ -4,8 +4,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, PlayCircle, Star, Users, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { CheckCircle2, Clock, PlayCircle, Star, Users, Loader2, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,10 +17,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useCart } from '@/components/providers/cart-provider'
-import type { Course } from '@/lib/types'
+import type { Course, Lecture } from '@/lib/types'
 import { discountedPrice, formatKRW } from '@/lib/utils'
 import { api } from '@/lib/api'
+import Hls from 'hls.js'
 
 export function CourseDetail({ course }: { course: Course }) {
   const router = useRouter()
@@ -31,21 +38,89 @@ export function CourseDetail({ course }: { course: Course }) {
   const [isPurchased, setIsPurchased] = useState(false)
   const [hasStudyAccess, setHasStudyAccess] = useState(false)
   const [studyId, setStudyId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null)
+  const [previewLectureTitle, setPreviewLectureTitle] = useState<string>('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const hlsRef = useRef<Hls | null>(null)
+
+  const videoRef = useCallback((video: HTMLVideoElement | null) => {
+    if (hlsRef.current) {
+      hlsRef.current.destroy()
+      hlsRef.current = null
+    }
+
+    if (!video || !previewVideoUrl) return
+
+    if (Hls.isSupported()) {
+      const hls = new Hls()
+      hlsRef.current = hls
+      hls.loadSource(previewVideoUrl)
+      hls.attachMedia(video)
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play().catch((e) => console.log('Auto-play failed:', e))
+      })
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = previewVideoUrl
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch((e) => console.log('Auto-play failed:', e))
+      })
+    }
+  }, [previewVideoUrl])
+
+  const handlePreview = async (lec: Lecture) => {
+    setPreviewLoading(true)
+    try {
+      const chId = lec.chapterId || '';
+      const streamUrlText = await api.getVideoStreamUrl(course.id, chId, lec.id)
+      
+      if (!streamUrlText) {
+        toast.error('비디오 스트리밍 주소를 가져오지 못했습니다.')
+        return
+      }
+
+      const formattedUrl = streamUrlText.startsWith('http')
+        ? streamUrlText
+        : `http://localhost:8080/videos-local/${streamUrlText}`
+
+      setPreviewLectureTitle(lec.title)
+      setPreviewVideoUrl(formattedUrl)
+      setPreviewOpen(true)
+    } catch (error) {
+      toast.error('미리보기 재생을 시작할 수 없습니다.')
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
 
   const final = discountedPrice(course.price, course.discountRate)
   const totalLectures = course.chapters.reduce((s, c) => s + c.lectures.length, 0)
   const inCart = has(course.id)
-  const canPurchase = !(isLoggedIn && isPurchased)
+  const canPurchase = !(isLoggedIn && isPurchased) && !isAdmin
 
   useEffect(() => {
     const fetchAccess = async () => {
       try {
         const profile = await api.getProfile()
         setIsLoggedIn(!!profile)
+        const nextIsAdmin = profile ? profile.isAdmin : false
+        setIsAdmin(nextIsAdmin)
+        
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
-        const active = profile ? await api.isCourseEnrollmentActive(course.id) : false
+        
+        let active = false
+        if (profile && !nextIsAdmin) {
+          try {
+            active = await api.isCourseEnrollmentActive(course.id)
+          } catch (err) {
+            console.error('Failed to check active enrollment:', err)
+          }
+        }
+        
         setIsPurchased(active)
-        setHasStudyAccess(active && !!nextStudyId)
+        setHasStudyAccess((active || nextIsAdmin) && !!nextStudyId)
         setStudyId(nextStudyId)
       } catch (e) {
         console.error('Failed to fetch course/study access:', e)
@@ -159,25 +234,49 @@ export function CourseDetail({ course }: { course: Course }) {
                     <AccordionTrigger className="text-sm font-semibold">{ch.title}</AccordionTrigger>
                     <AccordionContent>
                       <ul className="space-y-1">
-                        {ch.lectures.map((lec) => (
-                          <li
-                            key={lec.id}
-                            className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-secondary"
-                          >
-                            <span className="flex items-center gap-2">
-                              {lec.completed ? (
-                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                              ) : (
-                                <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              {lec.title}
-                            </span>
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              {lec.duration}
-                            </span>
-                          </li>
-                        ))}
+                        {ch.lectures.map((lec) => {
+                          const isFreePreview = lec.isFreePreview === true;
+                          const showPreviewButton = isFreePreview && !isPurchased;
+
+                          return (
+                            <li
+                              key={lec.id}
+                              className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-secondary"
+                            >
+                              <span className="flex items-center gap-2">
+                                {lec.completed ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <PlayCircle className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <span className="font-medium">{lec.title}</span>
+                                {isFreePreview && (
+                                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border-none font-semibold">
+                                    무료 미리보기
+                                  </Badge>
+                                )}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                {showPreviewButton && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 gap-1 px-2.5 text-xs font-semibold hover:bg-primary hover:text-primary-foreground border-primary text-primary transition-all duration-200"
+                                    onClick={() => handlePreview(lec)}
+                                    disabled={previewLoading}
+                                  >
+                                    <Play className="h-3 w-3 fill-current" />
+                                    미리보기
+                                  </Button>
+                                )}
+                                <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                                  <Clock className="h-3 w-3" />
+                                  {lec.duration}
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </AccordionContent>
                   </AccordionItem>
@@ -251,6 +350,10 @@ export function CourseDetail({ course }: { course: Course }) {
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/study/${studyId}`}>스터디 입장</Link>
                   </Button>
+                ) : (isAdmin || isPurchased) ? (
+                  <Button variant="outline" className="w-full" disabled>
+                    스터디 미개설
+                  </Button>
                 ) : null}
 
                 <Separator />
@@ -273,6 +376,32 @@ export function CourseDetail({ course }: { course: Course }) {
           </div>
         </div>
       </div>
+
+      {/* 무료 미리보기 HLS 비디오 모달 */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden bg-black border-none shadow-2xl animate-in fade-in-50 duration-200">
+          <DialogHeader className="p-4 bg-background border-b flex flex-row items-center justify-between">
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-none">미리보기</Badge>
+              <span className="truncate max-w-[500px]">{previewLectureTitle}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative aspect-video w-full bg-neutral-950 flex items-center justify-center">
+            <video
+              ref={videoRef}
+              controls
+              className="h-full w-full object-contain animate-in fade-in-0 duration-300"
+              playsInline
+            />
+            {!previewVideoUrl && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/80 text-muted-foreground gap-2">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="text-sm">스트리밍을 로드하는 중...</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

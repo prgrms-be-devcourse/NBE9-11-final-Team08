@@ -5,9 +5,11 @@ import com.team08.backend.domain.lecturemodificationrequest.dto.LectureModificat
 import com.team08.backend.domain.lecturemodificationrequest.entity.LectureModificationRequest;
 import com.team08.backend.domain.lecturemodificationrequest.entity.RequestStatus;
 import com.team08.backend.domain.lecturemodificationrequest.repository.LectureModificationRequestRepository;
+import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class LectureModificationApprovalService {
 
     private final LectureModificationRequestRepository requestRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void approveRequest(Long requestId, Long adminId) {
@@ -29,7 +32,13 @@ public class LectureModificationApprovalService {
         request.approve(adminId);
 
         Lecture lecture = request.getLecture();
+        String oldVideoUuid = lecture.getVideoUuid();
+
         lecture.updateM3u8Path(request.getAfterM3u8Path(), request.getAfterVideoUuid());
+
+        if (oldVideoUuid != null && !oldVideoUuid.isBlank()) {
+            eventPublisher.publishEvent(new VideoCleanUpEvent(lecture.getId(), oldVideoUuid));
+        }
     }
 
     @Transactional
@@ -46,5 +55,10 @@ public class LectureModificationApprovalService {
         }
 
         request.reject(approvalRequest.rejectedReason(), adminId);
+
+        String rejectedVideoUuid = request.getAfterVideoUuid();
+        if (rejectedVideoUuid != null && !rejectedVideoUuid.isBlank()) {
+            eventPublisher.publishEvent(new VideoCleanUpEvent(request.getLecture().getId(), rejectedVideoUuid));
+        }
     }
 }

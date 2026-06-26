@@ -1,6 +1,6 @@
 package com.team08.backend.domain.feed.outbox;
 
-import com.team08.backend.domain.studyactivity.entity.StudyActivity;
+import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 
 import java.time.LocalDateTime;
 
@@ -10,12 +10,12 @@ public record StudyActivityFeedOutboxPayload(
         Long authorId,
         LocalDateTime createdAt
 ) {
-    public static StudyActivityFeedOutboxPayload from(StudyActivity studyActivity) {
+    public static StudyActivityFeedOutboxPayload from(StudyActivityCreated event) {
         return new StudyActivityFeedOutboxPayload(
-                studyActivity.getId(),
-                studyActivity.getStudyId(),
-                studyActivity.getAuthorId(),
-                studyActivity.getCreatedAt()
+                event.studyActivityId(),
+                event.studyId(),
+                event.authorId(),
+                event.createdAt()
         );
     }
 }
