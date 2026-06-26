@@ -1,6 +1,5 @@
 package com.team08.backend.domain.issuedcoupon.batch;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
@@ -25,7 +24,6 @@ import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CouponExpirationBatchScheduler {
 
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -34,11 +32,23 @@ public class CouponExpirationBatchScheduler {
 
     private final JobLauncher jobLauncher;
     private final Job couponExpirationJob;
-
-    @Qualifier("couponExpirationRetryTaskScheduler")
     private final TaskScheduler retryTaskScheduler;
     private final JdbcTemplate jdbcTemplate;
     private final Clock clock;
+
+    public CouponExpirationBatchScheduler(
+            JobLauncher jobLauncher,
+            Job couponExpirationJob,
+            @Qualifier("couponExpirationRetryTaskScheduler") TaskScheduler retryTaskScheduler,
+            JdbcTemplate jdbcTemplate,
+            Clock clock
+    ) {
+        this.jobLauncher = jobLauncher;
+        this.couponExpirationJob = couponExpirationJob;
+        this.retryTaskScheduler = retryTaskScheduler;
+        this.jdbcTemplate = jdbcTemplate;
+        this.clock = clock;
+    }
 
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     public void runCouponExpirationJob() {

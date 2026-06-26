@@ -26,6 +26,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -110,6 +112,34 @@ class CouponExpirationBatchConfigTest {
         assertThat(findExpired1.getStatus()).isEqualTo(CouponStatus.EXPIRED);
         assertThat(findExpired2.getStatus()).isEqualTo(CouponStatus.EXPIRED);
         assertThat(findValid.getStatus()).isEqualTo(CouponStatus.ISSUED);
+    }
+
+    @Test
+    @DisplayName("만료 대상이 청크 크기를 초과해도 반복 실행으로 모두 EXPIRED 상태로 변경된다.")
+    void expireCouponsOverChunkSizeTest() throws Exception {
+        // given
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime past = now.minusDays(1);
+        List<IssuedCoupon> expiredCoupons = new ArrayList<>();
+
+        for (long userId = 1; userId <= 1001; userId++) {
+            expiredCoupons.add(createCoupon(userId, past, now.minusDays(30)));
+        }
+        issuedCouponRepository.saveAll(expiredCoupons);
+
+        // when
+        JobParameters jobParameters = new JobParametersBuilder()
+                .addString("now", now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .addLong("time", System.currentTimeMillis())
+                .toJobParameters();
+
+        JobExecution jobExecution = jobLauncherTestUtils.launchJob(jobParameters);
+
+        // then
+        assertThat(jobExecution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        assertThat(issuedCouponRepository.findAll())
+                .hasSize(1001)
+                .allMatch(coupon -> coupon.getStatus() == CouponStatus.EXPIRED);
     }
 
     private IssuedCoupon createCoupon(Long userId, LocalDateTime expiredAt, LocalDateTime issuedAt) {
