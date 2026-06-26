@@ -60,6 +60,7 @@ compose=(
 )
 
 service="backend-${target_color}"
+target_upstream="${service}:8080"
 
 echo "Deploying ${service} with image tag ${image_tag}..."
 "${compose[@]}" pull "${service}"
@@ -72,6 +73,7 @@ for attempt in $(seq 1 40); do
     echo "TARGET_COLOR=${target_color}"
     echo "TARGET_PORT=${target_port}"
     echo "TARGET_SERVICE=${service}"
+    echo "TARGET_UPSTREAM=${target_upstream}"
     exit 0
   fi
 

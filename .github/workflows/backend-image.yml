@@ -88,6 +88,5 @@ jobs:
           chmod +x infra/scripts/deploy-bluegreen.sh
           ./infra/scripts/deploy-bluegreen.sh \
             "${{ secrets.PROD_APP_PUBLIC_IP }}" \
-            "${{ secrets.PROD_EDGE_PUBLIC_IP }}" \
             "$HOME/.ssh/team08-prod" \
             "${{ inputs.image_tag }}"
