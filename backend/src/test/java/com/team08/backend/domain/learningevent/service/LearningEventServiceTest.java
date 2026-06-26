@@ -29,9 +29,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,9 +44,6 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LearningEventServiceTest {
-
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final ZoneOffset KST_OFFSET = ZoneOffset.ofHours(9);
 
     @Mock
     private LearningEventRepository learningEventRepository;
@@ -102,94 +96,6 @@ class LearningEventServiceTest {
 
         assertThat(response).isNotNull();
         verify(learningEventRepository).save(any());
-    }
-
-
-    // ──── 이벤트 시각 검증 (skew → 발행 여부 / KST 변환) ─────────────────────────
-
-    @Test
-    @DisplayName("입장 이벤트 - 허용 오차를 크게 벗어나면 적재만 하고 도메인 이벤트는 발행하지 않는다")
-    void recordEvent_lectureEnter_largeSkew_recordedButNotPublished() {
-        Long userId = 1L;
-        OffsetDateTime farPast = OffsetDateTime.now(KST_OFFSET).minusDays(1); // 5분 초과
-        RecordLearningEventRequest request = new RecordLearningEventRequest(
-                1L, 2L, 10L, LearningEventType.LECTURE_ENTER, null, farPast, "enter-skew");
-
-        given(learningEventRepository.existsByUniqueEventKey("enter-skew")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(savedEvent(1L, userId, request));
-
-        learningEventService.recordEvent(userId, request);
-
-        // 적재는 하되 시각은 보정하지 않고 클라이언트 원본(KST 변환)을 그대로 저장한다.
-        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
-        verify(learningEventRepository).save(captor.capture());
-        LocalDateTime expectedKst = farPast.atZoneSameInstant(KST).toLocalDateTime();
-        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
-        // 도메인 이벤트는 발행하지 않는다(후속 반응 차단).
-        verify(eventPublisher, never()).publishEvent(any(LearningEventRecorded.class));
-    }
-
-    @Test
-    @DisplayName("퇴장 이벤트 - 허용 오차를 크게 벗어나면 적재만 하고 도메인 이벤트는 발행하지 않는다")
-    void recordEvent_lectureExit_largeSkew_recordedButNotPublished() {
-        Long userId = 1L;
-        OffsetDateTime farFuture = OffsetDateTime.now(KST_OFFSET).plusDays(1); // 미래로 조작
-        RecordLearningEventRequest request = new RecordLearningEventRequest(
-                1L, 2L, 10L, LearningEventType.LECTURE_EXIT, 300, farFuture, "exit-skew");
-
-        given(learningEventRepository.existsByUniqueEventKey("exit-skew")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(savedEvent(1L, userId, request));
-
-        learningEventService.recordEvent(userId, request);
-
-        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
-        verify(learningEventRepository).save(captor.capture());
-        LocalDateTime expectedKst = farFuture.atZoneSameInstant(KST).toLocalDateTime();
-        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
-        verify(eventPublisher, never()).publishEvent(any(LearningEventRecorded.class));
-    }
-
-    @Test
-    @DisplayName("입장 이벤트 - 허용 오차 이내면 KST 변환 후 그대로 적재하고 발행한다")
-    void recordEvent_lectureEnter_withinSkew_keepsClientTimeAndPublishes() {
-        Long userId = 1L;
-        OffsetDateTime nowUtc = OffsetDateTime.now(ZoneOffset.UTC); // 현재 시각, UTC 오프셋
-        RecordLearningEventRequest request = new RecordLearningEventRequest(
-                1L, 2L, 10L, LearningEventType.LECTURE_ENTER, null, nowUtc, "enter-ok");
-
-        given(learningEventRepository.existsByUniqueEventKey("enter-ok")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(savedEvent(1L, userId, request));
-
-        learningEventService.recordEvent(userId, request);
-
-        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
-        verify(learningEventRepository).save(captor.capture());
-        // UTC 입력이 KST(+9h) 로 변환된 값이 그대로 저장된다.
-        LocalDateTime expectedKst = nowUtc.atZoneSameInstant(KST).toLocalDateTime();
-        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
-        // 신뢰 범위 안이므로 도메인 이벤트도 발행된다.
-        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
-    }
-
-    @Test
-    @DisplayName("입장/퇴장 외 이벤트 - 오차가 커도 KST 변환만 하고 항상 발행한다")
-    void recordEvent_videoStart_largeSkew_alwaysPublished() {
-        Long userId = 2L;
-        OffsetDateTime farPastUtc = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
-        RecordLearningEventRequest request = new RecordLearningEventRequest(
-                1L, 2L, 10L, LearningEventType.VIDEO_START, 120, farPastUtc, "video-skew");
-
-        given(learningEventRepository.existsByUniqueEventKey("video-skew")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(savedEvent(2L, userId, request));
-
-        learningEventService.recordEvent(userId, request);
-
-        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
-        verify(learningEventRepository).save(captor.capture());
-        // VIDEO_START 는 신뢰성 판정 대상이 아니므로 하루 전 시각이 보존되고 발행된다(KST 변환만).
-        LocalDateTime expectedKst = farPastUtc.atZoneSameInstant(KST).toLocalDateTime();
-        assertThat(captor.getValue().getEventTime()).isEqualTo(expectedKst);
-        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
     }
 
 
@@ -452,7 +358,6 @@ class LearningEventServiceTest {
                 1L, 2L, lectureId,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                OffsetDateTime.now(KST_OFFSET), // 허용 오차 이내 → 정상 발행 경로
                 eventKey
         );
     }
@@ -465,7 +370,7 @@ class LearningEventServiceTest {
                 req.lectureId(),
                 req.eventType(),
                 req.positionSeconds(),
-                req.eventTime().atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime(),
+                LocalDateTime.now(), // 서버가 수신 시각으로 적재
                 req.eventKey() != null ? req.eventKey() : "generated-key"
         );
         ReflectionTestUtils.setField(event, "id", id);
