@@ -121,6 +121,9 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
   // 강의 입장 권한 상태: enterLecture(수강권 검사) 실패 시 true → 재생/작성 차단
   const [accessDenied, setAccessDenied] = useState(false)
   const [entering, setEntering] = useState(true)
+  // 마지막으로 LECTURE_ENTER 를 적재한 강의 ID. 클린업에서 리셋하지 않아 StrictMode
+  // 이중 마운트에서도 살아남아, 같은 강의 입장 ENTER 가 중복 적재되는 것을 막는다.
+  const enterRecordedRef = useRef<string | null>(null)
   // duplicate lectureInfo removed
 
   // HLS 비디오 스트리밍 로드 및 해제
@@ -201,8 +204,13 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
     setEntering(true)
     pendingStartPosRef.current = null
 
+    // 같은 강의로의 즉시 재마운트(StrictMode)에서는 ENTER 를 다시 적재하지 않는다.
+    // 메타/진행 정보 GET 은 매 마운트마다 다시 읽어야 하므로 enter 호출 자체는 유지한다.
+    const recordEnter = enterRecordedRef.current !== lectureId
+    if (recordEnter) enterRecordedRef.current = lectureId
+
     session
-      .enter(lectureId)
+      .enter(lectureId, recordEnter)
       .then((res) => {
         if (cancelled) return
         setEntering(false)

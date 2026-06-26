@@ -752,8 +752,20 @@ const formatWatchTime = (totalSeconds: number): string => {
 const mapStudyReportToDisplay = (
   raw: StudyReportResponse,
 ): Omit<StudyReport, 'studyName' | 'userName'> => {
+  // 백엔드가 LocalDate를 [년,월,일] 배열로 직렬화하므로(WRITE_DATES_AS_TIMESTAMPS),
+  // 배열/문자열 양쪽 모두에서 MM-DD를 안전하게 뽑아낸다.
+  const toMonthDay = (date: unknown): string => {
+    if (Array.isArray(date)) {
+      const [, month, day] = date as number[]
+      if (month == null || day == null) return ''
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return `${pad(month)}-${pad(day)}`
+    }
+    return typeof date === 'string' ? date.slice(5) : ''
+  }
+
   const progressData = (raw.dailyProgress ?? []).map((d) => ({
-    day: d.date?.slice(5) ?? '', // MM-DD
+    day: toMonthDay(d.date), // MM-DD
     progress: Number(d.progressRate ?? 0),
     minutes: 0,
   }))
