@@ -32,14 +32,8 @@ variable "public_subnet_cidr" {
   }
 }
 
-variable "edge_instance_type" {
-  description = "EC2 instance type for the Nginx edge host."
-  type        = string
-  default     = "t3.small"
-}
-
 variable "app_instance_type" {
-  description = "EC2 instance type for the Spring application host."
+  description = "EC2 instance type for the single host running Nginx, MySQL, Redis, and Spring."
   type        = string
   default     = "t3.medium"
 }
@@ -51,6 +45,16 @@ variable "admin_cidr" {
   validation {
     condition     = can(cidrhost(var.admin_cidr, 0))
     error_message = "admin_cidr must be a valid IPv4 or IPv6 CIDR."
+  }
+}
+
+variable "admin_cidr2" {
+  description = "Second trusted CIDR allowed to connect over SSH, for example 203.0.113.10/32."
+  type        = string
+
+  validation {
+    condition     = can(cidrhost(var.admin_cidr2, 0))
+    error_message = "admin_cidr2 must be a valid IPv4 or IPv6 CIDR."
   }
 }
 

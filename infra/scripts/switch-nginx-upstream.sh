@@ -30,13 +30,22 @@ else
 fi
 rm -f "${env_file}.bak"
 
+domain="$(grep -m 1 -E "^DOMAIN=" "${env_file}" | cut -d= -f2- || true)"
+
 compose=(
   docker compose
   --env-file "${env_file}"
-  -f "${compose_dir}/compose.edge.yaml"
+  -f "${compose_dir}/compose.yaml"
+  -f "${compose_dir}/compose.bluegreen.yaml"
 )
+
+if [[ -z "${domain}" ]] || ! "${compose[@]}" run --rm --entrypoint sh certbot -c \
+  "test -f /etc/letsencrypt/live/${domain}/fullchain.pem && test -f /etc/letsencrypt/live/${domain}/privkey.pem"; then
+  echo "Updated BACKEND_UPSTREAM to ${backend_upstream}. TLS certificate is not ready yet; run ./scripts/bootstrap-https.sh before starting nginx."
+  exit 0
+fi
 
 "${compose[@]}" up -d nginx
 "${compose[@]}" exec nginx nginx -s reload
 
-echo "Switched edge upstream to ${backend_upstream}"
+echo "Switched nginx upstream to ${backend_upstream}"
