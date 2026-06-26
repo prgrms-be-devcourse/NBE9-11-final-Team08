@@ -134,7 +134,11 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
     let hls: Hls | null = null;
 
     if (Hls.isSupported()) {
-      hls = new Hls();
+      hls = new Hls({
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true
+        }
+      });
       hls.loadSource(videoUrl);
       hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {

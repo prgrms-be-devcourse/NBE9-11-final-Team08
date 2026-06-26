@@ -55,7 +55,11 @@ export function CourseDetail({ course }: { course: Course }) {
     if (!video || !previewVideoUrl) return
 
     if (Hls.isSupported()) {
-      const hls = new Hls()
+      const hls = new Hls({
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true
+        }
+      })
       hlsRef.current = hls
       hls.loadSource(previewVideoUrl)
       hls.attachMedia(video)
