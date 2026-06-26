@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ReflectionEditor } from '@/components/study/reflection-editor'
+import { StudyReportDialog } from '@/components/study/study-report-dialog'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useLearningSession } from '@/lib/hooks/use-learning-session'
@@ -65,7 +66,6 @@ const formatClock = (totalSeconds: number) => {
 }
 
 export function StudyView({ course, studyId, readOnly = false }: StudyViewProps) {
-  const reportHref = `/study/${studyId ?? course.id}/report`
   const lectures = useMemo(
     () => course.chapters.flatMap((c) => c.lectures),
     [course],
@@ -444,9 +444,7 @@ const videoUrl = (lectureInfo?.m3u8Path ?? active?.m3u8Path)
             <Progress value={totalProgress} className="h-2 w-28" />
             <span className="text-xs font-semibold">{totalProgress}%</span>
           </div>
-          <Button asChild variant="outline" size="sm">
-            <Link href={reportHref}>학습 리포트</Link>
-          </Button>
+          <StudyReportDialog studyId={studyId ?? course.id} />
         </div>
       </header>
 
