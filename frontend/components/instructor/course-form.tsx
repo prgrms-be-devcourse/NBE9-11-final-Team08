@@ -35,7 +35,7 @@ const buildChapterUpdatePayload = (chapters: Chapter[]) =>
       summary: lecture.summary ?? '',
       durationSeconds: Number(lecture.durationSeconds) > 0 ? Number(lecture.durationSeconds) : 1,
       orderNo: lectureIndex + 1,
-      isFreePreview: false,
+      isFreePreview: lecture.isFreePreview || false,
     })),
   }))
 
