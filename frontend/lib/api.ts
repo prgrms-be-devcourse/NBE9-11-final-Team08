@@ -248,6 +248,46 @@ async function request<T>(
   }
 }
 
+async function requestText(
+  path: string,
+  includeAuth = true,
+  handleAuthError = true,
+): Promise<string> {
+  if (!BASE_URL) return ''
+  try {
+    const fetchRequest = async () => {
+      const authHeaders = await getCredentialHeaders(includeAuth)
+      return fetch(`${BASE_URL}${path}`, {
+        headers: {
+          ...authHeaders,
+        },
+        credentials: getCredentialsMode(includeAuth),
+        cache: 'no-store',
+      })
+    }
+
+    let res = await fetchRequest()
+    if (shouldAttemptTokenRefresh(path, includeAuth, res.status) && await refreshAuthTokens()) {
+      res = await fetchRequest()
+    }
+
+    if (!res.ok) {
+      console.warn(`[API 에러] ${res.status} on ${path}`)
+      if (res.status === 401 && handleAuthError) {
+        handleUnauthorized()
+      }
+      return ''
+    }
+
+    return await res.text()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn(`[API 통신 실패] ${path}: ${message}`)
+    return ''
+  }
+}
+
+
 async function mutate<T>(
   path: string,
   method: string,
@@ -357,6 +397,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
       m3u8Path: lec.m3u8Path ?? null,
       summary: lec.summary ?? '',
       hasVideo: lec.hasVideo ?? false,
+      isFreePreview: lec.isFreePreview ?? false,
     })) || [],
   })) || [],
   status: detail.status,
@@ -944,6 +985,16 @@ export const api = {
     request<any>(
       `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}`,
       null,
+    ),
+
+  getVideoStreamUrl: (
+    courseId: string | number,
+    chapterId: string | number,
+    lectureId: string | number,
+  ) =>
+    requestText(
+      `/api/courses/${courseId}/chapters/${chapterId}/lectures/${lectureId}/stream`,
+      true,
     ),
 
   getLastWatched: (courseId: string | number) =>
