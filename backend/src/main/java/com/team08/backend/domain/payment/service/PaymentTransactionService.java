@@ -79,6 +79,18 @@ public class PaymentTransactionService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Optional<TossPaymentRecoveryTarget> findTossRecoveryTargetByOrderNumber(String orderNumber) {
+        return paymentRepository.findByProviderAndOrder_OrderNumber(PaymentProviderType.TOSS, orderNumber)
+                .map(payment -> new TossPaymentRecoveryTarget(
+                        payment.getId(),
+                        payment.getOrder().getId(),
+                        payment.getOrder().getUserId(),
+                        payment.getOrder().getOrderNumber(),
+                        payment.getAmount()
+                ));
+    }
+
     @Transactional
     public TossPaymentProcessingContext prepareTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
         Order order = findMyPaymentOrderForUpdate(userId, orderId);

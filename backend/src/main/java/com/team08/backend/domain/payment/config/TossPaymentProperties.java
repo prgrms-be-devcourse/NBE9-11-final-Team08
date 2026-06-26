@@ -8,6 +8,7 @@ import java.time.Duration;
 public record TossPaymentProperties(
         String baseUrl,
         String secretKey,
+        String webhookSecret,
         Duration connectTimeout,
         Duration readTimeout
 ) {
