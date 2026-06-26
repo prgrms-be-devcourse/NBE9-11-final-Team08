@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,6 +43,9 @@ public class LearningEventService {
         }
 
         //1. 이벤트 적재
+        //   발생 시각은 클라이언트 시계를 믿지 않고 서버 수신 시각으로 찍는다(권위값).
+        //   타임존 모호성·시계 오차·조작이 원천적으로 없고, 모든 이벤트가 단일 서버 클럭으로 정렬된다.
+        //   (현재 클라이언트는 이벤트를 즉시 전송하므로 수신 시각 ≈ 발생 시각)
         LearningEvent event = LearningEvent.create(
                 userId,
                 request.courseId(),
@@ -49,7 +53,7 @@ public class LearningEventService {
                 request.lectureId(),
                 request.eventType(),
                 request.positionSeconds(),
-                request.eventTime(),
+                LocalDateTime.now(),
                 eventKey
         );
 

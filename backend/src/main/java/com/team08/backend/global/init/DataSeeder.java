@@ -18,6 +18,7 @@ import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
+import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
@@ -679,7 +680,31 @@ public class DataSeeder {
         hist.add(courseClosed.close(sellerClosed.getId())); // SUSPENDED(판매중지)
 
         User sellerDraft = saveShowcaseSeller("seller5@test.com", "초안작성자", pw);
-        buildShowcaseCourse(sellerDraft, catMkt, "퍼포먼스 마케팅", 18000); // DRAFT 유지
+        Course courseDraft = buildShowcaseCourse(sellerDraft, catMkt, "퍼포먼스 마케팅", 18000); // DRAFT 유지
+
+        Course courseJpa = buildShowcaseCourse(sellerPopular, catBackend, "JPA 성능 튜닝", 35000);
+        hist.add(courseJpa.requestReview(sellerPopular.getId()));
+        hist.add(courseJpa.approve(admin.getId()));
+
+        Course courseTypeScript = buildShowcaseCourse(sellerPending, catFront, "TypeScript 실무", 28000);
+        hist.add(courseTypeScript.requestReview(sellerPending.getId()));
+        hist.add(courseTypeScript.approve(admin.getId()));
+
+        Course courseKubernetes = buildShowcaseCourse(sellerRejected, catDevops, "쿠버네티스 운영", 42000);
+        hist.add(courseKubernetes.requestReview(sellerRejected.getId()));
+        hist.add(courseKubernetes.approve(admin.getId()));
+
+        Course courseDesignSystem = buildShowcaseCourse(sellerClosed, catUiux, "디자인 시스템 구축", 32000);
+        hist.add(courseDesignSystem.requestReview(sellerClosed.getId()));
+        hist.add(courseDesignSystem.approve(admin.getId()));
+
+        Course courseGrowth = buildShowcaseCourse(sellerDraft, catMkt, "그로스 마케팅 분석", 26000);
+        hist.add(courseGrowth.requestReview(sellerDraft.getId()));
+        hist.add(courseGrowth.approve(admin.getId()));
+
+        List<Course> showcaseCourses = List.of(
+                coursePopular, coursePending, courseRejected, courseClosed, courseDraft,
+                courseJpa, courseTypeScript, courseKubernetes, courseDesignSystem, courseGrowth);
 
         courseStatusHistoryRepository.saveAll(hist);
 
@@ -694,6 +719,20 @@ public class DataSeeder {
         readonlyStudy.activate();
         readonlyStudy.changeToReadOnly(); // ACTIVE → READONLY
         studyMemberRepository.save(StudyMember.owner(sellerClosed, readonlyStudy));
+
+        List<Study> showcaseStudies = new ArrayList<>(List.of(activeStudy, readonlyStudy));
+        List<User> extraStudyOwners = List.of(sellerPopular, sellerPending, sellerRejected, sellerClosed, sellerDraft);
+        for (Course course : List.of(courseJpa, courseTypeScript, courseKubernetes, courseDesignSystem, courseGrowth)) {
+            User owner = extraStudyOwners.stream()
+                    .filter(seller -> seller.getId().equals(course.getInstructorId()))
+                    .findFirst()
+                    .orElse(sellerPopular);
+            Study study = studyRepository.save(Study.createForCourse(
+                    owner, course, course.getTitle() + " 스터디", "6개월 학습 기록이 쌓인 스터디"));
+            study.activate();
+            studyMemberRepository.save(StudyMember.owner(owner, study));
+            showcaseStudies.add(study);
+        }
 
         List<Lecture> popularLectures = lecturesOf(coursePopular);
         Lecture freeLecture = popularLectures.get(0); // 1장 1강 = 무료 미리보기
@@ -785,7 +824,11 @@ public class DataSeeder {
         expiredCoupon.expire();
         issuedCouponRepository.saveAll(List.of(usedCoupon, expiredCoupon, activeCoupon));
 
-        log.info("[DataInit] 페르소나 쇼케이스 생성 완료 (판매자 5 · 수강생 9 · 관리자 1)");
+        seedSixMonthDemoUsage(showcaseCourses, showcaseStudies, List.of(
+                learnerComplete, learnerInProgress, learnerRefund, learnerPreview, learnerReflection,
+                learnerAttendance, learnerReadonly, learnerQna, learnerCoupon), now);
+
+        log.info("[DataInit] 페르소나 쇼케이스 생성 완료 (판매자 5 · 강좌 10 · 수강생 9 · 관리자 1)");
         return true;
     }
 
@@ -853,6 +896,233 @@ public class DataSeeder {
                 name, CouponTarget.COURSE, CouponType.AUTO, 100, CouponUsageType.SINGLE_USE, false,
                 DiscountType.PERCENT, 10, 5000, null, 30,
                 now.minusDays(1), now.plusDays(30), null, List.of(courseId));
+    }
+
+    /**
+     * 6개월 사용 흔적: 수강생마다 3~5개 강좌를 듣고, 강의별 시청 이벤트/진행도/일별롤업/리포트를 남긴다.
+     * 쇼케이스의 단일 엣지 케이스 위에 실제 서비스처럼 누적된 데이터를 얹는 데모 전용 보강이다.
+     */
+    private void seedSixMonthDemoUsage(List<Course> courses, List<Study> studies, List<User> learners, LocalDateTime now) {
+        List<Course> learnableCourses = courses.stream()
+                .filter(course -> course.getStatus() == CourseStatus.ON_SALE || course.getId().equals(studies.get(1).getCourse().getId()))
+                .toList();
+        Map<Long, Study> studyByCourseId = new HashMap<>();
+        for (Study study : studies) {
+            studyByCourseId.put(study.getCourse().getId(), study);
+        }
+
+        Set<String> existingEnrollments = new HashSet<>();
+        Set<String> activeEnrollments = new HashSet<>();
+        enrollmentRepository.findAll().forEach(e -> {
+            String key = e.getUserId() + ":" + e.getCourseId();
+            existingEnrollments.add(key);
+            if (e.getStatus() == EnrollmentStatus.ACTIVE) {
+                activeEnrollments.add(key);
+            }
+        });
+
+        Set<String> existingProgresses = new HashSet<>();
+        lectureProgressRepository.findAll().forEach(p -> existingProgresses.add(p.getUserId() + ":" + p.getLectureId()));
+
+        Set<String> existingReflections = new HashSet<>();
+        lectureReflectionRepository.findAll()
+                .forEach(r -> existingReflections.add(r.getUserId() + ":" + r.getLectureId()));
+
+        List<LectureProgress> progresses = new ArrayList<>();
+        List<LearningEvent> events = new ArrayList<>();
+        List<LectureReflection> reflections = new ArrayList<>();
+        List<Attendance> attendances = new ArrayList<>();
+        List<StudyDailyStat> dailyStats = new ArrayList<>();
+        List<StudyReport> reports = new ArrayList<>();
+        Map<String, int[]> dailyAgg = new LinkedHashMap<>();
+
+        LocalDate startDate = now.toLocalDate().minusMonths(6).plusDays(3);
+        int coursePool = learnableCourses.size();
+        for (int userIndex = 0; userIndex < learners.size(); userIndex++) {
+            User learner = learners.get(userIndex);
+            int targetCourseCount = 3 + (userIndex % 3); // 3~5개
+            int enrolledCourseCount = 0;
+
+            for (int offset = 0; offset < coursePool && enrolledCourseCount < targetCourseCount; offset++) {
+                Course course = learnableCourses.get((userIndex + offset * 2) % coursePool);
+                String enrollmentKey = learner.getId() + ":" + course.getId();
+                if (existingEnrollments.contains(enrollmentKey)) {
+                    continue;
+                }
+
+                enroll(learner, course, now.minusMonths(6).plusDays(userIndex * 3L + offset), "6M-" + userIndex + "-" + offset);
+                existingEnrollments.add(enrollmentKey);
+                activeEnrollments.add(enrollmentKey);
+                enrolledCourseCount++;
+            }
+
+            List<Course> learnerCourses = learnableCourses.stream()
+                    .filter(course -> activeEnrollments.contains(learner.getId() + ":" + course.getId()))
+                    .limit(targetCourseCount)
+                    .toList();
+
+            Attendance previous = null;
+            int attendanceSeq = 0;
+            for (int month = 5; month >= 0; month--) {
+                LocalDate date = now.toLocalDate().minusMonths(month).withDayOfMonth(Math.min(7 + userIndex, 24));
+                Attendance attendance = Attendance.record(
+                        learner.getId(), date, Optional.ofNullable(previous), attendanceSeq, date.atTime(8, 30));
+                attendances.add(attendance);
+                previous = attendance;
+                attendanceSeq++;
+            }
+
+            for (int courseIndex = 0; courseIndex < learnerCourses.size(); courseIndex++) {
+                Course course = learnerCourses.get(courseIndex);
+                List<Lecture> lectures = orderedLectures(course);
+                if (lectures.isEmpty()) continue;
+
+                int completedLectures = 1 + ((userIndex + courseIndex) % lectures.size());
+                int eventCount = 0;
+                int completedCount = 0;
+                int totalWatchSeconds = 0;
+
+                for (int lectureIndex = 0; lectureIndex < lectures.size(); lectureIndex++) {
+                    Lecture lecture = lectures.get(lectureIndex);
+                    boolean complete = lectureIndex < completedLectures;
+                    int watchRate = complete ? 100 : 35 + ((userIndex + lectureIndex) % 4) * 10;
+                    int watchedSeconds = lecture.getDurationSeconds() * watchRate / 100;
+                    LocalDateTime watchedAt = startDate
+                            .plusDays((long) courseIndex * 23 + (long) lectureIndex * 11 + userIndex)
+                            .atTime(19, 0)
+                            .plusMinutes(lectureIndex * 12L);
+
+                    String progressKey = learner.getId() + ":" + lecture.getId();
+                    if (!existingProgresses.contains(progressKey)) {
+                        progresses.add(new LectureProgress(
+                                null, lecture.getId(), learner.getId(), watchedSeconds, watchedSeconds,
+                                watchRate, complete, complete ? watchedAt.plusMinutes(9) : null, watchedAt, watchedAt));
+                        existingProgresses.add(progressKey);
+                    }
+
+                    String reflectionKey = learner.getId() + ":" + lecture.getId();
+                    if (complete && lectureIndex % 2 == 0 && !existingReflections.contains(reflectionKey)) {
+                        reflections.add(LectureReflection.create(
+                                learner.getId(), lecture.getId(), sixMonthReflection(courseIndex, lectureIndex)));
+                        existingReflections.add(reflectionKey);
+                    }
+
+                    eventCount += appendSixMonthWatchEvents(events, learner.getId(), lecture, watchedAt, complete, watchedSeconds);
+                    completedCount += complete ? 1 : 0;
+                    totalWatchSeconds += watchedSeconds;
+
+                    String dailyKey = learner.getId() + "|" + course.getId() + "|" + watchedAt.toLocalDate();
+                    int[] daily = dailyAgg.computeIfAbsent(dailyKey, ignored -> new int[2]);
+                    daily[0] += complete ? 6 : 5;
+                    daily[1] += complete ? 1 : 0;
+                }
+
+                Study study = studyByCourseId.get(course.getId());
+                if (study != null) {
+                    reports.add(sixMonthReport(
+                            learner.getId(), study.getId(), lectures, totalWatchSeconds, courseIndex,
+                            completedCount, lectures.size(), eventCount, startDate.plusDays((long) userIndex + courseIndex * 17L)));
+                }
+            }
+        }
+
+        for (Map.Entry<String, int[]> entry : dailyAgg.entrySet()) {
+            String[] parts = entry.getKey().split("\\|");
+            int[] value = entry.getValue();
+            dailyStats.add(StudyDailyStat.of(
+                    Long.valueOf(parts[0]), Long.valueOf(parts[1]), LocalDate.parse(parts[2]), value[0], value[1]));
+        }
+
+        lectureProgressRepository.saveAll(progresses);
+        learningEventRepository.saveAll(events);
+        lectureReflectionRepository.saveAll(reflections);
+        attendanceRepository.saveAll(attendances);
+        studyDailyStatRepository.saveAll(dailyStats);
+        studyReportRepository.saveAll(reports);
+
+        log.info("[DataInit] 6개월 데모 사용 흔적 생성 — 진행 {}건, 이벤트 {}건, 출석 {}건, 일별롤업 {}건, 리포트 {}건",
+                progresses.size(), events.size(), attendances.size(), dailyStats.size(), reports.size());
+    }
+
+    private int appendSixMonthWatchEvents(List<LearningEvent> out, Long userId, Lecture lec,
+                                          LocalDateTime base, boolean complete, int watchedSeconds) {
+        Long courseId = lec.getChapter().getCourse().getId();
+        Long chapterId = lec.getChapter().getId();
+        Long lecId = lec.getId();
+        int duration = lec.getDurationSeconds();
+        String key = "sixm-" + userId + "-" + lecId + "-" + base.toLocalDate() + "-";
+
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, key + "enter"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), key + "start"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, watchedSeconds, base.plusMinutes(8), key + "end"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, watchedSeconds, base.plusMinutes(9), key + "exit"));
+        if (complete) {
+            out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_COMPLETE, duration, base.plusMinutes(9).plusSeconds(1), key + "complete"));
+            return 6;
+        }
+        return 5;
+    }
+
+    private StudyReport sixMonthReport(Long userId, Long studyId, List<Lecture> lectures, int totalWatchSeconds,
+                                       int qnaSeed, int completedLectures, int totalLectures, int eventCount,
+                                       LocalDate firstDate) {
+        StudyReport report = StudyReport.create(userId, studyId);
+        report.update(
+                totalWatchSeconds,
+                1 + (qnaSeed % 4),
+                completedLectures,
+                totalLectures,
+                6,
+                topLecturesJson(lectures),
+                sixMonthDailyProgressJson(firstDate, completedLectures, totalLectures),
+                sixMonthActivityMapJson(firstDate, eventCount));
+        return report;
+    }
+
+    private String topLecturesJson(List<Lecture> lectures) {
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < Math.min(3, lectures.size()); i++) {
+            Lecture lecture = lectures.get(i);
+            if (i > 0) json.append(",");
+            json.append("{\"lectureId\":").append(lecture.getId())
+                    .append(",\"title\":\"").append(lecture.getTitle())
+                    .append("\",\"watchTimeSeconds\":").append(lecture.getDurationSeconds())
+                    .append("}");
+        }
+        return json.append("]").toString();
+    }
+
+    private String sixMonthDailyProgressJson(LocalDate firstDate, int completedLectures, int totalLectures) {
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < 6; i++) {
+            if (i > 0) json.append(",");
+            int cumulative = Math.min(completedLectures, Math.max(1, i * completedLectures / 5));
+            double rate = totalLectures == 0 ? 0.0 : cumulative * 100.0 / totalLectures;
+            json.append("{\"date\":\"").append(firstDate.plusMonths(i))
+                    .append("\",\"progressRate\":").append(String.format(Locale.US, "%.2f", rate))
+                    .append("}");
+        }
+        return json.append("]").toString();
+    }
+
+    private String sixMonthActivityMapJson(LocalDate firstDate, int eventCount) {
+        StringBuilder json = new StringBuilder("{");
+        for (int i = 0; i < 6; i++) {
+            if (i > 0) json.append(",");
+            json.append("\"").append(firstDate.plusMonths(i)).append("\":")
+                    .append(Math.max(2, eventCount / 6 + (i % 3)));
+        }
+        return json.append("}").toString();
+    }
+
+    private String sixMonthReflection(int courseIndex, int lectureIndex) {
+        String[] notes = {
+                "이번 달에는 핵심 개념을 실제 프로젝트에 적용했다.",
+                "헷갈렸던 부분을 다시 듣고 예제 코드를 정리했다.",
+                "스터디 피드백을 반영해서 복습 루틴을 조정했다.",
+                "강의 내용을 업무 시나리오에 맞춰 체크리스트로 만들었다."
+        };
+        return notes[(courseIndex + lectureIndex) % notes.length];
     }
 
     /** 강좌 생명주기: ON_SALE 5 / IN_REVIEW 1 / SUSPENDED(판매중지) 2 / SUSPENDED(반려) 1 / DRAFT 1 */
@@ -1137,7 +1407,7 @@ public class DataSeeder {
         return result;
     }
 
-    /** 강의 시청 이벤트 시퀀스: ENTER → START → POSITION_SAVE → END → EXIT (완강 시 COMPLETE). */
+    /** 강의 시청 이벤트 시퀀스: ENTER → START → END → EXIT (완강 시 COMPLETE). */
     private void appendWatchEvents(List<LearningEvent> out, Long userId, Lecture lec,
                                    LocalDateTime base, boolean complete) {
         Long courseId = lec.getChapter().getCourse().getId();
@@ -1149,7 +1419,6 @@ public class DataSeeder {
 
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.POSITION_SAVE, dur / 2, base.plusMinutes(5), k + "pos"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, endPos, base.plusMinutes(8), k + "end"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, endPos, base.plusMinutes(9), k + "exit"));
         if (complete) {

@@ -24,16 +24,25 @@ read_env_value() {
 
 DOMAIN="$(read_env_value DOMAIN)"
 CERTBOT_EMAIL="$(read_env_value CERTBOT_EMAIL)"
-BACKEND_UPSTREAM="$(read_env_value BACKEND_UPSTREAM)"
+BACKEND_UPSTREAM="$(read_env_value BACKEND_UPSTREAM || true)"
 
 : "${DOMAIN:?DOMAIN is required in .env}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL is required in .env}"
-: "${BACKEND_UPSTREAM:?BACKEND_UPSTREAM is required in .env}"
+if [[ -z "${BACKEND_UPSTREAM}" ]]; then
+  BACKEND_UPSTREAM="backend-blue:8080"
+  if grep -q -E "^BACKEND_UPSTREAM=" "${env_file}"; then
+    sed -i.bak "s|^BACKEND_UPSTREAM=.*|BACKEND_UPSTREAM=${BACKEND_UPSTREAM}|" "${env_file}"
+  else
+    printf '\nBACKEND_UPSTREAM=%s\n' "${BACKEND_UPSTREAM}" >> "${env_file}"
+  fi
+  rm -f "${env_file}.bak"
+fi
 
 compose=(
   docker compose
   --env-file "${env_file}"
-  -f "${compose_dir}/compose.edge.yaml"
+  -f "${compose_dir}/compose.yaml"
+  -f "${compose_dir}/compose.bluegreen.yaml"
 )
 
 echo "Creating a temporary certificate for ${DOMAIN}..."

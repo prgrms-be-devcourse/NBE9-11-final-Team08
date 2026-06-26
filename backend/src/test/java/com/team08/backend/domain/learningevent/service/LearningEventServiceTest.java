@@ -83,22 +83,6 @@ class LearningEventServiceTest {
     }
 
     @Test
-    @DisplayName("재생 위치 이벤트 기록 - positionSeconds 포함")
-    void recordEvent_positionSave_withPositionSeconds() {
-        Long userId = 2L;
-        RecordLearningEventRequest request = positionSaveRequest(10L, 120, "pos-key-001");
-        LearningEvent saved = savedEvent(2L, userId, request);
-
-        given(learningEventRepository.existsByUniqueEventKey("pos-key-001")).willReturn(false);
-        given(learningEventRepository.save(any())).willReturn(saved);
-
-        LearningEventResponse response = learningEventService.recordEvent(userId, request);
-
-        assertThat(response.positionSeconds()).isEqualTo(120);
-        assertThat(response.eventType()).isEqualTo(LearningEventType.POSITION_SAVE);
-    }
-
-    @Test
     @DisplayName("eventKey 미제공 시 서버가 UUID 자동 생성")
     void recordEvent_noEventKey_serverGeneratesKey() {
         Long userId = 1L;
@@ -374,17 +358,6 @@ class LearningEventServiceTest {
                 1L, 2L, lectureId,
                 LearningEventType.LECTURE_ENTER,
                 null,
-                LocalDateTime.of(2026, 6, 13, 10, 0),
-                eventKey
-        );
-    }
-
-    private RecordLearningEventRequest positionSaveRequest(Long lectureId, int position, String eventKey) {
-        return new RecordLearningEventRequest(
-                1L, 2L, lectureId,
-                LearningEventType.POSITION_SAVE,
-                position,
-                LocalDateTime.of(2026, 6, 13, 10, 5),
                 eventKey
         );
     }
@@ -397,7 +370,7 @@ class LearningEventServiceTest {
                 req.lectureId(),
                 req.eventType(),
                 req.positionSeconds(),
-                req.eventTime(),
+                LocalDateTime.now(), // 서버가 수신 시각으로 적재
                 req.eventKey() != null ? req.eventKey() : "generated-key"
         );
         ReflectionTestUtils.setField(event, "id", id);
