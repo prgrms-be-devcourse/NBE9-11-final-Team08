@@ -34,13 +34,12 @@ Prerequisites:
 - An external DNS domain
 - A public GHCR package for this repository
 
-Create the infrastructure. Terraform creates two EC2 hosts:
+Create the infrastructure. Terraform creates one EC2 host:
 
-- edge host: t3.small, runs Nginx and Certbot
-- app host: t3.medium, runs MySQL, Redis, and Spring
+- app host: t3.medium, runs Nginx, Certbot, MySQL, Redis, and Spring blue-green containers
 
-The app security group allows Spring ports `8080` through `8082` only from the
-edge security group.
+The security group opens only SSH, HTTP, and HTTPS. Spring blue-green ports are
+bound to `127.0.0.1` on the host and are proxied through Nginx.
 
 ```bash
 cd infra/terraform
@@ -50,30 +49,25 @@ terraform init
 terraform apply
 ```
 
-Upload and start the app server first:
+Deploy the first backend image with blue-green:
 
 ```bash
-./infra/scripts/deploy.sh <app-public-ip> <ssh-private-key> [image-tag]
+./infra/scripts/deploy-bluegreen.sh <server-elastic-ip> <ssh-private-key> <image-tag>
 ```
 
 The first run creates `/opt/team08/compose/.env` on the server and stops. Connect
 over SSH, fill in that file, set `IS_COOKIE_SECURE=true`, and run the deploy
 command again.
 
-Upload and start the edge server:
-
-```bash
-./infra/scripts/deploy-edge.sh <edge-elastic-ip> <ssh-private-key>
-```
-
-On the edge server, fill `/opt/team08/compose/.env` with `DOMAIN`,
-`CERTBOT_EMAIL`, and `BACKEND_UPSTREAM=<app-private-ip>:8081`. Create an external
-DNS `A` record pointing the API domain to the Terraform `edge_elastic_ip` output.
+Create an external DNS `A` record pointing the API domain to the Terraform
+`server_elastic_ip` output. In `/opt/team08/compose/.env`, set `DOMAIN`,
+`CERTBOT_EMAIL`, and keep `BACKEND_UPSTREAM=backend-blue:8080` unless the active
+color is already green.
 
 After DNS propagation, issue the certificate and start HTTPS:
 
 ```bash
-ssh -i <ssh-private-key> ubuntu@<edge-elastic-ip>
+ssh -i <ssh-private-key> ubuntu@<server-elastic-ip>
 cd /opt/team08
 ./scripts/bootstrap-https.sh
 ```
@@ -83,21 +77,20 @@ production secrets remain local and are not committed.
 
 ## Blue-Green Deployment
 
-The app host runs Spring as `backend-blue` on `8081` and `backend-green` on
-`8082`. Deploying a new image starts the inactive color, waits for
-`/actuator/health`, switches the edge Nginx upstream, then records the active
-color.
+The server runs Spring as `backend-blue` on host-local `8081` and
+`backend-green` on host-local `8082`. Deploying a new image starts the inactive
+color, waits for `/actuator/health`, switches the local Nginx upstream to
+`backend-blue:8080` or `backend-green:8080`, then records the active color.
 
 Manual blue-green deployment:
 
 ```bash
 ./infra/scripts/deploy-bluegreen.sh \
-  <app-public-ip> <edge-elastic-ip> <ssh-private-key> <image-tag>
+  <server-elastic-ip> <ssh-private-key> <image-tag>
 ```
 
 GitHub Actions can do the same from the `Backend Image` workflow by setting
 `deploy=true`. Configure these repository secrets first:
 
 - `PROD_APP_PUBLIC_IP`
-- `PROD_EDGE_PUBLIC_IP`
 - `PROD_SSH_PRIVATE_KEY`

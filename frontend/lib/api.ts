@@ -752,8 +752,20 @@ const formatWatchTime = (totalSeconds: number): string => {
 const mapStudyReportToDisplay = (
   raw: StudyReportResponse,
 ): Omit<StudyReport, 'studyName' | 'userName'> => {
+  // 백엔드가 LocalDate를 [년,월,일] 배열로 직렬화하므로(WRITE_DATES_AS_TIMESTAMPS),
+  // 배열/문자열 양쪽 모두에서 MM-DD를 안전하게 뽑아낸다.
+  const toMonthDay = (date: unknown): string => {
+    if (Array.isArray(date)) {
+      const [, month, day] = date as number[]
+      if (month == null || day == null) return ''
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return `${pad(month)}-${pad(day)}`
+    }
+    return typeof date === 'string' ? date.slice(5) : ''
+  }
+
   const progressData = (raw.dailyProgress ?? []).map((d) => ({
-    day: d.date?.slice(5) ?? '', // MM-DD
+    day: toMonthDay(d.date), // MM-DD
     progress: Number(d.progressRate ?? 0),
     minutes: 0,
   }))
@@ -1197,13 +1209,11 @@ export const api = {
     courseId?: number
     chapterId?: number
     positionSeconds?: number
-    eventTime?: string
     eventKey?: string
   }) =>
     mutate<LearningEventResponse>('/api/learning-events', 'POST', {
       ...data,
-      // 백엔드 RecordLearningEventRequest 는 eventTime(@NotNull) 을 요구한다.
-      eventTime: data.eventTime ?? new Date().toISOString().slice(0, 19),
+      // 이벤트 발생 시각은 서버가 수신 시각으로 직접 찍는다(클라이언트는 시각을 보내지 않음).
       // 멱등 처리를 위한 클라이언트 고유 키 (중복 이벤트 방지)
       eventKey: data.eventKey ?? (typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()

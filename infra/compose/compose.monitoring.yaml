@@ -1,0 +1,64 @@
+# Grafana Cloud 연동용 모니터링 스택(override).
+# Alloy 가 exporter/백엔드 actuator 메트릭을 Docker 내부망으로 수집해
+# Grafana Cloud 로 remote_write 한다. 4GB 호스트 부담을 줄이려 저장소는 안 둔다.
+#
+# 사용(blue-green 운영):
+#   docker compose --env-file .env \
+#     -f compose.yaml -f compose.bluegreen.yaml -f compose.monitoring.yaml up -d
+#
+# db/redis/backend-blue/backend-green/internal/public 는 base compose 정의를 그대로 쓴다.
+services:
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    networks:
+      - internal
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    networks:
+      - internal
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    restart: unless-stopped
+    command:
+      - --mysqld.address=db:3306
+      - --mysqld.username=${MYSQL_EXPORTER_USER:-exporter}
+    environment:
+      # exporter 전용 DB 계정(README 의 GRANT 스니펫으로 미리 생성할 것)
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_EXPORTER_PASSWORD}
+    networks:
+      - internal
+
+  alloy:
+    image: grafana/alloy:v1.5.1
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    environment:
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER}
+      GRAFANA_CLOUD_API_KEY: ${GRAFANA_CLOUD_API_KEY}
+    volumes:
+      - ../monitoring/config.alloy:/etc/alloy/config.alloy:ro
+    depends_on:
+      - node-exporter
+      - redis-exporter
+      - mysqld-exporter
+    networks:
+      # internal: db/redis/backend/exporter 수집용
+      # public:   Grafana Cloud 로 나가는 egress 용 (internal 망은 외부 차단)
+      - internal
+      - public

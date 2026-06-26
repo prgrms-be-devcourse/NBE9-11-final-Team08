@@ -34,6 +34,10 @@ spring:
     open-in-view: false
     show-sql: false
 
+  batch:
+    job:
+      enabled: false
+
   cloud:
     aws:
       region:

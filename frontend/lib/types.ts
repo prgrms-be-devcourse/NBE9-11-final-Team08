@@ -363,7 +363,6 @@ export type LearningEventType =
   | 'LECTURE_ENTER'
   | 'VIDEO_START'
   | 'VIDEO_END'
-  | 'POSITION_SAVE'
   | 'LECTURE_EXIT'
   | 'LECTURE_COMPLETE'
 

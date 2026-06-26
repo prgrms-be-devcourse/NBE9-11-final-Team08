@@ -35,12 +35,10 @@ public class VideoAccessService {
 
         String m3u8Path = fileUrlFormatter.formatVideoUrl(lecture.getM3u8Path());
 
-        if (lecture.isFreePreview()) {
-            return new VideoStreamResponse(m3u8Path, List.of());
+        if (!lecture.isFreePreview()) {
+            // TODO: 권한 추가. 도훈님 확인 필요
+            courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.VIEW_CONTENT);
         }
-
-        // TODO: 권한 추가. 도훈님 확인 필요
-        courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.VIEW_CONTENT);
 
         String videoUuid = lecture.getVideoUuid();
         if (videoUuid == null || videoUuid.isBlank()) {

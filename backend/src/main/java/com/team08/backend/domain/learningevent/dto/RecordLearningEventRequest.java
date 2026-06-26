@@ -3,8 +3,6 @@ package com.team08.backend.domain.learningevent.dto;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDateTime;
-
 public record RecordLearningEventRequest(
 
         Long courseId,
@@ -18,9 +16,6 @@ public record RecordLearningEventRequest(
         LearningEventType eventType,
 
         Integer positionSeconds,
-
-        @NotNull
-        LocalDateTime eventTime,
 
         /**
          * 클라이언트가 생성한 고유 키 (UUID 권장).

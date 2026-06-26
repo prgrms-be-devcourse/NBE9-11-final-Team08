@@ -16,6 +16,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  batch:
+    job:
+      enabled: false
   jpa:
     hibernate:
       ddl-auto: validate
@@ -38,12 +41,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # prometheus 는 메트릭 스크랩용. nginx 에서 외부 차단하고
+        # Alloy 가 Docker 내부망으로만 수집한다(prod.conf.template 참고).
+        include: health, prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 server:
   shutdown: graceful
