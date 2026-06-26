@@ -90,7 +90,8 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         return new ResponseCookie[]{
                 buildCookie("CloudFront-Policy", base64Policy, cookiePath),
                 buildCookie("CloudFront-Signature", signature, cookiePath),
-                buildCookie("CloudFront-Key-Pair-Id", keyPairId, cookiePath)
+                buildCookie("CloudFront-Key-Pair-Id", keyPairId, cookiePath),
+                buildCookie("CloudFront-Hash-Algorithm", "SHA256", cookiePath)
         };
     }
 
