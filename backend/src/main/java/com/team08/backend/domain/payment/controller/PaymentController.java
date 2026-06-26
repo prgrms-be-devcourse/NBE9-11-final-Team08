@@ -4,7 +4,9 @@ import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
 import com.team08.backend.domain.payment.service.PaymentService;
+import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final TossPaymentWebhookService tossPaymentWebhookService;
 
     @PostMapping("/{orderId}/confirm")
     @Operation(summary = "Mock 결제 승인", description = "Mock 결제 승인 요청으로 결제를 성공 처리합니다.")
@@ -45,6 +48,12 @@ public class PaymentController {
             @RequestBody ConfirmPaymentRequest request
     ) {
         return paymentService.confirmTossPayment(principal.user().id(), orderId, request);
+    }
+
+    @PostMapping("/toss/webhook")
+    @Operation(summary = "Toss Payments webhook", description = "Toss Payments webhook 이벤트를 받아 결제 결과를 다시 조회하고 상태를 보정합니다.")
+    public void handleTossWebhook(@RequestBody TossPaymentWebhookRequest request) {
+        tossPaymentWebhookService.handle(request);
     }
 
     @PostMapping("/{orderId}/fail")

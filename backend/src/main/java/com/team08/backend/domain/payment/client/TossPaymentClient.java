@@ -22,6 +22,7 @@ import java.util.Set;
 public class TossPaymentClient {
 
     private static final String CONFIRM_PATH = "/v1/payments/confirm";
+    private static final String PAYMENT_LOOKUP_PATH = "/v1/payments/{paymentKey}";
     private static final String ORDER_LOOKUP_PATH = "/v1/payments/orders/{orderId}";
     private static final String UNKNOWN_ERROR_CODE = "TOSS_UNKNOWN";
     private static final String TIMEOUT_ERROR_CODE = "TOSS_TIMEOUT";
@@ -86,9 +87,17 @@ public class TossPaymentClient {
     }
 
     public Optional<TossPaymentResponse> findByOrderId(String orderId) {
+        return find(ORDER_LOOKUP_PATH, orderId);
+    }
+
+    public Optional<TossPaymentResponse> findByPaymentKey(String paymentKey) {
+        return find(PAYMENT_LOOKUP_PATH, paymentKey);
+    }
+
+    private Optional<TossPaymentResponse> find(String path, String value) {
         try {
             TossPaymentResponse response = restClient.get()
-                    .uri(ORDER_LOOKUP_PATH, orderId)
+                    .uri(path, value)
                     .retrieve()
                     .body(TossPaymentResponse.class);
             return Optional.ofNullable(response);
