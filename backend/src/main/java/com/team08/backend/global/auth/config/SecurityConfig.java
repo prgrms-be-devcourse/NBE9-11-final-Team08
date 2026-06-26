@@ -67,6 +67,9 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",
+                                // 메트릭 스크랩용. 외부는 nginx 가 403 으로 차단하고(prod.conf.template),
+                                // 호스트 포트도 127.0.0.1 바인딩이라 Alloy 가 내부망으로만 접근한다.
+                                "/actuator/prometheus",
                                 "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/signup",
