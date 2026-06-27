@@ -57,14 +57,15 @@ class LectureAccessValidatorTest {
     }
 
     @Test
-    void 무료_맛보기는_권한검사를_건너뛴다() {
+    void 무료_맛보기도_강의를_통한_접근은_권한검사를_거친다() {
         Lecture lecture = lecture(true);
         given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID)).willReturn(Optional.of(lecture));
 
         Lecture result = validator.validateForEnter(COURSE_ID, CHAPTER_ID, LECTURE_ID, USER_ID);
 
         assertThat(result).isSameAs(lecture);
-        verify(courseAccessAuthorizer, never()).authorizeByCourseId(any(), any(), any());
+        // 무료 맛보기 예외가 제거되어 미등록자도 권한 검사를 거친다.
+        verify(courseAccessAuthorizer).authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
     }
 
     @Test
@@ -105,14 +106,14 @@ class LectureAccessValidatorTest {
     void 권한이_없으면_authorizer의_예외가_전파된다() {
         Lecture lecture = lecture(false);
         given(lectureRepository.findByIdWithChapterAndCourse(LECTURE_ID)).willReturn(Optional.of(lecture));
-        willThrow(new CustomException(ErrorCode.STUDY_ACCESS_DENIED))
+        willThrow(new CustomException(ErrorCode.COURSE_ACCESS_DENIED))
                 .given(courseAccessAuthorizer)
                 .authorizeByCourseId(COURSE_ID, USER_ID, CourseAction.VIEW_CONTENT);
 
         assertThatThrownBy(() -> validator.validateForEnter(COURSE_ID, CHAPTER_ID, LECTURE_ID, USER_ID))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.STUDY_ACCESS_DENIED);
+                .isEqualTo(ErrorCode.COURSE_ACCESS_DENIED);
     }
 
     @Test

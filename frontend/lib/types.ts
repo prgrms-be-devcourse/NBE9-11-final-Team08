@@ -422,11 +422,14 @@ export interface EnrolledCourse {
 }
 
 export interface MyComment {
-  id: string
+  id: number
+  lectureId: number
   courseTitle: string
   lectureTitle: string
+  title: string
   content: string
   createdAt: string
+  answered: boolean
 }
 
 export type SignupRole = 'USER' | 'SELLER'
@@ -634,6 +637,11 @@ export interface StudyReport {
   progressData: { day: string; progress: number; minutes: number }[]
   calendar: { date: string; active: boolean; level?: number }[]
   topLectures: string[]
+}
+
+// 마이페이지 리포트 화면용: 화면 리포트 + 스터디 식별자(개별 갱신/구분용)
+export interface MyStudyReport extends StudyReport {
+  studyId: string
 }
 
 // 백엔드 StudyReportResponse(record)와 동일한 형태

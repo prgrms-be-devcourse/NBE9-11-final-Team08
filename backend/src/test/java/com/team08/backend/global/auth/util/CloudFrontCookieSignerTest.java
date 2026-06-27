@@ -40,7 +40,7 @@ class CloudFrontCookieSignerTest {
                 "/lectures/1/"
         );
 
-        assertThat(cookies).hasSize(3);
+        assertThat(cookies).hasSize(4);
         assertThat(cookies[0].getName()).isEqualTo("CloudFront-Policy");
         assertThat(cookies[1].getName()).isEqualTo("CloudFront-Signature");
         assertThat(cookies[2].getName()).isEqualTo("CloudFront-Key-Pair-Id");
@@ -133,7 +133,7 @@ class CloudFrontCookieSignerTest {
                 "/lectures/1/"
         );
 
-        assertThat(cookies).hasSize(3);
+        assertThat(cookies).hasSize(4);
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.isSecure()).isFalse();
             assertThat(cookie.getSameSite()).isEqualTo("Lax");
@@ -156,7 +156,7 @@ class CloudFrontCookieSignerTest {
                 "/lectures/1/"
         );
 
-        assertThat(cookies).hasSize(3);
+        assertThat(cookies).hasSize(4);
         assertThat(cookies[1].getName()).isEqualTo("CloudFront-Signature");
         assertThat(cookies[1].getValue()).isEqualTo("dummy-signature");
 
@@ -182,7 +182,7 @@ class CloudFrontCookieSignerTest {
                 "/lectures/1/"
         );
 
-        assertThat(cookies).hasSize(3);
+        assertThat(cookies).hasSize(4);
         for (ResponseCookie cookie : cookies) {
             assertThat(cookie.getDomain()).isEqualTo(".sokonyun.store");
         }

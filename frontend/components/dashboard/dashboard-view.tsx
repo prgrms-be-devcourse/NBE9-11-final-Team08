@@ -141,6 +141,7 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
       </div>
       <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap">{item.content}</p>
 
+
       {feedback ? (
         <div className="mt-3 space-y-2 rounded-lg bg-secondary/60 p-3">
           <p className="flex items-center gap-1 text-xs font-semibold text-primary">
@@ -168,7 +169,8 @@ function ActivityCard({ item }: { item: StudyActivityResponse }) {
             {loading ? '피드백 생성 중…' : 'AI 피드백 요청'}
           </Button>
         </>
-      )}
+      )
+      }
     </li>
   )
 }

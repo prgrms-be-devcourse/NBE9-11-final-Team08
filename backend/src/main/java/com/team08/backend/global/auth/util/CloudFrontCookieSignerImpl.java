@@ -90,7 +90,8 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
         return new ResponseCookie[]{
                 buildCookie("CloudFront-Policy", base64Policy, cookiePath),
                 buildCookie("CloudFront-Signature", signature, cookiePath),
-                buildCookie("CloudFront-Key-Pair-Id", keyPairId, cookiePath)
+                buildCookie("CloudFront-Key-Pair-Id", keyPairId, cookiePath),
+                buildCookie("CloudFront-Hash-Algorithm", "SHA256", cookiePath)
         };
     }
 
@@ -128,7 +129,9 @@ public class CloudFrontCookieSignerImpl implements CloudFrontCookieSigner {
     }
 
     private String encodeCloudFrontBase64(byte[] bytes) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-                .replace('_', '~');
+        return Base64.getEncoder().encodeToString(bytes)
+                .replace('+', '-')
+                .replace('=', '_')
+                .replace('/', '~');
     }
 }

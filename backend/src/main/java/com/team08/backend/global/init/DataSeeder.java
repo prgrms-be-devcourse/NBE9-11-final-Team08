@@ -1,5 +1,8 @@
 package com.team08.backend.global.init;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.aifeedback.dto.StructuredFeedback;
 import com.team08.backend.domain.aifeedback.entity.AiFeedback;
 import com.team08.backend.domain.aifeedback.repository.AiFeedbackRepository;
 import com.team08.backend.domain.attendance.entity.Attendance;
@@ -1215,10 +1218,18 @@ public class DataSeeder {
         List<AiFeedback> seeded = aiFeedbackRepository.findAll();
         seeded.sort(Comparator.comparing(AiFeedback::getId));
         if (seeded.size() >= 5) {
-            seeded.get(0).complete("학습 기록이 구체적입니다. 개념 설명을 한 줄 더 보강해 보세요.");
+            seeded.get(0).complete(feedbackJson(
+                    "학습 기록이 구체적입니다.",
+                    "핵심 개념을 자신의 언어로 정리한 점이 좋습니다.",
+                    "개념 설명을 한 줄 더 보강해 보세요.",
+                    "다음 학습에서 적용할 예시를 하나 메모해 보세요."));
             // seeded.get(1): PROCESSING 유지
             seeded.get(2).fail();                       // 실패 → 사용자가 재요청 가능
-            seeded.get(3).complete("좋은 회고입니다.");
+            seeded.get(3).complete(feedbackJson(
+                    "좋은 회고입니다.",
+                    "학습 과정을 솔직하게 돌아본 점이 인상적입니다.",
+                    "다음에 시도할 구체적인 행동을 덧붙여 보세요.",
+                    "배운 내용을 동료에게 한 번 설명해 보세요."));
             seeded.get(3).markStale();                  // COMPLETED → STALE
             // seeded.get(4): PROCESSING 유지
         }
@@ -1233,10 +1244,31 @@ public class DataSeeder {
             today.add(AiFeedback.startProcessing(
                     user0, study0.getId(), act.getId(), "활동 스냅샷 " + i, "claude-opus-4-8", "v1"));
         }
-        today.get(0).complete("구체성이 좋습니다.");
-        today.get(1).complete("보완점: 예시를 한 가지 추가해 보세요.");
+        today.get(0).complete(feedbackJson(
+                "구체성이 좋습니다.",
+                "활동 내용을 구체적으로 작성했습니다.",
+                "근거나 출처를 함께 적으면 더 좋습니다.",
+                "오늘 배운 내용을 짧게 요약해 보세요."));
+        today.get(1).complete(feedbackJson(
+                "잘 정리된 활동입니다.",
+                "흐름이 명확하게 정리되어 있습니다.",
+                "예시를 한 가지 추가해 보세요.",
+                "관련 개념을 하나 더 찾아 연결해 보세요."));
         // today.get(2): PROCESSING — 오늘 3번째까지 사용(일일 한도 도달)
         aiFeedbackRepository.saveAll(today);
+    }
+
+    /**
+     * 데모 AI 피드백을 실제 응답과 동일한 형식(StructuredFeedback JSON)으로 직렬화한다.
+     * 과거 시드는 평문 문자열을 저장해 대시보드 조회 시 역직렬화 오류(500)를 유발했다.
+     */
+    private String feedbackJson(String summary, String strength, String improvement, String nextStep) {
+        try {
+            return new ObjectMapper().writeValueAsString(new StructuredFeedback(
+                    summary, List.of(strength), List.of(improvement), List.of(nextStep)));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("데모 AI 피드백 직렬화 실패", e);
+        }
     }
 
     /**
