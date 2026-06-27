@@ -3,6 +3,7 @@ package com.team08.backend.domain.auth.service;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.entity.RefreshToken;
+import com.team08.backend.domain.auth.event.UserSignedUpEvent;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
@@ -54,6 +56,9 @@ public class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private AuthService authService;
 
     private final Clock fixedClock = Clock.fixed(
@@ -75,7 +80,8 @@ public class AuthServiceTest {
                 jwtProvider,
                 refreshTokenRepository,
                 tokenProperties,
-                fixedClock
+                fixedClock,
+                eventPublisher
         );
     }
 
@@ -176,6 +182,8 @@ public class AuthServiceTest {
                 .willReturn(false);
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
         authService.signup(request);
@@ -189,6 +197,7 @@ public class AuthServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
         assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_USER);
+        then(eventPublisher).should().publishEvent(any(UserSignedUpEvent.class));
     }
 
     @Test
@@ -206,6 +215,8 @@ public class AuthServiceTest {
                 .willReturn(false);
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
         authService.signup(request);
