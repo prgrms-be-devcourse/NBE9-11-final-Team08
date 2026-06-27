@@ -68,6 +68,11 @@ Enum coupon_usage_type {
   SINGLE_USE
   MULTI_USE
 }
+Enum auto_issue_type {
+  SIGNUP
+  ATTENDANCE_STREAK
+  MONTHLY_ATTENDANCE
+}
 Enum ai_feedback_status { 
   PENDING
   PROCESSING
@@ -315,6 +320,7 @@ Table coupon_policies {
   name varchar(100) [not null]
   coupon_target coupon_target [not null]
   coupon_type coupon_type [not null]
+  auto_issue_type auto_issue_type
   total_quantity int
   usage_type coupon_usage_type [not null]
   is_stackable boolean [not null, default: false]
@@ -351,13 +357,31 @@ Table issued_coupons {
   id bigint [pk, increment]
   policy_id bigint [not null]
   user_id bigint [not null]
+  issue_key varchar(100) [not null]
   status coupon_status [not null]
   issued_at datetime [not null]
   expired_at datetime [not null]
   used_at datetime
 
   indexes {
-    (user_id, policy_id) [unique]
+    (user_id, policy_id, issue_key) [unique, name: "uk_issued_coupon_user_policy_issue_key"]
+  }
+}
+Table coupon_reward_histories {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  policy_id bigint [not null]
+  reward_key varchar(100) [not null]
+  reward_type varchar(50) [not null]
+  issued_coupon_id bigint
+  issued_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (user_id, reward_key) [unique, name: "uk_coupon_reward_history_user_reward"]
+    user_id [name: "idx_coupon_reward_histories_user"]
+    policy_id [name: "idx_coupon_reward_histories_policy"]
   }
 }
 Table issued_coupon_jobs {
@@ -574,6 +598,9 @@ Ref: coupon_policy_courses.coupon_policy_id > coupon_policies.id
 Ref: coupon_policy_courses.course_id > courses.id
 Ref: issued_coupons.policy_id > coupon_policies.id
 Ref: issued_coupons.user_id > users.id
+Ref: coupon_reward_histories.user_id > users.id
+Ref: coupon_reward_histories.policy_id > coupon_policies.id
+Ref: coupon_reward_histories.issued_coupon_id > issued_coupons.id
 Ref: issued_coupon_jobs.policy_id > coupon_policies.id
 Ref: issued_coupon_jobs.user_id > users.id
 Ref: seller.user_id > users.id

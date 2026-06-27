@@ -2,6 +2,7 @@ package com.team08.backend.domain.auth.service;
 
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.entity.RefreshToken;
+import com.team08.backend.domain.auth.event.UserSignedUpEvent;
 import com.team08.backend.domain.auth.exception.DuplicateEmailException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.exception.InvalidSignupRoleException;
@@ -15,6 +16,7 @@ import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,8 @@ public class AuthService {
     private final TokenProperties tokenProperties;
 
     private final Clock clock;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TokenPair login(String email, String password) {
@@ -110,7 +114,8 @@ public class AuthService {
         }
 
         try {
-            userRepository.saveAndFlush(user);
+            User savedUser = userRepository.saveAndFlush(user);
+            eventPublisher.publishEvent(new UserSignedUpEvent(savedUser.getId()));
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEmailException();
         }

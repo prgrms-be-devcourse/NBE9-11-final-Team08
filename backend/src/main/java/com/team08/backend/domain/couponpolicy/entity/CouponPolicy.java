@@ -47,6 +47,9 @@ public class CouponPolicy extends BaseTimeEntity {
     @Column(nullable = false)
     private CouponType couponType;
 
+    @Enumerated(EnumType.STRING)
+    private AutoIssueType autoIssueType;
+
     private Integer totalQuantity;
 
     @Enumerated(EnumType.STRING)
@@ -81,10 +84,11 @@ public class CouponPolicy extends BaseTimeEntity {
 
     private LocalDateTime deletedAt;
 
-    private CouponPolicy(String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds) {
+    private CouponPolicy(String name, CouponTarget couponTarget, CouponType couponType, AutoIssueType autoIssueType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds) {
         this.name = name;
         this.couponTarget = couponTarget;
         this.couponType = couponType;
+        this.autoIssueType = autoIssueType;
         this.totalQuantity = totalQuantity;
         this.usageType = usageType;
         this.isStackable = isStackable != null ? isStackable : false;
@@ -134,8 +138,16 @@ public class CouponPolicy extends BaseTimeEntity {
     public static CouponPolicy createPolicy(
             String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
     ) {
+        return createPolicy(
+                name, couponTarget, couponType, null, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
+        );
+    }
+
+    public static CouponPolicy createPolicy(
+            String name, CouponTarget couponTarget, CouponType couponType, AutoIssueType autoIssueType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
+    ) {
         return new CouponPolicy(
-                name, couponTarget, couponType, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
+                name, couponTarget, couponType, autoIssueType, totalQuantity, usageType, isStackable, discountType, discountValue, maxDiscountAmount, minOrderAmount, validDays, issueStartDate, issueEndDate, categoryIds, courseIds
         );
     }
 
@@ -220,8 +232,9 @@ public class CouponPolicy extends BaseTimeEntity {
     }
 
     // 정책 핵심 정보 수정
-    public void update(String name, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
+    public void update(String name, AutoIssueType autoIssueType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
+        this.autoIssueType = autoIssueType;
         this.totalQuantity = totalQuantity;
         this.usageType = usageType;
         this.isStackable = isStackable != null ? isStackable : false;

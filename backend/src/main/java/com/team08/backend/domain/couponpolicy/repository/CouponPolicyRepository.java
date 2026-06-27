@@ -1,5 +1,6 @@
 package com.team08.backend.domain.couponpolicy.repository;
 
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import jakarta.persistence.LockModeType;
@@ -27,4 +28,41 @@ public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long
     @Query("SELECT c.couponType FROM CouponPolicy c WHERE c.id = :id")
     Optional<CouponType> findCouponTypeById(@Param("id") Long id);
 
+    @Query("""
+            SELECT c
+            FROM CouponPolicy c
+            WHERE c.autoIssueType = :autoIssueType
+              AND (c.issueStartDate IS NULL OR c.issueStartDate <= :now)
+              AND (c.issueEndDate IS NULL OR c.issueEndDate > :now)
+            """)
+    Optional<CouponPolicy> findActiveByAutoIssueType(
+            @Param("autoIssueType") AutoIssueType autoIssueType,
+            @Param("now") java.time.LocalDateTime now
+    );
+
+    @Query("""
+            SELECT COUNT(c) > 0
+            FROM CouponPolicy c
+            WHERE c.autoIssueType = :autoIssueType
+              AND (c.issueStartDate IS NULL OR c.issueStartDate <= :now)
+              AND (c.issueEndDate IS NULL OR c.issueEndDate > :now)
+            """)
+    boolean existsActiveByAutoIssueType(
+            @Param("autoIssueType") AutoIssueType autoIssueType,
+            @Param("now") java.time.LocalDateTime now
+    );
+
+    @Query("""
+            SELECT COUNT(c) > 0
+            FROM CouponPolicy c
+            WHERE c.autoIssueType = :autoIssueType
+              AND c.id <> :id
+              AND (c.issueStartDate IS NULL OR c.issueStartDate <= :now)
+              AND (c.issueEndDate IS NULL OR c.issueEndDate > :now)
+            """)
+    boolean existsActiveByAutoIssueTypeAndIdNot(
+            @Param("autoIssueType") AutoIssueType autoIssueType,
+            @Param("id") Long id,
+            @Param("now") java.time.LocalDateTime now
+    );
 }
