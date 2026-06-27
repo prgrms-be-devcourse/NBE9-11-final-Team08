@@ -20,6 +20,8 @@ import type {
   QnaPost,
   Study,
   StudyDetailResponse,
+  StudyMember,
+  StudyMemberResponse,
   StudyIdResponse,
   StudyReport,
   MyStudyReport,
@@ -416,15 +418,8 @@ const mapStudyDetailToStudy = (
   ownerName: detail.ownerNickname,
   myRole: (detail.myRole?.toLowerCase() ?? 'viewer') as Study['myRole'],
   progress: 0,
-  members: [
-    {
-      id: 'owner',
-      name: detail.ownerNickname,
-      progress: 0,
-      role: 'owner',
-      joinedAt: '',
-    },
-  ],
+  // 멤버 목록은 별도 엔드포인트(/api/studies/{id}/members)에서 조회한다.
+  members: [],
   applicants: [],
   announcements: [],
   posts: posts.map((post) => ({
@@ -435,6 +430,17 @@ const mapStudyDetailToStudy = (
     createdAt: post.createdAt,
     comments: [],
   })),
+})
+
+const mapStudyMemberResponseToMember = (
+  member: StudyMemberResponse,
+): StudyMember => ({
+  id: member.userId.toString(),
+  name: member.nickname,
+  avatarUrl: member.profileImage,
+  progress: 0,
+  role: member.role.toLowerCase() as StudyMember['role'],
+  joinedAt: parseDateToString(member.joinedAt),
 })
 
 const mapUseTypeToBackend = (useType: string): any => {
@@ -1204,6 +1210,15 @@ export const api = {
     if (!detail) return undefined
 
     return mapStudyDetailToStudy(detail)
+  },
+
+  getStudyMembers: async (studyId: string | number): Promise<StudyMember[]> => {
+    const members = await request<StudyMemberResponse[]>(
+      `/api/studies/${studyId}/members`,
+      [],
+    )
+    if (!Array.isArray(members)) return []
+    return members.map(mapStudyMemberResponseToMember)
   },
 
   getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
