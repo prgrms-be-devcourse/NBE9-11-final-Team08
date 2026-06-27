@@ -568,6 +568,7 @@ export interface StudyActivityResponse {
   activityId: number
   studyId: number
   authorId: number
+  authorNickname: string
   content: string
   createdAt: string
 }

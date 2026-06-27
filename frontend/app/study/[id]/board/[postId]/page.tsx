@@ -54,7 +54,7 @@ export default function StudyPostPage() {
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2">
         <p className="text-lg font-semibold">글을 찾을 수 없습니다.</p>
         <a href={`/study/${id}/board`} className="text-sm text-primary underline">
-          게시판으로 돌아가기
+          학습 활동으로 돌아가기
         </a>
       </div>
     )
