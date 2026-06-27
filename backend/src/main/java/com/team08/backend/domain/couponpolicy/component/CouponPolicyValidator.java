@@ -2,6 +2,7 @@ package com.team08.backend.domain.couponpolicy.component;
 
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.DiscountType;
@@ -28,7 +29,8 @@ public class CouponPolicyValidator {
                 request.categoryIds(),
                 request.courseIds(),
                 request.issueStartDate(),
-                request.issueEndDate()
+                request.issueEndDate(),
+                request.autoIssueType()
         );
     }
 
@@ -45,7 +47,8 @@ public class CouponPolicyValidator {
                 request.categoryIds(),
                 request.courseIds(),
                 request.issueStartDate(),
-                request.issueEndDate()
+                request.issueEndDate(),
+                request.autoIssueType()
         );
     }
 
@@ -61,7 +64,8 @@ public class CouponPolicyValidator {
             List<Long> categoryIds,
             List<Long> courseIds,
             LocalDateTime issueStartDate,
-            LocalDateTime issueEndDate
+            LocalDateTime issueEndDate,
+            AutoIssueType autoIssueType
     ) {
 
         // 숫자 범위 검증
@@ -90,6 +94,9 @@ public class CouponPolicyValidator {
             if (totalQuantity != null) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }
+        }
+        if (autoIssueType != null && type != CouponType.AUTO) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
         // 할인 타입별 검증

@@ -40,6 +40,7 @@ import { Check, ChevronsUpDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import {
+  autoIssueTypeLabel,
   couponDiscountTypeLabel,
   couponTargetLabel,
   couponTypeLabel,
@@ -47,6 +48,7 @@ import {
 } from '@/lib/coupon-labels'
 import type {
   AdminCoupon,
+  AutoIssueType,
   CouponApplyTarget,
   CouponDiscountType,
   CouponPolicyType,
@@ -65,6 +67,7 @@ type FormState = {
   name: string
   totalQuantity: string
   type: CouponPolicyType
+  autoIssueType: AutoIssueType | 'NONE'
   target: CouponApplyTarget
   useType: CouponUseType
   stackable: boolean
@@ -82,6 +85,7 @@ const emptyForm: FormState = {
   name: '',
   totalQuantity: '',
   type: 'NORMAL',
+  autoIssueType: 'NONE',
   target: 'ALL',
   useType: 'SINGLE',
   stackable: false,
@@ -100,6 +104,7 @@ function toForm(coupon: AdminCoupon): FormState {
     name: coupon.name,
     totalQuantity: coupon.totalQuantity?.toString() ?? '',
     type: coupon.type,
+    autoIssueType: coupon.autoIssueType ?? 'NONE',
     target: coupon.target,
     useType: coupon.useType,
     stackable: coupon.stackable,
@@ -214,6 +219,7 @@ export function CouponFormSheet({
       name: form.name.trim(),
       totalQuantity: form.type === 'FCFS' && form.totalQuantity ? Number(form.totalQuantity) : null,
       type: form.type,
+      autoIssueType: form.type === 'AUTO' && form.autoIssueType !== 'NONE' ? form.autoIssueType : null,
       target: form.target,
       useType: form.useType,
       stackable: form.stackable,
@@ -286,6 +292,9 @@ export function CouponFormSheet({
                       if (v !== 'FCFS') {
                         update('totalQuantity', '')
                       }
+                      if (v !== 'AUTO') {
+                        update('autoIssueType', 'NONE')
+                      }
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -309,6 +318,28 @@ export function CouponFormSheet({
                       onChange={(e) => update('totalQuantity', e.target.value)}
                       placeholder="예) 100"
                     />
+                  </Field>
+                )}
+                {form.type === 'AUTO' && (
+                  <Field label="자동 발급 용도">
+                    <Select
+                      value={form.autoIssueType}
+                      onValueChange={(v) => update('autoIssueType', v as AutoIssueType | 'NONE')}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {(v: string) =>
+                            v === 'NONE' ? '연결 안 함' : autoIssueTypeLabel[v as AutoIssueType]
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">연결 안 함</SelectItem>
+                        <SelectItem value="SIGNUP">회원가입</SelectItem>
+                        <SelectItem value="ATTENDANCE_STREAK">연속 출석</SelectItem>
+                        <SelectItem value="MONTHLY_ATTENDANCE">월간 출석</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </Field>
                 )}
               </div>

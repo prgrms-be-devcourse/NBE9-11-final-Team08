@@ -10,6 +10,7 @@ import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
 import com.team08.backend.domain.fixture.UserFixture;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
@@ -23,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -54,6 +56,9 @@ public class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private CouponRewardOutboxService couponRewardOutboxService;
+
     private AuthService authService;
 
     private final Clock fixedClock = Clock.fixed(
@@ -75,7 +80,8 @@ public class AuthServiceTest {
                 jwtProvider,
                 refreshTokenRepository,
                 tokenProperties,
-                fixedClock
+                fixedClock,
+                couponRewardOutboxService
         );
     }
 
@@ -176,6 +182,12 @@ public class AuthServiceTest {
                 .willReturn(false);
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", 1L);
+                    return user;
+                });
 
         // when
         authService.signup(request);
@@ -189,6 +201,7 @@ public class AuthServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
         assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_USER);
+        then(couponRewardOutboxService).should().createUserSignedUpEvent(1L);
     }
 
     @Test
@@ -206,6 +219,12 @@ public class AuthServiceTest {
                 .willReturn(false);
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", 1L);
+                    return user;
+                });
 
         // when
         authService.signup(request);
