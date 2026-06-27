@@ -73,6 +73,12 @@ Enum auto_issue_type {
   ATTENDANCE_STREAK
   MONTHLY_ATTENDANCE
 }
+Enum coupon_reward_outbox_event_status {
+  PENDING
+  PROCESSED
+  FAILED
+  DEAD
+}
 Enum ai_feedback_status { 
   PENDING
   PROCESSING
@@ -384,6 +390,26 @@ Table coupon_reward_histories {
     policy_id [name: "idx_coupon_reward_histories_policy"]
   }
 }
+Table coupon_reward_outbox_events {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  event_type varchar(50) [not null]
+  event_key varchar(100) [not null]
+  payload longtext [not null]
+  status coupon_reward_outbox_event_status [not null]
+  retry_count int [not null]
+  last_error longtext
+  processed_at datetime
+  next_retry_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (event_type, event_key) [unique, name: "uk_coupon_reward_outbox_event_key"]
+    (status, id) [name: "idx_coupon_reward_outbox_status_id"]
+    (user_id, id) [name: "idx_coupon_reward_outbox_user"]
+  }
+}
 Table issued_coupon_jobs {
   id bigint [pk, increment]
   policy_id bigint [not null]
@@ -601,6 +627,7 @@ Ref: issued_coupons.user_id > users.id
 Ref: coupon_reward_histories.user_id > users.id
 Ref: coupon_reward_histories.policy_id > coupon_policies.id
 Ref: coupon_reward_histories.issued_coupon_id > issued_coupons.id
+Ref: coupon_reward_outbox_events.user_id > users.id
 Ref: issued_coupon_jobs.policy_id > coupon_policies.id
 Ref: issued_coupon_jobs.user_id > users.id
 Ref: seller.user_id > users.id

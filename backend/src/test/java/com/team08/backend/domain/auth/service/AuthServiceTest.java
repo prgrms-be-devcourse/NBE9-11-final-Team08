@@ -3,7 +3,6 @@ package com.team08.backend.domain.auth.service;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.entity.RefreshToken;
-import com.team08.backend.domain.auth.event.UserSignedUpEvent;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
@@ -11,6 +10,7 @@ import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.couponreward.outbox.CouponRewardOutboxService;
 import com.team08.backend.domain.fixture.UserFixture;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
@@ -23,8 +23,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -57,7 +57,7 @@ public class AuthServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private CouponRewardOutboxService couponRewardOutboxService;
 
     private AuthService authService;
 
@@ -81,7 +81,7 @@ public class AuthServiceTest {
                 refreshTokenRepository,
                 tokenProperties,
                 fixedClock,
-                eventPublisher
+                couponRewardOutboxService
         );
     }
 
@@ -183,7 +183,11 @@ public class AuthServiceTest {
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
         given(userRepository.saveAndFlush(any(User.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
+                .willAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", 1L);
+                    return user;
+                });
 
         // when
         authService.signup(request);
@@ -197,7 +201,7 @@ public class AuthServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
         assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_USER);
-        then(eventPublisher).should().publishEvent(any(UserSignedUpEvent.class));
+        then(couponRewardOutboxService).should().createUserSignedUpEvent(1L);
     }
 
     @Test
@@ -216,7 +220,11 @@ public class AuthServiceTest {
         given(passwordEncoder.encode(request.password()))
                 .willReturn("encoded-password");
         given(userRepository.saveAndFlush(any(User.class)))
-                .willAnswer(invocation -> invocation.getArgument(0));
+                .willAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(user, "id", 1L);
+                    return user;
+                });
 
         // when
         authService.signup(request);
