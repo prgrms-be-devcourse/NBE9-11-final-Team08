@@ -4,27 +4,22 @@ import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxW
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.ReadOffset;
-import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.data.redis.stream.StreamListener;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class CouponRewardOutboxStreamWorker {
+public class CouponRewardOutboxStreamWorker implements StreamListener<String, MapRecord<String, String, String>> {
 
-    private static final String GROUP_NAME = "coupon-reward-outbox-workers";
-    private static final long STREAM_WORKER_DELAY_MS = 100;
+    static final String GROUP_NAME = "coupon-reward-outbox-workers";
 
     private final String consumerName = "coupon-reward-outbox-worker-" + UUID.randomUUID();
 
@@ -46,26 +41,15 @@ public class CouponRewardOutboxStreamWorker {
         }
     }
 
-    @Scheduled(fixedDelay = STREAM_WORKER_DELAY_MS)
-    public void processEvents() {
-        List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
-                Consumer.from(GROUP_NAME, consumerName),
-                StreamOffset.create(CouponRewardOutboxStreamPublishListener.STREAM_KEY, ReadOffset.lastConsumed())
-        );
-
-        if (records == null || records.isEmpty()) {
-            return;
-        }
-
-        for (MapRecord<String, Object, Object> record : records) {
-            process(record);
-        }
+    String consumerName() {
+        return consumerName;
     }
 
-    private void process(MapRecord<String, Object, Object> record) {
+    @Override
+    public void onMessage(MapRecord<String, String, String> record) {
         try {
-            Map<Object, Object> value = record.getValue();
-            Long outboxEventId = Long.valueOf(String.valueOf(value.get("outboxEventId")));
+            Map<String, String> value = record.getValue();
+            Long outboxEventId = Long.valueOf(value.get("outboxEventId"));
             couponRewardOutboxWorker.processOne(outboxEventId);
             redisTemplate.opsForStream().acknowledge(
                     CouponRewardOutboxStreamPublishListener.STREAM_KEY,
