@@ -203,10 +203,6 @@ export function StudyRealtimeFeed({ studyId }: { studyId: string }) {
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               이전 피드를 불러오는 중
             </div>
-          ) : !initialLoading && items.length > 0 && !hasNext ? (
-            <p className="text-center text-[11px] text-muted-foreground">
-              모든 피드를 확인했어요.
-            </p>
           ) : null}
         </div>
       </div>
@@ -253,24 +249,25 @@ function formatFeedTime(value: BackendDateTime) {
   const date = toDate(value)
   if (!date) return Array.isArray(value) ? '' : value
 
-  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (diffSeconds < 60) return '방금 전'
-
-  const diffMinutes = Math.floor(diffSeconds / 60)
-  if (diffMinutes < 60) return `${diffMinutes}분 전`
-
-  const diffHours = Math.floor(diffMinutes / 60)
-  if (diffHours < 24) return `${diffHours}시간 전`
-
   const now = new Date()
-  const isSameYear = date.getFullYear() === now.getFullYear()
-  return date.toLocaleString('ko-KR', {
-    year: isSameYear ? undefined : 'numeric',
-    month: 'numeric',
-    day: 'numeric',
+  const time = date.toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
   })
+
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  if (isToday) return time
+
+  const isSameYear = date.getFullYear() === now.getFullYear()
+  const day = date.toLocaleDateString('ko-KR', {
+    year: isSameYear ? undefined : 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  })
+  return `${day} ${time}`
 }
 
 function toDate(value: BackendDateTime) {
