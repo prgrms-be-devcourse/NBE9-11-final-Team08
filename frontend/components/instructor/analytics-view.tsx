@@ -29,9 +29,19 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatKRW } from '@/lib/utils'
 import { api } from '@/lib/api'
 import type { SellerAnalytics } from '@/lib/types'
+import { CourseDrilldown } from '@/components/instructor/course-drilldown'
 
 const revenueConfig = {
   revenue: { label: '매출', color: 'var(--chart-1)' },
@@ -47,12 +57,21 @@ const categoryConfig = {
 
 const pieColors = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
 
+const statusLabel: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+  ON_SALE: { label: '판매중', variant: 'default' },
+  IN_REVIEW: { label: '심사중', variant: 'secondary' },
+  DRAFT: { label: '작성중', variant: 'outline' },
+  SUSPENDED: { label: '판매 중지', variant: 'outline' },
+  DELETED: { label: '삭제됨', variant: 'outline' },
+}
+
 type Range = '3m' | '6m' | '1y'
 
 export function AnalyticsView({ initialData }: { initialData: SellerAnalytics | null }) {
   const [range, setRange] = useState<Range>('6m')
   const [data, setData] = useState<SellerAnalytics | null>(initialData)
   const [loading, setLoading] = useState(false)
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null)
 
   useEffect(() => {
     // 최초 렌더는 서버에서 받은 6m 데이터를 그대로 쓰고, 기간이 바뀔 때만 다시 불러온다.
@@ -103,6 +122,17 @@ export function AnalyticsView({ initialData }: { initialData: SellerAnalytics | 
   const monthly = data?.monthly ?? []
   const categories = data?.categories ?? []
   const topCourses = data?.topCourses ?? []
+  const courseBreakdown = data?.courseBreakdown ?? []
+
+  if (selectedCourseId !== null) {
+    return (
+      <CourseDrilldown
+        courseId={selectedCourseId}
+        range={range}
+        onBack={() => setSelectedCourseId(null)}
+      />
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -268,6 +298,62 @@ export function AnalyticsView({ initialData }: { initialData: SellerAnalytics | 
           )}
         </section>
       </div>
+
+      {/* 강좌별 매출 내역 */}
+      <section className="rounded-xl border bg-card p-5">
+        <h2 className="font-semibold">강좌별 매출</h2>
+        <p className="text-xs text-muted-foreground">
+          전체 기간 누적 · 매출 순 · 강좌를 클릭하면 상세 분석을 볼 수 있어요
+        </p>
+        {courseBreakdown.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>강좌</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead className="text-right">수강생</TableHead>
+                  <TableHead className="text-right">판매</TableHead>
+                  <TableHead className="text-right">매출</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {courseBreakdown.map((c) => {
+                  const s = statusLabel[c.status] ?? { label: c.status, variant: 'outline' as const }
+                  return (
+                    <TableRow
+                      key={c.courseId}
+                      onClick={() => setSelectedCourseId(c.courseId)}
+                      className="cursor-pointer"
+                    >
+                      <TableCell className="max-w-[280px]">
+                        <p className="line-clamp-1 font-medium">{c.title}</p>
+                        <p className="text-xs text-muted-foreground">{formatKRW(c.price)}</p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={s.variant}>{s.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {c.studentCount.toLocaleString()}명
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {c.orders.toLocaleString()}건
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatKRW(c.revenue)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <p className="mt-12 text-center text-sm text-muted-foreground">
+            등록된 강좌가 없습니다.
+          </p>
+        )}
+      </section>
     </div>
   )
 }

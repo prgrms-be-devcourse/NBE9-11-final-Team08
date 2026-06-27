@@ -700,6 +700,52 @@ export interface SellerAnalytics {
   monthly: { month: string; revenue: number; orders: number }[]
   categories: { name: string; value: number }[]
   topCourses: { courseId: number; title: string; price: number; studentCount: number; revenue: number }[]
+  courseBreakdown: {
+    courseId: number
+    title: string
+    status: string
+    price: number
+    studentCount: number
+    orders: number
+    revenue: number
+  }[]
+}
+
+export interface LectureEngagement {
+  lectureId: number
+  chapterTitle: string
+  title: string
+  durationSeconds: number
+  enterCount: number
+  completeCount: number
+  viewerCount: number
+  avgWatchSeconds: number
+}
+
+export interface SellerCourseDetail {
+  courseId: number
+  title: string
+  status: string
+  price: number
+  totalRevenue: number
+  totalOrders: number
+  activeStudents: number
+  completions: number
+  revenueDelta: number
+  ordersDelta: number
+  monthly: { month: string; revenue: number; orders: number }[]
+  lectures: LectureEngagement[]
+}
+
+export interface LectureReplay {
+  lectureId: number
+  title: string
+  durationSeconds: number
+  binSeconds: number
+  totalIntervals: number
+  viewerCount: number
+  bins: { index: number; startSeconds: number; endSeconds: number; count: number; heat: number }[]
+  hotspots: { startSeconds: number; endSeconds: number; count: number; heat: number }[]
 }
 
 export interface CourseStatRow {

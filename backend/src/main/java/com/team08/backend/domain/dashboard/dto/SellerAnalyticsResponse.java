@@ -13,6 +13,7 @@ import java.util.List;
  *   <li>{@code monthly}: 월별 매출/판매 건수(빈 달은 0으로 채운 연속 시계열)</li>
  *   <li>{@code categories}: 카테고리별 수강생 비중</li>
  *   <li>{@code topCourses}: 수강생 수 기준 상위 강좌</li>
+ *   <li>{@code courseBreakdown}: 본인 전체 강좌의 강좌별 매출/판매/수강생 내역(매출 내림차순)</li>
  * </ul>
  */
 public record SellerAnalyticsResponse(
@@ -25,7 +26,8 @@ public record SellerAnalyticsResponse(
         double ordersDelta,
         List<MonthlyPoint> monthly,
         List<CategorySlice> categories,
-        List<TopCourse> topCourses
+        List<TopCourse> topCourses,
+        List<CourseBreakdownRow> courseBreakdown
 ) {
 
     /** 월별 매출/판매 건수 한 점. month 는 "6월" 같은 한글 라벨. */
@@ -38,5 +40,14 @@ public record SellerAnalyticsResponse(
 
     /** 인기 상품 행. */
     public record TopCourse(Long courseId, String title, int price, long studentCount, long revenue) {
+    }
+
+    /**
+     * 강좌별 판매 내역 한 행(전체 기간 누적).
+     * status 는 {@code CourseStatus} 이름(ON_SALE/DRAFT/...), orders 는 결제완료 판매 건수.
+     */
+    public record CourseBreakdownRow(
+            Long courseId, String title, String status, int price,
+            long studentCount, long orders, long revenue) {
     }
 }

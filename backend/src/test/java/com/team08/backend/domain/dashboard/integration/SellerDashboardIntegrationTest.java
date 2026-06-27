@@ -8,6 +8,9 @@ import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.learningevent.entity.LearningEvent;
+import com.team08.backend.domain.learningevent.entity.LearningEventType;
+import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.user.entity.User;
@@ -59,9 +62,12 @@ class SellerDashboardIntegrationTest {
     @Autowired private CourseRepository courseRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private EnrollmentRepository enrollmentRepository;
+    @Autowired private LearningEventRepository learningEventRepository;
 
     private Long courseAId;
     private Long courseBId;
+    private Long courseCId;
+    private Long lectureAId;
 
     @BeforeEach
     void seed() {
@@ -84,6 +90,7 @@ class SellerDashboardIntegrationTest {
         a.approve(admin.getId());
         courseRepository.save(a);
         courseAId = a.getId();
+        lectureAId = lecture.getId();
 
         // 본인 DRAFT 강좌 B (디자인, 20,000원) — 판매중은 아니지만 수강생/카테고리/인기상품 집계엔 포함
         Course b = Course.createDraft(SELLER_ID, design.getId(), "코스B", "설명", "thumb", 20000);
@@ -93,13 +100,34 @@ class SellerDashboardIntegrationTest {
         // 타 판매자 강좌 C (기타) — 모든 집계에서 제외돼야 함
         Course c = Course.createDraft(OTHER_SELLER_ID, etc.getId(), "코스C", "설명", "thumb", 30000);
         courseRepository.save(c);
-        Long courseCId = c.getId();
+        courseCId = c.getId();
 
         // 결제완료 + 수강(ACTIVE)
         paidEnroll(learner1.getId(), courseAId, "코스A", 10000);
         paidEnroll(learner2.getId(), courseAId, "코스A", 10000);
         paidEnroll(learner1.getId(), courseBId, "코스B", 20000);
         paidEnroll(learner2.getId(), courseCId, "코스C", 30000); // 타 판매자 → 제외
+
+        // 강의 A 재생 이벤트: VIDEO_START→VIDEO_END 페어링용 (길이 600초)
+        // l1: [0,300],[300,600] 전구간 / l2: [0,150],[100,300] 앞부분 반복
+        int t = 0;
+        replay(learner1.getId(), LearningEventType.VIDEO_START, 0, t++);
+        replay(learner1.getId(), LearningEventType.VIDEO_END, 300, t++);
+        replay(learner1.getId(), LearningEventType.VIDEO_START, 300, t++);
+        replay(learner1.getId(), LearningEventType.VIDEO_END, 600, t++);
+        replay(learner2.getId(), LearningEventType.VIDEO_START, 0, t++);
+        replay(learner2.getId(), LearningEventType.VIDEO_END, 150, t++);
+        replay(learner2.getId(), LearningEventType.VIDEO_START, 100, t++);
+        replay(learner2.getId(), LearningEventType.VIDEO_END, 300, t++);
+
+        // 완강 이벤트 2건 (completions=2)
+        replay(learner1.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
+        replay(learner2.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
+    }
+
+    private void replay(Long userId, LearningEventType type, Integer pos, int secondOffset) {
+        learningEventRepository.save(LearningEvent.create(
+                userId, courseAId, null, lectureAId, type, pos, NOW.plusSeconds(secondOffset), null));
     }
 
     private void paidEnroll(Long userId, Long courseId, String title, int price) {
@@ -163,6 +191,88 @@ class SellerDashboardIntegrationTest {
                 .andExpect(jsonPath("$.topCourses[0].revenue").value(20000))
                 .andExpect(jsonPath("$.topCourses[1].courseId").value(courseBId))
                 .andExpect(jsonPath("$.topCourses[1].studentCount").value(1));
+    }
+
+    @Test
+    @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
+    @DisplayName("analytics: 강좌별 매출 내역을 매출 순으로 반환한다(B 20,000 > A 20,000, 타 판매자 제외)")
+    void analyticsCourseBreakdown() throws Exception {
+        // A: 결제 2건·매출 20,000·수강생 2, B: 결제 1건·매출 20,000·수강생 1
+        // 매출 동률이면 수강생 내림차순 → A가 먼저
+        mockMvc.perform(get("/api/seller/dashboard/analytics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseBreakdown.length()").value(2))
+                .andExpect(jsonPath("$.courseBreakdown[*].courseId", containsInAnyOrder(
+                        courseAId.intValue(), courseBId.intValue())))
+                .andExpect(jsonPath("$.courseBreakdown[0].courseId").value(courseAId))
+                .andExpect(jsonPath("$.courseBreakdown[0].status").value("ON_SALE"))
+                .andExpect(jsonPath("$.courseBreakdown[0].studentCount").value(2))
+                .andExpect(jsonPath("$.courseBreakdown[0].orders").value(2))
+                .andExpect(jsonPath("$.courseBreakdown[0].revenue").value(20000))
+                .andExpect(jsonPath("$.courseBreakdown[1].courseId").value(courseBId))
+                .andExpect(jsonPath("$.courseBreakdown[1].status").value("DRAFT"))
+                .andExpect(jsonPath("$.courseBreakdown[1].orders").value(1))
+                .andExpect(jsonPath("$.courseBreakdown[1].revenue").value(20000));
+    }
+
+    @Test
+    @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
+    @DisplayName("courseDetail: 단일 강좌 KPI·강의별 참여도를 집계한다")
+    void courseDetail() throws Exception {
+        mockMvc.perform(get("/api/seller/dashboard/courses/{courseId}", courseAId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.courseId").value(courseAId))
+                .andExpect(jsonPath("$.status").value("ON_SALE"))
+                .andExpect(jsonPath("$.totalRevenue").value(20000))
+                .andExpect(jsonPath("$.totalOrders").value(2))
+                .andExpect(jsonPath("$.activeStudents").value(2))
+                .andExpect(jsonPath("$.completions").value(2))
+                .andExpect(jsonPath("$.monthly.length()").value(6))
+                .andExpect(jsonPath("$.lectures.length()").value(1))
+                .andExpect(jsonPath("$.lectures[0].lectureId").value(lectureAId))
+                .andExpect(jsonPath("$.lectures[0].durationSeconds").value(600))
+                .andExpect(jsonPath("$.lectures[0].completeCount").value(2))
+                .andExpect(jsonPath("$.lectures[0].viewerCount").value(2))
+                // VIDEO_END 위치 평균 (300,600,150,300) = 337.5 → 337
+                .andExpect(jsonPath("$.lectures[0].avgWatchSeconds").value(337));
+    }
+
+    @Test
+    @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
+    @DisplayName("courseDetail: 타 판매자 강좌를 조회하면 403")
+    void courseDetailNotOwner() throws Exception {
+        mockMvc.perform(get("/api/seller/dashboard/courses/{courseId}", courseCId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
+    @DisplayName("courseDetail: 없는 강좌는 404")
+    void courseDetailNotFound() throws Exception {
+        mockMvc.perform(get("/api/seller/dashboard/courses/{courseId}", 999999L))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
+    @DisplayName("lectureReplay: VIDEO_START/END를 페어링해 자주 본 구간 히트맵을 만든다")
+    void lectureReplay() throws Exception {
+        // bins=10 → 60초 단위. 구간 [0,300]·[300,600]·[0,150]·[100,300] 누적
+        // bin1(60~120)=3(최대), bin5(300~360)=1
+        mockMvc.perform(get("/api/seller/dashboard/lectures/{lectureId}/replay", lectureAId)
+                        .param("bins", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lectureId").value(lectureAId))
+                .andExpect(jsonPath("$.durationSeconds").value(600))
+                .andExpect(jsonPath("$.binSeconds").value(60))
+                .andExpect(jsonPath("$.totalIntervals").value(4))
+                .andExpect(jsonPath("$.viewerCount").value(2))
+                .andExpect(jsonPath("$.bins.length()").value(10))
+                .andExpect(jsonPath("$.bins[1].count").value(3))
+                .andExpect(jsonPath("$.bins[1].heat").value(1.0))
+                .andExpect(jsonPath("$.bins[5].count").value(1))
+                .andExpect(jsonPath("$.hotspots[0].startSeconds").value(60))
+                .andExpect(jsonPath("$.hotspots[0].count").value(3));
     }
 
     @Test

@@ -51,6 +51,8 @@ import type {
   AnomalyResponse,
   AuditResponse,
   SellerAnalytics,
+  SellerCourseDetail,
+  LectureReplay,
   FeedCursor,
   FeedCursorResponse,
 } from './types'
@@ -1605,4 +1607,14 @@ export const api = {
   // ── Seller Dashboard APIs ───────────────────────────────────────────
   getSellerAnalytics: (range: '3m' | '6m' | '1y' = '6m') =>
     request<SellerAnalytics | null>(`/api/seller/dashboard/analytics?range=${range}`, null),
+  getSellerCourseDetail: (courseId: number, range: '3m' | '6m' | '1y' = '6m') =>
+    request<SellerCourseDetail | null>(
+      `/api/seller/dashboard/courses/${courseId}?range=${range}`,
+      null,
+    ),
+  getSellerLectureReplay: (lectureId: number, bins = 40) =>
+    request<LectureReplay | null>(
+      `/api/seller/dashboard/lectures/${lectureId}/replay?bins=${bins}`,
+      null,
+    ),
 }

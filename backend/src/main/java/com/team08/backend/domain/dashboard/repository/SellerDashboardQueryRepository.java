@@ -1,6 +1,7 @@
 package com.team08.backend.domain.dashboard.repository;
 
 import com.team08.backend.domain.dashboard.dto.SellerAnalyticsResponse;
+import com.team08.backend.domain.dashboard.dto.SellerCourseDetailResponse;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Repository;
@@ -113,6 +114,123 @@ public class SellerDashboardQueryRepository {
             result.add(new SellerAnalyticsResponse.TopCourse(
                     toLong(r[0]), String.valueOf(r[1]), ((Number) r[2]).intValue(),
                     toLong(r[3]), toLong(r[4])));
+        }
+        return result;
+    }
+
+    // ── 단일 강좌 드릴다운 ──────────────────────────────────────────────
+
+    /** 단일 강좌의 월별(yyyy-MM) 매출·판매 건수. {@link #monthlyRevenue}의 강좌 한정 버전. */
+    public Map<String, long[]> courseMonthlyRevenue(Long courseId, LocalDateTime from) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery("""
+                SELECT DATE_FORMAT(o.paid_at, '%Y-%m') AS ym,
+                       COALESCE(SUM(oi.final_price), 0) AS revenue,
+                       COUNT(*) AS orders
+                FROM order_items oi
+                JOIN orders o ON oi.order_id = o.id
+                WHERE o.status = 'PAID'
+                  AND o.paid_at >= :from
+                  AND oi.course_id = :courseId
+                GROUP BY ym
+                ORDER BY ym
+                """)
+                .setParameter("from", from)
+                .setParameter("courseId", courseId)
+                .getResultList();
+
+        Map<String, long[]> result = new LinkedHashMap<>();
+        for (Object[] r : rows) {
+            result.put(String.valueOf(r[0]), new long[]{toLong(r[1]), toLong(r[2])});
+        }
+        return result;
+    }
+
+    /** 단일 강좌의 ACTIVE 수강생 수. */
+    public long courseActiveStudents(Long courseId) {
+        return toLong(em.createNativeQuery("""
+                SELECT COUNT(*) FROM enrollments e
+                WHERE e.course_id = :courseId AND e.status = 'ACTIVE'
+                """).setParameter("courseId", courseId).getSingleResult());
+    }
+
+    /** 단일 강좌의 LECTURE_COMPLETE 이벤트 누적 수. */
+    public long courseCompletions(Long courseId) {
+        return toLong(em.createNativeQuery("""
+                SELECT COUNT(*) FROM learning_events le
+                WHERE le.course_id = :courseId AND le.event_type = 'LECTURE_COMPLETE'
+                """).setParameter("courseId", courseId).getSingleResult());
+    }
+
+    /** 강의별 참여도(입장/완료/고유 시청자/평균 멈춤 위치). 챕터·강의 순서대로. */
+    public List<SellerCourseDetailResponse.LectureEngagement> lectureEngagement(Long courseId) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery("""
+                SELECT l.id, ch.title AS chapterTitle, l.title, l.duration_seconds,
+                  (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_ENTER') AS enterCount,
+                  (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_COMPLETE') AS completeCount,
+                  (SELECT COUNT(DISTINCT le.user_id) FROM learning_events le WHERE le.lecture_id=l.id) AS viewerCount,
+                  (SELECT COALESCE(AVG(le.position_seconds),0) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='VIDEO_END') AS avgWatch
+                FROM lectures l
+                JOIN chapters ch ON l.chapter_id = ch.id
+                WHERE ch.course_id = :courseId AND l.deleted_at IS NULL
+                ORDER BY ch.order_no, l.order_no
+                """).setParameter("courseId", courseId).getResultList();
+
+        List<SellerCourseDetailResponse.LectureEngagement> result = new ArrayList<>();
+        for (Object[] r : rows) {
+            result.add(new SellerCourseDetailResponse.LectureEngagement(
+                    toLong(r[0]), String.valueOf(r[1]), String.valueOf(r[2]), ((Number) r[3]).intValue(),
+                    toLong(r[4]), toLong(r[5]), toLong(r[6]), toLong(r[7])));
+        }
+        return result;
+    }
+
+    /**
+     * 강의의 재생 구간 이벤트(VIDEO_START/VIDEO_END)를 사용자·시간 순으로 반환.
+     * 행: [userId, eventType, positionSeconds, eventTime]. 페어링/버킷팅은 서비스가 담당한다.
+     */
+    public List<Object[]> replayEvents(Long lectureId, int limit) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery("""
+                SELECT le.user_id, le.event_type, le.position_seconds, le.event_time
+                FROM learning_events le
+                WHERE le.lecture_id = :lectureId
+                  AND le.event_type IN ('VIDEO_START', 'VIDEO_END')
+                  AND le.position_seconds IS NOT NULL
+                ORDER BY le.user_id, le.event_time, le.id
+                LIMIT :limit
+                """)
+                .setParameter("lectureId", lectureId)
+                .setParameter("limit", limit)
+                .getResultList();
+        return rows;
+    }
+
+    /** 강좌별 판매 내역(전체 기간 누적): 수강생·판매 건수·매출. 매출 내림차순. */
+    public List<SellerAnalyticsResponse.CourseBreakdownRow> courseBreakdown(Long sellerId) {
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = em.createNativeQuery("""
+                SELECT c.id, c.title, c.status, c.price,
+                  (SELECT COUNT(*) FROM enrollments e
+                     WHERE e.course_id = c.id AND e.status = 'ACTIVE') AS students,
+                  (SELECT COUNT(*) FROM order_items oi
+                     JOIN orders o ON oi.order_id = o.id
+                     WHERE oi.course_id = c.id AND o.status = 'PAID') AS orders,
+                  (SELECT COALESCE(SUM(oi.final_price), 0) FROM order_items oi
+                     JOIN orders o ON oi.order_id = o.id
+                     WHERE oi.course_id = c.id AND o.status = 'PAID') AS revenue
+                FROM courses c
+                WHERE c.instructor_id = :sellerId
+                  AND c.deleted_at IS NULL
+                ORDER BY revenue DESC, students DESC, c.id DESC
+                """).setParameter("sellerId", sellerId).getResultList();
+
+        List<SellerAnalyticsResponse.CourseBreakdownRow> result = new ArrayList<>();
+        for (Object[] r : rows) {
+            result.add(new SellerAnalyticsResponse.CourseBreakdownRow(
+                    toLong(r[0]), String.valueOf(r[1]), String.valueOf(r[2]), ((Number) r[3]).intValue(),
+                    toLong(r[4]), toLong(r[5]), toLong(r[6])));
         }
         return result;
     }
