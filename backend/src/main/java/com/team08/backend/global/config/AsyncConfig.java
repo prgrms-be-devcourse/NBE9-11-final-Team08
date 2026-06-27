@@ -27,11 +27,14 @@ public class AsyncConfig {
 
         executor.setRejectedExecutionHandler((runnable, threadPoolExecutor) -> {
             int maxPoolSize = threadPoolExecutor.getMaximumPoolSize();
-            int queueCapacity = threadPoolExecutor.getQueue().remainingCapacity() + threadPoolExecutor.getQueue().size();
-            log.error("[비동기 인코딩 작업 유실 발생] 인프라 임계치 초과(Pool: {}, Queue: {}). 작업 요청이 거절되었습니다.", maxPoolSize, queueCapacity);
+            int currentQueueSize = threadPoolExecutor.getQueue().size();
+            int totalQueueCapacity = currentQueueSize + threadPoolExecutor.getQueue().remainingCapacity();
+            log.error("[비동기 인코딩 작업 유실 발생] 인프라 임계치 초과(Pool: {}, Queue: {}/{}). 작업 요청이 거절되었습니다.",
+                    maxPoolSize, currentQueueSize, totalQueueCapacity);
             throw new RejectedExecutionException("인코딩 처리 시스템이 혼잡하여 현재 요청을 수락할 수 없습니다. 잠시 후 다시 시도해주세요.");
         });
 
+        executor.initialize();
         return executor;
     }
 }
