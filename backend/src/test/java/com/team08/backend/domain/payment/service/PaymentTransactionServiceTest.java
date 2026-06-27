@@ -1,7 +1,5 @@
 package com.team08.backend.domain.payment.service;
 
-import com.team08.backend.domain.enrollment.entity.Enrollment;
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.order.entity.Order;
@@ -19,6 +17,7 @@ import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -35,7 +34,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,7 +81,7 @@ class PaymentTransactionServiceTest {
     private OrderCouponUsageRepository orderCouponUsageRepository;
 
     @Mock
-    private PaidCourseStudyMemberService paidCourseStudyMemberService;
+    private PaymentSuccessOutboxService paymentSuccessOutboxService;
 
     private PaymentTransactionService paymentTransactionService;
 
@@ -97,7 +95,7 @@ class PaymentTransactionServiceTest {
                 enrollmentRepository,
                 issuedCouponService,
                 orderCouponUsageRepository,
-                paidCourseStudyMemberService,
+                paymentSuccessOutboxService,
                 FIXED_CLOCK
         );
     }
@@ -134,7 +132,7 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
-    void sameIdempotencyKeyReturnsExistingTossSuccessEvenWhenOrderAlreadyPaid() {
+    void sameIdempotencyKeyReplayKeepsEnrollmentIdsEmptyWhenOrderAlreadyPaid() {
         Order order = order(OrderStatus.PAID);
         Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));
         ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
@@ -149,12 +147,9 @@ class PaymentTransactionServiceTest {
         );
         ReflectionTestUtils.setField(attempt, "id", ATTEMPT_ID);
         attempt.succeed("payment-key", FIXED_NOW.minusMinutes(1));
-        Enrollment enrollment = Enrollment.createActive(USER_ID, COURSE_ID, order, FIXED_NOW.minusMinutes(1));
-
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-1")).willReturn(Optional.of(attempt));
-        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE)).willReturn(List.of(enrollment));
 
         PaymentTransactionService.TossPaymentProcessingContext context =
                 paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest("idem-1"));
@@ -162,8 +157,9 @@ class PaymentTransactionServiceTest {
         assertThat(context.isIdempotentReplay()).isTrue();
         assertThat(context.idempotentResponse().paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(context.idempotentResponse().orderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(context.idempotentResponse().enrolledCourseIds()).containsExactly(COURSE_ID);
+        assertThat(context.idempotentResponse().enrolledCourseIds()).isEmpty();
         verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+        verify(enrollmentRepository, never()).findAllByOrder_IdAndStatus(any(), any());
     }
 
     @Test
@@ -182,7 +178,6 @@ class PaymentTransactionServiceTest {
         )).willReturn(List.of());
         stubPaymentSave(savedPayment);
         stubPaymentAttemptSave(savedAttempt);
-        stubEnrollmentSaveAll();
 
         PaymentTransactionService.TossPaymentProcessingContext context =
                 paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest());
@@ -206,8 +201,10 @@ class PaymentTransactionServiceTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
-        verify(enrollmentRepository).saveAll(any());
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(enrollmentRepository, never()).saveAllAndFlush(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
     }
 
     @Test
@@ -291,7 +288,7 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
-    void processingTossPaymentRecoveredAsSuccessIssuesEnrollment() {
+    void processingTossPaymentRecoveredAsSuccessCreatesOutbox() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment payment = recoverablePayment(order, PaymentStatus.PROCESSING);
         PaymentAttempt attempt = recoverableAttempt(payment);
@@ -306,7 +303,6 @@ class PaymentTransactionServiceTest {
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave(new AtomicReference<>());
-        stubEnrollmentSaveAll();
 
         boolean recovered = paymentTransactionService.recoverTossPayment(
                 recoveryTarget(order),
@@ -317,7 +313,8 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        verify(enrollmentRepository).saveAll(any());
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
     }
 
     @Test
@@ -353,7 +350,7 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
-    void unknownTossPaymentRecoveredAsSuccessIssuesEnrollment() {
+    void unknownTossPaymentRecoveredAsSuccessCreatesOutbox() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment payment = recoverablePayment(order, PaymentStatus.UNKNOWN);
         PaymentAttempt attempt = recoverableAttempt(payment);
@@ -368,7 +365,6 @@ class PaymentTransactionServiceTest {
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave(new AtomicReference<>());
-        stubEnrollmentSaveAll();
 
         boolean recovered = paymentTransactionService.recoverTossPayment(
                 recoveryTarget(order),
@@ -379,7 +375,8 @@ class PaymentTransactionServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(attempt.getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
-        verify(enrollmentRepository).saveAll(any());
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
     }
 
     @Test
@@ -502,19 +499,6 @@ class PaymentTransactionServiceTest {
             ReflectionTestUtils.setField(attempt, "id", ATTEMPT_ID);
             savedAttempt.set(attempt);
             return attempt;
-        });
-    }
-
-    private void stubEnrollmentSaveAll() {
-        given(enrollmentRepository.saveAll(any())).willAnswer(invocation -> {
-            Iterable<Enrollment> enrollments = invocation.getArgument(0);
-            List<Enrollment> savedEnrollments = new ArrayList<>();
-            long id = 1L;
-            for (Enrollment enrollment : enrollments) {
-                ReflectionTestUtils.setField(enrollment, "id", id++);
-                savedEnrollments.add(enrollment);
-            }
-            return savedEnrollments;
         });
     }
 
