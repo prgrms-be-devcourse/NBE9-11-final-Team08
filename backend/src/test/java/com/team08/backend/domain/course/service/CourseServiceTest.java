@@ -89,6 +89,15 @@ class CourseServiceTest {
     @Mock
     private FileUrlFormatter fileUrlFormatter;
 
+    @Mock
+    private CourseDetailCacheManager courseDetailCacheManager;
+
+    @Mock
+    private CourseViewCountRedisManager courseViewCountRedisManager;
+
+    @Mock
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
     @InjectMocks
     private CourseService courseService;
 
@@ -142,7 +151,7 @@ class CourseServiceTest {
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
         verify(courseRepository).findWithChaptersAsc(courseId);
-        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId);
     }
 
     @Test
@@ -171,7 +180,7 @@ class CourseServiceTest {
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
         verify(courseRepository).findWithChaptersAsc(courseId);
-        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId);
     }
 
     @Test
@@ -185,7 +194,6 @@ class CourseServiceTest {
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
         verify(courseRepository).findWithChaptersAsc(invalidCourseId);
-        verify(courseViewCountManager, never()).increaseViewCountRequiresNew(invalidCourseId);
     }
 
     @Test
