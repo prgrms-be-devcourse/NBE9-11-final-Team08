@@ -3,12 +3,11 @@ package com.team08.backend.domain.attendance.service;
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
-import com.team08.backend.domain.attendance.event.AttendanceCheckedEvent;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
+import com.team08.backend.domain.couponreward.outbox.CouponRewardOutboxService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.ErrorCode;
-import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,7 +16,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -47,7 +45,7 @@ class AttendanceServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private CouponRewardOutboxService couponRewardOutboxService;
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-15T10:00:00Z"), ZoneId.systemDefault());
@@ -144,8 +142,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("출석 성공 시 출석 이벤트를 발행한다")
-    void checkIn_success_publishesAttendanceEvent() {
+    @DisplayName("출석 성공 시 쿠폰 보상 outbox 이벤트를 저장한다")
+    void checkIn_success_createsCouponRewardOutboxEvent() {
         // given
         Long userId = 1L;
         LocalDate yesterday = today.minusDays(1);
@@ -165,11 +163,12 @@ class AttendanceServiceTest {
 
         // then
         assertEquals(7, response.consecutiveDays());
-        ArgumentCaptor<AttendanceCheckedEvent> captor = ArgumentCaptor.forClass(AttendanceCheckedEvent.class);
-        verify(eventPublisher, times(1)).publishEvent(captor.capture());
-        assertEquals(userId, captor.getValue().userId());
-        assertEquals(7, captor.getValue().consecutiveDays());
-        assertEquals(11, captor.getValue().monthlyTotalDays());
+        verify(couponRewardOutboxService, times(1)).createAttendanceCheckedEvent(
+                userId,
+                today,
+                7,
+                11
+        );
     }
 
     @Test

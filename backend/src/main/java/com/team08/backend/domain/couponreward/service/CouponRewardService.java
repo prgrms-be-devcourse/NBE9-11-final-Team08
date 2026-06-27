@@ -9,9 +9,7 @@ import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -30,12 +28,12 @@ public class CouponRewardService {
     private final IssuedCouponRepository issuedCouponRepository;
     private final Clock clock;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void issueSignupReward(Long userId) {
         issueRewardByAutoIssueType(userId, AutoIssueType.SIGNUP, "SIGNUP");
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void issueAttendanceStreakReward(Long userId, int consecutiveDays) {
         if (consecutiveDays <= 0 || consecutiveDays % ATTENDANCE_STREAK_REWARD_INTERVAL_DAYS != 0) {
             return;
@@ -47,7 +45,7 @@ public class CouponRewardService {
         );
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void issueMonthlyAttendanceReward(Long userId, String yearMonth, int monthlyTotalDays) {
         if (monthlyTotalDays != MONTHLY_ATTENDANCE_REWARD_DAYS) {
             return;
@@ -71,23 +69,41 @@ public class CouponRewardService {
     }
 
     private void issueReward(Long userId, CouponPolicy policy, String rewardKey, String rewardType, LocalDateTime now) {
+        if (couponRewardHistoryRepository.existsByUserIdAndRewardKey(userId, rewardKey)) {
+            log.info("이미 처리된 쿠폰 보상입니다. userId={}, rewardKey={}", userId, rewardKey);
+            return;
+        }
+
+        IssuedCoupon existingCoupon = issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(
+                        userId,
+                        policy.getId(),
+                        rewardKey
+                )
+                .orElse(null);
+        if (existingCoupon != null) {
+            CouponRewardHistory history = CouponRewardHistory.create(
+                    userId,
+                    policy.getId(),
+                    rewardKey,
+                    rewardType
+            );
+            history.markIssued(existingCoupon.getId(), existingCoupon.getIssuedAt());
+            couponRewardHistoryRepository.save(history);
+            log.info("이미 발급된 쿠폰 보상 이력을 보정했습니다. userId={}, rewardKey={}", userId, rewardKey);
+            return;
+        }
+
         CouponRewardHistory history = CouponRewardHistory.create(
                 userId,
                 policy.getId(),
                 rewardKey,
                 rewardType
         );
-
-        try {
-            couponRewardHistoryRepository.saveAndFlush(history);
-        } catch (DataIntegrityViolationException e) {
-            log.info("이미 처리된 쿠폰 보상입니다. userId={}, rewardKey={}", userId, rewardKey);
-            return;
-        }
+        couponRewardHistoryRepository.save(history);
 
         policy.validateIssuePeriod(now);
         IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, userId, rewardKey, now);
-        IssuedCoupon savedCoupon = issuedCouponRepository.saveAndFlush(issuedCoupon);
+        IssuedCoupon savedCoupon = issuedCouponRepository.save(issuedCoupon);
         history.markIssued(savedCoupon.getId(), now);
     }
 }

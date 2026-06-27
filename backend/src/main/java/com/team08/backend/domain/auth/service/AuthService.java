@@ -2,7 +2,6 @@ package com.team08.backend.domain.auth.service;
 
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.entity.RefreshToken;
-import com.team08.backend.domain.auth.event.UserSignedUpEvent;
 import com.team08.backend.domain.auth.exception.DuplicateEmailException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.exception.InvalidSignupRoleException;
@@ -12,11 +11,11 @@ import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.couponreward.outbox.CouponRewardOutboxService;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,7 +41,7 @@ public class AuthService {
 
     private final Clock clock;
 
-    private final ApplicationEventPublisher eventPublisher;
+    private final CouponRewardOutboxService couponRewardOutboxService;
 
     @Transactional
     public TokenPair login(String email, String password) {
@@ -115,7 +114,7 @@ public class AuthService {
 
         try {
             User savedUser = userRepository.saveAndFlush(user);
-            eventPublisher.publishEvent(new UserSignedUpEvent(savedUser.getId()));
+            couponRewardOutboxService.createUserSignedUpEvent(savedUser.getId());
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEmailException();
         }

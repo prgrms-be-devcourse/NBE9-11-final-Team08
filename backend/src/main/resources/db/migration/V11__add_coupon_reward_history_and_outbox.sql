@@ -25,3 +25,22 @@ CREATE TABLE coupon_reward_histories (
     INDEX idx_coupon_reward_histories_user (user_id),
     INDEX idx_coupon_reward_histories_policy (policy_id)
 ) ENGINE=InnoDB;
+
+CREATE TABLE coupon_reward_outbox_events (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    event_type VARCHAR(50) NOT NULL,
+    event_key VARCHAR(100) NOT NULL,
+    payload LONGTEXT NOT NULL,
+    status ENUM ('DEAD', 'FAILED', 'PENDING', 'PROCESSED') NOT NULL,
+    retry_count INT NOT NULL,
+    last_error LONGTEXT,
+    processed_at DATETIME(6),
+    next_retry_at DATETIME(6),
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_coupon_reward_outbox_event_key (event_type, event_key),
+    INDEX idx_coupon_reward_outbox_status_id (status, id),
+    INDEX idx_coupon_reward_outbox_user (user_id, id)
+) ENGINE=InnoDB;

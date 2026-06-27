@@ -3,14 +3,13 @@ package com.team08.backend.domain.attendance.service;
 import com.team08.backend.domain.attendance.dto.AttendanceResponse;
 import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
-import com.team08.backend.domain.attendance.event.AttendanceCheckedEvent;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
+import com.team08.backend.domain.couponreward.outbox.CouponRewardOutboxService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +27,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final CouponRewardOutboxService couponRewardOutboxService;
     private final Clock clock;
 
     // 출석체크
@@ -61,12 +60,12 @@ public class AttendanceService {
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
             Attendance savedLog = attendanceRepository.saveAndFlush(todayLog);
-            eventPublisher.publishEvent(new AttendanceCheckedEvent(
+            couponRewardOutboxService.createAttendanceCheckedEvent(
                     userId,
                     savedLog.getAttendanceDate(),
                     savedLog.getConsecutiveDays(),
                     savedLog.getMonthlyTotalDays()
-            ));
+            );
 
             return AttendanceResponse.from(savedLog);
         } catch (DataIntegrityViolationException e) {

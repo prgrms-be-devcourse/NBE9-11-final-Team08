@@ -4,4 +4,6 @@ import com.team08.backend.domain.couponreward.entity.CouponRewardHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CouponRewardHistoryRepository extends JpaRepository<CouponRewardHistory, Long> {
+
+    boolean existsByUserIdAndRewardKey(Long userId, String rewardKey);
 }
