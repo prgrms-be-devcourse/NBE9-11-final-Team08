@@ -2,6 +2,7 @@ package com.team08.backend.domain.study.controller;
 
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
 import com.team08.backend.domain.study.dto.response.StudyIdResponse;
+import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.service.StudyService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -47,6 +48,17 @@ public class StudyController {
         Long userId = loginUserPrincipal == null ? null : loginUserPrincipal.user().id();
 
         return studyService.getStudyDetail(studyId, userId);
+    }
+
+    @Operation(
+            summary = "스터디 멤버 목록 조회",
+            description = "스터디에 ACTIVE 상태로 참여 중인 멤버 목록을 조회합니다."
+    )
+    @GetMapping("/{studyId}/members")
+    public List<StudyMemberResponse> getStudyMembers(
+            @PathVariable Long studyId
+    ) {
+        return studyService.getStudyMembers(studyId);
     }
 
     @Operation(

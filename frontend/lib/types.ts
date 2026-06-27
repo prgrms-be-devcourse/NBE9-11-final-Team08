@@ -481,8 +481,17 @@ export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 export interface StudyMember {
   id: string
   name: string
+  avatarUrl?: string | null
   progress: number
   role: StudyRole
+  joinedAt: string
+}
+
+export interface StudyMemberResponse {
+  userId: number
+  nickname: string
+  profileImage: string | null
+  role: 'OWNER' | 'MEMBER'
   joinedAt: string
 }
 

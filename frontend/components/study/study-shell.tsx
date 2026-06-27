@@ -74,9 +74,6 @@ export function StudyShell({
               {STATUS_LABEL[study.status]}
             </Badge>
           </div>
-          <p className="truncate text-xs text-muted-foreground">
-            운영자 {study.ownerName} · 멤버 {study.members.length}명
-          </p>
         </div>
         <Button asChild variant="outline" size="sm" className="ml-auto">
           <Link href={`/courses/${study.courseId}`}>

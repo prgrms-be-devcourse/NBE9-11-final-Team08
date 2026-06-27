@@ -11,9 +11,10 @@ export default async function StudyPage({
   const { id } = await params
   const study = await api.getStudyForEntry(id)
   if (!study) notFound()
+  const members = await api.getStudyMembers(id)
   return (
     <StudyShell study={study}>
-      <StudyDashboard study={study} />
+      <StudyDashboard study={{ ...study, members }} />
     </StudyShell>
   )
 }

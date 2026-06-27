@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { BookOpen, Users } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -10,10 +10,6 @@ import type { Study } from '@/lib/types'
 
 export function StudyDashboard({ study }: { study: Study }) {
   const base = `/study/${study.id}`
-  const avgProgress = Math.round(
-    study.members.reduce((s, m) => s + m.progress, 0) /
-      Math.max(study.members.length, 1),
-  )
   const canUseStudyFeatures = study.myRole !== 'viewer'
 
   return (
@@ -43,19 +39,22 @@ export function StudyDashboard({ study }: { study: Study }) {
 
       {canUseStudyFeatures ? (
         <div className="grid items-start gap-6 lg:grid-cols-[1fr_320px]">
-          {/* 수강현황 */}
+          {/* 스터디 멤버 */}
           <section className="rounded-xl border bg-card">
             <div className="flex items-center gap-2 border-b px-5 py-3">
               <Users className="h-4 w-4" />
-              <h3 className="text-sm font-semibold">수강 현황</h3>
+              <h3 className="text-sm font-semibold">스터디 멤버</h3>
               <Badge variant="secondary" className="ml-auto">
-                평균 {avgProgress}%
+                {study.members.length}명
               </Badge>
             </div>
-            <ul className="divide-y">
+            <ul className="max-h-96 divide-y overflow-y-auto">
               {study.members.map((m) => (
                 <li key={m.id} className="flex items-center gap-3 px-5 py-3">
                   <Avatar className="h-8 w-8">
+                    {m.avatarUrl ? (
+                      <AvatarImage src={m.avatarUrl} alt={m.name} />
+                    ) : null}
                     <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
                       {m.name[0]}
                     </AvatarFallback>
@@ -69,15 +68,11 @@ export function StudyDashboard({ study }: { study: Study }) {
                         </Badge>
                       )}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      참여 {m.joinedAt}
-                    </p>
-                  </div>
-                  <div className="flex w-28 items-center gap-2">
-                    <Progress value={m.progress} className="h-2 flex-1" />
-                    <span className="w-9 text-right text-xs font-semibold">
-                      {m.progress}%
-                    </span>
+                    {m.joinedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        참여 {m.joinedAt.slice(0, 10)}
+                      </p>
+                    )}
                   </div>
                 </li>
               ))}
