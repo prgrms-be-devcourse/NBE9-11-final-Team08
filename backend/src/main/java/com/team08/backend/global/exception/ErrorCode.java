@@ -11,6 +11,7 @@ public enum ErrorCode {
     // ── 공통 ──────────────────────────────────────────────────────────────
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 파라미터 요청입니다. 입력 값을 확인해주세요."),
+    SYSTEM_BUSY(HttpStatus.SERVICE_UNAVAILABLE, "COMMON_503", "서버 처리 용량이 초과되었습니다. 잠시 후 다시 시도해주세요."),
 
     // ── Admin ────────────────────────────────────────────────────────────
     ADMIN_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ADMIN_001", "관리자만 접근할 수 있습니다."),

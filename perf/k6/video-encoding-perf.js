@@ -139,19 +139,15 @@ export function uploadVideoScenario(data) {
 
         // 202 Accepted 면 성공
         const isAccepted = res.status === 202;
-        // 500 이면 스레드 풀 거절(RejectedExecutionException) 혹은 서버 에러
-        const isRejected = res.status === 500;
-
+        // 500(서버 내부오류) 또는 503(인프라 바쁨) 이면 스레드 풀 거절(RejectedExecutionException) 혹은 서버 에러
+        const isRejected = res.status === 500 || res.status === 503;
+ 
         successCount.add(isAccepted ? 1 : 0);
         rejectCount.add(isRejected ? 1 : 0);
         errorRate.add(isRejected ? 1 : 0);
-
+ 
         check(res, {
             'status is 202 Accepted': (r) => r.status === 202,
-        });
-
-        if (res.status !== 202) {
-            console.warn(`[warn] Upload failed with status=${res.status}, body=${res.body}`);
-        }
+        }, { status: String(res.status), path: '/videos' });
     });
 }

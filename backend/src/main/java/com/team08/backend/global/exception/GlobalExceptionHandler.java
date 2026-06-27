@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 @RestControllerAdvice
@@ -14,6 +15,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
         ErrorCode errorCode = e.getErrorCode();
+
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(ErrorResponse.from(errorCode));
+    }
+
+    @ExceptionHandler(RejectedExecutionException.class)
+    public ResponseEntity<ErrorResponse> handleRejectedExecutionException(RejectedExecutionException e) {
+        log.error("RejectedExecutionException: {}", e.getMessage(), e);
+        ErrorCode errorCode = ErrorCode.SYSTEM_BUSY;
 
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
