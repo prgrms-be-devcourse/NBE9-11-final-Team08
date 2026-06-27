@@ -1,4 +1,4 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.dto;
 
 import java.time.LocalDate;
 

@@ -1,7 +1,12 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.couponreward.outbox.dto.AttendanceRewardPayload;
+import com.team08.backend.domain.couponreward.outbox.dto.CouponRewardOutboxCreatedEvent;
+import com.team08.backend.domain.couponreward.outbox.dto.SignupRewardPayload;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEvent;
+import com.team08.backend.domain.couponreward.outbox.repository.CouponRewardOutboxEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;

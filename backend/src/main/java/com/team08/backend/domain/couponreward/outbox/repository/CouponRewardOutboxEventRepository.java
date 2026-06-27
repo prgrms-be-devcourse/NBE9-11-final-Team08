@@ -1,5 +1,6 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.repository;
 
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEvent;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

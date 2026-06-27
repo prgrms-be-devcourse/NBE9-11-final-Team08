@@ -1,6 +1,9 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.couponreward.outbox.dto.CouponRewardOutboxCreatedEvent;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEvent;
+import com.team08.backend.domain.couponreward.outbox.repository.CouponRewardOutboxEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

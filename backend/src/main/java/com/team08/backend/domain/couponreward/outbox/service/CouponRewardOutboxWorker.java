@@ -1,4 +1,4 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

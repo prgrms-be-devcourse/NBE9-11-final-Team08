@@ -1,6 +1,10 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.couponreward.outbox.dto.SignupRewardPayload;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEvent;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEventStatus;
+import com.team08.backend.domain.couponreward.outbox.repository.CouponRewardOutboxEventRepository;
 import com.team08.backend.domain.couponreward.service.CouponRewardService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,13 +41,11 @@ class CouponRewardOutboxTransactionServiceTest {
     void issueAndMarkProcessed_issuesSignupRewardAndMarksProcessed() throws Exception {
         // given
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        CouponRewardOutboxProperties properties = new CouponRewardOutboxProperties(100, 5, 10, 600);
         CouponRewardOutboxTransactionService service = new CouponRewardOutboxTransactionService(
                 couponRewardOutboxEventRepository,
                 couponRewardService,
                 objectMapper,
-                clock,
-                properties
+                clock
         );
         CouponRewardOutboxEvent event = CouponRewardOutboxEvent.userSignedUp(
                 1L,
@@ -71,13 +73,11 @@ class CouponRewardOutboxTransactionServiceTest {
     void markFailed_marksEventFailedWithRetryDelay() {
         // given
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        CouponRewardOutboxProperties properties = new CouponRewardOutboxProperties(100, 5, 10, 600);
         CouponRewardOutboxTransactionService service = new CouponRewardOutboxTransactionService(
                 couponRewardOutboxEventRepository,
                 couponRewardService,
                 objectMapper,
-                clock,
-                properties
+                clock
         );
         CouponRewardOutboxEvent event = CouponRewardOutboxEvent.userSignedUp(1L, "{\"userId\":1}");
         given(couponRewardOutboxEventRepository.findByIdForUpdate(10L)).willReturn(Optional.of(event));

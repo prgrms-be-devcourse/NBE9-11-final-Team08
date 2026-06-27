@@ -1,9 +1,9 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.stream;
 
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxWorker;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -21,14 +21,10 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(
-        name = "app.coupon-reward.outbox.stream-worker-enabled",
-        havingValue = "true",
-        matchIfMissing = true
-)
 public class CouponRewardOutboxStreamWorker {
 
     private static final String GROUP_NAME = "coupon-reward-outbox-workers";
+    private static final long STREAM_WORKER_DELAY_MS = 100;
 
     private final String consumerName = "coupon-reward-outbox-worker-" + UUID.randomUUID();
 
@@ -50,7 +46,7 @@ public class CouponRewardOutboxStreamWorker {
         }
     }
 
-    @Scheduled(fixedDelayString = "${app.coupon-reward.outbox.stream-worker-delay-ms:100}")
+    @Scheduled(fixedDelay = STREAM_WORKER_DELAY_MS)
     public void processEvents() {
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(GROUP_NAME, consumerName),

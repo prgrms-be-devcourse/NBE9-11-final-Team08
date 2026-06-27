@@ -1,4 +1,4 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.entity;
 
 public enum CouponRewardOutboxEventStatus {
     PENDING,

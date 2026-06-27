@@ -1,7 +1,12 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.couponreward.outbox.dto.AttendanceRewardPayload;
+import com.team08.backend.domain.couponreward.outbox.dto.SignupRewardPayload;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEvent;
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEventStatus;
+import com.team08.backend.domain.couponreward.outbox.repository.CouponRewardOutboxEventRepository;
 import com.team08.backend.domain.couponreward.service.CouponRewardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,12 +22,14 @@ import java.time.format.DateTimeFormatter;
 public class CouponRewardOutboxTransactionService {
 
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final int MAX_RETRIES = 5;
+    private static final long RETRY_BASE_DELAY_SECONDS = 10;
+    private static final long RETRY_MAX_DELAY_SECONDS = 600;
 
     private final CouponRewardOutboxEventRepository couponRewardOutboxEventRepository;
     private final CouponRewardService couponRewardService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
-    private final CouponRewardOutboxProperties couponRewardOutboxProperties;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void issueAndMarkProcessed(Long eventId) {
@@ -44,7 +51,7 @@ public class CouponRewardOutboxTransactionService {
                 .ifPresent(event -> event.markFailed(
                         failureMessage(cause),
                         LocalDateTime.now(clock),
-                        couponRewardOutboxProperties.maxRetries(),
+                        MAX_RETRIES,
                         retryDelaySeconds(event.getRetryCount())
                 ));
     }
@@ -89,7 +96,7 @@ public class CouponRewardOutboxTransactionService {
 
     private long retryDelaySeconds(int retryCount) {
         long multiplier = 1L << Math.min(retryCount, 30);
-        long delay = couponRewardOutboxProperties.retryBaseDelaySeconds() * multiplier;
-        return Math.min(delay, couponRewardOutboxProperties.retryMaxDelaySeconds());
+        long delay = RETRY_BASE_DELAY_SECONDS * multiplier;
+        return Math.min(delay, RETRY_MAX_DELAY_SECONDS);
     }
 }

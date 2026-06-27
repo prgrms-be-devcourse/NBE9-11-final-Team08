@@ -1,5 +1,6 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.stream;
 
+import com.team08.backend.domain.couponreward.outbox.dto.CouponRewardOutboxCreatedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

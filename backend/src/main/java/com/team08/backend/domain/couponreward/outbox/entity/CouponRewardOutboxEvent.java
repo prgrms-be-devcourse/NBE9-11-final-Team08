@@ -1,4 +1,4 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.entity;
 
 import com.team08.backend.global.common.BaseTimeEntity;
 import jakarta.persistence.Column;

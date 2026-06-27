@@ -1,5 +1,8 @@
-package com.team08.backend.domain.couponreward.outbox;
+package com.team08.backend.domain.couponreward.outbox.scheduler;
 
+import com.team08.backend.domain.couponreward.outbox.entity.CouponRewardOutboxEventStatus;
+import com.team08.backend.domain.couponreward.outbox.repository.CouponRewardOutboxEventRepository;
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxWorker;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,12 +32,10 @@ class CouponRewardOutboxSchedulerTest {
     void sweepPending_processesRetryableOutboxEventIds() {
         // given
         Clock clock = Clock.fixed(Instant.parse("2026-06-27T00:00:00Z"), ZoneId.of("Asia/Seoul"));
-        CouponRewardOutboxProperties properties = new CouponRewardOutboxProperties(100, 5, 10, 600);
         CouponRewardOutboxScheduler scheduler = new CouponRewardOutboxScheduler(
                 couponRewardOutboxEventRepository,
                 couponRewardOutboxWorker,
-                clock,
-                properties
+                clock
         );
         LocalDateTime now = LocalDateTime.now(clock);
         given(couponRewardOutboxEventRepository.findRetryableIds(
