@@ -35,23 +35,29 @@ public class PaymentSuccessOutboxTransactionService {
     private final EnrollmentRepository enrollmentRepository;
     private final PaidCourseStudyMemberService paidCourseStudyMemberService;
     private final Clock clock;
+    private final PaymentSuccessOutboxProperties properties;
 
     @Transactional(readOnly = true)
-    public List<Long> findPendingIds(int batchSize) {
-        return paymentSuccessOutboxRepository.findPending(
+    public List<Long> findReadyIds() {
+        LocalDateTime now = LocalDateTime.now(clock);
+        return paymentSuccessOutboxRepository.findReady(
                 PaymentSuccessOutboxStatus.PENDING,
-                PageRequest.of(0, batchSize)
+                PaymentSuccessOutboxStatus.FAILED,
+                now,
+                PageRequest.of(0, properties.batchSize())
         ).stream().map(PaymentSuccessOutboxEvent::getId).toList();
     }
 
     @Transactional
-    public void processPending(Long eventId) {
+    public void processReady(Long eventId) {
         PaymentSuccessOutboxEvent event = paymentSuccessOutboxRepository.findByIdForUpdate(eventId)
                 .orElseThrow(() -> new IllegalStateException("결제 성공 후처리 Outbox 이벤트를 찾을 수 없습니다."));
-        if (event.getStatus() != PaymentSuccessOutboxStatus.PENDING) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (!isReady(event, now)) {
             return;
         }
         event.markProcessing();
+        paymentSuccessOutboxRepository.flush();
 
         Payment payment = paymentRepository.findById(event.getPaymentId())
                 .orElseThrow(() -> new IllegalStateException("결제 성공 후처리 대상 결제를 찾을 수 없습니다."));
@@ -101,9 +107,32 @@ public class PaymentSuccessOutboxTransactionService {
     public void markFailed(Long eventId, String errorMessage) {
         PaymentSuccessOutboxEvent event = findEvent(eventId);
         if (event.getStatus() == PaymentSuccessOutboxStatus.PENDING
+                || event.getStatus() == PaymentSuccessOutboxStatus.FAILED
                 || event.getStatus() == PaymentSuccessOutboxStatus.PROCESSING) {
-            event.markFailed(errorMessage);
+            LocalDateTime now = LocalDateTime.now(clock);
+            event.markFailed(
+                    errorMessage,
+                    now,
+                    properties.maxRetries(),
+                    retryDelaySeconds(event.getRetryCount())
+            );
         }
+    }
+
+    private boolean isReady(PaymentSuccessOutboxEvent event, LocalDateTime now) {
+        if (event.getStatus() == PaymentSuccessOutboxStatus.PENDING) {
+            return true;
+        }
+
+        return event.getStatus() == PaymentSuccessOutboxStatus.FAILED
+                && event.getNextRetryAt() != null
+                && !event.getNextRetryAt().isAfter(now);
+    }
+
+    private long retryDelaySeconds(int retryCount) {
+        long multiplier = 1L << Math.min(retryCount, 30);
+        long delay = properties.retryBaseDelaySeconds() * multiplier;
+        return Math.min(delay, properties.retryMaxDelaySeconds());
     }
 
     private PaymentSuccessOutboxEvent findEvent(Long eventId) {

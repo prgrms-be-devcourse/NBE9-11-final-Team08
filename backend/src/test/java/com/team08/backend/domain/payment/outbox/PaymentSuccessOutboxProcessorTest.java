@@ -4,8 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
@@ -21,12 +19,11 @@ class PaymentSuccessOutboxProcessorTest {
     @Test
     void processingFailureMarksEventFailed() {
         PaymentSuccessOutboxProcessor processor = new PaymentSuccessOutboxProcessor(transactionService);
-        ReflectionTestUtils.setField(processor, "batchSize", 20);
-        given(transactionService.findPendingIds(20)).willReturn(List.of(1L));
+        given(transactionService.findReadyIds()).willReturn(List.of(1L));
         willThrow(new IllegalStateException("후처리 실패"))
-                .given(transactionService).processPending(1L);
+                .given(transactionService).processReady(1L);
 
-        processor.processPending();
+        processor.processReady();
 
         verify(transactionService).markFailed(1L, "후처리 실패");
     }

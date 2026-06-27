@@ -2,7 +2,6 @@ package com.team08.backend.domain.payment.outbox;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -13,13 +12,10 @@ public class PaymentSuccessOutboxProcessor {
 
     private final PaymentSuccessOutboxTransactionService transactionService;
 
-    @Value("${app.payment.success-outbox.batch-size:20}")
-    private int batchSize;
-
-    public void processPending() {
-        for (Long eventId : transactionService.findPendingIds(batchSize)) {
+    public void processReady() {
+        for (Long eventId : transactionService.findReadyIds()) {
             try {
-                transactionService.processPending(eventId);
+                transactionService.processReady(eventId);
             } catch (Exception exception) {
                 String errorMessage = StringUtils.hasText(exception.getMessage())
                         ? exception.getMessage()

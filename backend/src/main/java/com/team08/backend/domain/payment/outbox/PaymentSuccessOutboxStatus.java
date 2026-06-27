@@ -4,5 +4,6 @@ public enum PaymentSuccessOutboxStatus {
     PENDING,
     PROCESSING,
     SUCCESS,
-    FAILED
+    FAILED,
+    DEAD
 }

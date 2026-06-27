@@ -17,7 +17,7 @@ public class PaymentSuccessOutboxScheduler {
     private final PaymentSuccessOutboxProcessor paymentSuccessOutboxProcessor;
 
     @Scheduled(fixedDelayString = "${app.payment.success-outbox.fixed-delay:1000}")
-    public void processPending() {
-        paymentSuccessOutboxProcessor.processPending();
+    public void processReady() {
+        paymentSuccessOutboxProcessor.processReady();
     }
 }

@@ -17,11 +17,14 @@ public interface PaymentSuccessOutboxRepository extends JpaRepository<PaymentSuc
     @Query("""
             select event
             from PaymentSuccessOutboxEvent event
-            where event.status = :status
+            where event.status = :pendingStatus
+               or (event.status = :failedStatus and event.nextRetryAt <= :now)
             order by event.id asc
             """)
-    List<PaymentSuccessOutboxEvent> findPending(
-            @Param("status") PaymentSuccessOutboxStatus status,
+    List<PaymentSuccessOutboxEvent> findReady(
+            @Param("pendingStatus") PaymentSuccessOutboxStatus pendingStatus,
+            @Param("failedStatus") PaymentSuccessOutboxStatus failedStatus,
+            @Param("now") java.time.LocalDateTime now,
             Pageable pageable
     );
 

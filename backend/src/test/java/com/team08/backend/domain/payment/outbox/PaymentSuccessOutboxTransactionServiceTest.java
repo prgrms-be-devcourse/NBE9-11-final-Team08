@@ -45,6 +45,14 @@ class PaymentSuccessOutboxTransactionServiceTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-06-28T10:00:00Z"), ZONE_ID);
     private static final LocalDateTime FIXED_NOW = LocalDateTime.now(FIXED_CLOCK);
     private static final LocalDateTime PAID_AT = FIXED_NOW.minusMinutes(1);
+    private static final PaymentSuccessOutboxProperties PROPERTIES = new PaymentSuccessOutboxProperties(
+            true,
+            1000,
+            20,
+            5,
+            10,
+            600
+    );
 
     @Mock
     private PaymentSuccessOutboxRepository paymentSuccessOutboxRepository;
@@ -70,7 +78,8 @@ class PaymentSuccessOutboxTransactionServiceTest {
                 orderItemRepository,
                 enrollmentRepository,
                 paidCourseStudyMemberService,
-                FIXED_CLOCK
+                FIXED_CLOCK,
+                PROPERTIES
         );
     }
 
@@ -87,10 +96,11 @@ class PaymentSuccessOutboxTransactionServiceTest {
                 .willReturn(List.of());
         given(enrollmentRepository.saveAllAndFlush(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-        transactionService.processPending(EVENT_ID);
+        transactionService.processReady(EVENT_ID);
 
         ArgumentCaptor<List<Enrollment>> captor = ArgumentCaptor.forClass(List.class);
         verify(enrollmentRepository).saveAllAndFlush(captor.capture());
+        verify(paymentSuccessOutboxRepository).flush();
         assertThat(captor.getValue()).singleElement().satisfies(enrollment -> {
             assertThat(enrollment.getUserId()).isEqualTo(USER_ID);
             assertThat(enrollment.getCourseId()).isEqualTo(COURSE_ID);
@@ -101,6 +111,8 @@ class PaymentSuccessOutboxTransactionServiceTest {
         verify(paidCourseStudyMemberService).joinAsMember(USER_ID, List.of(COURSE_ID), PAID_AT);
         assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.SUCCESS);
         assertThat(event.getProcessedAt()).isEqualTo(FIXED_NOW);
+        assertThat(event.getLastError()).isNull();
+        assertThat(event.getNextRetryAt()).isNull();
     }
 
     @Test
@@ -116,11 +128,74 @@ class PaymentSuccessOutboxTransactionServiceTest {
         given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(USER_ID, List.of(COURSE_ID)))
                 .willReturn(List.of(COURSE_ID));
 
-        transactionService.processPending(EVENT_ID);
+        transactionService.processReady(EVENT_ID);
 
         verify(enrollmentRepository, never()).saveAllAndFlush(any());
         verify(paidCourseStudyMemberService).joinAsMember(USER_ID, List.of(COURSE_ID), PAID_AT);
         assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.SUCCESS);
+    }
+
+    @Test
+    void failureSchedulesRetryWithExponentialBackoff() {
+        PaymentSuccessOutboxEvent event = pendingEvent();
+        given(paymentSuccessOutboxRepository.findById(EVENT_ID)).willReturn(Optional.of(event));
+
+        transactionService.markFailed(EVENT_ID, "후처리 실패");
+
+        assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.FAILED);
+        assertThat(event.getRetryCount()).isEqualTo(1);
+        assertThat(event.getLastError()).isEqualTo("후처리 실패");
+        assertThat(event.getNextRetryAt()).isEqualTo(FIXED_NOW.plusSeconds(10));
+    }
+
+    @Test
+    void reachingMaxRetriesMarksEventDead() {
+        PaymentSuccessOutboxEvent event = pendingEvent();
+        given(paymentSuccessOutboxRepository.findById(EVENT_ID)).willReturn(Optional.of(event));
+
+        for (int attempt = 0; attempt < PROPERTIES.maxRetries(); attempt++) {
+            transactionService.markFailed(EVENT_ID, "후처리 실패");
+        }
+
+        assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.DEAD);
+        assertThat(event.getRetryCount()).isEqualTo(PROPERTIES.maxRetries());
+        assertThat(event.getNextRetryAt()).isNull();
+    }
+
+    @Test
+    void dueFailedEventCanBeProcessedAgain() {
+        PaymentSuccessOutboxEvent event = pendingEvent();
+        event.markFailed("첫 처리 실패", FIXED_NOW.minusSeconds(20), PROPERTIES.maxRetries(), 10);
+        Order order = paidOrder();
+        Payment payment = successfulPayment(order);
+        OrderItem orderItem = orderItem(order);
+        stubTarget(event, order, payment, orderItem);
+        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(List.of());
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(USER_ID, List.of(COURSE_ID)))
+                .willReturn(List.of());
+        given(enrollmentRepository.saveAllAndFlush(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+        transactionService.processReady(EVENT_ID);
+
+        assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.SUCCESS);
+        assertThat(event.getProcessedAt()).isEqualTo(FIXED_NOW);
+        assertThat(event.getLastError()).isNull();
+        assertThat(event.getNextRetryAt()).isNull();
+        verify(paidCourseStudyMemberService).joinAsMember(USER_ID, List.of(COURSE_ID), PAID_AT);
+    }
+
+    @Test
+    void failedEventBeforeNextRetryTimeIsNotProcessed() {
+        PaymentSuccessOutboxEvent event = pendingEvent();
+        event.markFailed("첫 처리 실패", FIXED_NOW, PROPERTIES.maxRetries(), 10);
+        given(paymentSuccessOutboxRepository.findByIdForUpdate(EVENT_ID)).willReturn(Optional.of(event));
+
+        transactionService.processReady(EVENT_ID);
+
+        assertThat(event.getStatus()).isEqualTo(PaymentSuccessOutboxStatus.FAILED);
+        verify(paymentSuccessOutboxRepository, never()).flush();
+        verify(paymentRepository, never()).findById(any());
     }
 
     private void stubTarget(

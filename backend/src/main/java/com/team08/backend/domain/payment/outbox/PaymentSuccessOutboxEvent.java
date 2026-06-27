@@ -57,6 +57,11 @@ public class PaymentSuccessOutboxEvent extends BaseTimeEntity {
     @Column(columnDefinition = "LONGTEXT")
     private String lastError;
 
+    @Column(nullable = false)
+    private int retryCount;
+
+    private LocalDateTime nextRetryAt;
+
     private LocalDateTime processedAt;
 
     private PaymentSuccessOutboxEvent(Long paymentId, Long orderId, Long userId) {
@@ -65,6 +70,7 @@ public class PaymentSuccessOutboxEvent extends BaseTimeEntity {
         this.userId = userId;
         this.eventType = PAYMENT_SUCCESS_POST_PROCESSING;
         this.status = PaymentSuccessOutboxStatus.PENDING;
+        this.retryCount = 0;
     }
 
     public static PaymentSuccessOutboxEvent paymentSucceeded(Long paymentId, Long orderId, Long userId) {
@@ -73,17 +79,32 @@ public class PaymentSuccessOutboxEvent extends BaseTimeEntity {
 
     public void markProcessing() {
         this.status = PaymentSuccessOutboxStatus.PROCESSING;
-        this.lastError = null;
+        this.nextRetryAt = null;
     }
 
     public void markSuccess(LocalDateTime processedAt) {
         this.status = PaymentSuccessOutboxStatus.SUCCESS;
         this.processedAt = processedAt;
         this.lastError = null;
+        this.nextRetryAt = null;
     }
 
-    public void markFailed(String lastError) {
-        this.status = PaymentSuccessOutboxStatus.FAILED;
+    public void markFailed(
+            String lastError,
+            LocalDateTime failedAt,
+            int maxRetries,
+            long retryDelaySeconds
+    ) {
+        this.retryCount++;
         this.lastError = lastError;
+
+        if (this.retryCount >= maxRetries) {
+            this.status = PaymentSuccessOutboxStatus.DEAD;
+            this.nextRetryAt = null;
+            return;
+        }
+
+        this.status = PaymentSuccessOutboxStatus.FAILED;
+        this.nextRetryAt = failedAt.plusSeconds(retryDelaySeconds);
     }
 }
