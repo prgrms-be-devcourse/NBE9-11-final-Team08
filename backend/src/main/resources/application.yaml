@@ -86,6 +86,13 @@ app:
       retry-base-delay-seconds: ${FEED_OUTBOX_RETRY_BASE_DELAY_SECONDS:10}
       retry-max-delay-seconds: ${FEED_OUTBOX_RETRY_MAX_DELAY_SECONDS:600}
   payment:
+    success-outbox:
+      scheduler-enabled: true
+      fixed-delay: 1000
+      batch-size: 20
+      max-retries: 5
+      retry-base-delay-seconds: 10
+      retry-max-delay-seconds: 600
     toss:
       base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
       secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
