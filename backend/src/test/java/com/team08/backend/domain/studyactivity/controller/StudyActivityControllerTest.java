@@ -60,6 +60,7 @@ class StudyActivityControllerTest {
                 100L,
                 studyId,
                 userId,
+                "테스터",
                 request.content(),
                 LocalDateTime.of(2026, 6, 12, 20, 0)
         );
@@ -132,6 +133,7 @@ class StudyActivityControllerTest {
                 100L,
                 studyId,
                 userId,
+                "테스터",
                 "오늘 학습한 내용을 스터디원들과 공유합니다.",
                 LocalDateTime.of(2026, 6, 12, 20, 0)
         );
@@ -167,6 +169,7 @@ class StudyActivityControllerTest {
                 activityId,
                 studyId,
                 userId,
+                "테스터",
                 "오늘 학습한 내용을 스터디원들과 공유합니다.",
                 LocalDateTime.of(2026, 6, 12, 20, 0)
         );
@@ -199,6 +202,7 @@ class StudyActivityControllerTest {
                 activityId,
                 studyId,
                 userId,
+                "테스터",
                 request.content(),
                 LocalDateTime.of(2026, 6, 12, 20, 0)
         );

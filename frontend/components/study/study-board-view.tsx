@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { MessageCircle, PenLine } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { formatDateTime } from '@/lib/utils'
 import type { Study, StudyActivityResponse } from '@/lib/types'
 
 export function StudyBoardView({
@@ -17,9 +18,9 @@ export function StudyBoardView({
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">학습 활동 피드</h2>
+          <h2 className="text-xl font-bold">학습 활동</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            학습한 내용을 회고로 남기고 멤버들과 공유하세요. 글 {posts.length}건
+            학습한 내용을 남기고 멤버들과 공유하세요. 글 {posts.length}건
           </p>
         </div>
         <Button asChild size="sm">
@@ -38,36 +39,30 @@ export function StudyBoardView({
           </p>
         </div>
       ) : (
-        <ul className="overflow-hidden rounded-xl border bg-card">
+        <ul className="space-y-3">
           {posts.map((post, index) => (
-            <li key={post.activityId?.toString() || `post-${index}`} className="border-b last:border-b-0">
+            <li key={post.activityId?.toString() || `post-${index}`}>
               <Link
                 href={`${base}/board/${post.activityId?.toString() || '0'}`}
-                className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-secondary/60"
+                className="flex gap-3 rounded-xl border bg-card px-5 py-4 transition-colors hover:border-foreground/20 hover:bg-secondary/40"
               >
+                <Avatar className="mt-0.5 h-9 w-9 shrink-0">
+                  <AvatarFallback className="bg-secondary text-xs text-secondary-foreground">
+                    {post.authorNickname?.charAt(0) || '?'}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 truncate font-medium">
-                    {post.content.split('\n')[0] || '내용 없음'}
-                  </p>
-                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                    {post.content}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      {post.authorNickname}
+                    </span>
+                    <span>·</span>
+                    <span>{formatDateTime(post.createdAt)}</span>
+                  </div>
+                  <p className="mt-1.5 line-clamp-[8] whitespace-pre-line text-sm leading-relaxed text-foreground/90">
+                    {post.content || '내용 없음'}
                   </p>
                 </div>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  <MessageCircle className="h-3.5 w-3.5" />
-                  0
-                </span>
-                <div className="hidden w-28 shrink-0 items-center gap-2 sm:flex">
-                  <Avatar className="h-6 w-6">
-                    <AvatarFallback className="bg-secondary text-[10px] text-secondary-foreground">
-                      {post.authorId ? String(post.authorId).charAt(0) : '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="truncate text-xs">작성자 {post.authorId}</span>
-                </div>
-                <span className="hidden shrink-0 text-xs text-muted-foreground md:block">
-                  {new Date(post.createdAt).toLocaleDateString()}
-                </span>
               </Link>
             </li>
           ))}

@@ -1,6 +1,7 @@
 package com.team08.backend.domain.study.service;
 
 import com.team08.backend.domain.study.dto.response.StudyDetailResponse;
+import com.team08.backend.domain.study.dto.response.StudyMemberResponse;
 import com.team08.backend.domain.study.dto.response.StudySummaryResponse;
 import com.team08.backend.domain.study.entity.Study;
 import com.team08.backend.domain.study.entity.StudyStatus;
@@ -65,6 +66,18 @@ public class StudyService {
                 .orElse(null);
 
         return createDetailResponse(study, role);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudyMemberResponse> getStudyMembers(Long studyId) {
+        Study study = findStudyById(studyId);
+        validateReadableStudy(study);
+
+        return studyMemberRepository
+                .findActiveMembersWithUser(studyId, StudyMemberStatus.ACTIVE)
+                .stream()
+                .map(StudyMemberResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
