@@ -689,6 +689,19 @@ export interface DailySessionPoint {
   distinctLearners: number
 }
 
+export interface SellerAnalytics {
+  totalRevenue: number
+  totalOrders: number
+  totalStudents: number
+  totalCourses: number
+  onSaleCourses: number
+  revenueDelta: number
+  ordersDelta: number
+  monthly: { month: string; revenue: number; orders: number }[]
+  categories: { name: string; value: number }[]
+  topCourses: { courseId: number; title: string; price: number; studentCount: number; revenue: number }[]
+}
+
 export interface CourseStatRow {
   courseId: number
   title: string

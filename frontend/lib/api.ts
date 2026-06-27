@@ -50,6 +50,7 @@ import type {
   LearningEventRow,
   AnomalyResponse,
   AuditResponse,
+  SellerAnalytics,
   FeedCursor,
   FeedCursorResponse,
 } from './types'
@@ -1600,4 +1601,8 @@ export const api = {
   },
   getAdminAudit: () =>
     request<AuditResponse | null>('/api/admin/dashboard/audit/retention', null),
+
+  // ── Seller Dashboard APIs ───────────────────────────────────────────
+  getSellerAnalytics: (range: '3m' | '6m' | '1y' = '6m') =>
+    request<SellerAnalytics | null>(`/api/seller/dashboard/analytics?range=${range}`, null),
 }
