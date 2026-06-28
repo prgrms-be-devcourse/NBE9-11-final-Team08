@@ -10,7 +10,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      timeout: 1s
+      timeout: 3s
       connect-timeout: 1s
 
   application:
@@ -107,6 +107,12 @@ app:
       webhook-secret: ${TOSS_PAYMENTS_WEBHOOK_SECRET:}
       connect-timeout: ${TOSS_PAYMENTS_CONNECT_TIMEOUT:3s}
       read-timeout: ${TOSS_PAYMENTS_READ_TIMEOUT:5s}
+    nicepay:
+      base-url: ${NICEPAY_PAYMENTS_BASE_URL:https://api.nicepay.co.kr}
+      client-key: ${NICEPAY_PAYMENTS_CLIENT_KEY:}
+      secret-key: ${NICEPAY_PAYMENTS_SECRET_KEY:}
+      connect-timeout: ${NICEPAY_PAYMENTS_CONNECT_TIMEOUT:3s}
+      read-timeout: ${NICEPAY_PAYMENTS_READ_TIMEOUT:5s}
 
 cloud:
   aws:
