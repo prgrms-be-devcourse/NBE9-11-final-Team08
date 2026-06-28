@@ -36,9 +36,7 @@
  *
  *    LECTURE_ENTER
  *      ↓
- *    VIDEO_START
- *      ↓
- *    POSITION_SAVE × 3
+ *    VIDEO_PAUSE × 3
  *      ↓
  *    LECTURE_COMPLETE
  *
@@ -413,45 +411,21 @@ export function learningFlowScenario(data) {
     sleep(randomIntBetween(1, 2));
 
     /**
-     * 재생 시작
-     */
-    group('VIDEO_START', () => {
-
-        const res = postEvent(headers, {
-            courseId,
-            chapterId,
-            lectureId,
-
-            eventType: 'VIDEO_START',
-
-            positionSeconds: 0,
-
-            eventTime:
-                new Date()
-                    .toISOString()
-                    .replace('Z', ''),
-
-            eventKey: uuidv4()
-        });
-
-        checkWrite(res, 'VIDEO_START');
-    });
-
-    /**
-     * 재생 위치 저장
+     * 멈춤(일시정지/중단) × 3 — 멈춘 위치를 어려운 구간 분석에 사용.
+     * (구 POSITION_SAVE 하트비트는 PATCH /api/lectures/{id}/progress 로 분리되어 이벤트로 적재하지 않는다.)
      */
     for (let i = 1; i <= 3; i++) {
 
         sleep(randomIntBetween(1, 3));
 
-        group(`POSITION_SAVE_${i}`, () => {
+        group(`VIDEO_PAUSE_${i}`, () => {
 
             const res = postEvent(headers, {
                 courseId,
                 chapterId,
                 lectureId,
 
-                eventType: 'POSITION_SAVE',
+                eventType: 'VIDEO_PAUSE',
 
                 positionSeconds: i * 30,
 
@@ -460,10 +434,10 @@ export function learningFlowScenario(data) {
                         .toISOString()
                         .replace('Z', ''),
 
-                eventKey: null
+                eventKey: uuidv4()
             });
 
-            checkWrite(res, 'POSITION_SAVE');
+            checkWrite(res, 'VIDEO_PAUSE');
         });
     }
 

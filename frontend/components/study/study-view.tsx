@@ -334,7 +334,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
   const handlePlay = () => {
     if (!active?.id) return
     setPlaying(true)
-    session.play(active.id, positionRef.current)
+    // 재생 시작/재개 이벤트는 더 이상 수집하지 않는다(멈춤 위치만 분석에 사용).
   }
 
   const handlePause = () => {
