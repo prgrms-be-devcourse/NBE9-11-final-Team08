@@ -7,6 +7,7 @@ import com.team08.backend.domain.couponreward.entity.CouponRewardHistory;
 import com.team08.backend.domain.couponreward.repository.CouponRewardHistoryRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.CouponIssueExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,10 +52,14 @@ class CouponRewardServiceTest {
 
     @BeforeEach
     void setUp() {
-        couponRewardService = new CouponRewardService(
-                couponPolicyRepository,
+        CouponIssueExecutor couponIssueExecutor = new CouponIssueExecutor(
                 couponRewardHistoryRepository,
                 issuedCouponRepository,
+                clock
+        );
+        couponRewardService = new CouponRewardService(
+                couponPolicyRepository,
+                couponIssueExecutor,
                 clock
         );
     }
