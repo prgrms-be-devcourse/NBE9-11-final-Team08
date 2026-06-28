@@ -8,17 +8,17 @@ import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
-import com.team08.backend.domain.payment.client.TossPaymentClient;
-import com.team08.backend.domain.payment.client.TossPaymentException;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
-import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
+import com.team08.backend.domain.payment.provider.PaymentProviderConfirmRequest;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
+import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
@@ -46,7 +46,7 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final EnrollmentRepository enrollmentRepository;
-    private final TossPaymentClient tossPaymentClient;
+    private final PaymentProviderRouter paymentProviderRouter;
     private final PaymentTransactionService paymentTransactionService;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
@@ -99,20 +99,32 @@ public class PaymentService {
     }
 
     public ConfirmPaymentResponse confirmTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
-        TossPaymentProcessingContext context = paymentTransactionService.prepareTossPayment(userId, orderId, request);
+        return confirmProviderPayment(userId, orderId, PaymentProviderType.TOSS, request);
+    }
+
+    public ConfirmPaymentResponse confirmProviderPayment(
+            Long userId,
+            Long orderId,
+            PaymentProviderType providerType,
+            ConfirmPaymentRequest request
+    ) {
+        TossPaymentProcessingContext context = paymentTransactionService.prepareProviderPayment(userId, orderId, providerType, request);
         if (context.isIdempotentReplay()) {
             return context.idempotentResponse();
         }
 
         try {
-            TossConfirmPaymentRequest tossRequest = new TossConfirmPaymentRequest(
+            PaymentProviderConfirmRequest providerRequest = new PaymentProviderConfirmRequest(
                     request.paymentKey(),
                     context.orderNumber(),
                     context.amount()
             );
-            return paymentTransactionService.completeTossPayment(context, tossPaymentClient.confirm(tossRequest));
-        } catch (TossPaymentException e) {
-            return paymentTransactionService.failTossPayment(context, request, e);
+            return paymentTransactionService.completeProviderPayment(
+                    context,
+                    paymentProviderRouter.confirm(providerType, providerRequest)
+            );
+        } catch (PaymentProviderException e) {
+            return paymentTransactionService.failProviderPayment(context, request, e);
         }
     }
 
