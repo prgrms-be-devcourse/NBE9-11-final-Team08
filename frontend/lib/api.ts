@@ -57,6 +57,7 @@ import type {
   LecturePauses,
   FeedCursor,
   FeedCursorResponse,
+  CouponIssueRequestResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -1357,7 +1358,31 @@ export const api = {
   terminateAdminCoupon: (couponId: number) =>
     mutate<void>(`/api/admin/coupons/${couponId}/terminate`, 'PATCH'),
   deleteAdminCoupon: (couponId: number) =>
-    mutate<void>(`/api/admin/coupons/${couponId}`, 'DELETE'),
+    mutate(`/api/admin/coupons/${couponId}`, 'DELETE'),
+
+  issueCouponToUsers: async (policyId: number, userIds: number[], requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/users`,
+      'POST',
+      { userIds, requestKey }
+    )
+  },
+
+  issueCouponToAll: async (policyId: number, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/all`,
+      'POST',
+      { requestKey }
+    )
+  },
+
+  getCouponIssueRequests: async (page = 0, size = 20) => {
+    const result = await request<PageResponse<CouponIssueRequestResponse> | null>(
+      `/api/admin/coupons/issue-requests?page=${page}&size=${size}`,
+      null
+    )
+    return result
+  },
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
