@@ -6,6 +6,7 @@ import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.service.PaymentService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
@@ -60,6 +61,21 @@ public class PaymentController {
             @RequestBody ConfirmPaymentRequest request
     ) {
         return paymentService.confirmTossPayment(principal.user().id(), orderId, request);
+    }
+
+    @PostMapping("/{orderId}/providers/{providerType}/confirm")
+    @Operation(
+            summary = "Provider 결제 승인",
+            description = "주문에 대해 선택된 Provider 승인 API 결과가 성공한 경우에만 결제를 완료 처리합니다."
+    )
+    public ConfirmPaymentResponse confirmProviderPayment(
+            @AuthenticationPrincipal LoginUserPrincipal principal,
+            @Parameter(description = "주문 ID", example = "1")
+            @PathVariable Long orderId,
+            @PathVariable PaymentProviderType providerType,
+            @RequestBody ConfirmPaymentRequest request
+    ) {
+        return paymentService.confirmProviderPayment(principal.user().id(), orderId, providerType, request);
     }
 
     @PostMapping("/toss/webhook")
