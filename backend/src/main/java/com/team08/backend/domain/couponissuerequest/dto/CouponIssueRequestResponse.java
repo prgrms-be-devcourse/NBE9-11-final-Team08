@@ -17,7 +17,10 @@ public record CouponIssueRequestResponse(
         long failedCount,
         long skippedCount,
         Long requestedBy,
-        LocalDateTime requestedAt
+        LocalDateTime requestedAt,
+        LocalDateTime startedAt,
+        LocalDateTime completedAt,
+        String failureReason
 ) {
 
     public static CouponIssueRequestResponse from(CouponIssueRequest request) {
@@ -32,7 +35,10 @@ public record CouponIssueRequestResponse(
                 request.getFailedCount(),
                 request.getSkippedCount(),
                 request.getRequestedBy(),
-                request.getRequestedAt()
+                request.getRequestedAt(),
+                request.getStartedAt(),
+                request.getCompletedAt(),
+                request.getFailureReason()
         );
     }
 }

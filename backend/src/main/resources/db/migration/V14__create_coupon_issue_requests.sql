@@ -1,3 +1,42 @@
+CREATE TEMPORARY TABLE tmp_issued_coupon_keep AS
+SELECT
+    user_id,
+    policy_id,
+    MIN(id) AS keep_id
+FROM issued_coupons
+GROUP BY user_id, policy_id;
+
+UPDATE order_coupon_usages ocu
+JOIN issued_coupons ic ON ic.id = ocu.issued_coupon_id
+JOIN tmp_issued_coupon_keep k
+    ON k.user_id = ic.user_id
+   AND k.policy_id = ic.policy_id
+SET ocu.issued_coupon_id = k.keep_id
+WHERE ocu.issued_coupon_id <> k.keep_id;
+
+UPDATE coupon_reward_histories crh
+JOIN issued_coupons ic ON ic.id = crh.issued_coupon_id
+JOIN tmp_issued_coupon_keep k
+    ON k.user_id = ic.user_id
+   AND k.policy_id = ic.policy_id
+SET crh.issued_coupon_id = k.keep_id
+WHERE crh.issued_coupon_id <> k.keep_id;
+
+DELETE ic
+FROM issued_coupons ic
+JOIN tmp_issued_coupon_keep k
+    ON k.user_id = ic.user_id
+   AND k.policy_id = ic.policy_id
+WHERE ic.id <> k.keep_id;
+
+DROP TEMPORARY TABLE tmp_issued_coupon_keep;
+
+ALTER TABLE issued_coupons
+    DROP INDEX uk_issued_coupon_user_policy_issue_key;
+
+ALTER TABLE issued_coupons
+    ADD UNIQUE KEY uk_issued_coupon_user_policy (user_id, policy_id);
+
 CREATE TABLE coupon_issue_requests (
     id BIGINT NOT NULL AUTO_INCREMENT,
     policy_id BIGINT NOT NULL,

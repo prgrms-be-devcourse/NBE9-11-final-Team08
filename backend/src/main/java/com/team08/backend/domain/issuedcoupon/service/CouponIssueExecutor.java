@@ -27,14 +27,12 @@ public class CouponIssueExecutor {
         LocalDateTime now = LocalDateTime.now(clock);
 
         if (couponRewardHistoryRepository.existsByUserIdAndRewardKey(userId, rewardKey)) {
-            log.info("이미 처리된 쿠폰 보상입니다. userId={}, rewardKey={}", userId, rewardKey);
             return CouponIssueResult.skipped();
         }
 
-        IssuedCoupon existingCoupon = issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(
+        IssuedCoupon existingCoupon = issuedCouponRepository.findByUserIdAndPolicyId(
                         userId,
-                        policy.getId(),
-                        rewardKey
+                        policy.getId()
                 )
                 .orElse(null);
         if (existingCoupon != null) {
@@ -46,7 +44,6 @@ public class CouponIssueExecutor {
             );
             history.markIssued(existingCoupon.getId(), existingCoupon.getIssuedAt());
             couponRewardHistoryRepository.save(history);
-            log.info("이미 발급된 쿠폰 보상 이력을 보정했습니다. userId={}, rewardKey={}", userId, rewardKey);
             return CouponIssueResult.skipped();
         }
 

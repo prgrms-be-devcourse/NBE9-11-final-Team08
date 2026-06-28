@@ -72,7 +72,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(10L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "SIGNUP"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -109,7 +109,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(10L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.ATTENDANCE_STREAK), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "ATTENDANCE_STREAK_14"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -141,7 +141,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(20L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.MONTHLY_ATTENDANCE), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 20L, "MONTHLY_ATTENDANCE_15_2026-06"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 20L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -201,7 +201,7 @@ class CouponRewardServiceTest {
 
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "SIGNUP"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.of(issuedCoupon));
 
         // when
@@ -210,6 +210,36 @@ class CouponRewardServiceTest {
         // then
         ArgumentCaptor<CouponRewardHistory> historyCaptor = ArgumentCaptor.forClass(CouponRewardHistory.class);
         then(couponRewardHistoryRepository).should().save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getIssuedCouponId()).isEqualTo(100L);
+        then(issuedCouponRepository).should(never()).save(any(IssuedCoupon.class));
+    }
+
+    @Test
+    @DisplayName("보상키가 달라도 같은 정책 쿠폰을 이미 받았으면 중복 발급하지 않는다")
+    void issueReward_doesNotIssueDuplicateCouponWhenSamePolicyAlreadyIssuedWithDifferentRewardKey() {
+        // given
+        Long userId = 1L;
+        CouponPolicy policy = policy(10L);
+        IssuedCoupon issuedCoupon = IssuedCoupon.create(
+                policy,
+                userId,
+                "SIGNUP",
+                LocalDateTime.of(2026, 6, 15, 9, 0)
+        );
+        ReflectionTestUtils.setField(issuedCoupon, "id", 100L);
+
+        given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.ATTENDANCE_STREAK), any(LocalDateTime.class)))
+                .willReturn(Optional.of(policy));
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
+                .willReturn(Optional.of(issuedCoupon));
+
+        // when
+        couponRewardService.issueAttendanceStreakReward(userId, 14);
+
+        // then
+        ArgumentCaptor<CouponRewardHistory> historyCaptor = ArgumentCaptor.forClass(CouponRewardHistory.class);
+        then(couponRewardHistoryRepository).should().save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getRewardKey()).isEqualTo("ATTENDANCE_STREAK_14");
         assertThat(historyCaptor.getValue().getIssuedCouponId()).isEqualTo(100L);
         then(issuedCouponRepository).should(never()).save(any(IssuedCoupon.class));
     }

@@ -117,6 +117,10 @@ public class CouponIssueRequest extends BaseTimeEntity {
         this.skippedCount++;
     }
 
+    public void addSkippedCount(long count) {
+        this.skippedCount += count;
+    }
+
     public void markCompleted(LocalDateTime completedAt) {
         this.status = CouponIssueRequestStatus.COMPLETED;
         this.completedAt = completedAt;

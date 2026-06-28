@@ -1,6 +1,5 @@
 package com.team08.backend.domain.couponissuerequest.service;
 
-import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequest;
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -30,12 +29,6 @@ public class CouponIssueRequestProcessor {
     @Transactional
     public void processSelectedUser(Long requestId, Long policyId, Long userId, String issueKey) {
         LocalDateTime now = LocalDateTime.now(clock);
-        CouponIssueRequest request = couponIssueRequestRepository.findByIdForUpdate(requestId)
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_INPUT_VALUE));
-        if (request.isFinished()) {
-            return;
-        }
-        request.markProcessing(now);
 
         try {
             if (!userRepository.existsById(userId)) {
@@ -52,14 +45,14 @@ public class CouponIssueRequestProcessor {
             );
 
             if (result.issued()) {
-                request.increaseSuccessCount();
+                couponIssueRequestRepository.incrementSuccessCount(requestId);
             } else {
-                request.increaseSkippedCount();
+                couponIssueRequestRepository.incrementSkippedCount(requestId);
             }
         } catch (RuntimeException e) {
-            request.increaseFailedCount();
+            couponIssueRequestRepository.incrementFailedCount(requestId);
         }
-        request.completeIfProcessed(now);
+        couponIssueRequestRepository.completeIfProcessed(requestId, now);
     }
 
     private void validateManualIssuePolicy(CouponPolicy policy) {

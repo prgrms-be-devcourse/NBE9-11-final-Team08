@@ -6,6 +6,7 @@ import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -47,7 +48,13 @@ class CouponIssueRequestServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private IssuedCouponRepository issuedCouponRepository;
+
+    @Mock
     private CouponIssueRequestStreamPublisher streamPublisher;
+
+    @Mock
+    private CouponIssueRequestBatchLauncher batchLauncher;
 
     private CouponIssueRequestService couponIssueRequestService;
 
@@ -62,7 +69,9 @@ class CouponIssueRequestServiceTest {
                 couponPolicyRepository,
                 couponIssueRequestRepository,
                 userRepository,
+                issuedCouponRepository,
                 streamPublisher,
+                batchLauncher,
                 clock
         );
     }
@@ -76,6 +85,7 @@ class CouponIssueRequestServiceTest {
         CouponPolicy policy = manualIssuePolicy();
         given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
         given(userRepository.findAllById(List.of(1L, 2L))).willReturn(List.of(mock(User.class), mock(User.class)));
+        given(issuedCouponRepository.findIssuedUserIds(policyId, List.of(1L, 2L))).willReturn(List.of());
         given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
                 .willAnswer(invocation -> {
                     CouponIssueRequest request = invocation.getArgument(0);
@@ -100,6 +110,41 @@ class CouponIssueRequestServiceTest {
         assertThat(requestCaptor.getValue().getRequestedBy()).isEqualTo(adminId);
 
         then(streamPublisher).should().publish(100L, policyId, 1L, "SELECTED_USERS_VIP_EVENT_2026");
+        then(streamPublisher).should().publish(100L, policyId, 2L, "SELECTED_USERS_VIP_EVENT_2026");
+    }
+
+    @Test
+    @DisplayName("이미 같은 정책 쿠폰을 받은 회원은 스킵 처리하고 메시지를 발행하지 않는다")
+    void requestUsersIssue_skipsAlreadyIssuedUsers() {
+        // given
+        Long policyId = 10L;
+        Long adminId = 99L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(userRepository.findAllById(List.of(1L, 2L))).willReturn(List.of(mock(User.class), mock(User.class)));
+        given(issuedCouponRepository.findIssuedUserIds(policyId, List.of(1L, 2L))).willReturn(List.of(1L));
+        given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
+                .willAnswer(invocation -> {
+                    CouponIssueRequest request = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(request, "id", 100L);
+                    return request;
+                });
+
+        // when
+        couponIssueRequestService.requestUsersIssue(
+                policyId,
+                List.of(1L, 2L),
+                "VIP_EVENT_2026",
+                adminId
+        );
+
+        // then
+        ArgumentCaptor<CouponIssueRequest> requestCaptor = ArgumentCaptor.forClass(CouponIssueRequest.class);
+        then(couponIssueRequestRepository).should().saveAndFlush(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getRequestedCount()).isEqualTo(2);
+        assertThat(requestCaptor.getValue().getSkippedCount()).isEqualTo(1);
+
+        then(streamPublisher).should(never()).publish(100L, policyId, 1L, "SELECTED_USERS_VIP_EVENT_2026");
         then(streamPublisher).should().publish(100L, policyId, 2L, "SELECTED_USERS_VIP_EVENT_2026");
     }
 
@@ -135,6 +180,7 @@ class CouponIssueRequestServiceTest {
         CouponPolicy policy = manualIssuePolicy();
         given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
         given(userRepository.findAllById(List.of(1L))).willReturn(List.of(mock(User.class)));
+        given(issuedCouponRepository.findIssuedUserIds(policyId, List.of(1L))).willReturn(List.of());
         given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
                 .willThrow(new DataIntegrityViolationException("duplicated"));
 
