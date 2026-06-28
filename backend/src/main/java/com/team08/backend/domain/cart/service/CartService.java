@@ -13,12 +13,16 @@ import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,15 +33,23 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final CartCreationService cartCreationService;
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public CartResponse addItem(Long userId, Long courseId) {
         Course course = findCourse(courseId);
         validateCourseOnSale(course);
         validateNotEnrolled(userId, courseId);
         Cart cart = prepareCartForAddItem(userId);
         cart.addItem(courseId);
-        cartRepository.saveAndFlush(cart);
+        try {
+            cartRepository.saveAndFlush(cart);
+        } catch (DataIntegrityViolationException exception) {
+            if (!isDuplicateCartItemViolation(exception)) {
+                throw exception;
+            }
+            throw new CustomException(ErrorCode.LECTURE_ALREADY_IN_CART);
+        }
         return toResponse(cart);
     }
 
@@ -86,8 +98,28 @@ public class CartService {
     }
 
     private Cart prepareCartForAddItem(Long userId) {
+        Optional<Cart> existingCart = cartRepository.findByUserIdWithItems(userId);
+        if (existingCart.isPresent()) {
+            return existingCart.get();
+        }
+
+        try {
+            cartCreationService.create(userId);
+        } catch (DataIntegrityViolationException exception) {
+            return cartRepository.findByUserIdWithItems(userId)
+                    .orElseThrow(() -> exception);
+        }
+
         return cartRepository.findByUserIdWithItems(userId)
-                .orElseGet(() -> Cart.create(userId));
+                .orElseThrow(() -> new IllegalStateException("생성된 장바구니를 조회할 수 없습니다."));
+    }
+
+    private boolean isDuplicateCartItemViolation(DataIntegrityViolationException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.toLowerCase(Locale.ROOT).contains("uk_cart_item_cart_course");
     }
 
     private CartResponse toResponse(Cart cart) {

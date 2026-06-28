@@ -121,13 +121,6 @@ public class PaymentService {
         Order order = findMyPaymentOrder(userId, orderId);
         validateFailableOrder(order);
 
-        int expectedDiscount = 0;
-        if (request.issuedCouponId() != null) {
-            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
-        }
-
-        validatePaymentAmount(order, request.amount(), expectedDiscount);
-
         LocalDateTime declinedAt = LocalDateTime.now(clock);
         Payment savedPayment = processDeclinedPayment(order, request, declinedAt);
         return PaymentResponse.from(savedPayment, order);
