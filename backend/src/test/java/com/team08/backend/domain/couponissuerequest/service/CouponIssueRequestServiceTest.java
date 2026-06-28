@@ -1,0 +1,183 @@
+package com.team08.backend.domain.couponissuerequest.service;
+
+import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequest;
+import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
+import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
+import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+
+@ExtendWith(MockitoExtension.class)
+class CouponIssueRequestServiceTest {
+
+    @Mock
+    private CouponPolicyRepository couponPolicyRepository;
+
+    @Mock
+    private CouponIssueRequestRepository couponIssueRequestRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private CouponIssueRequestStreamPublisher streamPublisher;
+
+    private CouponIssueRequestService couponIssueRequestService;
+
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-06-15T00:00:00Z"),
+            ZoneId.of("Asia/Seoul")
+    );
+
+    @BeforeEach
+    void setUp() {
+        couponIssueRequestService = new CouponIssueRequestService(
+                couponPolicyRepository,
+                couponIssueRequestRepository,
+                userRepository,
+                streamPublisher,
+                clock
+        );
+    }
+
+    @Test
+    @DisplayName("특정 회원 발급 요청을 저장하고 회원별 Redis Stream 메시지를 발행한다")
+    void requestUsersIssue_savesRequestAndPublishesMessages() {
+        // given
+        Long policyId = 10L;
+        Long adminId = 99L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(userRepository.findAllById(List.of(1L, 2L))).willReturn(List.of(mock(User.class), mock(User.class)));
+        given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
+                .willAnswer(invocation -> {
+                    CouponIssueRequest request = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(request, "id", 100L);
+                    return request;
+                });
+
+        // when
+        couponIssueRequestService.requestUsersIssue(
+                policyId,
+                List.of(1L, 2L, 1L),
+                "VIP_EVENT_2026",
+                adminId
+        );
+
+        // then
+        ArgumentCaptor<CouponIssueRequest> requestCaptor = ArgumentCaptor.forClass(CouponIssueRequest.class);
+        then(couponIssueRequestRepository).should().saveAndFlush(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getPolicyId()).isEqualTo(policyId);
+        assertThat(requestCaptor.getValue().getRequestKey()).isEqualTo("VIP_EVENT_2026");
+        assertThat(requestCaptor.getValue().getRequestedCount()).isEqualTo(2);
+        assertThat(requestCaptor.getValue().getRequestedBy()).isEqualTo(adminId);
+
+        then(streamPublisher).should().publish(100L, policyId, 1L, "SELECTED_USERS_VIP_EVENT_2026");
+        then(streamPublisher).should().publish(100L, policyId, 2L, "SELECTED_USERS_VIP_EVENT_2026");
+    }
+
+    @Test
+    @DisplayName("AUTO 타입이 아니거나 autoIssueType이 있으면 특정 회원 발급 요청을 거부한다")
+    void requestUsersIssue_rejectsNonManualIssuePolicy() {
+        // given
+        Long policyId = 10L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+        given(policy.getCouponType()).willReturn(CouponType.AUTO);
+        given(policy.getAutoIssueType()).willReturn(AutoIssueType.SIGNUP);
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+
+        // when & then
+        assertThatThrownBy(() -> couponIssueRequestService.requestUsersIssue(
+                policyId,
+                List.of(1L),
+                "VIP_EVENT_2026",
+                99L
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_COUPON_TYPE);
+
+        then(couponIssueRequestRepository).shouldHaveNoInteractions();
+        then(streamPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("요청 키가 중복되면 예외가 발생하고 메시지를 발행하지 않는다")
+    void requestUsersIssue_throwsWhenRequestKeyDuplicated() {
+        // given
+        Long policyId = 10L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(userRepository.findAllById(List.of(1L))).willReturn(List.of(mock(User.class)));
+        given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
+                .willThrow(new DataIntegrityViolationException("duplicated"));
+
+        // when & then
+        assertThatThrownBy(() -> couponIssueRequestService.requestUsersIssue(
+                policyId,
+                List.of(1L),
+                "VIP_EVENT_2026",
+                99L
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_ALREADY_ISSUED);
+
+        then(streamPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 회원이 포함되면 발급 요청을 저장하지 않는다")
+    void requestUsersIssue_throwsWhenUserNotFound() {
+        // given
+        Long policyId = 10L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(userRepository.findAllById(List.of(1L, 2L))).willReturn(List.of(mock(User.class)));
+
+        // when & then
+        assertThatThrownBy(() -> couponIssueRequestService.requestUsersIssue(
+                policyId,
+                List.of(1L, 2L),
+                "VIP_EVENT_2026",
+                99L
+        ))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+
+        then(couponIssueRequestRepository).should(never()).saveAndFlush(any(CouponIssueRequest.class));
+        then(streamPublisher).shouldHaveNoInteractions();
+    }
+
+    private CouponPolicy manualIssuePolicy() {
+        CouponPolicy policy = mock(CouponPolicy.class);
+        given(policy.getCouponType()).willReturn(CouponType.AUTO);
+        given(policy.getAutoIssueType()).willReturn(null);
+        return policy;
+    }
+}

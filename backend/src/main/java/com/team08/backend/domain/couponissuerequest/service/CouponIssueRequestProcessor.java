@@ -3,6 +3,7 @@ package com.team08.backend.domain.couponissuerequest.service;
 import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequest;
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.service.CouponIssueExecutor;
@@ -42,6 +43,7 @@ public class CouponIssueRequestProcessor {
             }
             CouponPolicy policy = couponPolicyRepository.findById(policyId)
                     .orElseThrow(CouponPolicyNotFoundException::new);
+            validateManualIssuePolicy(policy);
             CouponIssueExecutor.CouponIssueResult result = couponIssueExecutor.issueRewardCoupon(
                     userId,
                     policy,
@@ -58,5 +60,11 @@ public class CouponIssueRequestProcessor {
             request.increaseFailedCount();
         }
         request.completeIfProcessed(now);
+    }
+
+    private void validateManualIssuePolicy(CouponPolicy policy) {
+        if (policy.getCouponType() != CouponType.AUTO || policy.getAutoIssueType() != null) {
+            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
+        }
     }
 }

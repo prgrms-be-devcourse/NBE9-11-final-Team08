@@ -5,6 +5,7 @@ import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequest;
 import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequestType;
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -38,6 +39,7 @@ public class CouponIssueRequestService {
 
         CouponPolicy policy = couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
+        validateManualIssuePolicy(policy);
 
         LocalDateTime now = LocalDateTime.now(clock);
         policy.validateIssuePeriod(now);
@@ -76,6 +78,12 @@ public class CouponIssueRequestService {
             return couponIssueRequestRepository.saveAndFlush(request);
         } catch (DataIntegrityViolationException e) {
             throw new CustomException(ErrorCode.COUPON_ALREADY_ISSUED);
+        }
+    }
+
+    private void validateManualIssuePolicy(CouponPolicy policy) {
+        if (policy.getCouponType() != CouponType.AUTO || policy.getAutoIssueType() != null) {
+            throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
     }
 
