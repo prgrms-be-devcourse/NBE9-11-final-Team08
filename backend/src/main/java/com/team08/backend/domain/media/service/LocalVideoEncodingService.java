@@ -3,6 +3,7 @@ package com.team08.backend.domain.media.service;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.exception.MediaCleanupException;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -120,12 +121,12 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
                             try {
                                 Files.delete(path);
                             } catch (IOException e) {
-                                throw new RuntimeException("Failed to delete path: " + path, e);
+                                throw new MediaCleanupException("Failed to delete path: " + path, e);
                             }
                         });
             } catch (Exception e) {
                 log.error("Failed to rollback delete encoded HLS directory. folder: {}", targetPath, e);
-                throw new RuntimeException("Failed to delete directory: " + targetPath, e);
+                throw new MediaCleanupException("Failed to delete directory: " + targetPath, e);
             }
         }
     }

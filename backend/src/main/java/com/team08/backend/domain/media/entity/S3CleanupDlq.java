@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+import org.springframework.lang.Nullable;
+
 /**
  * 비동기 S3 삭제 태스크가 RejectedExecutionException 혹은 삭제 실패로 소실되지 않도록
  * 영구 보존하는 DB 기반 Dead Letter Queue 엔티티입니다.
@@ -50,6 +52,7 @@ public class S3CleanupDlq extends BaseTimeEntity {
     @Column(nullable = false)
     private Instant failedAt;
 
+    @Nullable
     private Instant nextRetryAt;
 
     private S3CleanupDlq(Long lectureId, String targetDirName) {
@@ -58,7 +61,7 @@ public class S3CleanupDlq extends BaseTimeEntity {
         this.status = DlqStatus.PENDING;
         this.retryCount = 0;
         this.failedAt = Instant.now();
-        this.nextRetryAt = Instant.now(); // 즉시 재시도 가능
+        this.nextRetryAt = Instant.now().plusSeconds(60); // 1분 안전 지연 후 첫 재시도
     }
 
     /**
