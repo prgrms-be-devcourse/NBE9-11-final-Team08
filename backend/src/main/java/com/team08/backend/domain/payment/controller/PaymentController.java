@@ -64,7 +64,10 @@ public class PaymentController {
     }
 
     @PostMapping("/{orderId}/providers/{providerType}/confirm")
-    @Operation(summary = "Provider 寃곗젣 ?뱀씤", description = "二쇰Ц?????꽑?앸맂 Provider ?뱀씤 API 寃곌낵媛 ?깃났???뚮쭔 寃곗젣瑜??꾨즺 泥섎━?⑸땲??")
+    @Operation(
+            summary = "Provider 결제 승인",
+            description = "주문에 대해 선택된 Provider 승인 API 결과가 성공한 경우에만 결제를 완료 처리합니다."
+    )
     public ConfirmPaymentResponse confirmProviderPayment(
             @AuthenticationPrincipal LoginUserPrincipal principal,
             @Parameter(description = "二쇰Ц ID", example = "1")
