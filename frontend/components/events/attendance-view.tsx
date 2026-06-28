@@ -48,7 +48,7 @@ export function AttendanceView() {
       
       setCheckedToday(true)
       setCheckedDays(prev => prev.includes(today) ? prev : [...prev, today])
-      toast.success('출석 완료! 포인트가 적립되었습니다.')
+      toast.success('출석이 완료되었습니다!')
     } catch (err: any) {
       if (String(err.message || '').includes('이미 출석')) {
         setCheckedToday(true)

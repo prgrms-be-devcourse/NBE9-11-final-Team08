@@ -5,7 +5,7 @@ import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -27,7 +27,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
-    private final IssuedCouponService issuedCouponService;
+    private final CouponRewardOutboxService couponRewardOutboxService;
     private final Clock clock;
 
     // 출석체크
@@ -60,11 +60,12 @@ public class AttendanceService {
         // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
             Attendance savedLog = attendanceRepository.saveAndFlush(todayLog);
-
-            // 7일 연속 출석 시 보상 쿠폰 자동 발급
-            if (savedLog.getConsecutiveDays() == 7) {
-                issuedCouponService.issueAttendanceCoupon(userId);
-            }
+            couponRewardOutboxService.createAttendanceCheckedEvent(
+                    userId,
+                    savedLog.getAttendanceDate(),
+                    savedLog.getConsecutiveDays(),
+                    savedLog.getMonthlyTotalDays()
+            );
 
             return AttendanceResponse.from(savedLog);
         } catch (DataIntegrityViolationException e) {

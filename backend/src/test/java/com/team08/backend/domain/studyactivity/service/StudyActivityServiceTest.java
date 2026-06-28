@@ -7,6 +7,7 @@ import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ class StudyActivityServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private StudyActivityService studyActivityService;

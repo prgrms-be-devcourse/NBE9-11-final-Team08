@@ -1,5 +1,6 @@
 package com.team08.backend.domain.couponpolicy.dto;
 
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.entity.CouponUsageType;
@@ -20,6 +21,8 @@ public record CouponPolicyCreateRequest(
 
         @NotNull(message = "쿠폰 발급 타입은 필수입니다.")
         CouponType couponType,
+
+        AutoIssueType autoIssueType,
 
         @Min(value = 1, message = "쿠폰 수량은 1 이상이어야 합니다.")
         Integer totalQuantity, // null이면 무제한
@@ -54,4 +57,40 @@ public record CouponPolicyCreateRequest(
 
         List<Long> courseIds
 ) {
+    public CouponPolicyCreateRequest(
+            String name,
+            CouponTarget couponTarget,
+            CouponType couponType,
+            Integer totalQuantity,
+            CouponUsageType usageType,
+            Boolean isStackable,
+            DiscountType discountType,
+            Integer discountValue,
+            Integer maxDiscountAmount,
+            Integer minOrderAmount,
+            Integer validDays,
+            LocalDateTime issueStartDate,
+            LocalDateTime issueEndDate,
+            List<Long> categoryIds,
+            List<Long> courseIds
+    ) {
+        this(
+                name,
+                couponTarget,
+                couponType,
+                null,
+                totalQuantity,
+                usageType,
+                isStackable,
+                discountType,
+                discountValue,
+                maxDiscountAmount,
+                minOrderAmount,
+                validDays,
+                issueStartDate,
+                issueEndDate,
+                categoryIds,
+                courseIds
+        );
+    }
 }

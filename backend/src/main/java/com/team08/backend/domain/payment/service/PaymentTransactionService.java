@@ -1,7 +1,5 @@
 package com.team08.backend.domain.payment.service;
 
-import com.team08.backend.domain.enrollment.entity.Enrollment;
-import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.order.entity.Order;
@@ -19,6 +17,7 @@ import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -58,7 +57,7 @@ public class PaymentTransactionService {
     private final EnrollmentRepository enrollmentRepository;
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
-    private final PaidCourseStudyMemberService paidCourseStudyMemberService;
+    private final PaymentSuccessOutboxService paymentSuccessOutboxService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -143,7 +142,7 @@ public class PaymentTransactionService {
         if (!isValidTossPaymentResult(tossResponse, order, context.expectedDiscount())) {
             attempt.markUnknown(TOSS_PAYMENT_MISMATCH, "Toss payment result does not match order.", completedAt);
             payment.markUnknown(TOSS_PAYMENT_MISMATCH, "Toss payment result does not match order.", completedAt);
-            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
         }
 
         if (!isDoneTossPayment(tossResponse)) {
@@ -155,7 +154,7 @@ public class PaymentTransactionService {
                     "Toss payment confirm result is not done.",
                     completedAt
             );
-            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+            return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
         }
 
         List<OrderItem> orderItems = findOrderItems(order);
@@ -176,19 +175,9 @@ public class PaymentTransactionService {
         }
 
         markOrderPaid(order, completedAt);
-        List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(
-                context.userId(),
-                order,
-                orderItems,
-                completedAt
-        );
-        paidCourseStudyMemberService.joinAsMember(
-                context.userId(),
-                savedEnrollments.stream().map(Enrollment::getCourseId).toList(),
-                completedAt
-        );
+        paymentSuccessOutboxService.createIfAbsent(savedPayment.getId(), order.getId(), context.userId());
 
-        return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
+        return ConfirmPaymentResponse.from(savedPayment, order);
     }
 
     @Transactional
@@ -225,7 +214,7 @@ public class PaymentTransactionService {
             }
         }
 
-        return ConfirmPaymentResponse.from(paymentRepository.save(payment), order, List.of());
+        return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
     }
 
     @Transactional
@@ -329,10 +318,7 @@ public class PaymentTransactionService {
     }
 
     private ConfirmPaymentResponse toIdempotentResponse(Order order, Payment payment) {
-        List<Enrollment> enrollments = payment.isCompleted()
-                ? enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE)
-                : List.of();
-        return ConfirmPaymentResponse.from(payment, order, enrollments);
+        return ConfirmPaymentResponse.from(payment, order);
     }
 
     private int calculateExpectedDiscount(Long userId, Long issuedCouponId, Order order) {
@@ -437,12 +423,7 @@ public class PaymentTransactionService {
 
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             markOrderPaid(order, recoveredAt);
-            List<Enrollment> enrollments = issueEnrollmentsAtPaidTime(order.getUserId(), order, orderItems, recoveredAt);
-            paidCourseStudyMemberService.joinAsMember(
-                    order.getUserId(),
-                    enrollments.stream().map(Enrollment::getCourseId).toList(),
-                    recoveredAt
-            );
+            paymentSuccessOutboxService.createIfAbsent(payment.getId(), order.getId(), order.getUserId());
         }
     }
 
@@ -475,19 +456,6 @@ public class PaymentTransactionService {
 
     private void markOrderPaid(Order order, LocalDateTime paidAt) {
         order.markPaid(paidAt);
-    }
-
-    private List<Enrollment> issueEnrollmentsAtPaidTime(
-            Long userId,
-            Order order,
-            List<OrderItem> orderItems,
-            LocalDateTime enrolledAt
-    ) {
-        List<Enrollment> enrollments = orderItems.stream()
-                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order, enrolledAt))
-                .toList();
-
-        return enrollmentRepository.saveAll(enrollments);
     }
 
     public record TossPaymentProcessingContext(

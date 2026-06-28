@@ -35,6 +35,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Modifying(clearAutomatically = true)
     @Query("update Course c set c.viewCount = c.viewCount + 1 where c.id = :courseId")
     void increaseViewCountAtomic(@Param("courseId") Long courseId);
+ 
+    @Modifying(clearAutomatically = true)
+    @Query("update Course c set c.viewCount = c.viewCount + :delta where c.id = :courseId")
+    void increaseViewCountByDelta(@Param("courseId") Long courseId, @Param("delta") int delta);
 
     Page<Course> findAllByStatus(CourseStatus status, Pageable pageable);
 

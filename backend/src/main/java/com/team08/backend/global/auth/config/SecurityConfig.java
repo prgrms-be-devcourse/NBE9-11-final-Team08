@@ -119,8 +119,10 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/coupons").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/me").authenticated()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}/members").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/by-course/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories").permitAll()
             .requestMatchers(org.springframework.http.HttpMethod.GET, "/videos-local/**").permitAll()

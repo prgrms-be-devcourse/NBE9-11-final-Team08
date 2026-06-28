@@ -18,6 +18,7 @@ import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
+import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
@@ -50,6 +51,7 @@ public class PaymentService {
     private final IssuedCouponService issuedCouponService;
     private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final PaidCourseStudyMemberService paidCourseStudyMemberService;
+    private final PaymentSuccessOutboxService paymentSuccessOutboxService;
     private final Clock clock;
 
     @Transactional
@@ -91,15 +93,9 @@ public class PaymentService {
 
         markOrderPaid(order, paidAt);
 
-        // 결제 완료 시점과 수강권 발급 시점을 동일하게 맞춘다.
-        List<Enrollment> savedEnrollments = issueEnrollmentsAtPaidTime(userId, order, orderItems, paidAt);
-        paidCourseStudyMemberService.joinAsMember(
-                userId,
-                savedEnrollments.stream().map(Enrollment::getCourseId).toList(),
-                paidAt
-        );
+        paymentSuccessOutboxService.createIfAbsent(savedPayment.getId(), order.getId(), userId);
 
-        return ConfirmPaymentResponse.from(savedPayment, order, savedEnrollments);
+        return ConfirmPaymentResponse.from(savedPayment, order);
     }
 
     public ConfirmPaymentResponse confirmTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
@@ -199,10 +195,7 @@ public class PaymentService {
     }
 
     private ConfirmPaymentResponse toIdempotentResponse(Order order, Payment payment) {
-        List<Enrollment> enrollments = payment.isCompleted()
-                ? enrollmentRepository.findAllByOrder_IdAndStatus(order.getId(), EnrollmentStatus.ACTIVE)
-                : List.of();
-        return ConfirmPaymentResponse.from(payment, order, enrollments);
+        return ConfirmPaymentResponse.from(payment, order);
     }
 
     private void validateFailableOrder(Order order) {
@@ -277,14 +270,6 @@ public class PaymentService {
 
     private void markOrderPaid(Order order, LocalDateTime paidAt) {
         order.markPaid(paidAt);
-    }
-
-    private List<Enrollment> issueEnrollmentsAtPaidTime(Long userId, Order order, List<OrderItem> orderItems, LocalDateTime enrolledAt) {
-        List<Enrollment> enrollments = orderItems.stream()
-                .map(orderItem -> Enrollment.createActive(userId, orderItem.getCourseId(), order, enrolledAt))
-                .toList();
-
-        return enrollmentRepository.saveAll(enrollments);
     }
 
     private Payment refundSuccessfulPayment(Order order, LocalDateTime refundedAt) {

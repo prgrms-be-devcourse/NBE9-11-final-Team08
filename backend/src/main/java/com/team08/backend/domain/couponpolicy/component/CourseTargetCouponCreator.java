@@ -34,6 +34,7 @@ public class CourseTargetCouponCreator extends AbstractCouponPolicyCreator {
                 request.name(),
                 request.couponTarget(),
                 request.couponType(),
+                request.autoIssueType(),
                 request.totalQuantity(),
                 request.usageType(),
                 request.isStackable(),

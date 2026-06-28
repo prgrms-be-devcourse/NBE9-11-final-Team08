@@ -35,7 +35,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { segment: '', label: '대시보드', icon: LayoutDashboard },
   { segment: 'course', label: '강좌', icon: BookOpen },
-  { segment: 'board', label: '게시판', icon: MessageSquare, memberOnly: true },
+  { segment: 'board', label: '학습 활동', icon: MessageSquare, memberOnly: true },
   { segment: 'report', label: '리포트', icon: BarChart3 },
   { segment: 'settings', label: '설정', icon: Settings, ownerOnly: true },
 ]
@@ -74,9 +74,6 @@ export function StudyShell({
               {STATUS_LABEL[study.status]}
             </Badge>
           </div>
-          <p className="truncate text-xs text-muted-foreground">
-            운영자 {study.ownerName} · 멤버 {study.members.length}명
-          </p>
         </div>
         <Button asChild variant="outline" size="sm" className="ml-auto">
           <Link href={`/courses/${study.courseId}`}>

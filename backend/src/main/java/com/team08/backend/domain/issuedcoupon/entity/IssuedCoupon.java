@@ -21,11 +21,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "issued_coupons", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "policy_id"}))
+@Table(name = "issued_coupons", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "policy_id", "issue_key"}))
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class IssuedCoupon {
+    public static final String DEFAULT_ISSUE_KEY = "DOWNLOAD";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,6 +37,9 @@ public class IssuedCoupon {
 
     @Column(nullable = false)
     private Long userId;
+
+    @Column(nullable = false, length = 100)
+    private String issueKey;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -48,9 +53,10 @@ public class IssuedCoupon {
 
     private LocalDateTime usedAt;
 
-    private IssuedCoupon(Long policyId, Long userId, LocalDateTime expiredAt, LocalDateTime now) {
+    private IssuedCoupon(Long policyId, Long userId, String issueKey, LocalDateTime expiredAt, LocalDateTime now) {
         this.policyId = policyId;
         this.userId = userId;
+        this.issueKey = issueKey;
         this.status = CouponStatus.ISSUED;
         this.issuedAt = now;
         this.expiredAt = expiredAt;
@@ -58,9 +64,14 @@ public class IssuedCoupon {
 
     // 쿠폰 발급 기록 생성
     public static IssuedCoupon create(CouponPolicy policy, Long userId, LocalDateTime now) {
+        return create(policy, userId, DEFAULT_ISSUE_KEY, now);
+    }
+
+    public static IssuedCoupon create(CouponPolicy policy, Long userId, String issueKey, LocalDateTime now) {
         return new IssuedCoupon(
                 policy.getId(),
                 userId,
+                issueKey,
                 policy.calculateExpirationDate(now),
                 now
         );

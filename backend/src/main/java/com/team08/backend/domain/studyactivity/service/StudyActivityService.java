@@ -7,6 +7,8 @@ import com.team08.backend.domain.studyactivity.dto.StudyActivityResponse;
 import com.team08.backend.domain.studyactivity.entity.StudyActivity;
 import com.team08.backend.domain.studyactivity.event.StudyActivityCreated;
 import com.team08.backend.domain.studyactivity.repository.StudyActivityRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -18,14 +20,21 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class StudyActivityService {
+
+    private static final String UNKNOWN_AUTHOR = "(알 수 없음)";
 
     private final StudyActivityRepository studyActivityRepository;
     private final AiFeedbackInvalidator aiFeedbackInvalidator;
     private final StudyAccessAuthorizer studyAccessAuthorizer;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserRepository userRepository;
 
     @Transactional
     public StudyActivityResponse createActivity(Long studyId, Long userId, String content) {
@@ -36,7 +45,7 @@ public class StudyActivityService {
 
         eventPublisher.publishEvent(StudyActivityCreated.from(savedActivity));
 
-        return StudyActivityResponse.from(savedActivity);
+        return StudyActivityResponse.from(savedActivity, resolveNickname(savedActivity.getAuthorId()));
     }
 
     @Transactional(readOnly = true)
@@ -56,9 +65,17 @@ public class StudyActivityService {
                 )
         );
 
-        return studyActivityRepository
-                .findAllByStudyIdAndDeletedAtIsNull(studyId, latestFirstPageable)
-                .map(StudyActivityResponse::from);
+        Page<StudyActivity> activities = studyActivityRepository
+                .findAllByStudyIdAndDeletedAtIsNull(studyId, latestFirstPageable);
+
+        Map<Long, String> nicknameByUserId = resolveNicknames(
+                activities.stream().map(StudyActivity::getAuthorId).toList()
+        );
+
+        return activities.map(activity -> StudyActivityResponse.from(
+                activity,
+                nicknameByUserId.getOrDefault(activity.getAuthorId(), UNKNOWN_AUTHOR)
+        ));
     }
 
     @Transactional(readOnly = true)
@@ -71,7 +88,7 @@ public class StudyActivityService {
 
         StudyActivity activity = findActivity(studyId, activityId);
 
-        return StudyActivityResponse.from(activity);
+        return StudyActivityResponse.from(activity, resolveNickname(activity.getAuthorId()));
     }
 
     @Transactional
@@ -91,7 +108,7 @@ public class StudyActivityService {
 
         aiFeedbackInvalidator.markStale(activityId);
 
-        return StudyActivityResponse.from(activity);
+        return StudyActivityResponse.from(activity, resolveNickname(activity.getAuthorId()));
     }
 
     @Transactional
@@ -103,6 +120,21 @@ public class StudyActivityService {
         activity.validateAuthor(userId);
 
         activity.delete();
+    }
+
+    private String resolveNickname(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getNickname)
+                .orElse(UNKNOWN_AUTHOR);
+    }
+
+    private Map<Long, String> resolveNicknames(List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
     }
 
     private StudyActivity findActivity(Long studyId, Long activityId) {
