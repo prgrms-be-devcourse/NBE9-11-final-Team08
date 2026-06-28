@@ -1,0 +1,13 @@
+scrape_configs:
+  - job_name: 'spring-boot'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+    metrics_path: '/actuator/prometheus'
+
+  # 호스트 시스템 메트릭(CPU/메모리/디스크). macOS 네이티브 node_exporter를 쓰는 경우
+  # 타깃을 'host.docker.internal:9100' 으로 교체.
+  - job_name: 'node'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['node-exporter:9100']

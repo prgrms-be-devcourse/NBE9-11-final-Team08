@@ -160,10 +160,15 @@ function login(email, password) {
         { headers: { 'Content-Type': 'application/json' } }
     );
 
-    if (res.status !== 200) {
+    if (res.status !== 200 && res.status !== 204) {
         throw new Error(`[setup] login failed email=${email}, status=${res.status}, body=${res.body}`);
     }
-    return JSON.parse(res.body).accessToken;
+    // 로그인 응답은 204 + HttpOnly 쿠키(accessToken)로 토큰을 내려준다(본문 없음).
+    const cookie = res.cookies['accessToken'];
+    if (!cookie || !cookie[0]) {
+        throw new Error(`[setup] login failed email=${email}, no accessToken cookie, status=${res.status}`);
+    }
+    return cookie[0].value;
 }
 
 function download(token) {
