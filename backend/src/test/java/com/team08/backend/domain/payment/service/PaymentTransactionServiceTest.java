@@ -132,6 +132,62 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
+    void unknownPaymentCannotStartTossPaymentAgainWithDifferentUserSelection() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));
+        payment.markUnknown("TOSS_TIMEOUT", "Toss timeout", FIXED_NOW.minusMinutes(1));
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "retry-user-selection"))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentTransactionService.prepareTossPayment(
+                USER_ID,
+                ORDER_ID,
+                confirmRequest("retry-user-selection")
+        ))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
+    void declinedPaymentCanStartTossPaymentAgainAndCreatesNewAttempt() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(2));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(2));
+        payment.decline("payment-key", "CARD", "CARD_DECLINED", "카드 승인 거절", FIXED_NOW.minusMinutes(1));
+        AtomicReference<PaymentAttempt> savedAttempt = new AtomicReference<>();
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "retry-user-selection"))
+                .willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave(new AtomicReference<>());
+        stubPaymentAttemptSave(savedAttempt);
+
+        PaymentTransactionService.TossPaymentProcessingContext context =
+                paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest("retry-user-selection"));
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(context.attemptId()).isEqualTo(ATTEMPT_ID);
+        assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.REQUESTED);
+        assertThat(savedAttempt.get().getIdempotencyKey()).isEqualTo("retry-user-selection");
+        assertThat(savedAttempt.get().getProvider()).isEqualTo(PaymentProviderType.TOSS);
+    }
+
+    @Test
     void sameIdempotencyKeyReplayKeepsEnrollmentIdsEmptyWhenOrderAlreadyPaid() {
         Order order = order(OrderStatus.PAID);
         Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));

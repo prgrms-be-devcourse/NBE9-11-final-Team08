@@ -51,6 +51,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -417,6 +418,7 @@ class PaymentServiceTest {
 
         verify(paymentTransactionService).failTossPayment(context, request, exception);
         verify(paymentTransactionService, never()).completeTossPayment(any(), any());
+        verify(tossPaymentClient, times(1)).confirm(any(TossConfirmPaymentRequest.class));
         assertThat(response).isSameAs(expectedResponse);
     }
 
