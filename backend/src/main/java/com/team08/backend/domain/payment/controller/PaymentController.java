@@ -6,6 +6,7 @@ import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.service.PaymentService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
@@ -60,6 +61,18 @@ public class PaymentController {
             @RequestBody ConfirmPaymentRequest request
     ) {
         return paymentService.confirmTossPayment(principal.user().id(), orderId, request);
+    }
+
+    @PostMapping("/{orderId}/providers/{providerType}/confirm")
+    @Operation(summary = "Provider 寃곗젣 ?뱀씤", description = "二쇰Ц?????꽑?앸맂 Provider ?뱀씤 API 寃곌낵媛 ?깃났???뚮쭔 寃곗젣瑜??꾨즺 泥섎━?⑸땲??")
+    public ConfirmPaymentResponse confirmProviderPayment(
+            @AuthenticationPrincipal LoginUserPrincipal principal,
+            @Parameter(description = "二쇰Ц ID", example = "1")
+            @PathVariable Long orderId,
+            @PathVariable PaymentProviderType providerType,
+            @RequestBody ConfirmPaymentRequest request
+    ) {
+        return paymentService.confirmProviderPayment(principal.user().id(), orderId, providerType, request);
     }
 
     @PostMapping("/toss/webhook")

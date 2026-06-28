@@ -18,6 +18,8 @@ import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
+import com.team08.backend.domain.payment.provider.PaymentProviderConfirmResponse;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -156,6 +158,31 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
+    void unknownPaymentCannotStartPaymentAgainWithDifferentProvider() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(1));
+        payment.markUnknown("TOSS_TIMEOUT", "Toss timeout", FIXED_NOW.minusMinutes(1));
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "retry-nicepay"))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> paymentTransactionService.prepareProviderPayment(
+                USER_ID,
+                ORDER_ID,
+                PaymentProviderType.NICEPAY,
+                confirmRequest("retry-nicepay")
+        ))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+    }
+
+    @Test
     void declinedPaymentCanStartTossPaymentAgainAndCreatesNewAttempt() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
@@ -185,6 +212,43 @@ class PaymentTransactionServiceTest {
         assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.REQUESTED);
         assertThat(savedAttempt.get().getIdempotencyKey()).isEqualTo("retry-user-selection");
         assertThat(savedAttempt.get().getProvider()).isEqualTo(PaymentProviderType.TOSS);
+    }
+
+    @Test
+    void declinedPaymentCanStartDifferentProviderPaymentAgainAndCreatesProviderAttempt() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        Payment payment = Payment.createReady(order, PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(2));
+        ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
+        payment.markProcessing(PaymentProviderType.TOSS, FIXED_NOW.minusMinutes(2));
+        payment.decline("payment-key", "CARD", "CARD_DECLINED", "移대뱶 ?뱀씤 嫄곗젅", FIXED_NOW.minusMinutes(1));
+        AtomicReference<PaymentAttempt> savedAttempt = new AtomicReference<>();
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "retry-nicepay"))
+                .willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave(new AtomicReference<>());
+        stubPaymentAttemptSave(savedAttempt);
+
+        PaymentTransactionService.TossPaymentProcessingContext context =
+                paymentTransactionService.prepareProviderPayment(
+                        USER_ID,
+                        ORDER_ID,
+                        PaymentProviderType.NICEPAY,
+                        confirmRequest("retry-nicepay")
+                );
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
+        assertThat(context.providerType()).isEqualTo(PaymentProviderType.NICEPAY);
+        assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.REQUESTED);
+        assertThat(savedAttempt.get().getProvider()).isEqualTo(PaymentProviderType.NICEPAY);
+        assertThat(savedAttempt.get().getIdempotencyKey()).isEqualTo("retry-nicepay");
     }
 
     @Test
@@ -264,6 +328,45 @@ class PaymentTransactionServiceTest {
     }
 
     @Test
+    void providerPaymentCanBePreparedAndCompletedInSeparatedTransactions() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        AtomicReference<Payment> savedPayment = new AtomicReference<>();
+        AtomicReference<PaymentAttempt> savedAttempt = new AtomicReference<>();
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave(savedPayment);
+        stubPaymentAttemptSave(savedAttempt);
+
+        PaymentTransactionService.TossPaymentProcessingContext context =
+                paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, confirmRequest());
+
+        assertThat(context.providerType()).isEqualTo(PaymentProviderType.NICEPAY);
+        assertThat(savedPayment.get().getProvider()).isEqualTo(PaymentProviderType.NICEPAY);
+        assertThat(savedAttempt.get().getProvider()).isEqualTo(PaymentProviderType.NICEPAY);
+
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(savedPayment.get()));
+        given(paymentAttemptRepository.findById(ATTEMPT_ID)).willReturn(Optional.of(savedAttempt.get()));
+
+        ConfirmPaymentResponse response = paymentTransactionService.completeProviderPayment(
+                context,
+                providerResponse(order.getOrderNumber(), "DONE", 30_000)
+        );
+
+        assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.SUCCESS);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
+    }
+
+    @Test
     void existingEnrollmentPreventsTossPaymentBeforePaymentAttempt() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
@@ -334,6 +437,42 @@ class PaymentTransactionServiceTest {
                 context,
                 confirmRequest(),
                 TossPaymentException.timeout("TOSS_TIMEOUT", "Toss timeout")
+        );
+
+        assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.TIMEOUT);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void providerTimeoutMarksUnknownWithoutEnrollment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        AtomicReference<Payment> savedPayment = new AtomicReference<>();
+        AtomicReference<PaymentAttempt> savedAttempt = new AtomicReference<>();
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        stubPaymentSave(savedPayment);
+        stubPaymentAttemptSave(savedAttempt);
+
+        PaymentTransactionService.TossPaymentProcessingContext context =
+                paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, confirmRequest());
+
+        given(paymentRepository.findById(PAYMENT_ID)).willReturn(Optional.of(savedPayment.get()));
+        given(paymentAttemptRepository.findById(ATTEMPT_ID)).willReturn(Optional.of(savedAttempt.get()));
+
+        ConfirmPaymentResponse response = paymentTransactionService.failProviderPayment(
+                context,
+                confirmRequest(),
+                PaymentProviderException.timeout("NICEPAY_TIMEOUT", "NICEPAY timeout")
         );
 
         assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
@@ -586,6 +725,17 @@ class PaymentTransactionServiceTest {
 
     private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
         return new TossPaymentResponse(
+                "payment-key",
+                orderNumber,
+                status,
+                "CARD",
+                amount,
+                OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+        );
+    }
+
+    private PaymentProviderConfirmResponse providerResponse(String orderNumber, String status, int amount) {
+        return new PaymentProviderConfirmResponse(
                 "payment-key",
                 orderNumber,
                 status,

@@ -10,20 +10,20 @@ import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
-import com.team08.backend.domain.payment.client.TossPaymentClient;
-import com.team08.backend.domain.payment.client.TossPaymentException;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
-import com.team08.backend.domain.payment.dto.toss.TossConfirmPaymentRequest;
-import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
+import com.team08.backend.domain.payment.provider.PaymentProviderConfirmRequest;
+import com.team08.backend.domain.payment.provider.PaymentProviderConfirmResponse;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
+import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -40,7 +40,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -83,7 +82,7 @@ class PaymentServiceTest {
     private EnrollmentRepository enrollmentRepository;
 
     @Mock
-    private TossPaymentClient tossPaymentClient;
+    private PaymentProviderRouter paymentProviderRouter;
 
     @Mock
     private PaymentTransactionService paymentTransactionService;
@@ -110,7 +109,7 @@ class PaymentServiceTest {
                 orderRepository,
                 orderItemRepository,
                 enrollmentRepository,
-                tossPaymentClient,
+                paymentProviderRouter,
                 paymentTransactionService,
                 issuedCouponService,
                 orderCouponUsageRepository,
@@ -376,21 +375,21 @@ class PaymentServiceTest {
                 null,
                 0
         );
-        TossPaymentResponse tossResponse = tossResponse(context.orderNumber(), "DONE", 30_000);
+        PaymentProviderConfirmResponse providerResponse = providerResponse(context.orderNumber(), "DONE", 30_000);
         ConfirmPaymentResponse expectedResponse = confirmSuccessResponse();
 
-        given(paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, request)).willReturn(context);
-        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class))).willReturn(tossResponse);
-        given(paymentTransactionService.completeTossPayment(context, tossResponse)).willReturn(expectedResponse);
+        given(paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.TOSS, request)).willReturn(context);
+        given(paymentProviderRouter.confirm(eq(PaymentProviderType.TOSS), any(PaymentProviderConfirmRequest.class))).willReturn(providerResponse);
+        given(paymentTransactionService.completeProviderPayment(context, providerResponse)).willReturn(expectedResponse);
 
         ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, request);
 
-        ArgumentCaptor<TossConfirmPaymentRequest> tossRequestCaptor = ArgumentCaptor.forClass(TossConfirmPaymentRequest.class);
-        verify(tossPaymentClient).confirm(tossRequestCaptor.capture());
-        assertThat(tossRequestCaptor.getValue().paymentKey()).isEqualTo("payment-key");
-        assertThat(tossRequestCaptor.getValue().orderId()).isEqualTo(context.orderNumber());
-        assertThat(tossRequestCaptor.getValue().amount()).isEqualTo(30_000);
-        verify(paymentTransactionService).completeTossPayment(context, tossResponse);
+        ArgumentCaptor<PaymentProviderConfirmRequest> providerRequestCaptor = ArgumentCaptor.forClass(PaymentProviderConfirmRequest.class);
+        verify(paymentProviderRouter).confirm(eq(PaymentProviderType.TOSS), providerRequestCaptor.capture());
+        assertThat(providerRequestCaptor.getValue().paymentKey()).isEqualTo("payment-key");
+        assertThat(providerRequestCaptor.getValue().orderId()).isEqualTo(context.orderNumber());
+        assertThat(providerRequestCaptor.getValue().amount()).isEqualTo(30_000);
+        verify(paymentTransactionService).completeProviderPayment(context, providerResponse);
         assertThat(response).isSameAs(expectedResponse);
     }
 
@@ -407,19 +406,80 @@ class PaymentServiceTest {
                 null,
                 0
         );
-        TossPaymentException exception = TossPaymentException.timeout("TOSS_TIMEOUT", "Toss timeout");
+        PaymentProviderException exception = PaymentProviderException.timeout("TOSS_TIMEOUT", "Toss timeout");
         ConfirmPaymentResponse expectedResponse = pendingPaymentResponse(PaymentStatus.UNKNOWN);
 
-        given(paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, request)).willReturn(context);
-        given(tossPaymentClient.confirm(any(TossConfirmPaymentRequest.class))).willThrow(exception);
-        given(paymentTransactionService.failTossPayment(context, request, exception)).willReturn(expectedResponse);
+        given(paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.TOSS, request)).willReturn(context);
+        given(paymentProviderRouter.confirm(eq(PaymentProviderType.TOSS), any(PaymentProviderConfirmRequest.class))).willThrow(exception);
+        given(paymentTransactionService.failProviderPayment(context, request, exception)).willReturn(expectedResponse);
 
         ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, request);
 
-        verify(paymentTransactionService).failTossPayment(context, request, exception);
-        verify(paymentTransactionService, never()).completeTossPayment(any(), any());
-        verify(tossPaymentClient, times(1)).confirm(any(TossConfirmPaymentRequest.class));
+        verify(paymentTransactionService).failProviderPayment(context, request, exception);
+        verify(paymentTransactionService, never()).completeProviderPayment(any(), any());
+        verify(paymentProviderRouter, times(1)).confirm(eq(PaymentProviderType.TOSS), any(PaymentProviderConfirmRequest.class));
         assertThat(response).isSameAs(expectedResponse);
+    }
+
+    @Test
+    void providerConfirmCallsOnlySelectedProviderWithoutFallback() {
+        ConfirmPaymentRequest request = confirmRequest(30_000);
+        PaymentTransactionService.TossPaymentProcessingContext context = PaymentTransactionService.TossPaymentProcessingContext.requested(
+                PaymentProviderType.NICEPAY,
+                USER_ID,
+                ORDER_ID,
+                "ORD-20260612100000-ABC12345",
+                30_000,
+                PAYMENT_ID,
+                200L,
+                null,
+                0
+        );
+        PaymentProviderConfirmResponse providerResponse = providerResponse(context.orderNumber(), "DONE", 30_000);
+        ConfirmPaymentResponse expectedResponse = confirmSuccessResponse();
+
+        given(paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, request))
+                .willReturn(context);
+        given(paymentProviderRouter.confirm(eq(PaymentProviderType.NICEPAY), any(PaymentProviderConfirmRequest.class)))
+                .willReturn(providerResponse);
+        given(paymentTransactionService.completeProviderPayment(context, providerResponse)).willReturn(expectedResponse);
+
+        ConfirmPaymentResponse response = paymentService.confirmProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, request);
+
+        verify(paymentProviderRouter).confirm(eq(PaymentProviderType.NICEPAY), any(PaymentProviderConfirmRequest.class));
+        verify(paymentProviderRouter, never()).confirm(eq(PaymentProviderType.TOSS), any(PaymentProviderConfirmRequest.class));
+        assertThat(response).isSameAs(expectedResponse);
+    }
+
+    @Test
+    void providerTimeoutDoesNotFallbackToOtherProvider() {
+        ConfirmPaymentRequest request = confirmRequest(30_000);
+        PaymentTransactionService.TossPaymentProcessingContext context = PaymentTransactionService.TossPaymentProcessingContext.requested(
+                PaymentProviderType.NICEPAY,
+                USER_ID,
+                ORDER_ID,
+                "ORD-20260612100000-ABC12345",
+                30_000,
+                PAYMENT_ID,
+                200L,
+                null,
+                0
+        );
+        PaymentProviderException exception = PaymentProviderException.timeout("NICEPAY_TIMEOUT", "NICEPAY timeout");
+        ConfirmPaymentResponse expectedResponse = pendingPaymentResponse(PaymentStatus.UNKNOWN);
+
+        given(paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, request))
+                .willReturn(context);
+        given(paymentProviderRouter.confirm(eq(PaymentProviderType.NICEPAY), any(PaymentProviderConfirmRequest.class)))
+                .willThrow(exception);
+        given(paymentTransactionService.failProviderPayment(context, request, exception)).willReturn(expectedResponse);
+
+        ConfirmPaymentResponse response = paymentService.confirmProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.NICEPAY, request);
+
+        verify(paymentProviderRouter).confirm(eq(PaymentProviderType.NICEPAY), any(PaymentProviderConfirmRequest.class));
+        verify(paymentProviderRouter, never()).confirm(eq(PaymentProviderType.TOSS), any(PaymentProviderConfirmRequest.class));
+        verify(paymentTransactionService).failProviderPayment(context, request, exception);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.UNKNOWN);
     }
 
     @Test
@@ -508,15 +568,15 @@ class PaymentServiceTest {
         PaymentTransactionService.TossPaymentProcessingContext context =
                 PaymentTransactionService.TossPaymentProcessingContext.replay(expectedResponse);
 
-        given(paymentTransactionService.prepareTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1")))
+        given(paymentTransactionService.prepareProviderPayment(USER_ID, ORDER_ID, PaymentProviderType.TOSS, confirmRequest(30_000, "idem-1")))
                 .willReturn(context);
 
         ConfirmPaymentResponse response = paymentService.confirmTossPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1"));
 
         assertThat(response).isSameAs(expectedResponse);
-        verifyNoInteractions(tossPaymentClient);
-        verify(paymentTransactionService, never()).completeTossPayment(any(), any());
-        verify(paymentTransactionService, never()).failTossPayment(any(), any(), any());
+        verifyNoInteractions(paymentProviderRouter);
+        verify(paymentTransactionService, never()).completeProviderPayment(any(), any());
+        verify(paymentTransactionService, never()).failProviderPayment(any(), any(), any());
     }
 
     @Test
@@ -688,14 +748,14 @@ class PaymentServiceTest {
         return attempt;
     }
 
-    private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
-        return new TossPaymentResponse(
+    private PaymentProviderConfirmResponse providerResponse(String orderNumber, String status, int amount) {
+        return new PaymentProviderConfirmResponse(
                 "payment-key",
                 orderNumber,
                 status,
                 "CARD",
                 amount,
-                OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+                java.time.OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
         );
     }
 
