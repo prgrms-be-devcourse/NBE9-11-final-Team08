@@ -94,6 +94,9 @@ public class CouponIssueRequest extends BaseTimeEntity {
     }
 
     public void markProcessing(LocalDateTime startedAt) {
+        if (this.status == CouponIssueRequestStatus.PROCESSING) {
+            return;
+        }
         this.status = CouponIssueRequestStatus.PROCESSING;
         this.startedAt = startedAt;
     }
@@ -123,5 +126,17 @@ public class CouponIssueRequest extends BaseTimeEntity {
         this.status = CouponIssueRequestStatus.FAILED;
         this.failureReason = failureReason;
         this.completedAt = completedAt;
+    }
+
+    public boolean isFinished() {
+        return this.status == CouponIssueRequestStatus.COMPLETED
+                || this.status == CouponIssueRequestStatus.FAILED
+                || this.status == CouponIssueRequestStatus.CANCELED;
+    }
+
+    public void completeIfProcessed(LocalDateTime completedAt) {
+        if (this.successCount + this.failedCount + this.skippedCount >= this.requestedCount) {
+            markCompleted(completedAt);
+        }
     }
 }

@@ -23,12 +23,12 @@ public class CouponIssueExecutor {
     private final Clock clock;
 
     @Transactional
-    public void issueRewardCoupon(Long userId, CouponPolicy policy, String rewardKey, String rewardType) {
+    public CouponIssueResult issueRewardCoupon(Long userId, CouponPolicy policy, String rewardKey, String rewardType) {
         LocalDateTime now = LocalDateTime.now(clock);
 
         if (couponRewardHistoryRepository.existsByUserIdAndRewardKey(userId, rewardKey)) {
             log.info("이미 처리된 쿠폰 보상입니다. userId={}, rewardKey={}", userId, rewardKey);
-            return;
+            return CouponIssueResult.skipped();
         }
 
         IssuedCoupon existingCoupon = issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(
@@ -47,7 +47,7 @@ public class CouponIssueExecutor {
             history.markIssued(existingCoupon.getId(), existingCoupon.getIssuedAt());
             couponRewardHistoryRepository.save(history);
             log.info("이미 발급된 쿠폰 보상 이력을 보정했습니다. userId={}, rewardKey={}", userId, rewardKey);
-            return;
+            return CouponIssueResult.skipped();
         }
 
         CouponRewardHistory history = CouponRewardHistory.create(
@@ -62,5 +62,20 @@ public class CouponIssueExecutor {
         IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, userId, rewardKey, now);
         IssuedCoupon savedCoupon = issuedCouponRepository.save(issuedCoupon);
         history.markIssued(savedCoupon.getId(), now);
+        return CouponIssueResult.issued(savedCoupon.getId());
+    }
+
+    public record CouponIssueResult(
+            boolean issued,
+            Long issuedCouponId
+    ) {
+
+        public static CouponIssueResult issued(Long issuedCouponId) {
+            return new CouponIssueResult(true, issuedCouponId);
+        }
+
+        public static CouponIssueResult skipped() {
+            return new CouponIssueResult(false, null);
+        }
     }
 }
