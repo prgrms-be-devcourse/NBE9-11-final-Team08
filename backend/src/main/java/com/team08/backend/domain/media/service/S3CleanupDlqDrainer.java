@@ -14,15 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * s3_cleanup_dlq 테이블에 쌓인 실패 항목을 1분 주기로 드레인하여
- * 지수 백오프 전략으로 S3(또는 로컬 파일시스템) 삭제를 재시도합니다.
- *
- * 재시도 전략:
- * - 1차 실패 → 2분 후 재시도
- * - 2차 실패 → 4분 후 재시도
- * - 3차(MAX_RETRY) 초과 → DEAD 상태 전환 + Micrometer 카운터 발화 (Grafana 알람)
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -31,7 +22,7 @@ public class S3CleanupDlqDrainer {
     private final S3CleanupDlqRepository dlqRepository;
     private final DlqTaskProcessor taskProcessor;
 
-    @Scheduled(fixedDelay = 60_000) // 1분 주기
+    @Scheduled(fixedDelay = 60_000)
     public void drainDlq() {
         List<S3CleanupDlq> pendingTasks =
                 dlqRepository.findByStatusAndNextRetryAtBefore(DlqStatus.PENDING, Instant.now());
@@ -48,10 +39,6 @@ public class S3CleanupDlqDrainer {
     }
 }
 
-/**
- * 개별 DLQ 태스크 처리를 독립적인 REQUIRES_NEW 트랜잭션 단위로 쪼개어 실행하는 내부 컴포넌트입니다.
- * - 특정 태스크 실패 시의 롤백이 다른 태스크 처리에 전파되지 않도록 트랜잭션을 완벽히 격리합니다.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -64,6 +51,7 @@ class DlqTaskProcessor {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processTask(S3CleanupDlq task) {
         boolean success = false;
+        StringBuilder errorBuilder = new StringBuilder();
 
         for (MediaEncodingService service : mediaEncodingServices) {
             try {
@@ -75,12 +63,10 @@ class DlqTaskProcessor {
                 log.error("[DLQ 재시도 실패] lectureId={}, dir={}, retryCount={}, service={}",
                         task.getLectureId(), task.getTargetDirName(), task.getRetryCount(),
                         service.getClass().getSimpleName(), e);
-                task.incrementRetry(e.getMessage());
-
-                if (task.getStatus() == DlqStatus.DEAD) {
-                    log.error("[DLQ DEAD 전환] 최대 재시도 초과. 수동 처리 필요! lectureId={}, dir={}",
-                            task.getLectureId(), task.getTargetDirName());
+                if (errorBuilder.length() > 0) {
+                    errorBuilder.append(" | ");
                 }
+                errorBuilder.append(service.getClass().getSimpleName()).append(": ").append(e.getMessage());
             }
         }
 
@@ -88,8 +74,11 @@ class DlqTaskProcessor {
             dlqRepository.delete(task);
             meterRegistry.counter("dlq.drain.success").increment();
         } else {
+            task.incrementRetry(errorBuilder.toString());
             dlqRepository.save(task);
             if (task.getStatus() == DlqStatus.DEAD) {
+                log.error("[DLQ DEAD 전환] 최대 재시도 초과. 수동 처리 필요! lectureId={}, dir={}",
+                        task.getLectureId(), task.getTargetDirName());
                 meterRegistry.counter("dlq.dead.count",
                         "lectureId", String.valueOf(task.getLectureId())).increment();
             }

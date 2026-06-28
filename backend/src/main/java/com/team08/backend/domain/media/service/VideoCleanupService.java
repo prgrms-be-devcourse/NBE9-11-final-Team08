@@ -13,13 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * 인코딩 완료 후 AFTER_COMMIT(구 영상 클린업) 또는 AFTER_ROLLBACK(롤백 시 찌꺼기 클린업)
- * 삭제 처리를 담당하는 비동기 격리 서비스입니다.
- *
- * - 삭제 연산 전용 풀 "videoCleanupExecutor"를 사용하여 인코딩 스레드 풀과의 자원 경쟁을 차단합니다.
- * - S3 또는 로컬 삭제 실패 시 DLQ 테이블에 실패 경로를 기록하여 유실률 0%를 보장합니다.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
