@@ -107,6 +107,20 @@ Enum issued_coupon_job_status {
   PROCESSING
   ISSUED
 }
+Enum coupon_issue_request_type {
+  SIGNUP
+  ATTENDANCE_STREAK
+  MONTHLY_ATTENDANCE
+  SELECTED_USERS
+  ALL_USERS
+}
+Enum coupon_issue_request_status {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELED
+}
 // =====================================
 // USER DOMAIN
 // =====================================
@@ -423,6 +437,31 @@ Table issued_coupon_jobs {
     (status)
   }
 }
+Table coupon_issue_requests {
+  id bigint [pk, increment]
+  policy_id bigint [not null]
+  request_key varchar(100) [not null]
+  issue_type coupon_issue_request_type [not null]
+  status coupon_issue_request_status [not null]
+  requested_count bigint [not null, default: 0]
+  success_count bigint [not null, default: 0]
+  failed_count bigint [not null, default: 0]
+  skipped_count bigint [not null, default: 0]
+  requested_by bigint
+  requested_at datetime [not null]
+  started_at datetime
+  completed_at datetime
+  failure_reason longtext
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (issue_type, request_key) [unique, name: "uk_coupon_issue_request_key"]
+    (status, id) [name: "idx_coupon_issue_requests_status_id"]
+    (policy_id, id) [name: "idx_coupon_issue_requests_policy_id"]
+    (requested_by, id) [name: "idx_coupon_issue_requests_requested_by"]
+  }
+}
 Table orders {
   id bigint [pk, increment]
   user_id bigint [not null]
@@ -630,6 +669,8 @@ Ref: coupon_reward_histories.issued_coupon_id > issued_coupons.id
 Ref: coupon_reward_outbox_events.user_id > users.id
 Ref: issued_coupon_jobs.policy_id > coupon_policies.id
 Ref: issued_coupon_jobs.user_id > users.id
+Ref: coupon_issue_requests.policy_id > coupon_policies.id
+Ref: coupon_issue_requests.requested_by > users.id
 Ref: seller.user_id > users.id
 Ref: orders.user_id > users.id
 Ref: order_items.order_id > orders.id

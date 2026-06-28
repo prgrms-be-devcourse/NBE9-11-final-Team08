@@ -1,0 +1,23 @@
+CREATE TABLE coupon_issue_requests (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    policy_id BIGINT NOT NULL,
+    request_key VARCHAR(100) NOT NULL,
+    issue_type ENUM ('SIGNUP', 'ATTENDANCE_STREAK', 'MONTHLY_ATTENDANCE', 'SELECTED_USERS', 'ALL_USERS') NOT NULL,
+    status ENUM ('REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELED') NOT NULL,
+    requested_count BIGINT NOT NULL DEFAULT 0,
+    success_count BIGINT NOT NULL DEFAULT 0,
+    failed_count BIGINT NOT NULL DEFAULT 0,
+    skipped_count BIGINT NOT NULL DEFAULT 0,
+    requested_by BIGINT,
+    requested_at DATETIME(6) NOT NULL,
+    started_at DATETIME(6),
+    completed_at DATETIME(6),
+    failure_reason LONGTEXT,
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_coupon_issue_request_key (issue_type, request_key),
+    INDEX idx_coupon_issue_requests_status_id (status, id),
+    INDEX idx_coupon_issue_requests_policy_id (policy_id, id),
+    INDEX idx_coupon_issue_requests_requested_by (requested_by, id)
+) ENGINE=InnoDB;
