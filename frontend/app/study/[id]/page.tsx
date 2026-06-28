@@ -11,9 +11,13 @@ export default async function StudyPage({
   const { id } = await params
   const study = await api.getStudyForEntry(id)
   if (!study) notFound()
+  const [members, lastWatched] = await Promise.all([
+    api.getStudyMembers(id),
+    api.getLastWatched(study.courseId),
+  ])
   return (
     <StudyShell study={study}>
-      <StudyDashboard study={study} />
+      <StudyDashboard study={{ ...study, members }} lastWatched={lastWatched} />
     </StudyShell>
   )
 }

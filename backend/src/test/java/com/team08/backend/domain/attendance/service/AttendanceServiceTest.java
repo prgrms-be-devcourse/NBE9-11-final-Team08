@@ -5,7 +5,7 @@ import com.team08.backend.domain.attendance.dto.AttendanceStatusResponse;
 import com.team08.backend.domain.attendance.entity.Attendance;
 import com.team08.backend.domain.attendance.exception.AttendanceAlreadyExistsException;
 import com.team08.backend.domain.attendance.repository.AttendanceRepository;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +45,7 @@ class AttendanceServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private IssuedCouponService issuedCouponService;
+    private CouponRewardOutboxService couponRewardOutboxService;
 
     @Spy
     private Clock clock = Clock.fixed(Instant.parse("2026-06-15T10:00:00Z"), ZoneId.systemDefault());
@@ -142,8 +142,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("7일 연속 출석 시 보상 쿠폰이 자동 발급된다")
-    void checkIn_consecutive7Days_issuesCoupon() {
+    @DisplayName("출석 성공 시 쿠폰 보상 outbox 이벤트를 저장한다")
+    void checkIn_success_createsCouponRewardOutboxEvent() {
         // given
         Long userId = 1L;
         LocalDate yesterday = today.minusDays(1);
@@ -163,7 +163,12 @@ class AttendanceServiceTest {
 
         // then
         assertEquals(7, response.consecutiveDays());
-        verify(issuedCouponService, times(1)).issueAttendanceCoupon(userId);
+        verify(couponRewardOutboxService, times(1)).createAttendanceCheckedEvent(
+                userId,
+                today,
+                7,
+                11
+        );
     }
 
     @Test

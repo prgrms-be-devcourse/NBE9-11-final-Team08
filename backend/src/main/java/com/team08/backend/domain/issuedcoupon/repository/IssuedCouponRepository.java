@@ -23,6 +23,8 @@ public interface IssuedCouponRepository extends JpaRepository<IssuedCoupon, Long
     // 특정 사용자에게 발급된 특정 쿠폰 조회
     Optional<IssuedCoupon> findByUserIdAndPolicyId(Long userId, Long policyId);
 
+    Optional<IssuedCoupon> findByUserIdAndPolicyIdAndIssueKey(Long userId, Long policyId, String issueKey);
+
     // 비관적 락 조회
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM IssuedCoupon c WHERE c.id = :id")

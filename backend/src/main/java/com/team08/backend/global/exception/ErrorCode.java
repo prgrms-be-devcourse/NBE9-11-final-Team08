@@ -11,6 +11,7 @@ public enum ErrorCode {
     // ── 공통 ──────────────────────────────────────────────────────────────
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_500", "서버 내부 오류가 발생했습니다."),
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "COMMON_400", "잘못된 파라미터 요청입니다. 입력 값을 확인해주세요."),
+    SYSTEM_BUSY(HttpStatus.SERVICE_UNAVAILABLE, "COMMON_503", "서버 처리 용량이 초과되었습니다. 잠시 후 다시 시도해주세요."),
 
     // ── Admin ────────────────────────────────────────────────────────────
     ADMIN_ACCESS_DENIED(HttpStatus.FORBIDDEN, "ADMIN_001", "관리자만 접근할 수 있습니다."),
@@ -131,6 +132,7 @@ public enum ErrorCode {
     COUPON_ALREADY_USED_OR_EXPIRED(HttpStatus.BAD_REQUEST, "COUPON_009", "사용할 수 없는 쿠폰 상태입니다."),
     COUPON_POLICY_ALREADY_ISSUED(HttpStatus.BAD_REQUEST, "COUPON_010", "이미 발급된 쿠폰이 있는 정책은 수정할 수 없습니다."),
     COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE(HttpStatus.BAD_REQUEST, "COUPON_011", "이미 발급된 쿠폰이 있는 정책은 삭제할 수 없습니다."),
+    COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS(HttpStatus.CONFLICT, "COUPON_012", "이미 해당 자동 발급 용도의 쿠폰 정책이 존재합니다."),
 
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),

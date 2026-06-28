@@ -38,6 +38,12 @@ public class CouponPolicyService {
     // 쿠폰 정책 생성
     @Transactional
     public CouponPolicyResponse createCouponPolicy(CouponPolicyCreateRequest request) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (request.autoIssueType() != null
+                && couponPolicyRepository.existsActiveByAutoIssueType(request.autoIssueType(), now)) {
+            throw new CustomException(ErrorCode.COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS);
+        }
+
         CouponPolicy newPolicy = couponPolicyFactory.create(request);
         CouponPolicy savedPolicy = couponPolicyRepository.save(newPolicy);
 
@@ -72,9 +78,18 @@ public class CouponPolicyService {
         }
 
         couponPolicyValidator.validateForUpdate(request, policy.getCouponType(), policy.getCouponTarget());
+        if (request.autoIssueType() != null
+                && couponPolicyRepository.existsActiveByAutoIssueTypeAndIdNot(
+                request.autoIssueType(),
+                id,
+                LocalDateTime.now(clock)
+        )) {
+            throw new CustomException(ErrorCode.COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS);
+        }
 
         policy.update(
                 request.name(),
+                request.autoIssueType(),
                 request.totalQuantity(),
                 request.usageType(),
                 request.isStackable(),

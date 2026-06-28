@@ -10,6 +10,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      timeout: 1s
+      connect-timeout: 1s
 
   application:
     name: backend
@@ -86,9 +88,17 @@ app:
       retry-base-delay-seconds: ${FEED_OUTBOX_RETRY_BASE_DELAY_SECONDS:10}
       retry-max-delay-seconds: ${FEED_OUTBOX_RETRY_MAX_DELAY_SECONDS:600}
   payment:
+    success-outbox:
+      scheduler-enabled: true
+      fixed-delay: 1000
+      batch-size: 20
+      max-retries: 5
+      retry-base-delay-seconds: 10
+      retry-max-delay-seconds: 600
     toss:
       base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
       secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
+      webhook-secret: ${TOSS_PAYMENTS_WEBHOOK_SECRET:}
       connect-timeout: ${TOSS_PAYMENTS_CONNECT_TIMEOUT:3s}
       read-timeout: ${TOSS_PAYMENTS_READ_TIMEOUT:5s}
 

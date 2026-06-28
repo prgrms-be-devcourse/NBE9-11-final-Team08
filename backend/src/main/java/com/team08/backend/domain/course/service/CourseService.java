@@ -51,6 +51,8 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CourseStatusHistoryRepository courseStatusHistoryRepository;
     private final CourseViewCountManager courseViewCountManager;
+    private final CourseViewCountRedisManager courseViewCountRedisManager;
+    private final CourseDetailCacheManager courseDetailCacheManager;
     private final CourseStudyManager courseStudyManager;
     private final EnrollmentRepository enrollmentRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -73,21 +75,38 @@ public class CourseService {
         return savedCourse.getId();
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CourseDetailResponse getCourseDetail(Long courseId) {
+        // 1. Redis 조회수 증가 처리 (Write-Behind)
+        int delta = 0;
+        try {
+            courseViewCountRedisManager.increaseViewCount(courseId);
+            delta = courseViewCountRedisManager.getViewCountDelta(courseId);
+        } catch (Exception e) {
+            log.error("Failed to process Redis view count caching for courseId: {}", courseId, e);
+        }
+ 
+        // 2. Cache-Aside 패턴으로 DTO 캐시 조회
+        CourseDetailResponse cachedResponse = courseDetailCacheManager.getCache(courseId);
+        if (cachedResponse != null) {
+            // 캐시 히트 시 실시간 조회수만 복제하여 RDB 조회 없이 즉시 반환
+            int totalViewCount = cachedResponse.viewCount() + delta;
+            return cachedResponse.withViewCount(totalViewCount);
+        }
+ 
+        // 3. Cache Miss: RDB 조회 수행
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
         // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
-
-        // TODO: 대규모 트래픽 발생 시 RDB Write 부하가 우려되므로 차후 Redis를 활용한 쓰기 지연(Write-Behind) 방식으로 고도화 필요
-        try {
-            courseViewCountManager.increaseViewCountRequiresNew(courseId);
-        } catch (Exception e) {
-            log.error("Failed to increase course view count for courseId: {}", courseId, e);
-        }
-
-        return CourseDetailResponse.from(course, fileUrlFormatter);
+ 
+        // 4. 원본 DTO 생성 및 Redis 캐시 기록
+        CourseDetailResponse originalResponse = CourseDetailResponse.from(course, fileUrlFormatter);
+        courseDetailCacheManager.setCache(courseId, originalResponse);
+ 
+        // 5. 실시간 조회수 합산 반환
+        int totalViewCount = course.getViewCount() + delta;
+        return CourseDetailResponse.from(course, totalViewCount, fileUrlFormatter);
     }
 
     public Page<CourseCardResponse> getCourses(CourseSortType sortType, Pageable pageable) {
@@ -118,6 +137,9 @@ public class CourseService {
             course.updateThumbnail(newS3Key);
             eventPublisher.publishEvent(new CourseThumbnailEvent(course.getId(), oldThumbnail, newS3Key));
         }
+        
+        // 변경 완료 후 캐시 무효화 처리
+        courseDetailCacheManager.evictCache(courseId);
     }
 
     @Transactional
@@ -132,6 +154,7 @@ public class CourseService {
         CourseStatusHistory history = course.requestReview(instructorId);
 
         courseStatusHistoryRepository.save(history);
+        courseDetailCacheManager.evictCache(courseId);
     }
 
     @Transactional
@@ -144,6 +167,7 @@ public class CourseService {
         CourseStatusHistory history = course.cancelReview(instructorId);
 
         courseStatusHistoryRepository.save(history);
+        courseDetailCacheManager.evictCache(courseId);
     }
 
     @Transactional
@@ -161,6 +185,7 @@ public class CourseService {
                 course.getDescription()
         );
         courseStudyManager.createForCourse(command);
+        courseDetailCacheManager.evictCache(courseId);
     }
 
     @Transactional
@@ -172,6 +197,7 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new AdminCourseRejectedEvent(courseId));
+        courseDetailCacheManager.evictCache(courseId);
     }
 
     @Transactional
@@ -184,6 +210,7 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new CourseClosedEvent(courseId));
+        courseDetailCacheManager.evictCache(courseId);
 
         // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
     }
@@ -197,6 +224,7 @@ public class CourseService {
         courseStatusHistoryRepository.save(history);
 
         eventPublisher.publishEvent(new CourseClosedEvent(courseId));
+        courseDetailCacheManager.evictCache(courseId);
 
         // TODO: 일반 사용자의 신규 장바구니 담기 및 주문서 생성 차단 로직 연계 필요 (차후 장바구니/주문 도메인에서 CourseStatus.SUSPENDED 체크로 방어)
     }

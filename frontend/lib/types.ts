@@ -218,6 +218,7 @@ export interface Coupon {
 }
 
 export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
+export type AutoIssueType = 'SIGNUP' | 'ATTENDANCE_STREAK' | 'MONTHLY_ATTENDANCE'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'
 export type CouponDiscountType = 'AMOUNT' | 'RATE'
@@ -228,6 +229,7 @@ export interface AdminCoupon {
   name: string
   totalQuantity: number | null
   type: CouponPolicyType
+  autoIssueType?: AutoIssueType | null
   target: CouponApplyTarget
   useType: CouponUseType
   stackable: boolean
@@ -249,6 +251,7 @@ export interface AdminCouponPolicyResponse {
   name: string
   couponTarget: CouponApplyTarget
   couponType: CouponPolicyType
+  autoIssueType?: AutoIssueType | null
   totalQuantity: number | null
   usageType: CouponUseType | 'SINGLE_USE' | 'MULTI_USE'
   isStackable: boolean
@@ -267,6 +270,7 @@ export interface AdminCouponPolicyRequest {
   name: string
   couponTarget?: CouponApplyTarget
   couponType?: CouponPolicyType
+  autoIssueType?: AutoIssueType | null
   totalQuantity: number | null
   usageType: CouponUseType
   isStackable: boolean
@@ -481,8 +485,17 @@ export type StudyRole = 'owner' | 'member' | 'viewer' | 'OWNER' | 'MEMBER'
 export interface StudyMember {
   id: string
   name: string
+  avatarUrl?: string | null
   progress: number
   role: StudyRole
+  joinedAt: string
+}
+
+export interface StudyMemberResponse {
+  userId: number
+  nickname: string
+  profileImage: string | null
+  role: 'OWNER' | 'MEMBER'
   joinedAt: string
 }
 
@@ -559,6 +572,7 @@ export interface StudyActivityResponse {
   activityId: number
   studyId: number
   authorId: number
+  authorNickname: string
   content: string
   createdAt: string
 }

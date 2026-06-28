@@ -1,22 +1,35 @@
 package com.team08.backend.domain.payment.controller;
 
+import com.team08.backend.domain.payment.config.TossPaymentProperties;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
 import com.team08.backend.domain.payment.service.PaymentService;
+import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
+import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/payments")
@@ -24,6 +37,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final TossPaymentWebhookService tossPaymentWebhookService;
+    private final TossPaymentProperties tossPaymentProperties;
 
     @PostMapping("/{orderId}/confirm")
     @Operation(summary = "Mock 결제 승인", description = "Mock 결제 승인 요청으로 결제를 성공 처리합니다.")
@@ -47,6 +62,24 @@ public class PaymentController {
         return paymentService.confirmTossPayment(principal.user().id(), orderId, request);
     }
 
+    @PostMapping("/toss/webhook")
+    @Operation(summary = "Toss Payments webhook", description = "Toss Payments webhook 이벤트를 받아 결제 결과를 다시 조회하고 상태를 보정합니다.")
+    public ResponseEntity<Void> handleTossWebhook(
+            @RequestHeader(value = "X-Toss-Webhook-Secret", required = false) String headerSecret,
+            @RequestParam(value = "token", required = false) String token,
+            @RequestBody TossPaymentWebhookRequest request
+    ) {
+        if (!isValidWebhookSecret(headerSecret, token)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        TossPaymentWebhookResult result = tossPaymentWebhookService.handle(request);
+        if (result == TossPaymentWebhookResult.RETRYABLE_FAILURE) {
+            return ResponseEntity.status(503).build();
+        }
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{orderId}/fail")
     @Operation(summary = "Mock 결제 실패 처리", description = "Mock 결제 실패 결과를 기록하고 주문은 결제 대기 상태로 유지합니다.")
     public PaymentResponse failPayment(
@@ -66,5 +99,29 @@ public class PaymentController {
             @PathVariable Long orderId
     ) {
         return paymentService.refundPayment(principal.user().id(), orderId);
+    }
+
+    private boolean isValidWebhookSecret(String headerSecret, String token) {
+        String configuredSecret = tossPaymentProperties.webhookSecret();
+        if (!StringUtils.hasText(configuredSecret)) {
+            log.error("Toss webhook secret is not configured. Webhook request is rejected.");
+            return false;
+        }
+
+        return constantTimeEquals(configuredSecret, headerSecret)
+                || constantTimeEquals(configuredSecret, token);
+    }
+
+    private boolean constantTimeEquals(String expected, String actual) {
+        if (!StringUtils.hasText(actual)) {
+            return false;
+        }
+        if (expected.length() != actual.length()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                actual.getBytes(StandardCharsets.UTF_8)
+        );
     }
 }

@@ -20,6 +20,8 @@ import type {
   QnaPost,
   Study,
   StudyDetailResponse,
+  StudyMember,
+  StudyMemberResponse,
   StudyIdResponse,
   StudyReport,
   MyStudyReport,
@@ -218,6 +220,10 @@ async function request<T>(
   try {
     const fetchRequest = async () => {
       const authHeaders = await getCredentialHeaders(includeAuth)
+      const csrfToken = await ensureCsrfToken(includeAuth)
+      if (csrfToken) {
+        authHeaders[CSRF_HEADER_NAME] = csrfToken
+      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -258,6 +264,10 @@ async function requestText(
   try {
     const fetchRequest = async () => {
       const authHeaders = await getCredentialHeaders(includeAuth)
+      const csrfToken = await ensureCsrfToken(includeAuth)
+      if (csrfToken) {
+        authHeaders[CSRF_HEADER_NAME] = csrfToken
+      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           ...authHeaders,
@@ -416,15 +426,8 @@ const mapStudyDetailToStudy = (
   ownerName: detail.ownerNickname,
   myRole: (detail.myRole?.toLowerCase() ?? 'viewer') as Study['myRole'],
   progress: 0,
-  members: [
-    {
-      id: 'owner',
-      name: detail.ownerNickname,
-      progress: 0,
-      role: 'owner',
-      joinedAt: '',
-    },
-  ],
+  // 멤버 목록은 별도 엔드포인트(/api/studies/{id}/members)에서 조회한다.
+  members: [],
   applicants: [],
   announcements: [],
   posts: posts.map((post) => ({
@@ -435,6 +438,17 @@ const mapStudyDetailToStudy = (
     createdAt: post.createdAt,
     comments: [],
   })),
+})
+
+const mapStudyMemberResponseToMember = (
+  member: StudyMemberResponse,
+): StudyMember => ({
+  id: member.userId.toString(),
+  name: member.nickname,
+  avatarUrl: member.profileImage,
+  progress: 0,
+  role: member.role.toLowerCase() as StudyMember['role'],
+  joinedAt: parseDateToString(member.joinedAt),
 })
 
 const mapUseTypeToBackend = (useType: string): any => {
@@ -600,6 +614,7 @@ const mapAdminCouponPolicyToCoupon = (policy: AdminCouponPolicyResponse): AdminC
     name: policy.name,
     totalQuantity: policy.totalQuantity ?? null,
     type: policy.couponType,
+    autoIssueType: policy.autoIssueType ?? null,
     target: policy.couponTarget,
     useType: mapUseTypeToFrontend(policy.usageType),
     stackable: policy.isStackable,
@@ -621,6 +636,7 @@ const mapAdminCouponToPolicyRequest = (coupon: AdminCoupon): AdminCouponPolicyRe
   name: coupon.name,
   couponTarget: coupon.target,
   couponType: coupon.type,
+  autoIssueType: coupon.type === 'AUTO' ? (coupon.autoIssueType ?? null) : null,
   totalQuantity: coupon.totalQuantity,
   usageType: mapUseTypeToBackend(coupon.useType),
   isStackable: coupon.stackable,
@@ -1206,6 +1222,15 @@ export const api = {
     return mapStudyDetailToStudy(detail)
   },
 
+  getStudyMembers: async (studyId: string | number): Promise<StudyMember[]> => {
+    const members = await request<StudyMemberResponse[]>(
+      `/api/studies/${studyId}/members`,
+      [],
+    )
+    if (!Array.isArray(members)) return []
+    return members.map(mapStudyMemberResponseToMember)
+  },
+
   getStudyForEntry: async (studyId: string | number): Promise<Study | undefined> => {
     const study = await api.getStudy(studyId)
     if (!study) return undefined
@@ -1288,13 +1313,15 @@ export const api = {
   // Coupons & Admin
   getCoupons: async () => {
     const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
-      '/api/admin/coupons',
+      '/api/coupons',
       null,
-      true,
+      false,
       false,
     )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
-    return content.map(mapAdminCouponPolicyToUserCoupon)
+    return content
+      .filter((policy) => policy.couponType !== 'AUTO')
+      .map(mapAdminCouponPolicyToUserCoupon)
   },
   getMyCoupons: async () => {
     const coupons = await request<CouponListResponse[]>('/api/coupons/me', [])
