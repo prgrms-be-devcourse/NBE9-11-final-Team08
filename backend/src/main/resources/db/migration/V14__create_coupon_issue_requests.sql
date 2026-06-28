@@ -47,6 +47,7 @@ CREATE TABLE coupon_issue_requests (
     success_count BIGINT NOT NULL DEFAULT 0,
     failed_count BIGINT NOT NULL DEFAULT 0,
     skipped_count BIGINT NOT NULL DEFAULT 0,
+    target_user_max_id BIGINT,
     requested_by BIGINT,
     requested_at DATETIME(6) NOT NULL,
     started_at DATETIME(6),
@@ -58,5 +59,6 @@ CREATE TABLE coupon_issue_requests (
     UNIQUE KEY uk_coupon_issue_request_key (issue_type, request_key),
     INDEX idx_coupon_issue_requests_status_id (status, id),
     INDEX idx_coupon_issue_requests_policy_id (policy_id, id),
-    INDEX idx_coupon_issue_requests_requested_by (requested_by, id)
+    INDEX idx_coupon_issue_requests_requested_by (requested_by, id),
+    INDEX idx_coupon_issue_requests_all_grants (issue_type, status, target_user_max_id, policy_id, id)
 ) ENGINE=InnoDB;
