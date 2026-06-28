@@ -220,6 +220,10 @@ async function request<T>(
   try {
     const fetchRequest = async () => {
       const authHeaders = await getCredentialHeaders(includeAuth)
+      const csrfToken = await ensureCsrfToken(includeAuth)
+      if (csrfToken) {
+        authHeaders[CSRF_HEADER_NAME] = csrfToken
+      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -260,6 +264,10 @@ async function requestText(
   try {
     const fetchRequest = async () => {
       const authHeaders = await getCredentialHeaders(includeAuth)
+      const csrfToken = await ensureCsrfToken(includeAuth)
+      if (csrfToken) {
+        authHeaders[CSRF_HEADER_NAME] = csrfToken
+      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           ...authHeaders,
@@ -1305,13 +1313,15 @@ export const api = {
   // Coupons & Admin
   getCoupons: async () => {
     const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
-      '/api/admin/coupons',
+      '/api/coupons',
       null,
-      true,
+      false,
       false,
     )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
-    return content.map(mapAdminCouponPolicyToUserCoupon)
+    return content
+      .filter((policy) => policy.couponType !== 'AUTO')
+      .map(mapAdminCouponPolicyToUserCoupon)
   },
   getMyCoupons: async () => {
     const coupons = await request<CouponListResponse[]>('/api/coupons/me', [])

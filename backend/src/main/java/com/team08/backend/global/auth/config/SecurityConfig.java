@@ -80,6 +80,7 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/coupons").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/me").authenticated()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/studies/{studyId}/members").permitAll()
