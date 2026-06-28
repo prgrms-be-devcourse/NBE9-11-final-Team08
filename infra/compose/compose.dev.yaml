@@ -76,53 +76,8 @@ services:
     networks:
       - dev
 
-  # 평소엔 뜨지 않음. --profile monitor 로만 기동.
-  prometheus:
-    image: prom/prometheus:latest
-    profiles: [ "monitor" ]
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    networks:
-      - dev
-
-  grafana:
-    image: grafana/grafana:latest
-    profiles: [ "monitor" ]
-    ports:
-      - "3001:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - grafana_data:/var/lib/grafana   # named 볼륨 — 컨테이너 재생성에도 상태 보존
-    networks:
-      - dev
-
-  # 호스트 시스템 메모리/CPU 메트릭(node_memory_*, node_cpu_*) 노출.
-  # 주의(macOS): Docker Desktop의 리눅스 VM 기준 값이라 Mac 실호스트와 다를 수 있다.
-  #   Mac 실측이 필요하면 `brew install node_exporter`로 네이티브 기동 후
-  #   prometheus.yml의 node job 타깃을 host.docker.internal:9100 으로 바꿔 스크랩한다.
-  node-exporter:
-    image: prom/node-exporter:latest
-    profiles: [ "monitor" ]
-    pid: host
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--path.rootfs=/rootfs'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    networks:
-      - dev
-
 volumes:
   mysql_data:
-  grafana_data:
 
 networks:
   dev:
