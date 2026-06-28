@@ -119,10 +119,13 @@ public class LocalVideoEncodingService extends VideoEncodingTemplate implements 
                         .forEach(path -> {
                             try {
                                 Files.delete(path);
-                            } catch (IOException ignored) {}
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to delete path: " + path, e);
+                            }
                         });
             } catch (Exception e) {
                 log.error("Failed to rollback delete encoded HLS directory. folder: {}", targetPath, e);
+                throw new RuntimeException("Failed to delete directory: " + targetPath, e);
             }
         }
     }

@@ -36,4 +36,8 @@ public interface LectureRepository extends JpaRepository<Lecture, Long> {
     void updateOrderNo(@Param("id") Long id, @Param("orderNo") Integer orderNo, @Param("chapterId") Long chapterId);
 
     boolean existsByChapterCourseIdAndIsFreePreviewTrue(Long courseId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Lecture l WHERE l.id = :lectureId")
+    Optional<Lecture> findByIdWithPessimisticLock(@Param("lectureId") Long lectureId);
 }

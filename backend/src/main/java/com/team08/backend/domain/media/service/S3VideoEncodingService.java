@@ -93,6 +93,7 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
             s3FileStorageService.deleteDirectory(s3FolderPath);
         } catch (Exception e) {
             log.error("Failed to rollback delete encoded HLS folder in S3. lectureId: {}, folder: {}", lectureId, s3FolderPath, e);
+            throw new RuntimeException("Failed to delete S3 folder: " + s3FolderPath, e);
         }
     }
 }
