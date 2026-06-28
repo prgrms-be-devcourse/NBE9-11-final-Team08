@@ -52,7 +52,7 @@ class LectureDbServiceTest {
                 mockChapter
         );
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findByIdWithPessimisticLock(lectureId)).willReturn(Optional.of(lecture));
 
         lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
 
@@ -79,7 +79,7 @@ class LectureDbServiceTest {
                 mockChapter
         );
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.of(lecture));
+        given(lectureRepository.findByIdWithPessimisticLock(lectureId)).willReturn(Optional.of(lecture));
 
         lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName);
 
@@ -94,7 +94,7 @@ class LectureDbServiceTest {
         String targetDirName = UUID.randomUUID().toString();
         String dbSavePath = "lectures/1/" + targetDirName + "/output.m3u8";
 
-        given(lectureRepository.findById(lectureId)).willReturn(Optional.empty());
+        given(lectureRepository.findByIdWithPessimisticLock(lectureId)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> lectureDbService.updateLectureM3u8(lectureId, dbSavePath, targetDirName))
                 .isInstanceOf(CustomException.class);

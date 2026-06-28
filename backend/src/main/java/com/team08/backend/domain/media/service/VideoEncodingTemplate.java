@@ -50,6 +50,11 @@ public abstract class VideoEncodingTemplate {
 
         } catch (Exception e) {
             log.error("HLS Processing Pipeline Exception for lectureId: {}", lectureId, e);
+            try {
+                deleteEncodedFolder(targetDirName, lectureId);
+            } catch (Exception ex) {
+                log.error("Failed to cleanup generated folder on pipeline exception. dir={}", targetDirName, ex);
+            }
             throw new CustomException(ErrorCode.VIDEO_ENCODING_FAILED);
         } finally {
             cleanupTemporaryResources(process, file, sourceFile, localWorkspacePath);
@@ -114,4 +119,6 @@ public abstract class VideoEncodingTemplate {
     protected abstract void handleGeneratedFiles(Path workspacePath, String targetDirName, Long lectureId);
 
     protected abstract String getDbSavePath(String targetDirName, Long lectureId);
+
+    protected abstract void deleteEncodedFolder(String targetDirName, Long lectureId);
 }
