@@ -318,6 +318,25 @@ class PaymentServiceTest {
     }
 
     @Test
+    void amountMismatchStillRecordsDeclinedPayment() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        stubPaymentSave();
+
+        PaymentResponse response = paymentService.failPayment(USER_ID, ORDER_ID, failRequest(29_000));
+
+        ArgumentCaptor<Payment> paymentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(paymentCaptor.capture());
+        assertThat(paymentCaptor.getValue().getStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(paymentCaptor.getValue().getAmount()).isEqualTo(30_000);
+        assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.DECLINED);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        verifyNoInteractions(issuedCouponService);
+    }
+
+    @Test
     void declinedPaymentCanBeConfirmedAgain() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment declinedPayment = payment(order, PaymentStatus.DECLINED);
