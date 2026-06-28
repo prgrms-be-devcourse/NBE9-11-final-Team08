@@ -861,6 +861,7 @@ export interface CouponIssueRequestResponse {
   successCount: number
   failedCount: number
   skippedCount: number
+  targetUserMaxId: number | null
   requestedBy: number
   requestedAt: string | number[]
   startedAt: string | number[] | null

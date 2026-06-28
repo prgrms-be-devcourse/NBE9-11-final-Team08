@@ -53,9 +53,6 @@ class CouponIssueRequestServiceTest {
     @Mock
     private CouponIssueRequestStreamPublisher streamPublisher;
 
-    @Mock
-    private CouponIssueRequestBatchLauncher batchLauncher;
-
     private CouponIssueRequestService couponIssueRequestService;
 
     private final Clock clock = Clock.fixed(
@@ -71,7 +68,6 @@ class CouponIssueRequestServiceTest {
                 userRepository,
                 issuedCouponRepository,
                 streamPublisher,
-                batchLauncher,
                 clock
         );
     }
@@ -217,6 +213,37 @@ class CouponIssueRequestServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
 
         then(couponIssueRequestRepository).should(never()).saveAndFlush(any(CouponIssueRequest.class));
+        then(streamPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("전체 회원 발급 요청은 배치 없이 즉시 grant 완료로 저장한다")
+    void requestAllUsersIssue_opensGrantWithoutLaunchingBatch() {
+        // given
+        Long policyId = 10L;
+        Long adminId = 99L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+        given(userRepository.count()).willReturn(100_000L);
+        given(userRepository.findMaxId()).willReturn(Optional.of(123_456L));
+        given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        couponIssueRequestService.requestAllUsersIssue(policyId, "ALL_EVENT_2026", adminId);
+
+        // then
+        ArgumentCaptor<CouponIssueRequest> requestCaptor = ArgumentCaptor.forClass(CouponIssueRequest.class);
+        then(couponIssueRequestRepository).should().saveAndFlush(requestCaptor.capture());
+        CouponIssueRequest request = requestCaptor.getValue();
+        assertThat(request.getPolicyId()).isEqualTo(policyId);
+        assertThat(request.getRequestKey()).isEqualTo("ALL_EVENT_2026");
+        assertThat(request.getRequestedCount()).isEqualTo(100_000L);
+        assertThat(request.getSuccessCount()).isZero();
+        assertThat(request.getFailedCount()).isZero();
+        assertThat(request.getSkippedCount()).isZero();
+        assertThat(request.getTargetUserMaxId()).isEqualTo(123_456L);
+        assertThat(request.getCompletedAt()).isEqualTo(java.time.LocalDateTime.now(clock));
         then(streamPublisher).shouldHaveNoInteractions();
     }
 

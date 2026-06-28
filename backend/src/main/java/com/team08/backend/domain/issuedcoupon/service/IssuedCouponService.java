@@ -42,6 +42,7 @@ public class IssuedCouponService {
     private final IssuedCouponWriter issuedCouponWriter;
     private final IssuedCouponJobWriter issuedCouponJobWriter;
     private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
+    private final AllUsersCouponMaterializer allUsersCouponMaterializer;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
@@ -118,6 +119,7 @@ public class IssuedCouponService {
     // [사용자] 내 쿠폰 목록 조회
     @Transactional(readOnly = true)
     public List<CouponListResponse> getMyCoupons(Long userId) {
+        allUsersCouponMaterializer.materializeForUser(userId);
         List<IssuedCoupon> issuedCoupons = issuedCouponRepository.findByUserIdOrderByExpiredAtAsc(userId);
 
         // 쿠폰 정책 ID 목록 추출
@@ -145,6 +147,7 @@ public class IssuedCouponService {
     // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 (결제 전 화면 용 API)
     @Transactional(readOnly = true)
     public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
+        allUsersCouponMaterializer.materializeForUser(userId);
         CouponUsageContext context = getUsableCouponContext(userId, issuedCouponId, LocalDateTime.now(clock));
         CouponPolicy policy = context.couponPolicy();
 
@@ -167,6 +170,7 @@ public class IssuedCouponService {
     @Transactional
     public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
         LocalDateTime now = LocalDateTime.now(clock);
+        allUsersCouponMaterializer.materializeForUser(userId);
 
         // 비관적 락 조회
         IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(issuedCouponId)

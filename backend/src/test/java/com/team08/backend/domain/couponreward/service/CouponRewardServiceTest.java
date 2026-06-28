@@ -102,6 +102,38 @@ class CouponRewardServiceTest {
     }
 
     @Test
+    @DisplayName("회원가입 후 보상 처리 시 회원가입 쿠폰이 발급됐는지 확인한다")
+    void issueSignupReward_afterSignupCouponRewardIssuesCoupon() {
+        // given
+        Long signedUpUserId = 1L;
+        CouponPolicy signupPolicy = policy(10L);
+        given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
+                .willReturn(Optional.of(signupPolicy));
+        given(issuedCouponRepository.findByUserIdAndPolicyId(signedUpUserId, 10L))
+                .willReturn(Optional.empty());
+        given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(issuedCouponRepository.save(any(IssuedCoupon.class)))
+                .willAnswer(invocation -> {
+                    IssuedCoupon coupon = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(coupon, "id", 100L);
+                    return coupon;
+                });
+
+        // when
+        couponRewardService.issueSignupReward(signedUpUserId);
+
+        // then
+        ArgumentCaptor<IssuedCoupon> couponCaptor = ArgumentCaptor.forClass(IssuedCoupon.class);
+        then(issuedCouponRepository).should().save(couponCaptor.capture());
+        IssuedCoupon issuedCoupon = couponCaptor.getValue();
+        assertThat(issuedCoupon.getUserId()).isEqualTo(signedUpUserId);
+        assertThat(issuedCoupon.getPolicyId()).isEqualTo(10L);
+        assertThat(issuedCoupon.getIssueKey()).isEqualTo("SIGNUP");
+        assertThat(issuedCoupon.getIssuedAt()).isEqualTo(LocalDateTime.now(clock));
+    }
+
+    @Test
     @DisplayName("연속 출석일이 7의 배수이면 회차별 보상키로 쿠폰을 발급한다")
     void issueAttendanceStreakReward_issuesCouponWhenConsecutiveDaysIsMultipleOfSeven() {
         // given

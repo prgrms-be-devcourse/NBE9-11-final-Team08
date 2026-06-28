@@ -30,14 +30,12 @@ import java.util.Set;
 public class CouponIssueRequestService {
 
     private static final String SELECTED_USERS_ISSUE_KEY_PREFIX = "SELECTED_USERS_";
-    private static final String ALL_USERS_ISSUE_KEY_PREFIX = "ALL_USERS_";
 
     private final CouponPolicyRepository couponPolicyRepository;
     private final CouponIssueRequestRepository couponIssueRequestRepository;
     private final UserRepository userRepository;
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponIssueRequestStreamPublisher streamPublisher;
-    private final CouponIssueRequestBatchLauncher batchLauncher;
     private final Clock clock;
 
     public Page<CouponIssueRequestResponse> getIssueRequests(Pageable pageable) {
@@ -110,7 +108,8 @@ public class CouponIssueRequestService {
         policy.validateIssuePeriod(now);
 
         long userCount = userRepository.count();
-        if (userCount <= 0) {
+        Long targetUserMaxId = userRepository.findMaxId().orElse(null);
+        if (userCount <= 0 || targetUserMaxId == null) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
 
@@ -122,17 +121,9 @@ public class CouponIssueRequestService {
                 requestedBy,
                 now
         );
-        request.addRequestedCount(userCount);
-        request.markProcessing(now);
+        request.markAllUsersGrantOpened(userCount, targetUserMaxId, now);
 
         CouponIssueRequest savedRequest = saveRequest(request);
-        batchLauncher.launchAllUsersIssueJob(
-                savedRequest.getId(),
-                policyId,
-                ALL_USERS_ISSUE_KEY_PREFIX + normalizedRequestKey,
-                now
-        );
-
         return CouponIssueRequestResponse.from(savedRequest);
     }
 

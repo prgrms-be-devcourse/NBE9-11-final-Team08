@@ -52,6 +52,8 @@ public class CouponIssueRequest extends BaseTimeEntity {
     @Column(nullable = false)
     private long skippedCount;
 
+    private Long targetUserMaxId;
+
     private Long requestedBy;
 
     @Column(nullable = false)
@@ -119,6 +121,16 @@ public class CouponIssueRequest extends BaseTimeEntity {
 
     public void addSkippedCount(long count) {
         this.skippedCount += count;
+    }
+
+    public void markAllUsersGrantOpened(long targetCount, Long targetUserMaxId, LocalDateTime completedAt) {
+        this.requestedCount = targetCount;
+        this.successCount = 0;
+        this.failedCount = 0;
+        this.skippedCount = 0;
+        this.targetUserMaxId = targetUserMaxId;
+        this.startedAt = completedAt;
+        markCompleted(completedAt);
     }
 
     public void markCompleted(LocalDateTime completedAt) {

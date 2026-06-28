@@ -193,6 +193,50 @@ class PaymentServiceTest {
     }
 
     @Test
+    @DisplayName("전체 회원 쿠폰이 materialize된 직후 해당 쿠폰으로 결제할 수 있다")
+    void confirmPayment_afterAllUsersCouponMaterialized_usesCouponAndCompletesPayment() {
+        // given
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        Long materializedAllUsersCouponId = 55L;
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(enrollmentRepository.findCourseIdsByUserIdAndCourseIdIn(
+                USER_ID,
+                List.of(COURSE_ID)
+        )).willReturn(List.of());
+        given(issuedCouponService.calculateExpectedDiscount(USER_ID, materializedAllUsersCouponId, 30_000))
+                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse(
+                        "전체 회원 쿠폰",
+                        30_000,
+                        5_000,
+                        25_000
+                ));
+        given(issuedCouponService.useCouponForOrder(USER_ID, materializedAllUsersCouponId, 30_000))
+                .willReturn(5_000);
+        stubPaymentSave();
+
+        // when
+        ConfirmPaymentResponse response = paymentService.confirmPayment(
+                USER_ID,
+                ORDER_ID,
+                new ConfirmPaymentRequest("payment-key", "CARD", 25_000, materializedAllUsersCouponId)
+        );
+
+        // then
+        verify(issuedCouponService).calculateExpectedDiscount(USER_ID, materializedAllUsersCouponId, 30_000);
+        verify(issuedCouponService).useCouponForOrder(USER_ID, materializedAllUsersCouponId, 30_000);
+        verify(orderCouponUsageRepository).save(any());
+        assertThat(order.getDiscountPrice()).isEqualTo(5_000);
+        assertThat(order.getFinalPrice()).isEqualTo(25_000);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(response.amount()).isEqualTo(25_000);
+        assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
     void orderNotFoundCannotBeConfirmed() {
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, OTHER_USER_ID)).willReturn(Optional.empty());
 
