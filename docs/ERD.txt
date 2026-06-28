@@ -77,9 +77,7 @@ Enum ai_feedback_status {
 }
 Enum learning_event_type {
   LECTURE_ENTER
-  VIDEO_START
-  VIDEO_END
-  POSITION_SAVE
+  VIDEO_PAUSE
   LECTURE_EXIT
   LECTURE_COMPLETE
 }

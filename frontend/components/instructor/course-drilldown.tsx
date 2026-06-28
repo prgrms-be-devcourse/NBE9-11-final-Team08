@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/table'
 import { formatKRW } from '@/lib/utils'
 import { api } from '@/lib/api'
-import type { LectureReplay, SellerCourseDetail } from '@/lib/types'
+import type { LecturePauses, SellerCourseDetail } from '@/lib/types'
 
 type Range = '3m' | '6m' | '1y'
 
@@ -45,8 +45,8 @@ const revenueConfig = {
   revenue: { label: '매출', color: 'var(--chart-1)' },
 } satisfies ChartConfig
 
-const replayConfig = {
-  count: { label: '시청 횟수', color: 'var(--chart-1)' },
+const pauseConfig = {
+  count: { label: '멈춤 횟수', color: 'var(--chart-1)' },
 } satisfies ChartConfig
 
 function mmss(totalSeconds: number) {
@@ -140,7 +140,7 @@ export function CourseDrilldown({
       {/* Lecture engagement */}
       <section className="rounded-xl border bg-card p-5">
         <h3 className="font-semibold">강의별 참여도</h3>
-        <p className="text-xs text-muted-foreground">강의를 클릭하면 자주 본 구간을 볼 수 있어요</p>
+        <p className="text-xs text-muted-foreground">강의를 클릭하면 어려워서 멈춘 구간을 볼 수 있어요</p>
         {lectures.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
             <Table>
@@ -151,7 +151,7 @@ export function CourseDrilldown({
                   <TableHead className="text-right">입장</TableHead>
                   <TableHead className="text-right">완료</TableHead>
                   <TableHead className="text-right">시청자</TableHead>
-                  <TableHead className="text-right">평균 시청</TableHead>
+                  <TableHead className="text-right">평균 멈춤</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -181,22 +181,22 @@ export function CourseDrilldown({
         )}
       </section>
 
-      {selectedLecture !== null && <ReplayHeatmap lectureId={selectedLecture} />}
+      {selectedLecture !== null && <PauseHotspots lectureId={selectedLecture} />}
     </div>
   )
 }
 
-function ReplayHeatmap({ lectureId }: { lectureId: number }) {
-  const [replay, setReplay] = useState<LectureReplay | null>(null)
+function PauseHotspots({ lectureId }: { lectureId: number }) {
+  const [pauses, setPauses] = useState<LecturePauses | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     api
-      .getSellerLectureReplay(lectureId, 40)
+      .getSellerLecturePauses(lectureId, 40)
       .then((res) => {
-        if (active) setReplay(res)
+        if (active) setPauses(res)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -206,25 +206,25 @@ function ReplayHeatmap({ lectureId }: { lectureId: number }) {
     }
   }, [lectureId])
 
-  const bins = replay?.bins ?? []
+  const bins = pauses?.bins ?? []
   const hasData = bins.some((b) => b.count > 0)
 
   return (
     <section className="rounded-xl border bg-card p-5">
       <div className="flex items-center gap-2">
         <Flame className="size-4 text-primary" />
-        <h3 className="font-semibold">자주 본 구간</h3>
+        <h3 className="font-semibold">어려워서 멈춘 구간</h3>
         {loading && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
       </div>
       <p className="text-xs text-muted-foreground">
-        {replay
-          ? `${replay.title} · 시청자 ${replay.viewerCount.toLocaleString()}명 · 시청 구간 ${replay.totalIntervals.toLocaleString()}개`
-          : '재생 데이터를 불러오는 중'}
+        {pauses
+          ? `${pauses.title} · 학습자 ${pauses.viewerCount.toLocaleString()}명 · 멈춤 ${pauses.totalPauses.toLocaleString()}회`
+          : '멈춤 데이터를 불러오는 중'}
       </p>
 
       {hasData ? (
         <>
-          <ChartContainer config={replayConfig} className="mt-4 h-48 w-full">
+          <ChartContainer config={pauseConfig} className="mt-4 h-48 w-full">
             <BarChart data={bins} margin={{ left: 12, right: 12 }}>
               <CartesianGrid vertical={false} />
               <XAxis
@@ -241,10 +241,10 @@ function ReplayHeatmap({ lectureId }: { lectureId: number }) {
                 content={
                   <ChartTooltipContent
                     labelFormatter={(_, payload) => {
-                      const p = payload?.[0]?.payload as LectureReplay['bins'][number] | undefined
+                      const p = payload?.[0]?.payload as LecturePauses['bins'][number] | undefined
                       return p ? `${mmss(p.startSeconds)} – ${mmss(p.endSeconds)}` : ''
                     }}
-                    formatter={(v) => `${Number(v).toLocaleString()}회 시청`}
+                    formatter={(v) => `${Number(v).toLocaleString()}회 멈춤`}
                   />
                 }
               />
@@ -260,10 +260,10 @@ function ReplayHeatmap({ lectureId }: { lectureId: number }) {
             </BarChart>
           </ChartContainer>
 
-          {replay && replay.hotspots.length > 0 && (
+          {pauses && pauses.hotspots.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground">인기 구간:</span>
-              {replay.hotspots.map((h, i) => (
+              <span className="text-xs text-muted-foreground">어려운 구간:</span>
+              {pauses.hotspots.map((h, i) => (
                 <span
                   key={i}
                   className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
@@ -277,7 +277,7 @@ function ReplayHeatmap({ lectureId }: { lectureId: number }) {
       ) : (
         !loading && (
           <p className="mt-10 text-center text-sm text-muted-foreground">
-            아직 재생 구간 데이터가 없습니다.
+            아직 멈춤 데이터가 없습니다.
           </p>
         )
       )}

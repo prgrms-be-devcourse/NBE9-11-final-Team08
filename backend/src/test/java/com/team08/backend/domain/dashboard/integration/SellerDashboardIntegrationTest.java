@@ -108,24 +108,21 @@ class SellerDashboardIntegrationTest {
         paidEnroll(learner1.getId(), courseBId, "코스B", 20000);
         paidEnroll(learner2.getId(), courseCId, "코스C", 30000); // 타 판매자 → 제외
 
-        // 강의 A 재생 이벤트: VIDEO_START→VIDEO_END 페어링용 (길이 600초)
-        // l1: [0,300],[300,600] 전구간 / l2: [0,150],[100,300] 앞부분 반복
+        // 강의 A 멈춤(VIDEO_PAUSE) 이벤트 (길이 600초) — 멈춘 위치만 직접 집계
+        // 90초 부근(어려운 구간)에 멈춤 집중: l1 두 번(90,100) + l2 한 번(90) = 3
         int t = 0;
-        replay(learner1.getId(), LearningEventType.VIDEO_START, 0, t++);
-        replay(learner1.getId(), LearningEventType.VIDEO_END, 300, t++);
-        replay(learner1.getId(), LearningEventType.VIDEO_START, 300, t++);
-        replay(learner1.getId(), LearningEventType.VIDEO_END, 600, t++);
-        replay(learner2.getId(), LearningEventType.VIDEO_START, 0, t++);
-        replay(learner2.getId(), LearningEventType.VIDEO_END, 150, t++);
-        replay(learner2.getId(), LearningEventType.VIDEO_START, 100, t++);
-        replay(learner2.getId(), LearningEventType.VIDEO_END, 300, t++);
+        event(learner1.getId(), LearningEventType.VIDEO_PAUSE, 90, t++);
+        event(learner1.getId(), LearningEventType.VIDEO_PAUSE, 100, t++);
+        event(learner1.getId(), LearningEventType.VIDEO_PAUSE, 540, t++);
+        event(learner2.getId(), LearningEventType.VIDEO_PAUSE, 90, t++);
+        event(learner2.getId(), LearningEventType.VIDEO_PAUSE, 330, t++);
 
         // 완강 이벤트 2건 (completions=2)
-        replay(learner1.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
-        replay(learner2.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
+        event(learner1.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
+        event(learner2.getId(), LearningEventType.LECTURE_COMPLETE, null, t++);
     }
 
-    private void replay(Long userId, LearningEventType type, Integer pos, int secondOffset) {
+    private void event(Long userId, LearningEventType type, Integer pos, int secondOffset) {
         learningEventRepository.save(LearningEvent.create(
                 userId, courseAId, null, lectureAId, type, pos, NOW.plusSeconds(secondOffset), null));
     }
@@ -233,8 +230,8 @@ class SellerDashboardIntegrationTest {
                 .andExpect(jsonPath("$.lectures[0].durationSeconds").value(600))
                 .andExpect(jsonPath("$.lectures[0].completeCount").value(2))
                 .andExpect(jsonPath("$.lectures[0].viewerCount").value(2))
-                // VIDEO_END 위치 평균 (300,600,150,300) = 337.5 → 337
-                .andExpect(jsonPath("$.lectures[0].avgWatchSeconds").value(337));
+                // VIDEO_PAUSE 위치 평균 (90,100,540,90,330) = 1150/5 = 230
+                .andExpect(jsonPath("$.lectures[0].avgWatchSeconds").value(230));
     }
 
     @Test
@@ -255,22 +252,23 @@ class SellerDashboardIntegrationTest {
 
     @Test
     @WithMockLoginUser(id = SELLER_ID, role = "ROLE_SELLER")
-    @DisplayName("lectureReplay: VIDEO_START/END를 페어링해 자주 본 구간 히트맵을 만든다")
-    void lectureReplay() throws Exception {
-        // bins=10 → 60초 단위. 구간 [0,300]·[300,600]·[0,150]·[100,300] 누적
-        // bin1(60~120)=3(최대), bin5(300~360)=1
-        mockMvc.perform(get("/api/seller/dashboard/lectures/{lectureId}/replay", lectureAId)
+    @DisplayName("lecturePauses: VIDEO_PAUSE 위치로 어려워서 멈춘 구간 히트맵을 만든다")
+    void lecturePauses() throws Exception {
+        // bins=10 → 60초 단위. 멈춤 위치 90,100,540,90,330 누적
+        // bin1(60~120)=3(최대), bin5(300~360)=1, bin9(540~600)=1
+        mockMvc.perform(get("/api/seller/dashboard/lectures/{lectureId}/pauses", lectureAId)
                         .param("bins", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lectureId").value(lectureAId))
                 .andExpect(jsonPath("$.durationSeconds").value(600))
                 .andExpect(jsonPath("$.binSeconds").value(60))
-                .andExpect(jsonPath("$.totalIntervals").value(4))
+                .andExpect(jsonPath("$.totalPauses").value(5))
                 .andExpect(jsonPath("$.viewerCount").value(2))
                 .andExpect(jsonPath("$.bins.length()").value(10))
                 .andExpect(jsonPath("$.bins[1].count").value(3))
                 .andExpect(jsonPath("$.bins[1].heat").value(1.0))
                 .andExpect(jsonPath("$.bins[5].count").value(1))
+                .andExpect(jsonPath("$.bins[9].count").value(1))
                 .andExpect(jsonPath("$.hotspots[0].startSeconds").value(60))
                 .andExpect(jsonPath("$.hotspots[0].count").value(3));
     }

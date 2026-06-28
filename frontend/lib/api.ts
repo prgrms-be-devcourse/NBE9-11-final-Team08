@@ -52,7 +52,7 @@ import type {
   AuditResponse,
   SellerAnalytics,
   SellerCourseDetail,
-  LectureReplay,
+  LecturePauses,
   FeedCursor,
   FeedCursorResponse,
 } from './types'
@@ -1612,9 +1612,9 @@ export const api = {
       `/api/seller/dashboard/courses/${courseId}?range=${range}`,
       null,
     ),
-  getSellerLectureReplay: (lectureId: number, bins = 40) =>
-    request<LectureReplay | null>(
-      `/api/seller/dashboard/lectures/${lectureId}/replay?bins=${bins}`,
+  getSellerLecturePauses: (lectureId: number, bins = 40) =>
+    request<LecturePauses | null>(
+      `/api/seller/dashboard/lectures/${lectureId}/pauses?bins=${bins}`,
       null,
     ),
 }

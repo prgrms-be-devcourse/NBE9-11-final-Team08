@@ -435,7 +435,7 @@ public class DataSeeder {
                 events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
                         LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
                 events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
-                        LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
+                        LearningEventType.VIDEO_PAUSE, watched, base.plusSeconds(2), k + "pause"));
                 evCount++;
                 if (completed) {
                     events.add(LearningEvent.create(userId, courseId, chapterId, lecture.getId(),
@@ -775,10 +775,7 @@ public class DataSeeder {
         User learnerPreview = saveLearner("learner-preview@test.com", "맛보기시청자", pw);
         events.add(LearningEvent.create(learnerPreview.getId(), coursePopular.getId(),
                 freeLecture.getChapter().getId(), freeLecture.getId(),
-                LearningEventType.VIDEO_START, 0, now, "evt-preview-start"));
-        events.add(LearningEvent.create(learnerPreview.getId(), coursePopular.getId(),
-                freeLecture.getChapter().getId(), freeLecture.getId(),
-                LearningEventType.VIDEO_END, freeLecture.getDurationSeconds(), now, "evt-preview-end"));
+                LearningEventType.VIDEO_PAUSE, freeLecture.getDurationSeconds(), now, "evt-preview-pause"));
 
         // 회고작성자: 수강 + 회고
         User learnerReflection = saveLearner("learner-reflection@test.com", "회고작성자", pw);
@@ -1056,8 +1053,7 @@ public class DataSeeder {
         String key = "sixm-" + userId + "-" + lecId + "-" + base.toLocalDate() + "-";
 
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, key + "enter"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), key + "start"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, watchedSeconds, base.plusMinutes(8), key + "end"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_PAUSE, watchedSeconds, base.plusMinutes(8), key + "pause"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, watchedSeconds, base.plusMinutes(9), key + "exit"));
         if (complete) {
             out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_COMPLETE, duration, base.plusMinutes(9).plusSeconds(1), key + "complete"));
@@ -1450,8 +1446,7 @@ public class DataSeeder {
         String k = userId + "-" + lecId + "-";
 
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_ENTER, 0, base, k + "enter"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_START, 0, base.plusSeconds(2), k + "start"));
-        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_END, endPos, base.plusMinutes(8), k + "end"));
+        out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.VIDEO_PAUSE, endPos, base.plusMinutes(8), k + "pause"));
         out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_EXIT, endPos, base.plusMinutes(9), k + "exit"));
         if (complete) {
             out.add(LearningEvent.create(userId, courseId, chapterId, lecId, LearningEventType.LECTURE_COMPLETE, dur, base.plusMinutes(9).plusSeconds(1), k + "complete"));

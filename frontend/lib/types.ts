@@ -361,8 +361,7 @@ export interface LectureProgressResponse {
 
 export type LearningEventType =
   | 'LECTURE_ENTER'
-  | 'VIDEO_START'
-  | 'VIDEO_END'
+  | 'VIDEO_PAUSE'
   | 'LECTURE_EXIT'
   | 'LECTURE_COMPLETE'
 
@@ -737,12 +736,12 @@ export interface SellerCourseDetail {
   lectures: LectureEngagement[]
 }
 
-export interface LectureReplay {
+export interface LecturePauses {
   lectureId: number
   title: string
   durationSeconds: number
   binSeconds: number
-  totalIntervals: number
+  totalPauses: number
   viewerCount: number
   bins: { index: number; startSeconds: number; endSeconds: number; count: number; heat: number }[]
   hotspots: { startSeconds: number; endSeconds: number; count: number; heat: number }[]

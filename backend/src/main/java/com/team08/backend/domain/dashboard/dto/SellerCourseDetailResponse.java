@@ -29,7 +29,7 @@ public record SellerCourseDetailResponse(
         List<LectureEngagement> lectures
 ) {
 
-    /** 강의별 참여도 한 행. avgWatchSeconds 는 VIDEO_END 의 평균 멈춤 위치(초). */
+    /** 강의별 참여도 한 행. avgWatchSeconds 는 VIDEO_PAUSE 의 평균 멈춤 위치(초). */
     public record LectureEngagement(
             Long lectureId,
             String chapterTitle,

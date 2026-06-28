@@ -50,7 +50,7 @@ class LearningEventRepositoryTest {
     @DisplayName("사용자별 이벤트만 페이지로 반환한다")
     void findByUserId_returnsOnlyTargetUserEvents() {
         save(1L, 10L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "k1");
-        save(1L, 10L, 2L, 3L, LearningEventType.VIDEO_START, null, "k2");
+        save(1L, 10L, 2L, 3L, LearningEventType.VIDEO_PAUSE, 100, "k2");
         save(2L, 10L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "k3"); // 다른 유저
 
         Page<LearningEvent> result =
@@ -80,8 +80,8 @@ class LearningEventRepositoryTest {
         Long courseId = 10L;
         save(1L, courseId, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e1");
         save(2L, courseId, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e2");
-        save(3L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 300, "e3");
-        save(4L, courseId, 2L, 3L, LearningEventType.VIDEO_END, 500, "e4");
+        save(3L, courseId, 2L, 3L, LearningEventType.VIDEO_PAUSE, 300, "e3");
+        save(4L, courseId, 2L, 3L, LearningEventType.VIDEO_PAUSE, 500, "e4");
         save(5L, courseId, 2L, 3L, LearningEventType.LECTURE_COMPLETE, null, "e5");
         save(6L, 99L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "e6"); // 다른 강좌 제외
 
@@ -122,9 +122,9 @@ class LearningEventRepositoryTest {
     @DisplayName("챕터별 평균 시청 시간을 집계한다")
     void avgWatchTimeSecondsByChapterId_correctAverage() {
         Long chapterId = 20L;
-        save(1L, 10L, chapterId, 3L, LearningEventType.VIDEO_END, 400, "a1");
-        save(2L, 10L, chapterId, 3L, LearningEventType.VIDEO_END, 600, "a2");
-        save(3L, 10L, 99L, 3L, LearningEventType.VIDEO_END, 9999, "a3"); // 다른 챕터 제외
+        save(1L, 10L, chapterId, 3L, LearningEventType.VIDEO_PAUSE, 400, "a1");
+        save(2L, 10L, chapterId, 3L, LearningEventType.VIDEO_PAUSE, 600, "a2");
+        save(3L, 10L, 99L, 3L, LearningEventType.VIDEO_PAUSE, 9999, "a3"); // 다른 챕터 제외
 
         double avg = learningEventRepository.avgWatchTimeSecondsByChapterId(chapterId);
 
@@ -132,8 +132,8 @@ class LearningEventRepositoryTest {
     }
 
     @Test
-    @DisplayName("VIDEO_END 이벤트가 없으면 평균 시청 시간은 0이다")
-    void avgWatchTimeSecondsByChapterId_noVideoEnd_returnsZero() {
+    @DisplayName("VIDEO_PAUSE 이벤트가 없으면 평균 시청 시간은 0이다")
+    void avgWatchTimeSecondsByChapterId_noVideoPause_returnsZero() {
         Long chapterId = 20L;
         save(1L, 10L, chapterId, 3L, LearningEventType.LECTURE_ENTER, null, "z1");
 
@@ -148,7 +148,7 @@ class LearningEventRepositoryTest {
     @DisplayName("판매자 강좌 ID 목록에 해당하는 이벤트만 반환한다")
     void findByCourseIdIn_returnsOnlyMatchingCourses() {
         save(1L, 10L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "s1");
-        save(2L, 11L, 2L, 3L, LearningEventType.VIDEO_START, null, "s2");
+        save(2L, 11L, 2L, 3L, LearningEventType.VIDEO_PAUSE, 100, "s2");
         save(3L, 99L, 2L, 3L, LearningEventType.LECTURE_ENTER, null, "s3"); // 제외
 
         Page<LearningEvent> result = learningEventRepository.findByCourseIdIn(

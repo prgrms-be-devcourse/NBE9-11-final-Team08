@@ -3,7 +3,7 @@ package com.team08.backend.domain.dashboard.service;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.dashboard.dto.LectureReplayResponse;
+import com.team08.backend.domain.dashboard.dto.LecturePauseResponse;
 import com.team08.backend.domain.dashboard.dto.SellerAnalyticsResponse;
 import com.team08.backend.domain.dashboard.dto.SellerCourseDetailResponse;
 import com.team08.backend.domain.dashboard.repository.SellerDashboardQueryRepository;
@@ -19,14 +19,15 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 판매자 센터 "판매 분석" 대시보드 집계 서비스.
  * 호출한 판매자 본인(sellerId) 강좌만 대상으로 매출·수강생·카테고리·인기상품을 계산하고,
- * 단일 강좌 드릴다운(강의별 참여도)과 강의 "자주 본 구간" 히트맵을 제공한다.
+ * 단일 강좌 드릴다운(강의별 참여도)과 강의 "어려워서 멈춘 구간" 히트맵을 제공한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -34,9 +35,9 @@ import java.util.Map;
 public class SellerDashboardService {
 
     private static final int TOP_COURSES_LIMIT = 5;
-    private static final int DEFAULT_REPLAY_BINS = 40;
-    private static final int MAX_REPLAY_BINS = 200;
-    private static final int REPLAY_EVENT_LIMIT = 50_000; // 단일 강의 페어링 상한(과도한 적재 방어)
+    private static final int DEFAULT_PAUSE_BINS = 40;
+    private static final int MAX_PAUSE_BINS = 200;
+    private static final int PAUSE_EVENT_LIMIT = 50_000; // 단일 강의 멈춤 이벤트 집계 상한(과도한 적재 방어)
     private static final int HOTSPOT_LIMIT = 3;
 
     private final SellerDashboardQueryRepository queryRepository;
@@ -83,11 +84,11 @@ public class SellerDashboardService {
     }
 
     /**
-     * 강의 "자주 본 구간" 히트맵.
-     * VIDEO_START → VIDEO_END 를 사용자별로 페어링해 시청 구간을 만들고, 강의 길이를 bins 개로 나눠
-     * 각 구간을 덮은 시청 횟수를 센다. heat 는 최대 구간 대비 0~1 정규화 값.
+     * 강의 "어려워서 멈춘 구간" 히트맵.
+     * VIDEO_PAUSE 의 멈춘 위치를 강의 길이 bins 개 버킷에 직접 누적한다(시작/재개 페어링 없음).
+     * heat 는 최대 구간 대비 0~1 정규화 값.
      */
-    public LectureReplayResponse getLectureReplay(Long sellerId, Long lectureId, int requestedBins) {
+    public LecturePauseResponse getLecturePauses(Long sellerId, Long lectureId, int requestedBins) {
         Course course = courseRepository.findByLectureId(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
         course.validateOwner(sellerId);
@@ -98,67 +99,45 @@ public class SellerDashboardService {
         int bins = clampBins(requestedBins);
         double binSize = (double) duration / bins;
 
-        // 사용자별 VIDEO_START → VIDEO_END 페어링 → 시청 구간 [a,b]
-        List<Object[]> rows = queryRepository.replayEvents(lectureId, REPLAY_EVENT_LIMIT);
-        Map<Long, Integer> pendingStart = new HashMap<>();
-        List<int[]> intervals = new ArrayList<>();
-        java.util.Set<Long> viewers = new java.util.HashSet<>();
+        // 멈춤(VIDEO_PAUSE) 위치를 버킷에 직접 누적
+        List<Object[]> rows = queryRepository.pauseEvents(lectureId, PAUSE_EVENT_LIMIT);
+        long[] counts = new long[bins];
+        Set<Long> viewers = new HashSet<>();
+        long totalPauses = 0;
         for (Object[] r : rows) {
-            long userId = ((Number) r[0]).longValue();
-            String type = String.valueOf(r[1]);
-            Integer pos = (r[2] == null) ? null : ((Number) r[2]).intValue();
-            viewers.add(userId);
-            if (pos == null) {
+            viewers.add(((Number) r[0]).longValue());
+            if (r[1] == null) {
                 continue;
             }
-            if ("VIDEO_START".equals(type)) {
-                pendingStart.put(userId, pos);
-            } else { // VIDEO_END
-                Integer start = pendingStart.remove(userId);
-                if (start != null) {
-                    int a = Math.max(0, Math.min(start, pos));
-                    int b = Math.min(duration, Math.max(start, pos));
-                    if (b > a) {
-                        intervals.add(new int[]{a, b});
-                    }
-                }
-            }
-        }
-
-        // 구간을 bins 버킷에 누적
-        long[] counts = new long[bins];
-        for (int[] iv : intervals) {
-            int lo = (int) Math.floor(iv[0] / binSize);
-            int hi = (int) Math.floor((iv[1] - 1e-9) / binSize);
-            lo = Math.max(0, Math.min(lo, bins - 1));
-            hi = Math.max(0, Math.min(hi, bins - 1));
-            for (int i = lo; i <= hi; i++) {
-                counts[i]++;
-            }
+            int pos = Math.max(0, Math.min(duration, ((Number) r[1]).intValue()));
+            int idx = (int) Math.floor(pos / binSize);
+            idx = Math.max(0, Math.min(idx, bins - 1));
+            counts[idx]++;
+            totalPauses++;
         }
         long max = 0;
         for (long c : counts) {
             max = Math.max(max, c);
         }
 
-        List<LectureReplayResponse.Bin> binList = new ArrayList<>(bins);
+        List<LecturePauseResponse.Bin> binList = new ArrayList<>(bins);
         for (int i = 0; i < bins; i++) {
             int startSec = (int) Math.round(i * binSize);
             int endSec = (i == bins - 1) ? duration : (int) Math.round((i + 1) * binSize);
             double heat = (max == 0) ? 0.0 : Math.round(counts[i] * 1000.0 / max) / 1000.0;
-            binList.add(new LectureReplayResponse.Bin(i, startSec, endSec, counts[i], heat));
+            binList.add(new LecturePauseResponse.Bin(i, startSec, endSec, counts[i], heat));
         }
 
-        List<LectureReplayResponse.Hotspot> hotspots = binList.stream()
+        List<LecturePauseResponse.Hotspot> hotspots = binList.stream()
                 .filter(b -> b.count() > 0)
-                .sorted(Comparator.comparingLong(LectureReplayResponse.Bin::count).reversed())
+                .sorted(Comparator.comparingLong(LecturePauseResponse.Bin::count).reversed())
                 .limit(HOTSPOT_LIMIT)
-                .map(b -> new LectureReplayResponse.Hotspot(b.startSeconds(), b.endSeconds(), b.count(), b.heat()))
+                .map(b -> new LecturePauseResponse.Hotspot(b.startSeconds(), b.endSeconds(), b.count(), b.heat()))
                 .toList();
 
-        return new LectureReplayResponse(
+        return new LecturePauseResponse(
                 lectureId, lecture.getTitle(), duration, (int) Math.round(binSize),
-                intervals.size(), viewers.size(), binList, hotspots);
+                totalPauses, viewers.size(), binList, hotspots);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
@@ -175,9 +154,9 @@ public class SellerDashboardService {
 
     private static int clampBins(int requested) {
         if (requested <= 0) {
-            return DEFAULT_REPLAY_BINS;
+            return DEFAULT_PAUSE_BINS;
         }
-        return Math.min(requested, MAX_REPLAY_BINS);
+        return Math.min(requested, MAX_PAUSE_BINS);
     }
 
     /** byMonth(yyyy-MM → [revenue,orders])를 span 개월 연속 시계열로 정규화하고 합계·증감률을 계산. */

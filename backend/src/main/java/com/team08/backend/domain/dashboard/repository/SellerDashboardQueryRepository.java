@@ -170,7 +170,7 @@ public class SellerDashboardQueryRepository {
                   (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_ENTER') AS enterCount,
                   (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_COMPLETE') AS completeCount,
                   (SELECT COUNT(DISTINCT le.user_id) FROM learning_events le WHERE le.lecture_id=l.id) AS viewerCount,
-                  (SELECT COALESCE(AVG(le.position_seconds),0) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='VIDEO_END') AS avgWatch
+                  (SELECT COALESCE(AVG(le.position_seconds),0) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='VIDEO_PAUSE') AS avgWatch
                 FROM lectures l
                 JOIN chapters ch ON l.chapter_id = ch.id
                 WHERE ch.course_id = :courseId AND l.deleted_at IS NULL
@@ -187,18 +187,17 @@ public class SellerDashboardQueryRepository {
     }
 
     /**
-     * 강의의 재생 구간 이벤트(VIDEO_START/VIDEO_END)를 사용자·시간 순으로 반환.
-     * 행: [userId, eventType, positionSeconds, eventTime]. 페어링/버킷팅은 서비스가 담당한다.
+     * 강의의 멈춤 이벤트(VIDEO_PAUSE) 위치를 반환. 행: [userId, positionSeconds].
+     * 시작/재개(VIDEO_START) 수집을 없앴으므로 페어링 없이 멈춘 위치만 버킷팅한다.
      */
-    public List<Object[]> replayEvents(Long lectureId, int limit) {
+    public List<Object[]> pauseEvents(Long lectureId, int limit) {
         @SuppressWarnings("unchecked")
         List<Object[]> rows = em.createNativeQuery("""
-                SELECT le.user_id, le.event_type, le.position_seconds, le.event_time
+                SELECT le.user_id, le.position_seconds
                 FROM learning_events le
                 WHERE le.lecture_id = :lectureId
-                  AND le.event_type IN ('VIDEO_START', 'VIDEO_END')
+                  AND le.event_type = 'VIDEO_PAUSE'
                   AND le.position_seconds IS NOT NULL
-                ORDER BY le.user_id, le.event_time, le.id
                 LIMIT :limit
                 """)
                 .setParameter("lectureId", lectureId)

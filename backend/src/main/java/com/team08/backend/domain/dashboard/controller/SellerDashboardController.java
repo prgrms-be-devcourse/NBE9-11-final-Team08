@@ -1,6 +1,6 @@
 package com.team08.backend.domain.dashboard.controller;
 
-import com.team08.backend.domain.dashboard.dto.LectureReplayResponse;
+import com.team08.backend.domain.dashboard.dto.LecturePauseResponse;
 import com.team08.backend.domain.dashboard.dto.SellerAnalyticsResponse;
 import com.team08.backend.domain.dashboard.dto.SellerCourseDetailResponse;
 import com.team08.backend.domain.dashboard.service.SellerDashboardService;
@@ -44,13 +44,13 @@ public class SellerDashboardController {
     }
 
     @PreAuthorize("hasRole('SELLER')")
-    @Operation(summary = "강의 자주 본 구간", description = "VIDEO_START/VIDEO_END 이벤트로 시청 구간을 페어링해 만든 재생 히트맵(bins 개 버킷). 본인 강의만 조회 가능.")
-    @GetMapping("/lectures/{lectureId}/replay")
-    public LectureReplayResponse getLectureReplay(
+    @Operation(summary = "강의 어려워서 멈춘 구간", description = "VIDEO_PAUSE 이벤트의 멈춤 위치를 bins 개 버킷에 누적한 히트맵. 멈춤이 몰린 구간이 학습자가 어려워한 지점. 본인 강의만 조회 가능.")
+    @GetMapping("/lectures/{lectureId}/pauses")
+    public LecturePauseResponse getLecturePauses(
             @PathVariable Long lectureId,
             @RequestParam(defaultValue = "40") int bins,
             @AuthenticationPrincipal LoginUserPrincipal principal) {
-        return sellerDashboardService.getLectureReplay(principal.user().id(), lectureId, bins);
+        return sellerDashboardService.getLecturePauses(principal.user().id(), lectureId, bins);
     }
 
     private static int monthsOf(String range) {
