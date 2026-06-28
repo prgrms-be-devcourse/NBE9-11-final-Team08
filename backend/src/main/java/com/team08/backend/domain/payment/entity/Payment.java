@@ -123,10 +123,6 @@ public class Payment {
         this.updatedAt = processingStartedAt;
     }
 
-    public void decline(String failedReason, LocalDateTime declinedAt) {
-        decline(null, null, failedReason, declinedAt);
-    }
-
     public void decline(String paymentKey, String method, String failedReason, LocalDateTime declinedAt) {
         decline(paymentKey, method, null, failedReason, declinedAt);
     }
