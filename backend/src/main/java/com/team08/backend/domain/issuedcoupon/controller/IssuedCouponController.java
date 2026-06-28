@@ -4,6 +4,9 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicySummaryResponse;
+import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
+import com.team08.backend.domain.couponpolicy.service.CouponPolicyService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -15,6 +18,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -26,6 +34,17 @@ import java.util.List;
 public class IssuedCouponController {
 
     private final IssuedCouponService issuedCouponService;
+    private final CouponPolicyService couponPolicyService;
+
+    // [사용자] 쿠폰 정책 목록 조회 /api/coupons
+    @GetMapping
+    @Operation(summary = "발급 가능한 쿠폰 정책 목록 조회", description = "모든 사용자가 발급 가능한 쿠폰 정책 목록을 조회합니다.")
+    public Page<CouponPolicySummaryResponse> getCoupons(
+            @ParameterObject @ModelAttribute CouponPolicySearchRequest condition,
+            @PageableDefault(size = 10) Pageable pageable
+    ) {
+        return couponPolicyService.getCouponPolicies(condition, pageable);
+    }
 
     // [사용자] 쿠폰 다운로드 /api/coupons/{policyId}/download
     @PostMapping("/{policyId}/download")
