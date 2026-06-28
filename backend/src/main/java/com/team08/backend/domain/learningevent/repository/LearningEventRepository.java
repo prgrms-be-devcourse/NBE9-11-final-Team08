@@ -19,7 +19,7 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 강의별 통계 단일 쿼리 ─────────────────────────────────────────
     @Query("SELECT new com.team08.backend.domain.learningevent.dto.CourseStatsProjection(" +
            "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.LECTURE_ENTER THEN 1 ELSE 0 END), " +
-           "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.VIDEO_END THEN e.positionSeconds ELSE 0 END), " +
+           "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.VIDEO_PAUSE THEN e.positionSeconds ELSE 0 END), " +
            "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.LECTURE_COMPLETE THEN 1 ELSE 0 END)) " +
            "FROM LearningEvent e WHERE e.courseId = :courseId")
     CourseStatsProjection getStatsByCourseId(@Param("courseId") Long courseId);
@@ -62,7 +62,7 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     long countByChapterIdAndEventType(Long chapterId, LearningEventType eventType);
 
     @Query("SELECT COALESCE(AVG(e.positionSeconds), 0) FROM LearningEvent e " +
-           "WHERE e.chapterId = :chapterId AND e.eventType = 'VIDEO_END'")
+           "WHERE e.chapterId = :chapterId AND e.eventType = 'VIDEO_PAUSE'")
     double avgWatchTimeSecondsByChapterId(@Param("chapterId") Long chapterId);
 
     // ── 판매자 강좌 필터링 ───────────────────────────────────────────

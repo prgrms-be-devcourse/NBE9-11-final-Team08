@@ -67,6 +67,12 @@ server:
     max-http-form-post-size: -1
 
 app:
+  order:
+    expiration:
+      scheduler-enabled: true
+      fixed-delay: 60000
+      expiration-minutes: 30
+      batch-size: 20
   jwt:
     secret: ${JWT_SECRET}
     expiration-millis: ${JWT_EXPIRATION_MILLIS:3600000}

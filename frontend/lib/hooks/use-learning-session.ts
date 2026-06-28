@@ -45,22 +45,21 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
   )
 
   // 입장: 메타/진행 정보 로드 + LECTURE_ENTER 기록. null 이면 입장 불가(수강권 없음).
+  // recordEnter=false 면 GET(메타/진행)만 하고 ENTER 적재는 건너뛴다
+  // (StrictMode 즉시 재마운트 시 ENTER 중복 적재 방지).
   const enter = useCallback(
-    async (lectureId: string): Promise<LectureEnterResponse | null> => {
+    async (lectureId: string, recordEnter = true): Promise<LectureEnterResponse | null> => {
       const res = await api.enterLecture(courseId, chapterIdOf(lectureId) ?? '', lectureId)
-      if (res) record(lectureId, 'LECTURE_ENTER', 0)
+      if (res && recordEnter) record(lectureId, 'LECTURE_ENTER', 0)
       return res
     },
     [courseId, chapterIdOf, record],
   )
 
-  // 재생 시작 / 일시정지 — VIDEO_START / VIDEO_END
-  const play = useCallback(
-    (lectureId: string, position: number) => record(lectureId, 'VIDEO_START', position),
-    [record],
-  )
+  // 일시정지/중단 — VIDEO_PAUSE (멈춘 위치 = 학습자가 어려워한 구간 신호)
+  // 재생 시작/재개(구 VIDEO_START)는 학습 분석에 쓰지 않아 더 이상 수집하지 않는다.
   const pause = useCallback(
-    (lectureId: string, position: number) => record(lectureId, 'VIDEO_END', position),
+    (lectureId: string, position: number) => record(lectureId, 'VIDEO_PAUSE', position),
     [record],
   )
 
@@ -94,5 +93,5 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
     [record],
   )
 
-  return { enter, play, pause, beat, complete, exit }
+  return { enter, pause, beat, complete, exit }
 }

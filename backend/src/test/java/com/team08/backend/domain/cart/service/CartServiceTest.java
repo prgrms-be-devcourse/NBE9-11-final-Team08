@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -46,6 +48,9 @@ class CartServiceTest {
     @Mock
     private EnrollmentRepository enrollmentRepository;
 
+    @Mock
+    private CartCreationService cartCreationService;
+
     @InjectMocks
     private CartService cartService;
 
@@ -57,7 +62,8 @@ class CartServiceTest {
         given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(false);
-        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.empty());
+        given(cartRepository.findByUserIdWithItems(USER_ID))
+                .willReturn(Optional.empty(), Optional.of(cart));
         given(courseRepository.findAllById(any())).willReturn(List.of(course));
 
         CartResponse response = cartService.addItem(USER_ID, COURSE_ID);
@@ -74,6 +80,62 @@ class CartServiceTest {
         assertThat(response.items().get(0).title()).isEqualTo("Spring");
         assertThat(response.items().get(0).price()).isEqualTo(30_000);
         assertThat(response.totalPrice()).isEqualTo(30_000);
+        verify(cartCreationService).create(USER_ID);
+    }
+
+    @Test
+    void concurrentFirstCartCreationConflictReloadsExistingCart() {
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Cart existingCart = cart(CART_ID, USER_ID);
+
+        given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        given(cartRepository.findByUserIdWithItems(USER_ID))
+                .willReturn(Optional.empty(), Optional.of(existingCart));
+        willThrow(new DataIntegrityViolationException("uk_cart_user"))
+                .given(cartCreationService).create(USER_ID);
+        given(courseRepository.findAllById(any())).willReturn(List.of(course));
+
+        CartResponse response = cartService.addItem(USER_ID, COURSE_ID);
+
+        verify(cartRepository).saveAndFlush(existingCart);
+        assertThat(response.items()).singleElement()
+                .satisfies(item -> assertThat(item.courseId()).isEqualTo(COURSE_ID));
+    }
+
+    @Test
+    void concurrentDuplicateCourseConstraintUsesExistingDuplicatePolicy() {
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Cart cart = cart(CART_ID, USER_ID);
+
+        given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
+        given(cartRepository.saveAndFlush(cart))
+                .willThrow(new DataIntegrityViolationException("uk_cart_item_cart_course"));
+
+        assertThatThrownBy(() -> cartService.addItem(USER_ID, COURSE_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        exception -> assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.LECTURE_ALREADY_IN_CART));
+    }
+
+    @Test
+    void unrelatedCartSaveIntegrityViolationIsNotHiddenAsDuplicateCartItem() {
+        Course course = course(COURSE_ID, "Spring", 30_000, CourseStatus.ON_SALE);
+        Cart cart = cart(CART_ID, USER_ID);
+        DataIntegrityViolationException exception = new DataIntegrityViolationException("fk_cart_item_cart");
+
+        given(courseRepository.findById(COURSE_ID)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByUserIdAndCourseIdAndStatus(USER_ID, COURSE_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(false);
+        given(cartRepository.findByUserIdWithItems(USER_ID)).willReturn(Optional.of(cart));
+        given(cartRepository.saveAndFlush(cart)).willThrow(exception);
+
+        assertThatThrownBy(() -> cartService.addItem(USER_ID, COURSE_ID))
+                .isSameAs(exception);
     }
 
     @Test

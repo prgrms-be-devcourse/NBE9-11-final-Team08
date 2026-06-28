@@ -52,6 +52,9 @@ import type {
   LearningEventRow,
   AnomalyResponse,
   AuditResponse,
+  SellerAnalytics,
+  SellerCourseDetail,
+  LecturePauses,
   FeedCursor,
   FeedCursorResponse,
 } from './types'
@@ -1627,4 +1630,18 @@ export const api = {
   },
   getAdminAudit: () =>
     request<AuditResponse | null>('/api/admin/dashboard/audit/retention', null),
+
+  // ── Seller Dashboard APIs ───────────────────────────────────────────
+  getSellerAnalytics: (range: '3m' | '6m' | '1y' = '6m') =>
+    request<SellerAnalytics | null>(`/api/seller/dashboard/analytics?range=${range}`, null),
+  getSellerCourseDetail: (courseId: number, range: '3m' | '6m' | '1y' = '6m') =>
+    request<SellerCourseDetail | null>(
+      `/api/seller/dashboard/courses/${courseId}?range=${range}`,
+      null,
+    ),
+  getSellerLecturePauses: (lectureId: number, bins = 40) =>
+    request<LecturePauses | null>(
+      `/api/seller/dashboard/lectures/${lectureId}/pauses?bins=${bins}`,
+      null,
+    ),
 }
