@@ -43,6 +43,10 @@ services:
     depends_on: [influxdb]
     environment:
       BASE_URL: ${BASE_URL:-http://host.docker.internal:8080}
+      RPS: ${RPS:-50}
+      DURATION: ${DURATION:-2m}
+      USER_POOL: ${USER_POOL:-40}
+      HIT_RATIO: ${HIT_RATIO:-1.0}
     volumes:
       - ./k6:/scripts:ro
     networks: [client]

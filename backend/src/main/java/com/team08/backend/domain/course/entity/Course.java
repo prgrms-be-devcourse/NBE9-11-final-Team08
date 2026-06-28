@@ -151,6 +151,27 @@ public class Course extends BaseTimeEntity {
         return history;
     }
 
+    /**
+     * 시드 전용: 커리큘럼(챕터/강의) 인메모리 검증을 건너뛰고 DRAFT→IN_REVIEW→ON_SALE 로 전이한다.
+     * bulk 시더는 챕터/강의를 인메모리 그래프에 올리지 않고 DB 에만 적재하므로
+     * {@link #requestReview(Long)} 의 커리큘럼 검증을 통과할 수 없다. 운영 경로에서는 사용하지 말 것.
+     */
+    public List<CourseStatusHistory> publishForSeed(Long requestUserId, Long adminId) {
+        if (this.status != CourseStatus.DRAFT) {
+            throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
+        }
+
+        CourseStatusHistory reviewHistory =
+                CourseStatusHistory.of(this.id, this.status, CourseStatus.IN_REVIEW, requestUserId);
+        this.status = CourseStatus.IN_REVIEW;
+
+        CourseStatusHistory approveHistory =
+                CourseStatusHistory.of(this.id, this.status, CourseStatus.ON_SALE, adminId);
+        this.status = CourseStatus.ON_SALE;
+
+        return List.of(reviewHistory, approveHistory);
+    }
+
     public CourseStatusHistory cancelReview(Long requestUserId) {
         if (this.status != CourseStatus.IN_REVIEW) {
             throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);

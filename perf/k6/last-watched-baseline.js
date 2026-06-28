@@ -46,7 +46,11 @@
  *   RPS         초당 요청 수        (기본 50)
  *   DURATION    측정 구간 길이      (기본 2m)
  *   USER_POOL   로그인할 유저 수    (기본 40, 1~100 사이여야 이력이 존재)
- *   HIT_RATIO   "이력 있음" 비율    (기본 0.7)
+ *   HIT_RATIO   "이력 있음" 비율    (기본 1.0)
+ *
+ * 주의: 현재 bulk 시드는 user{k} 가 course{k} 에 수강등록/시청이력을 가진다.
+ * 다른 강좌를 임의 선택하면 권한 정책상 COURSE_010(403)이 정상적으로 발생하므로,
+ * null 응답 MISS 측정은 별도 수강등록-only 시드가 있을 때만 HIT_RATIO<1 로 실행한다.
  *
  * ============================================================================
  */
@@ -64,7 +68,7 @@ const BASE_URL   = __ENV.BASE_URL || 'http://localhost:8080';
 const RPS        = parseInt(__ENV.RPS || '50', 10);
 const DURATION   = __ENV.DURATION || '2m';
 const USER_POOL  = Math.max(1, Math.min(parseInt(__ENV.USER_POOL || '40', 10), 100));
-const HIT_RATIO  = parseFloat(__ENV.HIT_RATIO || '0.7');
+const HIT_RATIO  = parseFloat(__ENV.HIT_RATIO || '1.0');
 
 // bulk 시드 기준 강좌 수 (miss 경로에서 "다른 강좌"를 고를 때 사용)
 const TOTAL_COURSES = 100;
@@ -182,14 +186,16 @@ export function lastWatched(data) {
     const pairs = data.pairs;
     const p = pairs[randomIntBetween(0, pairs.length - 1)];
 
-    // HIT_RATIO 확률로 "이력 있음" 경로, 나머지는 "이력 없음" 경로
+    // HIT_RATIO 확률로 "이력 있음" 경로, 나머지는 "이력 없음" 경로.
+    // 현재 bulk 시드는 "권한은 있지만 이력만 없는 강좌"를 만들지 않으므로,
+    // 기본값은 권한 에러를 피하기 위해 HIT_RATIO=1.0 이다.
     const isHit = Math.random() < HIT_RATIO;
 
     let courseId;
     if (isHit) {
         courseId = p.ownCourseId; // 본인 강좌 → progress 존재
     } else {
-        // 본인 강좌가 아닌 임의 강좌 → progress 없음 → null
+        // 본인 강좌가 아닌 임의 강좌 → 현재 bulk 시드에서는 수강 권한 없음(COURSE_010)
         do {
             courseId = randomIntBetween(1, TOTAL_COURSES);
         } while (courseId === p.ownCourseId);
@@ -206,7 +212,9 @@ export function lastWatched(data) {
                 },
             }
         );
-
+        if (res.status !== 200) {
+            console.log(`[${isHit ? 'HIT' : 'MISS'}] courseId=${courseId}, status=${res.status}, body=${res.body}`);
+        }
         lastWatchedLatency.add(res.timings.duration);
         (isHit ? hitLatency : missLatency).add(res.timings.duration);
 

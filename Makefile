@@ -17,8 +17,12 @@ PROD        := $(BASE) -f compose.prod.yaml    # prod 는 base 에 덮어쓰기
 PERF_DIR     := perf
 PERF_DC      := docker compose -f compose.client.yml    # 부하기 stack (k6 + influx + grafana)
 T3_OVERRIDE  := -f ../../perf/compose.server-t3small.yml # base(compose.yaml) 위에 얹는 t3.small 제한 override
-PERF_SCRIPT  ?= last-watched-baseline.js   # make perf-client PERF_SCRIPT=other.js 로 교체 가능
+PERF_SCRIPT  ?= learning-event-perf.js   # make perf-client PERF_SCRIPT=other.js 로 교체 가능
 BASE_URL     ?= http://host.docker.internal:8080
+RPS          ?= 50
+DURATION     ?= 2m
+USER_POOL    ?= 40
+HIT_RATIO    ?= 1.0
 
 # 개발(dev/edge) compose 명령은 .env.dev 로 실행
 define run
@@ -100,7 +104,7 @@ perf-server-t3small-reset: ## [부하] t3.small 서버 삭제 (데이터 삭제)
 
 perf-client: ## [부하] k6 실행 (BASE_URL 타격) + influx/grafana 기동
 	cd $(PERF_DIR) && $(PERF_DC) up -d influxdb grafana
-	cd $(PERF_DIR) && BASE_URL=$(BASE_URL) $(PERF_DC) run --rm k6 run --out influxdb=http://influxdb:8086/k6 /scripts/$(PERF_SCRIPT)
+	cd $(PERF_DIR) && BASE_URL=$(BASE_URL) RPS=$(RPS) DURATION=$(DURATION) USER_POOL=$(USER_POOL) HIT_RATIO=$(HIT_RATIO) $(PERF_DC) run --rm k6 run --out influxdb=http://influxdb:8086/k6 /scripts/$(PERF_SCRIPT)
 	@echo "📊 Grafana → http://localhost:3000"
 
 perf-client-down: ## [부하] 부하 stack 정리 (볼륨 유지 → 대시보드/이력 보존)

@@ -146,13 +146,14 @@ public class DataSeeder {
 
         String password = passwordEncoder.encode("Test1234!");
 
-        userRepository.save(User.createAdmin("admin@test.com", password, "관리자", null));
+        User admin = userRepository.save(User.createAdmin("admin@test.com", password, "관리자", null));
 
         List<Category> categories = saveCategories();
         List<User> sellers        = saveSellers(cfg, password);
         List<User> users          = saveRegularUsers(cfg, password);
         CatalogData catalog       = saveCourses(cfg, sellers, categories);
 
+        publishCourses(catalog.courses(), admin.getId());
         seedCommerce(cfg, users, catalog);
         seedLearning(users, catalog);
         seedQna(users, catalog);
@@ -257,6 +258,15 @@ public class DataSeeder {
                 (long) savedCourses.size() * cfg.chaptersPerCourse() * cfg.lecturesPerChapter());
 
         return new CatalogData(savedCourses, sampleLectureByCourse, lecturesByCourse);
+    }
+
+    private void publishCourses(List<Course> courses, Long adminId) {
+        List<CourseStatusHistory> histories = new ArrayList<>();
+        for (Course course : courses) {
+            histories.addAll(course.publishForSeed(course.getInstructorId(), adminId));
+        }
+        courseStatusHistoryRepository.saveAll(histories);
+        log.info("[DataInit] 강의 {}개 판매중 상태로 전환", courses.size());
     }
 
     private void addLectures(SeedConfig cfg, List<Chapter> chapters, List<Lecture> buffer) {
