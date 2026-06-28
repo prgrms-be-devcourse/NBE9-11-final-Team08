@@ -70,7 +70,7 @@ public class PaymentController {
     )
     public ConfirmPaymentResponse confirmProviderPayment(
             @AuthenticationPrincipal LoginUserPrincipal principal,
-            @Parameter(description = "二쇰Ц ID", example = "1")
+            @Parameter(description = "주문 ID", example = "1")
             @PathVariable Long orderId,
             @PathVariable PaymentProviderType providerType,
             @RequestBody ConfirmPaymentRequest request
