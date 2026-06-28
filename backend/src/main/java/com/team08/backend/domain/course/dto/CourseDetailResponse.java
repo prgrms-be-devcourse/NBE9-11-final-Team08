@@ -19,6 +19,10 @@ public record CourseDetailResponse(
         List<ChapterInfoResponse> chapters
 ) {
     public static CourseDetailResponse from(Course course, FileUrlFormatter fileUrlFormatter) {
+        return from(course, course.getViewCount(), fileUrlFormatter);
+    }
+
+    public static CourseDetailResponse from(Course course, int viewCount, FileUrlFormatter fileUrlFormatter) {
         List<ChapterInfoResponse> chapterResponses = course.getChapters().stream()
                 .map(ChapterInfoResponse::from)
                 .toList();
@@ -32,8 +36,23 @@ public record CourseDetailResponse(
                 fileUrlFormatter.formatThumbnailUrl(course.getThumbnail()),
                 course.getPrice(),
                 course.getStatus(),
-                course.getViewCount(),
+                viewCount,
                 chapterResponses
+        );
+    }
+
+    public CourseDetailResponse withViewCount(int newViewCount) {
+        return new CourseDetailResponse(
+                this.id,
+                this.instructorId,
+                this.categoryId,
+                this.title,
+                this.description,
+                this.thumbnail,
+                this.price,
+                this.status,
+                newViewCount,
+                this.chapters
         );
     }
 }

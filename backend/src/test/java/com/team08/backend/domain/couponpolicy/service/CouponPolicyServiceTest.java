@@ -6,6 +6,7 @@ import com.team08.backend.domain.couponpolicy.component.CouponPolicyValidator;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyCreateRequest;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicyUpdateRequest;
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -14,6 +15,7 @@ import com.team08.backend.domain.couponpolicy.entity.DiscountType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +34,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -90,6 +94,83 @@ class CouponPolicyServiceTest {
     }
 
     @Test
+    @DisplayName("활성 자동 발급 정책이 이미 있으면 같은 용도의 자동 쿠폰 정책을 생성할 수 없다")
+    void createCouponPolicy_fail_whenActiveAutoIssueTypeAlreadyExists() {
+        // given
+        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+                "신규 가입 축하 쿠폰",
+                CouponTarget.ALL,
+                CouponType.AUTO,
+                AutoIssueType.SIGNUP,
+                null,
+                CouponUsageType.SINGLE_USE,
+                false,
+                DiscountType.AMOUNT,
+                1000,
+                null,
+                10000,
+                30,
+                null,
+                null,
+                null,
+                null
+        );
+        when(couponPolicyRepository.existsActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
+                .thenReturn(true);
+
+        // when & then
+        assertThatThrownBy(() -> couponPolicyService.createCouponPolicy(request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS);
+        verify(couponPolicyFactory, never()).create(any(CouponPolicyCreateRequest.class));
+        verify(couponPolicyRepository, never()).save(any(CouponPolicy.class));
+    }
+
+    @Test
+    @DisplayName("활성 자동 발급 정책이 없으면 같은 용도의 자동 쿠폰 정책을 생성할 수 있다")
+    void createCouponPolicy_success_whenActiveAutoIssueTypeDoesNotExist() {
+        // given
+        CouponPolicyCreateRequest request = new CouponPolicyCreateRequest(
+                "신규 가입 축하 쿠폰",
+                CouponTarget.ALL,
+                CouponType.AUTO,
+                AutoIssueType.SIGNUP,
+                null,
+                CouponUsageType.SINGLE_USE,
+                false,
+                DiscountType.AMOUNT,
+                1000,
+                null,
+                10000,
+                30,
+                null,
+                null,
+                null,
+                null
+        );
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                request.name(), request.couponTarget(), request.couponType(), request.autoIssueType(),
+                request.totalQuantity(), request.usageType(), request.isStackable(), request.discountType(),
+                request.discountValue(), request.maxDiscountAmount(), request.minOrderAmount(), request.validDays(),
+                request.issueStartDate(), request.issueEndDate(), request.categoryIds(), request.courseIds()
+        );
+
+        when(couponPolicyRepository.existsActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
+                .thenReturn(false);
+        when(couponPolicyFactory.create(request)).thenReturn(policy);
+        when(couponPolicyRepository.save(any(CouponPolicy.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        CouponPolicyResponse response = couponPolicyService.createCouponPolicy(request);
+
+        // then
+        assertThat(response.autoIssueType()).isEqualTo(AutoIssueType.SIGNUP);
+        verify(couponPolicyFactory).create(request);
+        verify(couponPolicyRepository).save(any(CouponPolicy.class));
+    }
+
+    @Test
     @DisplayName("발급 이력이 있는 쿠폰 정책은 수정 시 예외가 발생한다")
     void updateCouponPolicy_fail_whenAlreadyIssued() {
         // given
@@ -109,6 +190,49 @@ class CouponPolicyServiceTest {
         assertThatThrownBy(() -> couponPolicyService.updateCouponPolicy(policyId, updateRequest))
                 .isInstanceOf(CustomException.class);
         verify(couponPolicyRepository).findByIdWithLock(policyId);
+    }
+
+    @Test
+    @DisplayName("수정 시 다른 활성 자동 발급 정책과 용도가 겹치면 예외가 발생한다")
+    void updateCouponPolicy_fail_whenActiveAutoIssueTypeAlreadyExists() {
+        // given
+        Long policyId = 1L;
+        CouponPolicy policy = CouponPolicy.createPolicy(
+                "기존 쿠폰", CouponTarget.ALL, CouponType.AUTO, AutoIssueType.MONTHLY_ATTENDANCE,
+                null, CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT,
+                1000, null, 10000, 7, null, null, null, null
+        );
+        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(issuedCouponRepository.countByPolicyId(policyId)).thenReturn(0L);
+        when(couponPolicyRepository.existsActiveByAutoIssueTypeAndIdNot(
+                eq(AutoIssueType.SIGNUP),
+                eq(policyId),
+                any(LocalDateTime.class)
+        )).thenReturn(true);
+
+        CouponPolicyUpdateRequest updateRequest = new CouponPolicyUpdateRequest(
+                "수정 쿠폰",
+                AutoIssueType.SIGNUP,
+                null,
+                CouponUsageType.SINGLE_USE,
+                false,
+                DiscountType.AMOUNT,
+                2000,
+                null,
+                20000,
+                7,
+                null,
+                null,
+                null,
+                null
+        );
+
+        // when & then
+        assertThatThrownBy(() -> couponPolicyService.updateCouponPolicy(policyId, updateRequest))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS);
+        verify(couponPolicyUpdater, never()).updateTargets(any(CouponPolicy.class), any(), any());
     }
 
     @Test

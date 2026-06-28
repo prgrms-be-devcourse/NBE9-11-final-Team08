@@ -23,6 +23,7 @@ import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
+import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -41,7 +42,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -96,6 +96,9 @@ class PaymentServiceTest {
     @Mock
     private PaidCourseStudyMemberService paidCourseStudyMemberService;
 
+    @Mock
+    private PaymentSuccessOutboxService paymentSuccessOutboxService;
+
     private PaymentService paymentService;
 
     @BeforeEach
@@ -111,6 +114,7 @@ class PaymentServiceTest {
                 issuedCouponService,
                 orderCouponUsageRepository,
                 paidCourseStudyMemberService,
+                paymentSuccessOutboxService,
                 FIXED_CLOCK
         );
     }
@@ -128,7 +132,6 @@ class PaymentServiceTest {
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave();
-        stubEnrollmentSaveAll();
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
@@ -153,20 +156,11 @@ class PaymentServiceTest {
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.paidAt()).isEqualTo(FIXED_NOW);
-        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
-
-        ArgumentCaptor<Iterable<Enrollment>> enrollmentCaptor = ArgumentCaptor.forClass(Iterable.class);
-        verify(enrollmentRepository).saveAll(enrollmentCaptor.capture());
-        List<Enrollment> enrollments = toList(enrollmentCaptor.getValue());
-        assertThat(enrollments).singleElement()
-                .satisfies(enrollment -> {
-                    assertThat(enrollment.getUserId()).isEqualTo(USER_ID);
-                    assertThat(enrollment.getCourseId()).isEqualTo(COURSE_ID);
-                    assertThat(enrollment.getOrder().getId()).isEqualTo(ORDER_ID);
-                    assertThat(enrollment.getStatus()).isEqualTo(EnrollmentStatus.ACTIVE);
-                    assertThat(enrollment.getEnrolledAt()).isEqualTo(FIXED_NOW);
-                    assertThat(enrollment.getCreatedAt()).isEqualTo(FIXED_NOW);
-                });
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(enrollmentRepository, never()).saveAllAndFlush(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
+        verify(paidCourseStudyMemberService, never()).joinAsMember(any(), any(), any());
     }
 
     @Test
@@ -189,7 +183,6 @@ class PaymentServiceTest {
         given(issuedCouponService.useCouponForOrder(USER_ID, issuedCouponId, 30_000)).willReturn(5000);
 
         stubPaymentSave();
-        stubEnrollmentSaveAll();
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, new ConfirmPaymentRequest("payment-key", "CARD", 25_000, issuedCouponId));
 
@@ -276,7 +269,7 @@ class PaymentServiceTest {
     }
 
     @Test
-    void multipleOrderItemsCreateMultipleEnrollments() {
+    void multipleOrderItemsCreateSinglePaymentSuccessOutbox() {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         OrderItem firstItem = orderItem(1L, COURSE_ID, 30_000);
         OrderItem secondItem = orderItem(2L, COURSE_ID + 1, 20_000);
@@ -289,18 +282,13 @@ class PaymentServiceTest {
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubPaymentSave();
-        stubEnrollmentSaveAll();
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
-        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID, COURSE_ID + 1);
-
-        ArgumentCaptor<Iterable<Enrollment>> enrollmentCaptor = ArgumentCaptor.forClass(Iterable.class);
-        verify(enrollmentRepository).saveAll(enrollmentCaptor.capture());
-        List<Enrollment> enrollments = toList(enrollmentCaptor.getValue());
-        assertThat(enrollments).hasSize(2);
-        assertThat(enrollments).extracting(Enrollment::getCourseId)
-                .containsExactly(COURSE_ID, COURSE_ID + 1);
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(enrollmentRepository, never()).saveAllAndFlush(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
         verify(enrollmentRepository, never())
                 .existsByUserIdAndCourseIdAndStatus(any(), any(), any());
     }
@@ -343,7 +331,6 @@ class PaymentServiceTest {
                 List.of(COURSE_ID)
         )).willReturn(List.of());
         stubPaymentSave();
-        stubEnrollmentSaveAll();
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
@@ -351,8 +338,9 @@ class PaymentServiceTest {
         assertThat(declinedPayment.getPaymentKey()).isEqualTo("payment-key");
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
-        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
-        verify(enrollmentRepository).saveAll(any());
+        assertThat(response.enrolledCourseIds()).isEmpty();
+        verify(enrollmentRepository, never()).saveAll(any());
+        verify(paymentSuccessOutboxService).createIfAbsent(PAYMENT_ID, ORDER_ID, USER_ID);
     }
 
     @Test
@@ -414,24 +402,23 @@ class PaymentServiceTest {
     }
 
     @Test
-    void sameIdempotencyKeyReturnsExistingMockSuccessWithoutDuplicateProcessing() {
+    void sameIdempotencyKeyReplayKeepsEnrollmentIdsEmpty() {
         Order order = order(OrderStatus.PAID);
         Payment payment = payment(order, PaymentStatus.SUCCESS);
         PaymentAttempt attempt = paymentAttempt(payment, "idem-1");
-        Enrollment enrollment = Enrollment.createActive(USER_ID, COURSE_ID, order, FIXED_NOW.minusMinutes(1));
 
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(paymentAttemptRepository.findByPayment_IdAndIdempotencyKey(PAYMENT_ID, "idem-1")).willReturn(Optional.of(attempt));
-        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE)).willReturn(List.of(enrollment));
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-1"));
 
         assertThat(response.paymentStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
-        assertThat(response.enrolledCourseIds()).containsExactly(COURSE_ID);
+        assertThat(response.enrolledCourseIds()).isEmpty();
         verify(paymentRepository, never()).save(any(Payment.class));
         verify(paymentAttemptRepository, never()).save(any(PaymentAttempt.class));
+        verify(enrollmentRepository, never()).findAllByOrder_IdAndStatus(any(), any());
     }
 
     @Test
@@ -486,7 +473,6 @@ class PaymentServiceTest {
         )).willReturn(List.of());
         stubPaymentSave();
         stubPaymentAttemptSave();
-        stubEnrollmentSaveAll();
 
         ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000, "idem-2"));
 
@@ -543,7 +529,6 @@ class PaymentServiceTest {
                 List.of(COURSE_ID, COURSE_ID + 1)
         )).willReturn(List.of());
         stubPaymentSave();
-        stubEnrollmentSaveAll();
 
         paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(30_000));
 
@@ -619,19 +604,6 @@ class PaymentServiceTest {
 
     private void stubPaymentAttemptSave() {
         given(paymentAttemptRepository.save(any(PaymentAttempt.class))).willAnswer(invocation -> invocation.getArgument(0));
-    }
-
-    private void stubEnrollmentSaveAll() {
-        given(enrollmentRepository.saveAll(any())).willAnswer(invocation -> {
-            Iterable<Enrollment> enrollments = invocation.getArgument(0);
-            List<Enrollment> savedEnrollments = new ArrayList<>();
-            long id = 1L;
-            for (Enrollment enrollment : enrollments) {
-                ReflectionTestUtils.setField(enrollment, "id", id++);
-                savedEnrollments.add(enrollment);
-            }
-            return savedEnrollments;
-        });
     }
 
     private Order order(OrderStatus status) {
@@ -710,22 +682,17 @@ class PaymentServiceTest {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment payment = payment(order, PaymentStatus.SUCCESS);
         order.markPaid(FIXED_NOW);
-        return ConfirmPaymentResponse.from(payment, order, List.of());
+        return ConfirmPaymentResponse.from(payment, order);
     }
 
     private ConfirmPaymentResponse pendingPaymentResponse(PaymentStatus paymentStatus) {
         Order order = order(OrderStatus.PENDING_PAYMENT);
         Payment payment = payment(order, paymentStatus);
-        return ConfirmPaymentResponse.from(payment, order, List.of());
+        return ConfirmPaymentResponse.from(payment, order);
     }
 
     private FailPaymentRequest failRequest(int amount) {
         return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패", null);
     }
 
-    private List<Enrollment> toList(Iterable<Enrollment> enrollments) {
-        List<Enrollment> result = new ArrayList<>();
-        enrollments.forEach(result::add);
-        return result;
-    }
 }

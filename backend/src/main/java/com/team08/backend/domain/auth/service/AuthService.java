@@ -11,6 +11,7 @@ import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
 import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
+import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -39,6 +40,8 @@ public class AuthService {
     private final TokenProperties tokenProperties;
 
     private final Clock clock;
+
+    private final CouponRewardOutboxService couponRewardOutboxService;
 
     @Transactional
     public TokenPair login(String email, String password) {
@@ -110,7 +113,8 @@ public class AuthService {
         }
 
         try {
-            userRepository.saveAndFlush(user);
+            User savedUser = userRepository.saveAndFlush(user);
+            couponRewardOutboxService.createUserSignedUpEvent(savedUser.getId());
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEmailException();
         }

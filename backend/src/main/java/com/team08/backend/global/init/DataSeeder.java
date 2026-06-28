@@ -330,6 +330,7 @@ public class DataSeeder {
                     )
             );
         }
+        policies.addAll(autoRewardPolicies(now));
         List<CouponPolicy> savedPolicies = couponPolicyRepository.saveAll(policies);
 
         // 쿠폰 발급 (수강생 1명당 1장)
@@ -1269,6 +1270,65 @@ public class DataSeeder {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("데모 AI 피드백 직렬화 실패", e);
         }
+    }
+
+    private List<CouponPolicy> autoRewardPolicies(LocalDateTime now) {
+        return List.of(
+                CouponPolicy.createPolicy(
+                        "신규 가입 축하 쿠폰",
+                        CouponTarget.ALL,
+                        CouponType.AUTO,
+                        AutoIssueType.SIGNUP,
+                        null,
+                        CouponUsageType.SINGLE_USE,
+                        false,
+                        DiscountType.AMOUNT,
+                        1000,
+                        null,
+                        null,
+                        30,
+                        now.minusDays(1),
+                        null,
+                        null,
+                        null
+                ),
+                CouponPolicy.createPolicy(
+                        "연속 출석 보상 쿠폰",
+                        CouponTarget.ALL,
+                        CouponType.AUTO,
+                        AutoIssueType.ATTENDANCE_STREAK,
+                        null,
+                        CouponUsageType.SINGLE_USE,
+                        false,
+                        DiscountType.AMOUNT,
+                        1000,
+                        null,
+                        null,
+                        30,
+                        now.minusDays(1),
+                        null,
+                        null,
+                        null
+                ),
+                CouponPolicy.createPolicy(
+                        "월간 출석 보상 쿠폰",
+                        CouponTarget.ALL,
+                        CouponType.AUTO,
+                        AutoIssueType.MONTHLY_ATTENDANCE,
+                        null,
+                        CouponUsageType.SINGLE_USE,
+                        false,
+                        DiscountType.AMOUNT,
+                        1000,
+                        null,
+                        null,
+                        30,
+                        now.minusDays(1),
+                        null,
+                        null,
+                        null
+                )
+        );
     }
 
     /**

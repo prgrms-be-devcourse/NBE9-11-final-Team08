@@ -1,5 +1,6 @@
 package com.team08.backend.domain.couponpolicy.dto;
 
+import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -13,6 +14,7 @@ public record CouponPolicySummaryResponse(
         String name,
         CouponTarget couponTarget,
         CouponType couponType,
+        AutoIssueType autoIssueType,
         Integer totalQuantity,
         CouponUsageType usageType,
         Boolean isStackable,
@@ -30,6 +32,7 @@ public record CouponPolicySummaryResponse(
                 policy.getName(),
                 policy.getCouponTarget(),
                 policy.getCouponType(),
+                policy.getAutoIssueType(),
                 policy.getTotalQuantity(),
                 policy.getUsageType(),
                 policy.getIsStackable(),

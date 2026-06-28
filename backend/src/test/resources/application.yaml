@@ -74,6 +74,9 @@ app:
       max-retries: 5
       retry-base-delay-seconds: 10
       retry-max-delay-seconds: 600
+  payment:
+    success-outbox:
+      scheduler-enabled: false
   ai:
     model: stub
     prompt-version: v1

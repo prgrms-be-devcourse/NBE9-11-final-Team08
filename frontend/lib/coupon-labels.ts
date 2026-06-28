@@ -1,10 +1,17 @@
 import type {
+  AutoIssueType,
   CouponApplyTarget,
   CouponDiscountType,
   CouponPolicyType,
   CouponStatus,
   CouponUseType,
 } from './types'
+
+export const autoIssueTypeLabel: Record<AutoIssueType, string> = {
+  SIGNUP: '회원가입',
+  ATTENDANCE_STREAK: '연속 출석',
+  MONTHLY_ATTENDANCE: '월간 출석',
+}
 
 export const couponTypeLabel: Record<CouponPolicyType, string> = {
   AUTO: '자동',
