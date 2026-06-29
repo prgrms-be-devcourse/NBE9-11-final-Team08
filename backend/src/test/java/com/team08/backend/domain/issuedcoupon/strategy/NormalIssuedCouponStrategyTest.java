@@ -5,6 +5,7 @@ import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponWriter;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -36,6 +39,12 @@ class NormalIssuedCouponStrategyTest {
     @Mock
     private IssuedCouponRepository issuedCouponRepository;
 
+    @Mock
+    private IssuedCouponWriter issuedCouponWriter;
+
+    @Mock
+    private TransactionTemplate transactionTemplate;
+
     private Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private NormalIssuedCouponStrategy normalIssuedCouponStrategy;
@@ -45,7 +54,9 @@ class NormalIssuedCouponStrategyTest {
         normalIssuedCouponStrategy = new NormalIssuedCouponStrategy(
                 issuedCouponRepository,
                 clock,
-                couponPolicyRepository
+                couponPolicyRepository,
+                issuedCouponWriter,
+                transactionTemplate
         );
     }
 
@@ -57,21 +68,31 @@ class NormalIssuedCouponStrategyTest {
         Long policyId = 1L;
         CouponPolicy policy = mock(CouponPolicy.class);
         LocalDateTime now = LocalDateTime.now(clock);
+        IssuedCoupon savedCoupon = mock(IssuedCoupon.class);
 
         when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
         when(policy.getId()).thenReturn(policyId);
-        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(now.plusDays(30));
+        
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        
+        when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(savedCoupon);
 
         // when
-        IssuedCoupon result = normalIssuedCouponStrategy.issue(userId, policyId);
+        CouponIssueResult result = normalIssuedCouponStrategy.issue(userId, policyId);
 
         // then
         assertThat(result).isNotNull();
-        assertThat(result.getPolicyId()).isEqualTo(policyId);
+        assertThat(result.status()).isEqualTo(CouponIssueResult.Status.ISSUED);
+        assertThat(result.issuedCoupon()).isEqualTo(savedCoupon);
+        
         verify(couponPolicyRepository).findById(policyId);
         verify(couponPolicyRepository, never()).findByIdWithLock(policyId);
         verify(policy).validateIssuePeriod(any(LocalDateTime.class));
+        verify(issuedCouponWriter).saveWithConcurrencyProtection(any(IssuedCoupon.class));
     }
 
     @Test

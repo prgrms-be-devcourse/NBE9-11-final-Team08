@@ -14,9 +14,13 @@ import type {
   OrderDetailResponse,
   ConfirmPaymentResponse,
   ConfirmTossPaymentRequest,
+  NicepayPreparePaymentRequest,
+  NicepayPreparePaymentResponse,
   PaymentResponse,
   EnrolledCourse,
+  EnrolledCourseResponse,
   MyComment,
+  MyAnswer,
   QnaPost,
   Study,
   StudyDetailResponse,
@@ -44,6 +48,7 @@ import type {
   LearningEventType,
   LearningEventResponse,
   QnaQuestionResponse,
+  QnaAnswerResponse,
   StudyReportResponse,
   AdminOverview,
   DailySessionPoint,
@@ -454,6 +459,18 @@ const mapStudyMemberResponseToMember = (
   progress: 0,
   role: member.role.toLowerCase() as StudyMember['role'],
   joinedAt: parseDateToString(member.joinedAt),
+})
+
+const mapEnrolledCourseResponseToCourse = (course: EnrolledCourseResponse): EnrolledCourse => ({
+  id: String(course.studyId ?? course.courseId),
+  courseId: String(course.courseId),
+  title: course.title,
+  instructor: course.instructorNickname,
+  thumbnailUrl: course.thumbnailUrl || '/placeholder.svg',
+  progress: course.progressRate ?? 0,
+  totalLectures: course.totalLectures ?? 0,
+  completedLectures: course.completedLectures ?? 0,
+  status: course.progressRate >= 100 ? '완료' : '진행 중',
 })
 
 const mapUseTypeToBackend = (useType: string): any => {
@@ -1160,6 +1177,14 @@ export const api = {
   createQuestion: (lectureId: string | number, title: string, content: string) =>
     mutate<QnaQuestionResponse>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
 
+  // QnA 답변 (해당 강좌의 강사/판매자 전용 — 백엔드 MANAGE_ANSWER 로 강제)
+  createAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'POST', { content }),
+  updateAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'PUT', { content }),
+  deleteAnswer: (questionId: string | number) =>
+    mutate<void>(`/api/qna/questions/${questionId}/answers`, 'DELETE'),
+
   // Reflections
   getReflection: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/reflections`, null),
   createReflection: (lectureId: string | number, content: string) => mutate<any>(`/api/lectures/${lectureId}/reflections`, 'POST', { content }),
@@ -1201,6 +1226,10 @@ export const api = {
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
+  confirmProviderPayment: (orderId: number, providerType: string, request: ConfirmTossPaymentRequest) =>
+    mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/providers/${providerType}/confirm`, 'POST', request),
+  prepareNicepayPayment: (orderId: number, request: NicepayPreparePaymentRequest) =>
+    mutate<NicepayPreparePaymentResponse>(`/api/payments/${orderId}/nicepay/prepare`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
   confirmPayment: (
@@ -1246,6 +1275,12 @@ export const api = {
     request<PageResponse<StudyActivityResponse>>(
       `/api/studies/${studyId}/activities?page=${page}&size=${size}`,
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
+    ),
+
+  getMyStudyActivities: (page = 0, size = 10) =>
+    request<PageResponse<StudyActivityResponse>>(
+      `/api/study-activities/me?page=${page}&size=${size}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
     ),
 
   getStudyFeed: (studyId: string | number, cursor?: FeedCursor | null, size = 10) => {
@@ -1458,39 +1493,11 @@ export const api = {
     }
   },
   getPurchasedCourses: async (): Promise<EnrolledCourse[]> => {
-    try {
-      const res = await request<any>('/api/orders', { content: [] })
-      const orders = Array.isArray(res) ? res : (res?.content || [])
-      const enrolled: EnrolledCourse[] = []
-      for (const ord of orders) {
-        if (ord.status === 'PAID') {
-          for (const item of ord.items ?? []) {
-            const courseId = item.courseId.toString()
-            if (!enrolled.some(e => (e.courseId ?? e.id) === courseId)) {
-              const studyId = await api.getStudyIdByCourseId(courseId)
-              if (!studyId) continue
-              enrolled.push({
-                id: studyId,
-                courseId,
-                title: item.courseTitle || '',
-                instructor: '강사',
-                thumbnailUrl: '/placeholder.svg',
-                progress: 0,
-                totalLectures: 0,
-                completedLectures: 0,
-                status: '진행 중'
-              })
-            }
-          }
-        }
-      }
-      return enrolled
-    } catch (e) {
-      console.error('Failed to get purchased courses from orders:', e)
-      return []
-    }
+    const courses = await request<EnrolledCourseResponse[]>('/api/enrollments/me/courses', [])
+    return Array.isArray(courses) ? courses.map(mapEnrolledCourseResponseToCourse) : []
   },
   getMyComments: () => request<MyComment[]>('/api/me/comments', []),
+  getMyAnswers: () => request<MyAnswer[]>('/api/me/answers', []),
 
   // Orders
   getOrders: async () => {

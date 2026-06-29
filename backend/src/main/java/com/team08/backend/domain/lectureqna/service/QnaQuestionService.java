@@ -2,6 +2,7 @@ package com.team08.backend.domain.lectureqna.service;
 
 import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
 import com.team08.backend.domain.course.access.CourseAction;
+import com.team08.backend.domain.lectureqna.dto.MyAnswerResponse;
 import com.team08.backend.domain.lectureqna.dto.MyCommentResponse;
 import com.team08.backend.domain.lectureqna.dto.MyQnaRow;
 import com.team08.backend.domain.lectureqna.dto.QnaAnswerSummary;
@@ -10,6 +11,8 @@ import com.team08.backend.domain.lectureqna.entity.QnaAnswer;
 import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
+import com.team08.backend.domain.user.entity.User;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,9 @@ public class QnaQuestionService {
     private final QnaQuestionRepository qnaQuestionRepository;
     private final QnaAnswerRepository qnaAnswerRepository;
     private final CourseAccessAuthorizer courseAccessAuthorizer;
+    private final UserRepository userRepository;
+
+    private static final String UNKNOWN_NICKNAME = "수강생";
 
     @Transactional
     public QnaQuestionResponse createQuestion(Long lectureId, Long userId, String title, String content) {
@@ -39,7 +45,7 @@ public class QnaQuestionService {
 
         QnaQuestion question = QnaQuestion.create(userId, lectureId, title, content);
         QnaQuestion saved = qnaQuestionRepository.save(question);
-        return toResponse(saved, null);
+        return toResponse(saved, null, nicknameOf(userId));
     }
 
     @Transactional
@@ -58,7 +64,7 @@ public class QnaQuestionService {
         question.update(title, content);
         QnaQuestion saved = qnaQuestionRepository.save(question);
 
-        return toResponse(saved, null);
+        return toResponse(saved, null, nicknameOf(question.getUserId()));
     }
 
     @Transactional
@@ -91,7 +97,15 @@ public class QnaQuestionService {
                         a -> new QnaAnswerSummary(a.getId(), a.getContent(), a.getCreatedAt())
                 ));
 
-        return questions.map(q -> toResponse(q, answerMap.get(q.getId())));
+        // 질문 작성자 닉네임을 한 번의 배치 조회로 채워 N+1 을 피한다.
+        List<Long> authorIds = questions.stream().map(QnaQuestion::getUserId).distinct().toList();
+        Map<Long, String> nicknameMap = userRepository.findAllById(authorIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getNickname));
+
+        return questions.map(q -> toResponse(
+                q,
+                answerMap.get(q.getId()),
+                nicknameMap.getOrDefault(q.getUserId(), UNKNOWN_NICKNAME)));
     }
 
     /**
@@ -119,11 +133,25 @@ public class QnaQuestionService {
                 .toList();
     }
 
-    private QnaQuestionResponse toResponse(QnaQuestion q, QnaAnswerSummary answer) {
+    /**
+     * 마이페이지 "작성한 답변"(강사/판매자): 내가 작성한 QnA 답변을 최신순으로 모아준다.
+     */
+    @Transactional(readOnly = true)
+    public List<MyAnswerResponse> getMyAnswers(Long userId) {
+        return qnaAnswerRepository.findMyAnswers(userId);
+    }
+
+    private QnaQuestionResponse toResponse(QnaQuestion q, QnaAnswerSummary answer, String nickname) {
         return new QnaQuestionResponse(
-                q.getId(), q.getLectureId(), q.getUserId(),
+                q.getId(), q.getLectureId(), q.getUserId(), nickname,
                 q.getTitle(), q.getContent(),
                 q.getCreatedAt(), q.getUpdatedAt(),
                 answer);
+    }
+
+    private String nicknameOf(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getNickname)
+                .orElse(UNKNOWN_NICKNAME);
     }
 }

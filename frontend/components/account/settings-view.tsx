@@ -60,27 +60,6 @@ export function SettingsView({ profile }: { profile: UserProfile }) {
           </Button>
         </div>
       </section>
-
-      <section className="rounded-xl border bg-card p-5">
-        <h2 className="font-semibold">알림 설정</h2>
-        <Separator className="my-4" />
-        <ul className="space-y-4">
-          {notifications.map((n) => (
-            <li key={n.key} className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium">{n.label}</p>
-                <p className="text-xs text-muted-foreground">{n.desc}</p>
-              </div>
-              <Switch
-                checked={toggles[n.key]}
-                onCheckedChange={(v) =>
-                  setToggles((prev) => ({ ...prev, [n.key]: v }))
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   )
 }

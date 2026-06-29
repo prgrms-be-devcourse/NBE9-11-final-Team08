@@ -178,6 +178,36 @@ export interface ConfirmTossPaymentRequest {
   amount: number
   issuedCouponId?: number | null
   idempotencyKey?: string | null
+  authResultCode?: string | null
+  authResultMsg?: string | null
+  authToken?: string | null
+  txTid?: string | null
+  mid?: string | null
+  moid?: string | null
+  signature?: string | null
+  nextAppUrl?: string | null
+  netCancelUrl?: string | null
+  payMethod?: string | null
+}
+
+export interface NicepayPreparePaymentRequest {
+  payMethod: 'CARD'
+  issuedCouponId?: number | null
+}
+
+export interface NicepayPreparePaymentResponse {
+  goodsName: string
+  amt: number
+  mid: string
+  ediDate: string
+  moid: string
+  signData: string
+  payMethod: 'CARD'
+  buyerName: string
+  buyerTel: string
+  buyerEmail: string
+  charSet: string
+  reqReserved?: string | null
 }
 
 export interface PaymentResponse {
@@ -319,11 +349,22 @@ export interface QnaQuestionResponse {
   id: number
   lectureId: number
   userId: number
+  nickname: string
   title: string
   content: string
   createdAt: string
   updatedAt: string
   answer: QnaAnswerSummary | null
+}
+
+// 백엔드 QnaAnswerResponse(record)와 동일한 형태
+export interface QnaAnswerResponse {
+  id: number
+  questionId: number
+  instructorId: number
+  content: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface LectureReflectionResponse {
@@ -428,6 +469,19 @@ export interface EnrolledCourse {
   status: '진행 중' | '완료'
 }
 
+export interface EnrolledCourseResponse {
+  enrollmentId: number
+  courseId: number
+  studyId?: number | null
+  title: string
+  instructorNickname: string
+  thumbnailUrl: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
+  enrolledAt: string
+}
+
 export interface MyComment {
   id: number
   lectureId: number
@@ -437,6 +491,19 @@ export interface MyComment {
   content: string
   createdAt: string
   answered: boolean
+}
+
+// 백엔드 MyAnswerResponse(record)와 동일한 형태 — 강사/판매자가 작성한 답변
+export interface MyAnswer {
+  answerId: number
+  questionId: number
+  lectureId: number
+  courseTitle: string
+  lectureTitle: string
+  questionTitle: string
+  questionContent: string
+  answerContent: string
+  createdAt: string
 }
 
 export interface SignupRequest {

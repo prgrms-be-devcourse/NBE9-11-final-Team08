@@ -166,9 +166,6 @@ export function SiteHeader() {
                   <Link href="/mypage">마이페이지</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard">대시보드</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
                   <Link href="/mypage/report">내 스터디 리포트</Link>
                 </DropdownMenuItem>
                 {isSeller && (

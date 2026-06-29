@@ -13,6 +13,11 @@ public interface StudyActivityRepository extends JpaRepository<StudyActivity, Lo
             Pageable pageable
     );
 
+    Page<StudyActivity> findAllByAuthorIdAndDeletedAtIsNull(
+            Long authorId,
+            Pageable pageable
+    );
+
     Optional<StudyActivity> findByIdAndStudyIdAndDeletedAtIsNull(
             Long id,
             Long studyId

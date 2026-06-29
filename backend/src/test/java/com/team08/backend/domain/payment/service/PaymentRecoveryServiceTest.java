@@ -1,9 +1,11 @@
 package com.team08.backend.domain.payment.service;
 
-import com.team08.backend.domain.payment.client.TossPaymentClient;
-import com.team08.backend.domain.payment.client.TossPaymentException;
-import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
-import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentRecoveryTarget;
+import com.team08.backend.domain.payment.entity.PaymentProviderType;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
+import com.team08.backend.domain.payment.provider.PaymentProviderLookupRequest;
+import com.team08.backend.domain.payment.provider.PaymentProviderLookupResponse;
+import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
+import com.team08.backend.domain.payment.service.PaymentTransactionService.PaymentRecoveryTarget;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +38,7 @@ class PaymentRecoveryServiceTest {
     private PaymentTransactionService paymentTransactionService;
 
     @Mock
-    private TossPaymentClient tossPaymentClient;
+    private PaymentProviderRouter paymentProviderRouter;
 
     private PaymentRecoveryService paymentRecoveryService;
 
@@ -44,7 +46,7 @@ class PaymentRecoveryServiceTest {
     void setUp() {
         paymentRecoveryService = new PaymentRecoveryService(
                 paymentTransactionService,
-                tossPaymentClient,
+                paymentProviderRouter,
                 FIXED_CLOCK
         );
         ReflectionTestUtils.setField(paymentRecoveryService, "staleThreshold", Duration.ofMinutes(5));
@@ -53,58 +55,62 @@ class PaymentRecoveryServiceTest {
     }
 
     @Test
-    void recoversTossPaymentByBatchLimit() {
-        TossPaymentRecoveryTarget firstTarget = recoveryTarget(100L, "ORD-1");
-        TossPaymentRecoveryTarget secondTarget = recoveryTarget(101L, "ORD-2");
-        TossPaymentResponse firstResponse = tossResponse("ORD-1", "DONE");
-        TossPaymentResponse secondResponse = tossResponse("ORD-2", "DONE");
+    void recoversProviderPaymentByBatchLimit() {
+        PaymentRecoveryTarget firstTarget = recoveryTarget(PaymentProviderType.TOSS, 100L, "ORD-1");
+        PaymentRecoveryTarget secondTarget = recoveryTarget(PaymentProviderType.NICEPAY, 101L, "ORD-2");
+        PaymentProviderLookupResponse firstResponse = providerResponse("ORD-1", "DONE");
+        PaymentProviderLookupResponse secondResponse = providerResponse("ORD-2", "DONE");
 
-        given(paymentTransactionService.findTossRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
+        given(paymentTransactionService.findProviderRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
                 .willReturn(List.of(firstTarget, secondTarget));
-        given(tossPaymentClient.findByOrderId("ORD-1")).willReturn(Optional.of(firstResponse));
-        given(tossPaymentClient.findByOrderId("ORD-2")).willReturn(Optional.of(secondResponse));
-        given(paymentTransactionService.recoverTossPayment(firstTarget, firstResponse)).willReturn(true);
-        given(paymentTransactionService.recoverTossPayment(secondTarget, secondResponse)).willReturn(true);
+        given(paymentProviderRouter.lookup(PaymentProviderType.TOSS, new PaymentProviderLookupRequest(null, "ORD-1")))
+                .willReturn(Optional.of(firstResponse));
+        given(paymentProviderRouter.lookup(PaymentProviderType.NICEPAY, new PaymentProviderLookupRequest(null, "ORD-2")))
+                .willReturn(Optional.of(secondResponse));
+        given(paymentTransactionService.recoverProviderPayment(firstTarget, firstResponse)).willReturn(true);
+        given(paymentTransactionService.recoverProviderPayment(secondTarget, secondResponse)).willReturn(true);
 
         int recoveredCount = paymentRecoveryService.recoverPayments();
 
         assertThat(recoveredCount).isEqualTo(2);
-        verify(paymentTransactionService).findTossRecoveryTargets(FIXED_NOW.minusMinutes(5), 2);
-        verify(paymentTransactionService).recoverTossPayment(firstTarget, firstResponse);
-        verify(paymentTransactionService).recoverTossPayment(secondTarget, secondResponse);
+        verify(paymentTransactionService).findProviderRecoveryTargets(FIXED_NOW.minusMinutes(5), 2);
+        verify(paymentTransactionService).recoverProviderPayment(firstTarget, firstResponse);
+        verify(paymentTransactionService).recoverProviderPayment(secondTarget, secondResponse);
     }
 
     @Test
-    void missingTossPaymentIsRecoveredAsNotFound() {
-        TossPaymentRecoveryTarget target = recoveryTarget(100L, "ORD-1");
+    void missingProviderPaymentIsRecoveredAsNotFound() {
+        PaymentRecoveryTarget target = recoveryTarget(PaymentProviderType.NICEPAY, 100L, "ORD-1");
 
-        given(paymentTransactionService.findTossRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
+        given(paymentTransactionService.findProviderRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
                 .willReturn(List.of(target));
-        given(tossPaymentClient.findByOrderId("ORD-1")).willReturn(Optional.empty());
-        given(paymentTransactionService.recoverTossPaymentNotFound(target)).willReturn(true);
+        given(paymentProviderRouter.lookup(PaymentProviderType.NICEPAY, new PaymentProviderLookupRequest(null, "ORD-1")))
+                .willReturn(Optional.empty());
+        given(paymentTransactionService.recoverProviderPaymentNotFound(target)).willReturn(true);
 
         int recoveredCount = paymentRecoveryService.recoverPayments();
 
         assertThat(recoveredCount).isEqualTo(1);
-        verify(paymentTransactionService).recoverTossPaymentNotFound(target);
-        verify(paymentTransactionService, never()).recoverTossPayment(target, null);
+        verify(paymentTransactionService).recoverProviderPaymentNotFound(target);
+        verify(paymentTransactionService, never()).recoverProviderPayment(target, null);
     }
 
     @Test
-    void tossLookupFailureKeepsPaymentUnknown() {
-        TossPaymentRecoveryTarget target = recoveryTarget(100L, "ORD-1");
-        TossPaymentException exception = TossPaymentException.timeout("TOSS_TIMEOUT", "Toss timeout");
+    void providerLookupFailureKeepsPaymentUnknown() {
+        PaymentRecoveryTarget target = recoveryTarget(PaymentProviderType.NICEPAY, 100L, "ORD-1");
+        PaymentProviderException exception = PaymentProviderException.timeout("NICEPAY_TIMEOUT", "NICEPAY timeout");
 
-        given(paymentTransactionService.findTossRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
+        given(paymentTransactionService.findProviderRecoveryTargets(FIXED_NOW.minusMinutes(5), 2))
                 .willReturn(List.of(target));
-        given(tossPaymentClient.findByOrderId("ORD-1")).willThrow(exception);
-        given(paymentTransactionService.keepTossPaymentUnknown(target, "TOSS_TIMEOUT", "Toss timeout"))
+        given(paymentProviderRouter.lookup(PaymentProviderType.NICEPAY, new PaymentProviderLookupRequest(null, "ORD-1")))
+                .willThrow(exception);
+        given(paymentTransactionService.keepProviderPaymentUnknown(target, "NICEPAY_TIMEOUT", "NICEPAY timeout"))
                 .willReturn(true);
 
         int recoveredCount = paymentRecoveryService.recoverPayments();
 
         assertThat(recoveredCount).isEqualTo(1);
-        verify(paymentTransactionService).keepTossPaymentUnknown(target, "TOSS_TIMEOUT", "Toss timeout");
+        verify(paymentTransactionService).keepProviderPaymentUnknown(target, "NICEPAY_TIMEOUT", "NICEPAY timeout");
     }
 
     @Test
@@ -113,15 +119,15 @@ class PaymentRecoveryServiceTest {
 
         paymentRecoveryService.recoverScheduledPayments();
 
-        verify(paymentTransactionService, never()).findTossRecoveryTargets(FIXED_NOW.minusMinutes(5), 2);
+        verify(paymentTransactionService, never()).findProviderRecoveryTargets(FIXED_NOW.minusMinutes(5), 2);
     }
 
-    private TossPaymentRecoveryTarget recoveryTarget(Long paymentId, String orderNumber) {
-        return new TossPaymentRecoveryTarget(paymentId, 10L, 1L, orderNumber, 30_000);
+    private PaymentRecoveryTarget recoveryTarget(PaymentProviderType providerType, Long paymentId, String orderNumber) {
+        return new PaymentRecoveryTarget(providerType, paymentId, 10L, 1L, orderNumber, 30_000);
     }
 
-    private TossPaymentResponse tossResponse(String orderNumber, String status) {
-        return new TossPaymentResponse(
+    private PaymentProviderLookupResponse providerResponse(String orderNumber, String status) {
+        return new PaymentProviderLookupResponse(
                 "payment-key",
                 orderNumber,
                 status,

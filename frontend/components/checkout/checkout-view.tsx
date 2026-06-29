@@ -1,4 +1,4 @@
-// frontend/components/checkout/checkout-view.tsx
+﻿// frontend/components/checkout/checkout-view.tsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +14,7 @@ import {
   savePendingPayment,
   type PaymentProvider,
 } from '@/lib/checkout-payment'
+import { requestNicepayPayment, type NicepayAuthResult } from '@/lib/nicepay-payments'
 import { loadTossPayments } from '@/lib/toss-payments'
 import { formatKRW } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,14 +42,23 @@ type CouponOption = {
   courseIds?: number[]
 }
 
-type CheckoutStep = 'idle' | 'loading-order' | 'creating-order' | 'mock-confirming' | 'opening-toss'
+type CheckoutStep = 'idle' | 'loading-order' | 'creating-order' | 'mock-confirming' | 'opening-toss' | 'opening-nicepay'
+
+const resolveNicepayMethod = (result: NicepayAuthResult) => {
+  if (result.EasyPayCl === '16' || result.ClickpayCl === '16') {
+    return 'KAKAOPAY'
+  }
+  return result.EasyPayMethod || result.SelectPayMethod || result.PayMethod || 'CARD'
+}
 
 export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const router = useRouter()
   const { items, clear } = useCart()
   const submittingRef = useRef(false)
   const tossClientKey = process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY ?? ''
+  const nicepayMid = process.env.NEXT_PUBLIC_NICEPAY_MID ?? ''
   const canUseToss = tossClientKey.trim().length > 0
+  const canUseNicepay = nicepayMid.trim().length > 0
   const [directOrder, setDirectOrder] = useState<OrderDetailResponse | null>(null)
   const [orderLoadError, setOrderLoadError] = useState('')
   const [couponId, setCouponId] = useState<string>('none')
@@ -61,7 +71,10 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
     if (!canUseToss && provider === 'toss') {
       setProvider('mock')
     }
-  }, [canUseToss, provider])
+    if (!canUseNicepay && provider === 'nicepay') {
+      setProvider('mock')
+    }
+  }, [canUseNicepay, canUseToss, provider])
 
   useEffect(() => {
     if (!initialOrderId) return
@@ -173,7 +186,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   }, [couponId])
 
   const displayTotal = Math.max(0, baseFinalPrice - couponDiscount)
-  const isSubmitting = step === 'creating-order' || step === 'mock-confirming' || step === 'opening-toss'
+  const isSubmitting = step === 'creating-order' || step === 'mock-confirming' || step === 'opening-toss' || step === 'opening-nicepay'
 
   const stepTextByStep: Record<CheckoutStep, string> = {
     idle: '',
@@ -181,6 +194,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
     'creating-order': '주문을 생성하는 중...',
     'mock-confirming': 'Mock 결제를 승인하는 중...',
     'opening-toss': 'Toss 결제창을 여는 중...',
+    'opening-nicepay': 'NICEPAY 결제창을 여는 중...',
   }
   const stepText = stepTextByStep[step]
 
@@ -310,9 +324,82 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
     }
   }
 
+  async function handleNicepayPay() {
+    if (submittingRef.current) return
+    if (!assertReadyToPay()) return
+
+    if (!canUseNicepay) {
+      toast.error('NICEPAY MID가 설정되지 않았습니다. .env.local을 확인해주세요.')
+      return
+    }
+
+    submittingRef.current = true
+    setStep('creating-order')
+    try {
+      const order = await createOrGetOrder()
+      const pendingPayment = buildPendingPayment(order, 'nicepay')
+      const prepare = await api.prepareNicepayPayment(order.orderId, {
+        payMethod: 'CARD',
+        issuedCouponId: selectedCouponId,
+      })
+
+      setStep('opening-nicepay')
+      const result = await requestNicepayPayment(prepare)
+
+      const paymentKey = result.TxTid || result.TID || result.tid
+      if (!paymentKey) {
+        throw new Error('NICEPAY 결제 키를 확인할 수 없습니다.')
+      }
+      const payMethod = result.PayMethod || 'CARD'
+
+      const paymentResponse = await api.confirmProviderPayment(order.orderId, 'NICEPAY', {
+        paymentKey,
+        method: resolveNicepayMethod(result),
+        amount: pendingPayment.amount,
+        issuedCouponId: selectedCouponId,
+        idempotencyKey: pendingPayment.idempotencyKey,
+        authResultCode: result.AuthResultCode,
+        authResultMsg: result.AuthResultMsg,
+        authToken: result.AuthToken,
+        txTid: paymentKey,
+        mid: result.MID,
+        moid: result.Moid || result.moid,
+        signature: result.Signature,
+        nextAppUrl: result.NextAppURL,
+        netCancelUrl: result.NetCancelURL,
+        payMethod,
+      })
+
+      if (pendingPayment.fromCart && paymentResponse.orderStatus === 'PAID') {
+        await clear()
+      }
+
+      const orderNumber = paymentResponse.orderNumber || order.orderNumber
+      const amount = paymentResponse.amount || pendingPayment.amount
+      const status = paymentResponse.paymentStatus === 'SUCCESS'
+        ? 'success'
+        : paymentResponse.paymentStatus === 'DECLINED'
+          ? 'fail'
+          : 'pending'
+      router.push(
+        `/orders/complete?payment=nicepay&status=${status}&serviceOrderId=${order.orderId}&orderId=${encodeURIComponent(orderNumber)}&amount=${amount}`,
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'NICEPAY 결제창 호출에 실패했습니다.'
+      toast.error(message)
+      setStep('idle')
+      submittingRef.current = false
+    }
+  }
+
   const handlePay = () => {
     if (provider === 'toss') {
       void handleTossPay()
+      return
+    }
+
+    if (provider === 'nicepay') {
+      void handleNicepayPay()
       return
     }
 
@@ -400,7 +487,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
                     <SelectValue placeholder="사용할 쿠폰을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">선택 안함</SelectItem>
+                    <SelectItem value="none">선택 안 함</SelectItem>
                     {userCoupons.map((couponOption) => {
                       const applicable = isCouponApplicable(couponOption)
                       return (
@@ -444,6 +531,14 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
                       ? 'Toss 결제창 완료 후 백엔드 confirm API를 호출합니다.'
                       : 'Toss client key 설정 후 사용할 수 있습니다.',
                     disabled: !canUseToss,
+                  },
+                  {
+                    value: 'nicepay',
+                    label: 'NICEPAY 결제',
+                    description: canUseNicepay
+                      ? 'NICEPAY 결제창 인증 후 백엔드 Provider confirm API를 호출합니다.'
+                      : 'NICEPAY MID 설정 후 사용할 수 있습니다.',
+                    disabled: !canUseNicepay,
                   },
                 ].map((option) => (
                   <Label

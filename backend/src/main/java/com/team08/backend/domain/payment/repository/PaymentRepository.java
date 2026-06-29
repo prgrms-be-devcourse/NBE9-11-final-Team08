@@ -33,4 +33,18 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("threshold") LocalDateTime threshold,
             Pageable pageable
     );
+
+    @Query("""
+            select p
+            from Payment p
+            join fetch p.order o
+            where p.status in :statuses
+              and coalesce(p.updatedAt, p.createdAt) < :threshold
+            order by coalesce(p.updatedAt, p.createdAt) asc
+            """)
+    List<Payment> findRecoverablePayments(
+            @Param("statuses") Collection<PaymentStatus> statuses,
+            @Param("threshold") LocalDateTime threshold,
+            Pageable pageable
+    );
 }

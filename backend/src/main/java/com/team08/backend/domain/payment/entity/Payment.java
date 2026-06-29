@@ -153,6 +153,17 @@ public class Payment {
         this.updatedAt = unknownAt;
     }
 
+    public void markUnknown(String paymentKey, String method, String failureCode, String failureMessage, LocalDateTime unknownAt) {
+        validateStatus(PaymentStatus.PROCESSING);
+        this.paymentKey = paymentKey;
+        this.method = method;
+        this.status = PaymentStatus.UNKNOWN;
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+        this.failedReason = failureMessage;
+        this.updatedAt = unknownAt;
+    }
+
     public void recoverSucceed(String paymentKey, String method, LocalDateTime paidAt) {
         validateStatus(PaymentStatus.PROCESSING, PaymentStatus.UNKNOWN);
         this.paymentKey = paymentKey;
