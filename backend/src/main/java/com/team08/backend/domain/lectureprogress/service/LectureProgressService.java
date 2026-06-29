@@ -102,6 +102,7 @@ public class LectureProgressService {
             eventPublisher.publishEvent(new LectureCompletedEvent(
                     userId,
                     lecture.getChapter().getCourse().getId(),
+                    lecture.getChapter().getId(),
                     lectureId,
                     eventTime
             ));

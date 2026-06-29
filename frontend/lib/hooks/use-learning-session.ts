@@ -70,22 +70,17 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
     [],
   )
 
-  // 수강 완료: 진행 PATCH 먼저, 그 다음 LECTURE_COMPLETE.
-  // 완료 이벤트는 백엔드가 실제로 완료(progressRate ≥ 90%)로 인정한 경우(res.completed)에만 적재한다.
-  // → 시청시간이 부족해 완료되지 않았는데도 learning_daily_stats.completed_count 가
-  //    부풀려지는(리포트와 lecture_progresses 가 어긋나는) 문제를 막는다.
-  // (실패는 호출측에서 처리하도록 전파)
+  // 마지막 진행분 flush(PATCH). 완강 판별은 서버가 누적 시청시간(≥90%)으로 한다.
+  // 완료 시 필요한 처리(LECTURE_COMPLETE 적재·피드·통계)는 서버가 완료 전이에서 연쇄 발행하므로
+  // 클라이언트는 완료 이벤트를 직접 보내지 않는다. (실패는 호출측에서 처리하도록 전파)
   const complete = useCallback(
-    async (
+    (
       lectureId: string,
       position: number,
       delta: number,
-    ): Promise<LectureProgressResponse> => {
-      const res = await api.updateLectureProgress(lectureId, position, delta)
-      if (res.completed) record(lectureId, 'LECTURE_COMPLETE', position)
-      return res
-    },
-    [record],
+    ): Promise<LectureProgressResponse> =>
+      api.updateLectureProgress(lectureId, position, delta),
+    [],
   )
 
   // 퇴장: 마지막 위치 flush(PATCH delta=0) 먼저, 그 다음 LECTURE_EXIT.

@@ -10,8 +10,6 @@ import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
-import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
-import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,48 +29,61 @@ public class LearningEventService {
 
     private final LearningEventRepository learningEventRepository;
     private final CourseRepository courseRepository;
-    private final LectureProgressRepository lectureProgressRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    // ── 이벤트 기록 (중복 방지 포함) ───────────────────────────────────
+    // ── 클라이언트 이벤트 기록 (입장/멈춤/퇴장) ───────────────────────────────
     @Transactional
     public LearningEventResponse recordEvent(Long userId, RecordLearningEventRequest request) {
-        String eventKey = resolveEventKey(request);
-
-        // 클라이언트 쪽에서 네트워크 에러로 같은 이벤트를 여러번 보냈을 때
-        // 중복 이벤트 방지
-        if (learningEventRepository.existsByUniqueEventKey(eventKey)) {
-            throw new CustomException(ErrorCode.DUPLICATE_LEARNING_EVENT);
+        // 완료(LECTURE_COMPLETE)는 클라이언트가 직접 기록할 수 없다.
+        // 완강 판별은 오직 하트비트 진행률(lecture_progresses, ≥90%)로 결정되고,
+        // 완료 전이 시 서버가 LectureCompletedEvent → recordLectureCompletion 으로 연쇄 발행한다.
+        // (완료 ⟺ LECTURE_COMPLETE 이벤트 존재 불변식을 서버가 구조적으로 보장)
+        if (request.eventType() == LearningEventType.LECTURE_COMPLETE) {
+            throw new CustomException(ErrorCode.CLIENT_COMPLETE_EVENT_NOT_ALLOWED);
         }
-
-        // 완료 이벤트는 클라이언트 주장(eventType)을 그대로 믿지 않고 서버 상태로 검증한다.
-        // lecture_progresses 의 누적 시청시간이 완료 기준(progressRate≥90%)에 도달해
-        // completed=true 인 경우에만 적재를 허용한다. (프론트 가드를 우회한 직접 호출로
-        // learning_daily_stats.completed_count 가 부풀려져 리포트가 어긋나는 것을 막는다.)
-        if (request.eventType() == LearningEventType.LECTURE_COMPLETE
-                && !isLectureCompleted(userId, request.lectureId())) {
-            throw new CustomException(ErrorCode.LECTURE_NOT_COMPLETED);
-        }
-
-        //1. 이벤트 적재
-        //   발생 시각은 클라이언트 시계를 믿지 않고 서버 수신 시각으로 찍는다(권위값).
-        //   타임존 모호성·시계 오차·조작이 원천적으로 없고, 모든 이벤트가 단일 서버 클럭으로 정렬된다.
-        //   (현재 클라이언트는 이벤트를 즉시 전송하므로 수신 시각 ≈ 발생 시각)
-        LearningEvent event = LearningEvent.create(
+        return persist(
                 userId,
                 request.courseId(),
                 request.chapterId(),
                 request.lectureId(),
                 request.eventType(),
                 request.positionSeconds(),
-                LocalDateTime.now(),
-                eventKey
+                resolveEventKey(request)
+        );
+    }
+
+    // ── 완료 학습이벤트 적재 (서버 전용, 완료 전이에서만 호출) ──────────────────
+    // (user, lecture) 당 1회만 기록되도록 결정적 키로 멱등 처리한다.
+    @Transactional
+    public void recordLectureCompletion(Long userId, Long courseId, Long chapterId, Long lectureId,
+                                        LocalDateTime eventTime) {
+        String eventKey = completionEventKey(userId, lectureId);
+        if (learningEventRepository.existsByUniqueEventKey(eventKey)) {
+            return; // 이미 기록됨 — 멱등
+        }
+        persist(userId, courseId, chapterId, lectureId,
+                LearningEventType.LECTURE_COMPLETE, null, eventKey);
+    }
+
+    private LearningEventResponse persist(Long userId, Long courseId, Long chapterId, Long lectureId,
+                                          LearningEventType eventType, Integer positionSeconds, String eventKey) {
+        // 클라이언트 재전송 등으로 같은 키가 이미 있으면 중복 처리
+        if (learningEventRepository.existsByUniqueEventKey(eventKey)) {
+            throw new CustomException(ErrorCode.DUPLICATE_LEARNING_EVENT);
+        }
+
+        //1. 이벤트 적재
+        //   발생 시각은 클라이언트 시계를 믿지 않고 서버 수신 시각으로 찍는다(권위값).
+        //   타임존 모호성·시계 오차·조작이 원천적으로 없고, 모든 이벤트가 단일 서버 클럭으로 정렬된다.
+        LearningEvent event = LearningEvent.create(
+                userId, courseId, chapterId, lectureId,
+                eventType, positionSeconds, LocalDateTime.now(), eventKey
         );
 
         LearningEvent saved = learningEventRepository.save(event);
 
         //2. 적재된 이벤트를 단일 도메인 이벤트로 발행한다.
-        //   "그래서 무엇을 할지"(progress flush, 알림 등)는 각 리스너가 자기 타입만 필터링해
+        //   "그래서 무엇을 할지"(피드, 일별 통계 등)는 각 리스너가 자기 타입만 필터링해
         //   소유한다 — 새 반응은 리스너만 추가하면 되고 이 서비스는 수정하지 않는다(개방-폐쇄).
         eventPublisher.publishEvent(LearningEventRecorded.from(saved));
 
@@ -155,14 +166,9 @@ public class LearningEventService {
         return UUID.randomUUID().toString();
     }
 
-    // 완료 이벤트 검증용: 해당 유저·강의의 진행 행이 실제 완료 상태인지 확인한다.
-    private boolean isLectureCompleted(Long userId, Long lectureId) {
-        if (lectureId == null) {
-            return false;
-        }
-        return lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId)
-                .map(LectureProgress::getCompleted)
-                .orElse(false);
+    // 완료 학습이벤트의 결정적 키 — (user, lecture) 당 1회만 적재되도록 보장(멱등).
+    private String completionEventKey(Long userId, Long lectureId) {
+        return "LECTURE_COMPLETE:" + userId + ":" + lectureId;
     }
 
     private boolean isAdmin(String role) {

@@ -12,8 +12,6 @@ import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
-import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
-import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -52,9 +50,6 @@ class LearningEventServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
-
-    @Mock
-    private LectureProgressRepository lectureProgressRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -121,41 +116,47 @@ class LearningEventServiceTest {
         verify(learningEventRepository, never()).save(any());
     }
 
-    // ──── 완료 이벤트 서버 검증 ───────────────────────────────────────────────────
+    // ──── 완료 이벤트: 서버 전용(클라이언트 거부 + 멱등 적재) ───────────────────────
 
     @Test
-    @DisplayName("완료 이벤트: lecture_progresses 가 완료 상태면 적재 성공")
-    void recordEvent_lectureComplete_completed_success() {
+    @DisplayName("클라이언트가 LECTURE_COMPLETE 를 직접 보내면 거부, 적재하지 않음")
+    void recordEvent_clientComplete_rejected() {
         Long userId = 1L;
         RecordLearningEventRequest request = lectureCompleteRequest(10L, "complete-key");
-        LearningEvent saved = savedEvent(1L, userId, request);
-
-        given(learningEventRepository.existsByUniqueEventKey("complete-key")).willReturn(false);
-        given(lectureProgressRepository.findByUserIdAndLectureId(userId, 10L))
-                .willReturn(Optional.of(completedProgress(userId, 10L)));
-        given(learningEventRepository.save(any())).willReturn(saved);
-
-        LearningEventResponse response = learningEventService.recordEvent(userId, request);
-
-        assertThat(response.eventType()).isEqualTo(LearningEventType.LECTURE_COMPLETE);
-        verify(learningEventRepository).save(any());
-        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
-    }
-
-    @Test
-    @DisplayName("완료 이벤트: 진행 행이 완료 상태가 아니면 예외, 적재하지 않음")
-    void recordEvent_lectureComplete_notCompleted_throws() {
-        Long userId = 1L;
-        RecordLearningEventRequest request = lectureCompleteRequest(10L, "complete-key");
-
-        given(learningEventRepository.existsByUniqueEventKey("complete-key")).willReturn(false);
-        given(lectureProgressRepository.findByUserIdAndLectureId(userId, 10L))
-                .willReturn(Optional.of(inProgress(userId, 10L)));
 
         assertThatThrownBy(() -> learningEventService.recordEvent(userId, request))
                 .isInstanceOf(CustomException.class)
                 .extracting(e -> ((CustomException) e).getErrorCode())
-                .isEqualTo(ErrorCode.LECTURE_NOT_COMPLETED);
+                .isEqualTo(ErrorCode.CLIENT_COMPLETE_EVENT_NOT_ALLOWED);
+
+        verify(learningEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("서버 완료 적재: 신규면 LECTURE_COMPLETE 저장 + 도메인 이벤트 발행")
+    void recordLectureCompletion_new_persistsAndPublishes() {
+        Long userId = 1L;
+        String key = "LECTURE_COMPLETE:1:10";
+
+        given(learningEventRepository.existsByUniqueEventKey(key)).willReturn(false);
+        given(learningEventRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        learningEventService.recordLectureCompletion(userId, 2L, 3L, 10L, LocalDateTime.now());
+
+        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
+        verify(learningEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo(LearningEventType.LECTURE_COMPLETE);
+        assertThat(captor.getValue().getUniqueEventKey()).isEqualTo(key);
+        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
+    }
+
+    @Test
+    @DisplayName("서버 완료 적재: 이미 기록됐으면 멱등(저장·발행 없음)")
+    void recordLectureCompletion_duplicate_idempotent() {
+        given(learningEventRepository.existsByUniqueEventKey("LECTURE_COMPLETE:1:10")).willReturn(true);
+
+        learningEventService.recordLectureCompletion(1L, 2L, 3L, 10L, LocalDateTime.now());
 
         verify(learningEventRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
@@ -414,16 +415,6 @@ class LearningEventServiceTest {
                 null,
                 eventKey
         );
-    }
-
-    private LectureProgress completedProgress(Long userId, Long lectureId) {
-        LectureProgress progress = LectureProgress.start(userId, lectureId, 0, LocalDateTime.now());
-        ReflectionTestUtils.setField(progress, "completed", true);
-        return progress;
-    }
-
-    private LectureProgress inProgress(Long userId, Long lectureId) {
-        return LectureProgress.start(userId, lectureId, 0, LocalDateTime.now());
     }
 
     private LearningEvent savedEvent(Long id, Long userId, RecordLearningEventRequest req) {
