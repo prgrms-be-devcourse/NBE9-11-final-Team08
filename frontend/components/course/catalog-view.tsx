@@ -18,7 +18,6 @@ const sortLabels: Record<string, string> = {
   LATEST: '최신순',
   PRICE_ASC: '낮은가격순',
 }
-const filters = ['무료', '할인']
 
 export function CatalogView() {
   const searchParams = useSearchParams()
@@ -31,7 +30,7 @@ export function CatalogView() {
   useEffect(() => {
     setQuery(urlQuery)
   }, [urlQuery])
-  
+
   const [courses, setCourses] = useState<Course[]>([])
   const [totalElements, setTotalElements] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -142,14 +141,6 @@ export function CatalogView() {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          {filters.map((f) => (
-            <Badge key={f} variant="outline" className="cursor-pointer font-normal">
-              {f}
-            </Badge>
-          ))}
         </div>
 
         <div className="mb-4 flex items-center justify-between">

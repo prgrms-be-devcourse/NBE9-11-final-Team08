@@ -79,7 +79,7 @@ export function CourseDetail({ course }: { course: Course }) {
     try {
       const chId = lec.chapterId || '';
       const streamUrlText = await api.getVideoStreamUrl(course.id, chId, lec.id)
-      
+
       if (!streamUrlText) {
         toast.error('비디오 스트리밍 주소를 가져오지 못했습니다.')
         return
@@ -111,9 +111,9 @@ export function CourseDetail({ course }: { course: Course }) {
         setIsLoggedIn(!!profile)
         const nextIsAdmin = profile ? profile.isAdmin : false
         setIsAdmin(nextIsAdmin)
-        
+
         const nextStudyId = await api.getStudyIdByCourseId(course.id)
-        
+
         let active = false
         if (profile && !nextIsAdmin) {
           try {
@@ -122,7 +122,7 @@ export function CourseDetail({ course }: { course: Course }) {
             console.error('Failed to check active enrollment:', err)
           }
         }
-        
+
         setIsPurchased(active)
         setHasStudyAccess((active || nextIsAdmin) && !!nextStudyId)
         setStudyId(nextStudyId)
@@ -184,16 +184,9 @@ export function CourseDetail({ course }: { course: Course }) {
             </h1>
             <p className="mt-3 text-base leading-relaxed text-background/80">{course.subtitle || course.description?.substring(0, 100)}</p>
             <div className="mt-5 flex flex-wrap items-center gap-4 text-sm">
-              <span className="flex items-center gap-1 text-amber-400">
-                <Star className="h-4 w-4 fill-current" />
-                <span className="font-semibold">{(course.rating || 0).toFixed(1)}</span>
-                <span className="text-background/70">({course.reviewCount || 0}개 수강평)</span>
-              </span>
               <span className="flex items-center gap-1 text-background/80">
-                <Users className="h-4 w-4" />
-                {(course.studentCount || 0).toLocaleString('ko-KR')}명 참여
+                조회수: {(course.viewCount || 0).toLocaleString('ko-KR')}
               </span>
-              <Badge className="bg-primary text-primary-foreground">{course.level}</Badge>
             </div>
             <div className="mt-4 flex items-center gap-3">
               <Avatar className="h-9 w-9">
@@ -215,13 +208,6 @@ export function CourseDetail({ course }: { course: Course }) {
           <section>
             <h2 className="mb-3 text-xl font-bold">강좌 소개</h2>
             <p className="leading-relaxed text-muted-foreground">{course.description}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {course.tags?.map((t) => (
-                <Badge key={t} variant="outline">
-                  {t}
-                </Badge>
-              ))}
-            </div>
           </section>
 
           <section>
@@ -365,10 +351,6 @@ export function CourseDetail({ course }: { course: Course }) {
                   <li className="flex justify-between">
                     <span>강의 수</span>
                     <span className="font-medium text-foreground">{totalLectures}개</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>난이도</span>
-                    <span className="font-medium text-foreground">{course.level}</span>
                   </li>
                   <li className="flex justify-between">
                     <span>수강 대상</span>

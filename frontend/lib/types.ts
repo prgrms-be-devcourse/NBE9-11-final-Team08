@@ -37,11 +37,7 @@ export interface Course {
   thumbnailUrl: string
   price: number
   discountRate?: number
-  rating: number
-  reviewCount: number
-  studentCount: number
-  level: '왕초보' | '입문' | '초급' | '중급' | '심화'
-  tags: string[]
+  viewCount: number
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
