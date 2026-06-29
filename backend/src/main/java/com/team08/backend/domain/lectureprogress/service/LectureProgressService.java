@@ -79,20 +79,28 @@ public class LectureProgressService {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
+        // 같은 (user, lecture) 행에 대한 동시 하트비트의 lost update 를 막기 위해 행을
+        // 쓰기 락(SELECT ... FOR UPDATE)으로 읽는다. read-modify-write(watchedSeconds += delta)가
+        // 행 단위로 직렬화돼 누적분이 유실되지 않는다(다른 user/lecture 는 다른 행이라 경합 없음).
         LectureProgress progress = lectureProgressRepository
-                .findByUserIdAndLectureId(userId, lectureId)
+                .findByUserIdAndLectureIdForUpdate(userId, lectureId)
                 .orElse(null);
 
-        LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
-        boolean wasCompleted = progress != null && Boolean.TRUE.equals(progress.getCompleted());
-
+        LocalDateTime previousBeatAt;
+        boolean wasCompleted;
         if (progress == null) {
             if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
-            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등으로 행을 확보한다.
+            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등으로 행을 확보한 뒤
+            // 다시 쓰기 락으로 읽어 이후 누적을 직렬화한다.
             // previousBeatAt 은 null 로 유지해 최초 비트의 delta 산정 동작을 보존한다.
-            progress = getOrCreateStarted(userId, lectureId, positionSeconds, eventTime);
+            progress = getOrCreateStartedForUpdate(userId, lectureId, positionSeconds, eventTime);
+            previousBeatAt = null;
+            wasCompleted = false;
+        } else {
+            previousBeatAt = progress.getUpdatedAt();
+            wasCompleted = Boolean.TRUE.equals(progress.getCompleted());
         }
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
@@ -122,6 +130,17 @@ public class LectureProgressService {
         lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, now);
         return lectureProgressRepository
                 .findByUserIdAndLectureId(userId, lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+    }
+
+    /**
+     * getOrCreateStarted 와 같되, 재조회를 쓰기 락으로 수행한다. 하트비트 누적 경로에서
+     * 최초 비트가 행을 만든 직후에도 이어지는 동시 갱신을 행 락으로 직렬화하기 위함이다.
+     */
+    private LectureProgress getOrCreateStartedForUpdate(Long userId, Long lectureId, int positionSeconds, LocalDateTime now) {
+        lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, now);
+        return lectureProgressRepository
+                .findByUserIdAndLectureIdForUpdate(userId, lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
     }
 
