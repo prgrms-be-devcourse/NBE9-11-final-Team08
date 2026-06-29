@@ -303,7 +303,7 @@ export function CouponFormSheet({
                       <SelectItem value="AUTO">자동</SelectItem>
                       <SelectItem value="NORMAL">일반</SelectItem>
                       <SelectItem value="FCFS">선착순</SelectItem>
-                      <SelectItem value="ADMIN_ISSUE">관리자 발급</SelectItem>
+                      <SelectItem value="ADMIN">관리자 발급</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>

@@ -134,7 +134,7 @@ public class CouponIssueRequestService {
     }
 
     private void validateManualIssuePolicy(CouponPolicy policy) {
-        if (policy.getCouponType() != CouponType.ADMIN_ISSUE) {
+        if (policy.getCouponType() != CouponType.ADMIN) {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
     }

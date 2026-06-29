@@ -112,7 +112,7 @@ class AllUsersCouponMaterializerTest {
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "전체 회원 쿠폰",
                 CouponTarget.ALL,
-                CouponType.ADMIN_ISSUE,
+                CouponType.ADMIN,
                 null,
                 CouponUsageType.SINGLE_USE,
                 false,

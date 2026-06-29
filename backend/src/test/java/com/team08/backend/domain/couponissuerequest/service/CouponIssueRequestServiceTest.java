@@ -143,7 +143,7 @@ class CouponIssueRequestServiceTest {
     }
 
     @Test
-    @DisplayName("ADMIN_ISSUE 타입이 아니면 특정 회원 발급 요청을 거부한다")
+    @DisplayName("ADMIN 타입이 아니면 특정 회원 발급 요청을 거부한다")
     void requestUsersIssue_rejectsNonManualIssuePolicy() {
         // given
         Long policyId = 10L;
@@ -246,7 +246,7 @@ class CouponIssueRequestServiceTest {
 
     private CouponPolicy manualIssuePolicy() {
         CouponPolicy policy = mock(CouponPolicy.class);
-        given(policy.getCouponType()).willReturn(CouponType.ADMIN_ISSUE);
+        given(policy.getCouponType()).willReturn(CouponType.ADMIN);
         return policy;
     }
 }

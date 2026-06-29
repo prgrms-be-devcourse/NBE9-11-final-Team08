@@ -28,7 +28,7 @@ public interface CouponIssueRequestRepository extends JpaRepository<CouponIssueR
             WHERE r.issueType = 'ALL_USERS'
               AND r.status = 'COMPLETED'
               AND r.targetUserMaxId >= :userId
-              AND p.couponType = 'ADMIN_ISSUE'
+              AND p.couponType = 'ADMIN'
               AND (p.issueStartDate IS NULL OR p.issueStartDate <= :now)
               AND (p.issueEndDate IS NULL OR p.issueEndDate >= :now)
               AND NOT EXISTS (

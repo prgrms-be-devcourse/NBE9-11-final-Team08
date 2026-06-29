@@ -140,7 +140,7 @@ class CouponIssueRequestProcessorTest {
 
     private CouponPolicy manualIssuePolicy() {
         CouponPolicy policy = mock(CouponPolicy.class);
-        given(policy.getCouponType()).willReturn(CouponType.ADMIN_ISSUE);
+        given(policy.getCouponType()).willReturn(CouponType.ADMIN);
         return policy;
     }
 }

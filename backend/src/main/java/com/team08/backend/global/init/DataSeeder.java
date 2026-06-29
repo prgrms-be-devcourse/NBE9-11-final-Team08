@@ -311,7 +311,7 @@ public class DataSeeder {
                     CouponPolicy.createPolicy(
                             "쿠폰 정책 " + (p + 1),
                             CouponTarget.COURSE,
-                            CouponType.ADMIN_ISSUE,
+                            CouponType.ADMIN,
                             null, // totalQuantity
                             CouponUsageType.SINGLE_USE,
                             false,

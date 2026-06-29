@@ -4,5 +4,5 @@ public enum CouponType {
     AUTO,
     NORMAL,
     FCFS,
-    ADMIN_ISSUE
+    ADMIN
 }
