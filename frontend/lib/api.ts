@@ -68,6 +68,7 @@ const REFRESH_EXCLUDED_PATHS = new Set([
   '/api/auth/logout',
   '/api/auth/refresh',
   '/api/auth/signup',
+  '/api/auth/seller/signup',
 ])
 
 let refreshAuthPromise: Promise<boolean> | null = null
@@ -181,6 +182,7 @@ const handleUnauthorized = () => {
       pathname === '/events' ||
       pathname === '/login' ||
       pathname === '/signup' ||
+      pathname === '/seller/signup' ||
       pathname === '/cart'
 
     if (!isPublicRoute) {
@@ -895,6 +897,7 @@ const getCurrentUserId = async (): Promise<number> => {
 export const api = {
   // Auth
   signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
+  sellerSignup: (data: SignupRequest) => mutate<void>('/api/auth/seller/signup', 'POST', data, false, true),
   login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
     return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)

@@ -33,6 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return (AUTH_PREFIX + "csrf").equals(path)
                 || (AUTH_PREFIX + "login").equals(path)
                 || (AUTH_PREFIX + "signup").equals(path)
+                || (AUTH_PREFIX + "seller/signup").equals(path)
                 || (AUTH_PREFIX + "refresh").equals(path)
                 || (AUTH_PREFIX + "logout").equals(path);
     }

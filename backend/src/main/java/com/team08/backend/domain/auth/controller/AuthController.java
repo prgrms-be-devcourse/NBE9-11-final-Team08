@@ -92,6 +92,17 @@ public class AuthController {
     }
 
     @Operation(
+            summary = "판매자 회원가입",
+            description = "판매자 정보를 입력받아 새로운 판매자 계정을 생성합니다."
+    )
+    @SecurityRequirements
+    @PostMapping("/seller/signup")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void signupSeller(@Valid @RequestBody SignupRequest request) {
+        authService.signupSeller(request);
+    }
+
+    @Operation(
             summary = "인증 토큰 갱신",
             description = "리프레시 토큰 쿠키를 검증하고 새로운 액세스 토큰과 리프레시 토큰을 발급합니다."
     )

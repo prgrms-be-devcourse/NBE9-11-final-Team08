@@ -12,7 +12,11 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { api } from '@/lib/api'
 
-export function SignupForm() {
+type SignupFormProps = {
+  mode?: 'user' | 'seller'
+}
+
+export function SignupForm({ mode = 'user' }: SignupFormProps) {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [name, setName] = useState('')
@@ -22,7 +26,16 @@ export function SignupForm() {
   const [agree, setAgree] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  const isSeller = mode === 'seller'
   const passwordMismatch = confirm.length > 0 && password !== confirm
+  const title = isSeller ? '판매자 회원가입' : '회원가입'
+  const description = isSeller
+    ? '강좌를 등록하고 학습자를 만날 판매자 계정을 만들어보세요.'
+    : '가입하면 신규 회원 10% 쿠폰을 드려요.'
+  const nameLabel = isSeller ? '판매자명 (닉네임)' : '이름 (닉네임)'
+  const namePlaceholder = isSeller
+    ? 'PlayLearn의 새로운 판매자 (예: 홍길동)'
+    : 'PlayLearn의 새로운 멤버 (예: 홍길동)'
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -37,13 +50,13 @@ export function SignupForm() {
     setSubmitting(true)
 
     try {
-      await api.signup({
+      const signup = isSeller ? api.sellerSignup : api.signup
+      await signup({
         email,
         password,
         nickname: name,
-        userRole: 'USER', // Default to USER for standard signup
       })
-      toast.success('회원가입이 완료되었습니다!')
+      toast.success(isSeller ? '판매자 회원가입이 완료되었습니다!' : '회원가입이 완료되었습니다!')
       router.push('/login')
     } catch (err: any) {
       toast.error(err.message || '회원가입 중 오류가 발생했습니다')
@@ -58,19 +71,17 @@ export function SignupForm() {
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
           <GraduationCap className="h-7 w-7" />
         </span>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">회원가입</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          가입하면 신규 회원 10% 쿠폰을 드려요.
-        </p>
+        <h1 className="mt-4 text-2xl font-bold tracking-tight">{title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="name">이름 (닉네임)</Label>
+          <Label htmlFor="name">{nameLabel}</Label>
           <Input
             id="name"
             required
-            placeholder="PlayLearn의 새로운 멤버 (예: 홍길동)"
+            placeholder={namePlaceholder}
             autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -152,7 +163,7 @@ export function SignupForm() {
 
         <Button type="submit" size="lg" disabled={submitting}>
           {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-          {submitting ? '가입 중...' : '회원가입'}
+          {submitting ? '가입 중...' : isSeller ? '판매자 회원가입' : '회원가입'}
         </Button>
       </form>
 
@@ -162,6 +173,14 @@ export function SignupForm() {
           로그인
         </Link>
       </p>
+      {!isSeller && (
+        <p className="mt-3 text-center text-sm text-muted-foreground">
+          강좌를 판매하고 싶으신가요?{' '}
+          <Link href="/seller/signup" className="font-medium text-primary hover:underline">
+            판매자 회원가입
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

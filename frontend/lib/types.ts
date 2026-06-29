@@ -435,14 +435,11 @@ export interface MyComment {
   answered: boolean
 }
 
-export type SignupRole = 'USER' | 'SELLER'
-
 export interface SignupRequest {
   email: string
   password: string
   nickname: string
   profileImage?: string
-  userRole: SignupRole
 }
 
 export interface CourseCreateRequest {
