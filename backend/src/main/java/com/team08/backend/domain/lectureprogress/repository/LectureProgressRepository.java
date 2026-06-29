@@ -36,9 +36,6 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
     // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 모든 강의 진행 정보(있는 것만)
     List<LectureProgress> findByUserIdAndLectureIdIn(Long userId, List<Long> lectureIds);
 
-    // 강좌 내 강의들 중 사용자가 가장 최근 학습한 진행 정보
-    Optional<LectureProgress> findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(Long userId, List<Long> lectureIds);
-
     // 사용자의 강좌 내 완료한 강의 수
     long countByUserIdAndLectureIdInAndCompleted(Long userId, List<Long> lectureIds, Boolean completed);
 
