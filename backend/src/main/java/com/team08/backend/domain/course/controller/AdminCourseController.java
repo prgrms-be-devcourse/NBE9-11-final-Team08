@@ -1,6 +1,7 @@
 package com.team08.backend.domain.course.controller;
 
 import com.team08.backend.domain.course.dto.CourseCardResponse;
+import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseRejectRequest;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
@@ -28,6 +29,12 @@ public class AdminCourseController {
             @RequestParam(name = "status", required = false) CourseStatus status,
             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         return courseService.getCoursesForAdmin(status, pageable);
+    }
+
+    @GetMapping("/{courseId}")
+    @ResponseStatus(HttpStatus.OK)
+    public CourseDetailResponse getCourseDetailForAdmin(@PathVariable("courseId") Long courseId) {
+        return courseService.getCourseDetailForAdmin(courseId);
     }
 
     @PostMapping("/{courseId}/approve")

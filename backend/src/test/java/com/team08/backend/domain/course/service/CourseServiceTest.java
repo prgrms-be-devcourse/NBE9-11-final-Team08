@@ -52,6 +52,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.util.ReflectionUtils.*;
@@ -101,6 +102,14 @@ class CourseServiceTest {
     @InjectMocks
     private CourseService courseService;
 
+    private Course onSaleCourse(Long courseId) {
+        Course course = TestEntityFactory.course(courseId);
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
+        return course;
+    }
+
     @Test
     void 강좌를_성공적으로_생성하고_ID를_반환한다() {
         Long instructorId = 1L;
@@ -135,7 +144,7 @@ class CourseServiceTest {
     @Test
     void 강좌를_상세_조회하면_조회수가_1_증가하고_커리큘럼과_함께_반환한다() {
         Long courseId = 100L;
-        Course course = TestEntityFactory.course(courseId);
+        Course course = onSaleCourse(courseId);
 
         Chapter chapter = ChapterFixture.chapter(1L, "첫 번째 챕터", 1, course);
         Lecture freeLecture = LectureFixture.lecture(10L, "무료 맛보기 강의", "videos/free.m3u8", 600, 1, chapter);
@@ -155,10 +164,30 @@ class CourseServiceTest {
     }
 
     @Test
+    void Redis_조회수_증가가_실패하면_RDB_조회수_증가로_fallback한다() {
+        Long courseId = 100L;
+        Course course = onSaleCourse(courseId);
+
+        given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
+        willThrow(new RuntimeException("redis down"))
+                .given(courseViewCountRedisManager).increaseViewCount(courseId);
+
+        CourseDetailResponse response = courseService.getCourseDetail(courseId);
+
+        assertThat(response.viewCount()).isEqualTo(course.getViewCount() + 1);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId);
+        verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
+    }
+
+    @Test
     void 무료_미리보기가_아닌_강의는_상세_조회_시_영상_주소가_노출되지_않는다() {
         Long courseId = 100L;
         Course course = TestEntityFactory.course(courseId);
         Chapter chapter = ChapterFixture.chapter(1L, "첫 번째 챕터", 1, course);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.ON_SALE);
 
         Lecture paidLecture = Lecture.createWithStream(
                 "videos/paid.m3u8",
@@ -568,7 +597,7 @@ class CourseServiceTest {
     }
 
     @Test
-    void 정상_조건을_충족하면_심사_반려_상태로_전이되고_이력_저장_및_반려_이벤트가_발행된다() {
+    void 정상_조건을_충족하면_심사_반려_후_임시저장_상태로_전이되고_이력이_저장된다() {
         Long courseId = 100L;
         Long adminId = 999L;
         String reason = "콘텐츠 부적절";
@@ -585,9 +614,9 @@ class CourseServiceTest {
 
         courseService.rejectCourseReview(courseId, adminId, reason);
 
-        assertThat(course.getStatus()).isEqualTo(CourseStatus.SUSPENDED);
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DRAFT);
         verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
-        verify(eventPublisher).publishEvent(any(AdminCourseRejectedEvent.class));
+        verify(eventPublisher, never()).publishEvent(any(AdminCourseRejectedEvent.class));
     }
 
     @Test
@@ -737,6 +766,30 @@ class CourseServiceTest {
     }
 
     @Test
+    void 판매_중지된_강좌에_활성_수강생이_없으면_관리자가_삭제할_수_있다() {
+        Long courseId = 100L;
+        Long adminId = 1L;
+        Course course = Course.createDraft(10L, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.SUSPENDED);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        courseService.deleteCourseByAdmin(courseId, adminId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
     void 판매자가_삭제_요청_시_소유자가_아닌_예외가_발생한다() {
         Long courseId = 100L;
         Long hackerId = 999L;
@@ -786,6 +839,30 @@ class CourseServiceTest {
         Field statusField = findField(Course.class, "status");
         makeAccessible(statusField);
         setField(statusField, course, CourseStatus.ON_SALE);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+        given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);
+
+        courseService.deleteCourseByInstructor(courseId, instructorId);
+
+        assertThat(course.getStatus()).isEqualTo(CourseStatus.DELETED);
+        verify(courseThumbnailService).deleteThumbnail("courses/thumbnails/100/thumb.jpg");
+        verify(courseStatusHistoryRepository).save(any(CourseStatusHistory.class));
+        verify(eventPublisher).publishEvent(any(CourseDeletedEvent.class));
+    }
+
+    @Test
+    void 판매_중지된_강좌에_활성_수강생이_없으면_판매자가_삭제할_수_있다() {
+        Long courseId = 100L;
+        Long instructorId = 10L;
+        Course course = Course.createDraft(instructorId, 0L, "제목", "설명", "courses/thumbnails/100/thumb.jpg", 0);
+        Field idField = findField(Course.class, "id");
+        makeAccessible(idField);
+        setField(idField, course, courseId);
+
+        Field statusField = findField(Course.class, "status");
+        makeAccessible(statusField);
+        setField(statusField, course, CourseStatus.SUSPENDED);
 
         given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
         given(enrollmentRepository.existsByCourseIdAndStatus(courseId, EnrollmentStatus.ACTIVE)).willReturn(false);

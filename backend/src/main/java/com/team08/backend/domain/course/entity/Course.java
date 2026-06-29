@@ -182,8 +182,8 @@ public class Course extends BaseTimeEntity {
             throw new CustomException(ErrorCode.REJECT_REASON_REQUIRED);
         }
 
-        CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.SUSPENDED, adminId, reason);
-        this.status = CourseStatus.SUSPENDED;
+        CourseStatusHistory history = CourseStatusHistory.of(this.id, this.status, CourseStatus.DRAFT, adminId, reason);
+        this.status = CourseStatus.DRAFT;
 
         return history;
     }
@@ -217,7 +217,7 @@ public class Course extends BaseTimeEntity {
     }
 
     public CourseStatusHistory delete(Long requestUserId) {
-        if (this.status != CourseStatus.ON_SALE) {
+        if (this.status != CourseStatus.DRAFT && this.status != CourseStatus.ON_SALE && this.status != CourseStatus.SUSPENDED) {
             throw new CustomException(ErrorCode.INVALID_COURSE_STATUS_TRANSITION);
         }
 

@@ -1,7 +1,6 @@
 package com.team08.backend.domain.course.service;
 
 import com.team08.backend.domain.course.event.CourseClosedEvent;
-import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
 import com.team08.backend.domain.study.service.CourseStudyManager;
 import lombok.RequiredArgsConstructor;
@@ -17,11 +16,6 @@ public class CourseClosedEventListener {
     @EventListener
     public void handleCourseClosedEvent(CourseClosedEvent event) {
         courseStudyManager.closeForCourse(event.courseId());
-    }
-
-    @EventListener
-    public void handleAdminCourseRejectedEvent(AdminCourseRejectedEvent event) {
-        courseStudyManager.rejectForCourse(event.courseId());
     }
 
     @EventListener

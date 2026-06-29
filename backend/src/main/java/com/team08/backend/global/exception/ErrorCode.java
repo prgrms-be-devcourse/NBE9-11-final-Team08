@@ -61,7 +61,7 @@ public enum ErrorCode {
     INVALID_COURSE_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "COURSE_004", "변경할 수 없는 강좌 상태입니다."),
     COURSE_CURRICULUM_EMPTY(HttpStatus.BAD_REQUEST, "COURSE_005", "강좌에 최소 1개 이상의 챕터와 강의가 존재해야 심사를 요청할 수 있습니다."),
     REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "COURSE_006", "강좌 심사 반려 시 사유는 필수입니다."),
-    COURSE_HAS_ACTIVE_ENROLLMENTS(HttpStatus.BAD_REQUEST, "COURSE_007", "수강 중인 활성 수강생이 존재하여 강좌를 삭제할 수 없습니다."),
+    COURSE_HAS_ACTIVE_ENROLLMENTS(HttpStatus.BAD_REQUEST, "COURSE_007", "수강생이 존재하므로 삭제할 수 없습니다"),
     LECTURE_MODIFICATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COURSE_008", "강의 변경 신청 내역을 찾을 수 없습니다."),
     INVALID_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "COURSE_009", "유효하지 않은 순서 변경 요청입니다."),
     COURSE_ACCESS_DENIED(HttpStatus.FORBIDDEN,       "COURSE_010", "강좌에 접근할 권한이 없습니다."),
