@@ -51,6 +51,9 @@ class CouponIssueRequestServiceTest {
     private IssuedCouponRepository issuedCouponRepository;
 
     @Mock
+    private com.team08.backend.domain.attendance.repository.AttendanceRepository attendanceRepository;
+
+    @Mock
     private CouponIssueRequestStreamPublisher streamPublisher;
 
     private CouponIssueRequestService couponIssueRequestService;
@@ -67,6 +70,7 @@ class CouponIssueRequestServiceTest {
                 couponIssueRequestRepository,
                 userRepository,
                 issuedCouponRepository,
+                attendanceRepository,
                 streamPublisher,
                 clock
         );

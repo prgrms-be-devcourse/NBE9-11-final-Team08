@@ -41,7 +41,7 @@ CREATE TABLE coupon_issue_requests (
     id BIGINT NOT NULL AUTO_INCREMENT,
     policy_id BIGINT NOT NULL,
     request_key VARCHAR(100) NOT NULL,
-    issue_type ENUM ('SELECTED_USERS', 'ALL_USERS') NOT NULL,
+    issue_type ENUM ('SELECTED_USERS', 'ALL_USERS', 'INACTIVE_USERS') NOT NULL,
     status ENUM ('REQUESTED', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELED') NOT NULL,
     requested_count BIGINT NOT NULL DEFAULT 0,
     success_count BIGINT NOT NULL DEFAULT 0,

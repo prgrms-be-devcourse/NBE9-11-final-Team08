@@ -1376,6 +1376,14 @@ export const api = {
     )
   },
 
+  issueCouponToInactiveUsers: async (policyId: number, inactiveDays: number, maxInactiveDays: number | undefined, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/inactive`,
+      'POST',
+      { inactiveDays, maxInactiveDays, requestKey }
+    )
+  },
+
   getCouponIssueRequests: async (page = 0, size = 20) => {
     const result = await request<PageResponse<CouponIssueRequestResponse> | null>(
       `/api/admin/coupons/issue-requests?page=${page}&size=${size}`,

@@ -10,6 +10,7 @@ import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundExce
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
+import com.team08.backend.domain.attendance.repository.AttendanceRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -35,6 +37,7 @@ public class CouponIssueRequestService {
     private final CouponIssueRequestRepository couponIssueRequestRepository;
     private final UserRepository userRepository;
     private final IssuedCouponRepository issuedCouponRepository;
+    private final AttendanceRepository attendanceRepository;
     private final CouponIssueRequestStreamPublisher streamPublisher;
     private final Clock clock;
 
@@ -122,6 +125,59 @@ public class CouponIssueRequestService {
         request.markAllUsersGrantOpened(userCount, targetUserMaxId, now);
 
         CouponIssueRequest savedRequest = saveRequest(request);
+        return CouponIssueRequestResponse.from(savedRequest);
+    }
+
+    public CouponIssueRequestResponse requestInactiveUsersIssue(Long policyId, int inactiveDays, Integer maxInactiveDays, String requestKey, Long requestedBy) {
+        CouponPolicy policy = couponPolicyRepository.findById(policyId)
+                .orElseThrow(CouponPolicyNotFoundException::new);
+        validateManualIssuePolicy(policy);
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        policy.validateIssuePeriod(now);
+
+        LocalDate today = now.toLocalDate();
+        LocalDate thresholdDate = today.minusDays(inactiveDays);
+        LocalDate limitDate = today.minusDays(maxInactiveDays != null ? maxInactiveDays : 365);
+
+        List<Long> targetUserIds = attendanceRepository.findInactiveUserIds(thresholdDate, limitDate);
+        if (targetUserIds.isEmpty()) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        Set<Long> alreadyIssuedUserIds = new HashSet<>(issuedCouponRepository.findIssuedUserIds(policyId, targetUserIds));
+        List<Long> finalTargetUserIds = targetUserIds.stream()
+                .filter(userId -> !alreadyIssuedUserIds.contains(userId))
+                .toList();
+
+        String normalizedRequestKey = normalizeRequestKey(requestKey);
+        CouponIssueRequest request = CouponIssueRequest.request(
+                policyId,
+                normalizedRequestKey,
+                CouponIssueRequestType.INACTIVE_USERS,
+                requestedBy,
+                now
+        );
+        request.addRequestedCount(targetUserIds.size());
+        request.addSkippedCount(alreadyIssuedUserIds.size());
+        
+        if (finalTargetUserIds.isEmpty()) {
+            request.markCompleted(now);
+        } else {
+            request.markProcessing(now);
+        }
+
+        CouponIssueRequest savedRequest = saveRequest(request);
+        String issueKey = SELECTED_USERS_ISSUE_KEY_PREFIX + normalizedRequestKey;
+        
+        // Chunking the stream publishing to prevent Redis Pipeline memory spikes
+        int chunkSize = 5000;
+        for (int i = 0; i < finalTargetUserIds.size(); i += chunkSize) {
+            int end = Math.min(finalTargetUserIds.size(), i + chunkSize);
+            List<Long> chunk = finalTargetUserIds.subList(i, end);
+            streamPublisher.publishAll(savedRequest.getId(), policyId, chunk, issueKey);
+        }
+
         return CouponIssueRequestResponse.from(savedRequest);
     }
 

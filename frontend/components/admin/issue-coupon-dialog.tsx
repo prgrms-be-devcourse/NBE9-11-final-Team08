@@ -30,8 +30,10 @@ export function IssueCouponDialog({
   onOpenChange,
   coupon,
 }: IssueCouponDialogProps) {
-  const [issueType, setIssueType] = useState<'ALL' | 'TARGET'>('TARGET')
+  const [issueType, setIssueType] = useState<'ALL' | 'TARGET' | 'INACTIVE'>('TARGET')
   const [userIdsText, setUserIdsText] = useState('')
+  const [inactiveDays, setInactiveDays] = useState<string>('7')
+  const [maxInactiveDays, setMaxInactiveDays] = useState<string>('365')
   const [processing, setProcessing] = useState(false)
 
   if (!coupon) return null
@@ -44,6 +46,16 @@ export function IssueCouponDialog({
       if (issueType === 'ALL') {
         await api.issueCouponToAll(coupon.id, requestKey)
         toast.success('전체 회원 발급 요청이 전송되었습니다.')
+      } else if (issueType === 'INACTIVE') {
+        const iDays = parseInt(inactiveDays, 10)
+        const mDays = maxInactiveDays ? parseInt(maxInactiveDays, 10) : undefined
+        if (isNaN(iDays) || iDays <= 0) {
+          toast.error('미접속 일수를 올바르게 입력해주세요.')
+          setProcessing(false)
+          return
+        }
+        await api.issueCouponToInactiveUsers(coupon.id, iDays, isNaN(mDays!) ? undefined : mDays, requestKey)
+        toast.success(`장기 미접속 회원 대상 발급 요청이 전송되었습니다.`)
       } else {
         const userIds = userIdsText
           .split(',')
@@ -90,6 +102,10 @@ export function IssueCouponDialog({
               <Label htmlFor="r-target">특정 회원에게 발급</Label>
             </div>
             <div className="flex items-center space-x-2">
+              <RadioGroupItem value="INACTIVE" id="r-inactive" />
+              <Label htmlFor="r-inactive">장기 미접속 회원</Label>
+            </div>
+            <div className="flex items-center space-x-2">
               <RadioGroupItem value="ALL" id="r-all" />
               <Label htmlFor="r-all">전체 회원에게 발급</Label>
             </div>
@@ -108,6 +124,39 @@ export function IssueCouponDialog({
               <p className="text-xs text-muted-foreground">
                 발급받을 회원의 숫자 ID를 쉼표(,)로 구분하여 입력하세요.
               </p>
+            </div>
+          )}
+          {issueType === 'INACTIVE' && (
+            <div className="space-y-4 rounded-md border p-4">
+              <div className="space-y-2">
+                <Label htmlFor="inactiveDays">미접속 일수 기준</Label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="inactiveDays"
+                    type="number"
+                    min="1"
+                    value={inactiveDays}
+                    onChange={(e) => setInactiveDays(e.target.value)}
+                    className="w-24"
+                  />
+                  <span className="text-sm">일 이상 미접속한 유저 대상</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxInactiveDays">장기 이탈 하한선 (선택)</Label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    id="maxInactiveDays"
+                    type="number"
+                    min="1"
+                    value={maxInactiveDays}
+                    onChange={(e) => setMaxInactiveDays(e.target.value)}
+                    className="w-24"
+                    placeholder="예: 365"
+                  />
+                  <span className="text-sm">일 이내 접속 기록이 있는 유저만 (영구 이탈자 제외)</span>
+                </div>
+              </div>
             </div>
           )}
           {issueType === 'ALL' && (

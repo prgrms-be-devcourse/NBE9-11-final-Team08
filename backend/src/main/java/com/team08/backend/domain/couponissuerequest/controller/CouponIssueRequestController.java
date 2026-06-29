@@ -1,6 +1,7 @@
 package com.team08.backend.domain.couponissuerequest.controller;
 
 import com.team08.backend.domain.couponissuerequest.dto.CouponIssueAllUsersRequest;
+import com.team08.backend.domain.couponissuerequest.dto.CouponIssueInactiveUsersRequest;
 import com.team08.backend.domain.couponissuerequest.dto.CouponIssueRequestResponse;
 import com.team08.backend.domain.couponissuerequest.dto.CouponIssueUsersRequest;
 import com.team08.backend.domain.couponissuerequest.service.CouponIssueRequestService;
@@ -70,6 +71,23 @@ public class CouponIssueRequestController {
     ) {
         return couponIssueRequestService.requestAllUsersIssue(
                 policyId,
+                request.requestKey(),
+                loginUserPrincipal.user().id()
+        );
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/{policyId}/issue/inactive")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public CouponIssueRequestResponse issueToInactiveUsers(
+            @PathVariable Long policyId,
+            @Valid @RequestBody CouponIssueInactiveUsersRequest request,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
+    ) {
+        return couponIssueRequestService.requestInactiveUsersIssue(
+                policyId,
+                request.inactiveDays(),
+                request.maxInactiveDays(),
                 request.requestKey(),
                 loginUserPrincipal.user().id()
         );
