@@ -566,32 +566,14 @@ export function CurriculumBuilder({
               >
                 <Plus className="size-4" /> 새 강의 추가
               </Button>
-                  </div>
-                </article>
-              ))}
-
-              {active.lectures.length === 0 ? (
-                <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-                  아직 강의가 없습니다. 새 강의를 추가하세요.
-                </div>
-              ) : null}
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed py-20 text-center text-sm text-muted-foreground">
+              챕터를 추가해 커리큘럼 구성을 시작하세요.
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => addLecture(active.id)}
-              className="w-full gap-1.5"
-            >
-              <Plus className="size-4" /> 새 강의 추가
-            </Button>
-          </>
-        ) : (
-          <div className="rounded-xl border border-dashed py-20 text-center text-sm text-muted-foreground">
-            챕터를 추가해 커리큘럼 구성을 시작하세요.
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
     </div>
   )
 }
