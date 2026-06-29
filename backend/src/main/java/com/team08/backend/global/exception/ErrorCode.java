@@ -65,6 +65,7 @@ public enum ErrorCode {
     LECTURE_MODIFICATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COURSE_008", "강의 변경 신청 내역을 찾을 수 없습니다."),
     INVALID_ORDER_REQUEST(HttpStatus.BAD_REQUEST, "COURSE_009", "유효하지 않은 순서 변경 요청입니다."),
     COURSE_ACCESS_DENIED(HttpStatus.FORBIDDEN,       "COURSE_010", "강좌에 접근할 권한이 없습니다."),
+    COURSE_ALREADY_ON_SALE(HttpStatus.BAD_REQUEST, "COURSE_011", "이미 공개 판매 중인 강좌는 커리큘럼(챕터/강의)을 수정할 수 없습니다."),
 
     // ── Lecture ──────────────────────────────────────────────────────────
     LECTURE_NOT_FOUND(HttpStatus.NOT_FOUND,     "LECTURE_001", "강의를 찾을 수 없습니다."),

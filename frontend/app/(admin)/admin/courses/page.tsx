@@ -6,6 +6,6 @@ export const metadata = {
 }
 
 export default async function AdminCoursesPage() {
-  const response = await api.getCourses(0, 100)
+  const response = await api.getAdminCourses(undefined, 0, 100)
   return <CourseManager initialCourses={response.content} />
 }

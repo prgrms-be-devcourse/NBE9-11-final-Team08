@@ -1,5 +1,6 @@
 package com.team08.backend.domain.chapter.service;
 
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
 import com.team08.backend.domain.chapter.entity.Chapter;
@@ -46,6 +47,10 @@ public class ChapterService {
 
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
+
+        if (course.getStatus() == CourseStatus.ON_SALE || course.getStatus() == CourseStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.COURSE_ALREADY_ON_SALE);
+        }
 
         Chapter chapter = request.toEntity(course);
         course.addChapter(chapter);

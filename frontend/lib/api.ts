@@ -911,6 +911,20 @@ export const api = {
     }
   },
 
+  getAdminCourses: async (status?: string, page = 0, size = 20): Promise<PageResponse<Course>> => {
+    const statusQuery = status && status !== 'ALL' ? `&status=${status}` : ''
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/admin/courses?page=${page}&size=${size}${statusQuery}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
+      false,
+      false,
+    )
+    return {
+      ...res,
+      content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
+    }
+  },
+
   // Categories
   getCategories: () => request<CategoryResponse[]>('/api/categories', [], false, false),
 

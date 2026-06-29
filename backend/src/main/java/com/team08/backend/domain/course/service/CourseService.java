@@ -120,6 +120,15 @@ public class CourseService {
                 .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
     }
 
+    public Page<CourseCardResponse> getCoursesForAdmin(CourseStatus status, Pageable pageable) {
+        if (status == null) {
+            return courseRepository.findAll(pageable)
+                    .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
+        }
+        return courseRepository.findAllByStatus(status, pageable)
+                .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
+    }
+
     @Transactional
     public void updateCourseGeneralInfo(Long courseId, Long instructorId, CourseUpdateRequest request, MultipartFile thumbnailFile) {
         Course course = courseRepository.findWithChaptersAsc(courseId)

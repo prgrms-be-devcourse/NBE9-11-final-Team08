@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lecture.service;
 
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.fixture.ChapterFixture;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
@@ -145,6 +146,58 @@ class LectureServiceTest {
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
         verify(chapterRepository).findByIdWithCourse(chapterId);
+    }
+
+    @Test
+    void 이미_ON_SALE_상태인_코스의_챕터에_강의_생성_요청_시_예외가_발생한다() {
+        Long courseId = 10L;
+        Long chapterId = 1L;
+        LectureCreateRequest request = new LectureCreateRequest(
+                "스프링 시큐리티 구조와 흐름",
+                "videos/security.m3u8",
+                UUID.randomUUID().toString(),
+                "시큐리티 필터 체인 분석",
+                1200,
+                1,
+                false
+        );
+
+        Course realCourse = TestEntityFactory.course(courseId);
+        ReflectionTestUtils.setField(realCourse, "id", courseId);
+        ReflectionTestUtils.setField(realCourse, "status", CourseStatus.ON_SALE);
+        Chapter chapter = ChapterFixture.chapter(chapterId, "보안 기본", 1, realCourse);
+
+        given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
+
+        assertThatThrownBy(() -> lectureService.createLecture(courseId, chapterId, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_ALREADY_ON_SALE.getMessage());
+    }
+
+    @Test
+    void 이미_SUSPENDED_상태인_코스의_챕터에_강의_생성_요청_시_예외가_발생한다() {
+        Long courseId = 10L;
+        Long chapterId = 1L;
+        LectureCreateRequest request = new LectureCreateRequest(
+                "스프링 시큐리티 구조와 흐름",
+                "videos/security.m3u8",
+                UUID.randomUUID().toString(),
+                "시큐리티 필터 체인 분석",
+                1200,
+                1,
+                false
+        );
+
+        Course realCourse = TestEntityFactory.course(courseId);
+        ReflectionTestUtils.setField(realCourse, "id", courseId);
+        ReflectionTestUtils.setField(realCourse, "status", CourseStatus.SUSPENDED);
+        Chapter chapter = ChapterFixture.chapter(chapterId, "보안 기본", 1, realCourse);
+
+        given(chapterRepository.findByIdWithCourse(chapterId)).willReturn(Optional.of(chapter));
+
+        assertThatThrownBy(() -> lectureService.createLecture(courseId, chapterId, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_ALREADY_ON_SALE.getMessage());
     }
 
     // ── 강의 입장 (enterLecture) ──────────────────────────────────────────
