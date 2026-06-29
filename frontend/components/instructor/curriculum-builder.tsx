@@ -64,7 +64,7 @@ export function CurriculumBuilder({
       return
     }
     try {
-      const course = await api.getCourse(courseId)
+      const course = await api.getInstructorCourse(courseId)
       setCourse(course ?? null)
       if (course) {
         const mappedChapters = (course.chapters ?? []).map((ch) => ({
@@ -279,7 +279,7 @@ export function CurriculumBuilder({
 
       await api.updateCourse(courseId, formData)
 
-      const refreshedCourse = await api.getCourse(courseId)
+      const refreshedCourse = await api.getInstructorCourse(courseId)
       
       let videoUploadFailed = false
       const uploadedVideoNames: Record<string, string> = {}

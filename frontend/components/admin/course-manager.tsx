@@ -117,9 +117,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
 
     try {
       if (type === 'approve') {
-        if (!course.id.toString().startsWith('10')) {
-          await api.approveCourseByAdmin(course.id)
-        }
+        await api.approveCourseByAdmin(course.id)
         setCourses((prev) =>
           prev.map((c) => (c.id === course.id ? { ...c, status: 'ON_SALE' } : c))
         )
@@ -129,36 +127,31 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
           toast.error('반려 사유를 입력해주세요.')
           return
         }
-        if (!course.id.toString().startsWith('10')) {
-          await api.rejectCourseByAdmin(course.id, reason)
-        }
+        await api.rejectCourseByAdmin(course.id, reason)
         setCourses((prev) =>
-          prev.map((c) => (c.id === course.id ? { ...c, status: 'DRAFT' } : c))
+          prev.map((c) => (c.id === course.id ? { ...c, status: 'DRAFT', statusReason: reason } : c))
         )
-        toast.success(`"${course.title}" 강좌의 심사 요청을 반려(DRAFT) 처리했습니다.`)
+        toast.success(`"${course.title}" 강좌의 심사 요청을 반려했습니다. 판매자가 수정 후 다시 신청할 수 있습니다.`)
       } else if (type === 'suspend') {
         if (!reason.trim()) {
           toast.error('판매 중지 사유를 입력해주세요.')
           return
         }
-        if (!course.id.toString().startsWith('10')) {
-          await api.suspendCourseByAdmin(course.id, reason)
-        }
+        await api.suspendCourseByAdmin(course.id, reason)
         setCourses((prev) =>
           prev.map((c) => (c.id === course.id ? { ...c, status: 'SUSPENDED' } : c))
         )
         toast.success(`"${course.title}" 강좌를 강제 판매 중지(SUSPENDED) 처리했습니다.`)
       } else if (type === 'delete') {
-        if (!course.id.toString().startsWith('10')) {
-          await api.deleteCourseByAdmin(course.id)
-        }
+        await api.deleteCourseByAdmin(course.id)
         setCourses((prev) => prev.filter((c) => c.id !== course.id))
         toast.success(`"${course.title}" 강좌를 삭제했습니다.`)
       }
       setConfirmModal(null)
       setReason('')
     } catch (e: any) {
-      toast.error(`작업 실패: ${e.message || e}`)
+      const message = e.message || String(e)
+      toast.error(message.includes('수강생이 존재') ? '수강생이 존재하므로 삭제할 수 없습니다' : `작업 실패: ${message}`)
     } finally {
       setProcessing(false)
     }

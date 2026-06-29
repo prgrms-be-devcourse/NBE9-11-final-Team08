@@ -14,7 +14,7 @@ export default async function AdminCoursePreviewPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const course = await api.getCourse(id)
+  const course = await api.getAdminCourse(id)
 
   if (!course) {
     notFound()

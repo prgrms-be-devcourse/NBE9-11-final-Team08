@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import type { Chapter, Course } from '@/lib/types'
+import type { CategoryResponse, Chapter, Course } from '@/lib/types'
 
-const subCategories = ['백엔드', '프론트엔드', '데브옵스', '프로그래밍 언어', '업무 생산성']
+const allowedCourseCategoryNames = ['DevOps', '백엔드', '마케팅', '프론트엔드', 'UI/UX']
+const categoryId = (category: CategoryResponse) => String(category.id)
 
 const buildChapterUpdatePayload = (chapters: Chapter[]) =>
   chapters.map((chapter, chapterIndex) => ({
@@ -45,15 +46,12 @@ export function CourseForm({ course }: { course?: Course }) {
   
   const [title, setTitle] = useState(course?.title ?? '')
   const [mainCat, setMainCat] = useState(course?.category ?? '')
-  const [subCat, setSubCat] = useState(course?.subCategory ?? '')
   const [price, setPrice] = useState(course ? String(course.price) : '')
   const [description, setDescription] = useState(course?.description ?? '')
   const [tags, setTags] = useState<string[]>(course?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(
-    course?.category ? [course.category] : [],
-  )
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
@@ -67,32 +65,23 @@ export function CourseForm({ course }: { course?: Course }) {
 
   useEffect(() => {
     let active = true
-    api.getCourses(0, 100)
+    api.getCategories()
       .then((response) => {
         if (!active) return
-        const next = Array.from(
-          new Set(
-            response.content
-              .map((item) => item.category)
-              .filter((value): value is string => Boolean(value)),
-          ),
-        )
-        setCategoryOptions(
-          Array.from(new Set([course?.category, ...next].filter(Boolean) as string[])),
-        )
+        setCategories(response)
       })
-      .catch(() => {
-        if (course?.category) setCategoryOptions([course.category])
-      })
+      .catch(() => setCategories([]))
     return () => {
       active = false
     }
   }, [course?.category])
 
+  const mainCategories = categories.filter((category) => allowedCourseCategoryNames.includes(category.name))
+
   useEffect(() => {
     if (!course?.id) return
     let active = true
-    api.getCourse(course.id).then((fresh) => {
+    api.getInstructorCourse(course.id).then((fresh) => {
       if (!active || !fresh?.chapters?.length) return
       setCourseChapters(fresh.chapters)
     })
@@ -127,7 +116,8 @@ export function CourseForm({ course }: { course?: Course }) {
       toast.success('강의가 성공적으로 삭제되었습니다.')
       router.push('/instructor')
     } catch (error: any) {
-      toast.error(`강의 삭제 실패: ${error.message || error}`)
+      const message = error.message || String(error)
+      toast.error(message.includes('수강생이 존재') ? '수강생이 존재하므로 삭제할 수 없습니다' : `강의 삭제 실패: ${message}`)
     } finally {
       setLoading(false)
     }
@@ -162,8 +152,9 @@ export function CourseForm({ course }: { course?: Course }) {
   }
 
   const handleSubmit = async (status: 'DRAFT' | 'REVIEW') => {
-    const categoryId = Number(mainCat)
-    if (!title.trim() || !price || !Number.isFinite(categoryId)) {
+    const selectedCategoryId = mainCat
+    const selectedCategoryNumber = Number(selectedCategoryId)
+    if (!title.trim() || !price || !selectedCategoryId || !Number.isFinite(selectedCategoryNumber)) {
       toast.error('필수 항목(제목, 가격, 대분류)을 입력해주세요.')
       return
     }
@@ -171,7 +162,7 @@ export function CourseForm({ course }: { course?: Course }) {
     setLoading(true)
     try {
       if (editing && course) {
-        const freshCourse = await api.getCourse(course.id)
+        const freshCourse = await api.getInstructorCourse(course.id)
         const chaptersForUpdate =
           freshCourse?.chapters?.length ? freshCourse.chapters : courseChapters
 
@@ -194,7 +185,7 @@ export function CourseForm({ course }: { course?: Course }) {
         const requestData = {
           title,
           description,
-          categoryId,
+          categoryId: selectedCategoryNumber,
           price: Number(price),
           thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
           chapters: buildChapterUpdatePayload(chaptersForUpdate),
@@ -228,7 +219,7 @@ export function CourseForm({ course }: { course?: Course }) {
         const requestData = {
           title,
           description,
-          categoryId,
+          categoryId: selectedCategoryNumber,
           price: Number(price),
           thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
         }
@@ -288,7 +279,7 @@ export function CourseForm({ course }: { course?: Course }) {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
               <div className="grid gap-2">
                 <Label>대분류</Label>
                 <Select value={mainCat} onValueChange={(value) => setMainCat(value ?? '')} disabled={isReadOnly || loading}>
@@ -296,26 +287,11 @@ export function CourseForm({ course }: { course?: Course }) {
                     <SelectValue placeholder="대분류 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categoryOptions.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          카테고리 {c}
+                    {mainCategories.map((c) => (
+                        <SelectItem key={c.id} value={categoryId(c)}>
+                          {c.name}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>소분류</Label>
-                <Select value={subCat} onValueChange={(value) => setSubCat(value ?? '')} disabled={isReadOnly || loading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="소분류 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subCategories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
