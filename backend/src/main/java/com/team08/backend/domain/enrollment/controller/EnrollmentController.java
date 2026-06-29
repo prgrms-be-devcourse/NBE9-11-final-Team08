@@ -1,6 +1,7 @@
 package com.team08.backend.domain.enrollment.controller;
 
 import com.team08.backend.domain.enrollment.dto.ActiveEnrollmentExistsResponse;
+import com.team08.backend.domain.enrollment.dto.EnrolledCourseResponse;
 import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/enrollments")
 @RequiredArgsConstructor
@@ -20,6 +23,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class EnrollmentController {
 
     private final EnrollmentQueryService enrollmentQueryService;
+
+    @Operation(
+            summary = "내 활성 수강 강좌 목록 조회",
+            description = "현재 로그인한 사용자의 ACTIVE 수강 등록 강좌를 최신 등록순으로 조회합니다."
+    )
+    @GetMapping("/me/courses")
+    public List<EnrolledCourseResponse> getMyActiveCourses(
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal
+    ) {
+        return enrollmentQueryService.getMyActiveCourses(loginUserPrincipal.user().id());
+    }
 
     @Operation(
             summary = "강의 활성 수강 여부 조회",
