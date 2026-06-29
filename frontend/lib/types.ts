@@ -319,11 +319,22 @@ export interface QnaQuestionResponse {
   id: number
   lectureId: number
   userId: number
+  nickname: string
   title: string
   content: string
   createdAt: string
   updatedAt: string
   answer: QnaAnswerSummary | null
+}
+
+// 백엔드 QnaAnswerResponse(record)와 동일한 형태
+export interface QnaAnswerResponse {
+  id: number
+  questionId: number
+  instructorId: number
+  content: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface LectureReflectionResponse {
@@ -450,6 +461,19 @@ export interface MyComment {
   content: string
   createdAt: string
   answered: boolean
+}
+
+// 백엔드 MyAnswerResponse(record)와 동일한 형태 — 강사/판매자가 작성한 답변
+export interface MyAnswer {
+  answerId: number
+  questionId: number
+  lectureId: number
+  courseTitle: string
+  lectureTitle: string
+  questionTitle: string
+  questionContent: string
+  answerContent: string
+  createdAt: string
 }
 
 export interface SignupRequest {

@@ -7,17 +7,17 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import type { UserProfile } from '@/lib/types'
 
-const links = [
-  { label: '내 강좌 & 스터디', href: '/mypage' },
-  { label: '스터디 리포트', href: '/mypage/report' },
-  { label: '주문 내역', href: '/orders' },
-  { label: '내 쿠폰', href: '/mypage/coupons' },
-  { label: '작성한 댓글', href: '/mypage/comments' },
-  { label: '설정', href: '/mypage/settings' },
-]
-
 export function AccountSidebar({ profile }: { profile: UserProfile | null }) {
   const pathname = usePathname()
+
+  const links = [
+    { label: '내 강좌 & 스터디', href: '/mypage' },
+    { label: '스터디 리포트', href: '/mypage/report' },
+    { label: '주문 내역', href: '/orders' },
+    { label: '내 쿠폰', href: '/mypage/coupons' },
+    { label: `내 ${profile?.isSeller ? '답변' : '질문'}`, href: '/mypage/comments' },
+    { label: '설정', href: '/mypage/settings' },
+  ]
 
   return (
     <aside className="w-full lg:w-64">

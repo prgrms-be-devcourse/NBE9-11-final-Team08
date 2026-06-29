@@ -18,6 +18,7 @@ import type {
   EnrolledCourse,
   EnrolledCourseResponse,
   MyComment,
+  MyAnswer,
   QnaPost,
   Study,
   StudyDetailResponse,
@@ -45,6 +46,7 @@ import type {
   LearningEventType,
   LearningEventResponse,
   QnaQuestionResponse,
+  QnaAnswerResponse,
   StudyReportResponse,
   AdminOverview,
   DailySessionPoint,
@@ -1173,6 +1175,14 @@ export const api = {
   createQuestion: (lectureId: string | number, title: string, content: string) =>
     mutate<QnaQuestionResponse>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
 
+  // QnA 답변 (해당 강좌의 강사/판매자 전용 — 백엔드 MANAGE_ANSWER 로 강제)
+  createAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'POST', { content }),
+  updateAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'PUT', { content }),
+  deleteAnswer: (questionId: string | number) =>
+    mutate<void>(`/api/qna/questions/${questionId}/answers`, 'DELETE'),
+
   // Reflections
   getReflection: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/reflections`, null),
   createReflection: (lectureId: string | number, content: string) => mutate<any>(`/api/lectures/${lectureId}/reflections`, 'POST', { content }),
@@ -1481,6 +1491,7 @@ export const api = {
     return Array.isArray(courses) ? courses.map(mapEnrolledCourseResponseToCourse) : []
   },
   getMyComments: () => request<MyComment[]>('/api/me/comments', []),
+  getMyAnswers: () => request<MyAnswer[]>('/api/me/answers', []),
 
   // Orders
   getOrders: async () => {

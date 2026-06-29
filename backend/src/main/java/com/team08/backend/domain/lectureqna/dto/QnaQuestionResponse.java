@@ -6,6 +6,7 @@ public record QnaQuestionResponse(
         Long id,
         Long lectureId,
         Long userId,
+        String nickname,
         String title,
         String content,
         LocalDateTime createdAt,
