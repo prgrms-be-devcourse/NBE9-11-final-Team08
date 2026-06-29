@@ -595,15 +595,13 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
                 <span className="w-10 text-right text-xs font-semibold">
                   {activeProgress}%
                 </span>
+                {active && lectureCompleted(active) && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                    <CheckCircle2 className="h-4 w-4" />
+                    완료됨
+                  </span>
+                )}
               </div>
-              <Button
-                size="sm"
-                onClick={markComplete}
-                disabled={accessDenied || entering || (active ? lectureCompleted(active) : true)}
-              >
-                <CheckCircle2 className="mr-1 h-4 w-4" />
-                {active && lectureCompleted(active) ? '완료됨' : '수강 완료'}
-              </Button>
             </div>
           </div>
 
