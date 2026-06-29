@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ReflectionEditor } from '@/components/study/reflection-editor'
@@ -99,6 +100,7 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
     course.chapters.map((c) => c.id),
   )
   const [posts, setPosts] = useState<QnaQuestionResponse[]>([])
+  const [questionTitle, setQuestionTitle] = useState('')
   const [question, setQuestion] = useState('')
 
   const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
@@ -448,6 +450,10 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
       )
       return
     }
+    if (!questionTitle.trim()) {
+      toast.error('제목을 입력해주세요.')
+      return
+    }
     if (!question.trim()) return
     if (!active?.id) {
       toast.error('강의를 선택해주세요.')
@@ -455,10 +461,10 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
     }
 
     try {
-      const title = question.trim().substring(0, 50)
-      const res = await api.createQuestion(active.id, title, question.trim())
+      const res = await api.createQuestion(active.id, questionTitle.trim(), question.trim())
       if (res && res.id) {
         setPosts((prev) => [res, ...prev])
+        setQuestionTitle('')
         setQuestion('')
         toast.success('질문이 게시되었습니다.')
       } else {
@@ -656,6 +662,12 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
             </p>
           ) : (
             <div className="space-y-2 p-4">
+              <Input
+                value={questionTitle}
+                onChange={(e) => setQuestionTitle(e.target.value)}
+                placeholder="제목"
+                maxLength={50}
+              />
               <Textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
