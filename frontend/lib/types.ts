@@ -363,6 +363,14 @@ export interface LectureProgressResponse {
   completed: boolean
 }
 
+// 강좌 커리큘럼 화면용 — 사용자의 강의별 진행도(진행 이력이 있는 강의만 내려온다)
+export interface CourseLectureProgressResponse {
+  lectureId: number
+  lastPositionSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
 export type LearningEventType =
   | 'LECTURE_ENTER'
   | 'VIDEO_PAUSE'
