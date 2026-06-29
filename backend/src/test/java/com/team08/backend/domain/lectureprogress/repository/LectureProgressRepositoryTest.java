@@ -58,51 +58,6 @@ class LectureProgressRepositoryTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc
-    // ─────────────────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("강좌 내 강의 중 가장 최근 학습한 진행 정보를 반환한다")
-    void findTopByUserIdAndLectureIdIn_returnsMostRecent() {
-        save(1L, 10L, 100, false, time(10, 0));
-        save(1L, 11L, 200, false, time(12, 0)); // 가장 최근
-        save(1L, 12L, 50, false, time(9, 0));
-
-        Optional<LectureProgress> result =
-                lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(
-                        1L, List.of(10L, 11L, 12L));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getLectureId()).isEqualTo(11L);
-    }
-
-    @Test
-    @DisplayName("목록에 포함된 강의만 대상으로 가장 최근 진행 정보를 반환한다")
-    void findTopByUserIdAndLectureIdIn_filtersByLectureIds() {
-        save(1L, 10L, 100, false, time(10, 0));
-        save(1L, 99L, 999, false, time(23, 0)); // 더 최근이지만 목록에 없음
-
-        Optional<LectureProgress> result =
-                lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(
-                        1L, List.of(10L));
-
-        assertThat(result).isPresent();
-        assertThat(result.get().getLectureId()).isEqualTo(10L);
-    }
-
-    @Test
-    @DisplayName("학습한 강의가 없으면 빈 Optional을 반환한다")
-    void findTopByUserIdAndLectureIdIn_noMatch_returnsEmpty() {
-        save(1L, 10L, 100, false, time(10, 0));
-
-        Optional<LectureProgress> result =
-                lectureProgressRepository.findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(
-                        1L, List.of(50L, 51L));
-
-        assertThat(result).isEmpty();
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
     // fixture
     // ─────────────────────────────────────────────────────────────────────────
 

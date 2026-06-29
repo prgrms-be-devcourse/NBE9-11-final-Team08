@@ -67,30 +67,11 @@ public class ChapterService {
     public LectureEnterResponse getLastWatchedLecture(Long courseId, Long userId) {
         lectureAccessValidator.validateCourseAccess(courseId, userId);
 
+        // 입장(enterLecture)마다 last_watched_lectures 를 upsert 하므로 이어보기는 이 단건 조회로 끝난다.
+        // 행이 없으면(미시청) 이어볼 강의가 없는 것이라 null 을 반환한다.
         return lastWatchedLectureService
                 .findLectureId(userId, courseId)
                 .map(lectureId -> buildResponse(userId, lectureId))
-                .orElseGet(() -> getLastWatchedByProgress(courseId, userId));
-    }
-
-    // [마이그레이션 브리지] 정상 경로는 아님.
-    // 정상 입장(enterLecture)은 last_watched_lectures 행을 항상 upsert 하므로 보통 이 폴백은 안 탄다.
-    // 이 폴백이 실제로 값을 찾는 경우는 두 가지뿐:
-    //   1) last_watched_lectures 도입(2026-06-21) 이전 데이터 — progress 행은 있으나 last_watched 행이 없음(백필 없이 무중단용)
-    //   2) "입장 없이 하트비트" 비정상 경로 — LectureProgressService 가 progress 행만 lazy 생성
-    // legacy 데이터가 소진되거나 백필을 돌리면 1) 사유는 사라지므로, 이후 제거 가능.
-    private LectureEnterResponse getLastWatchedByProgress(Long courseId, Long userId) {
-        List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
-        if (lectureIds.isEmpty()) {
-            return null;
-        }
-        return lectureProgressRepository
-                .findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(userId, lectureIds)
-                .map(progress -> {
-                    Lecture lecture = lectureRepository.findById(progress.getLectureId())
-                            .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND_IN_CHAPTER));
-                    return LectureEnterResponse.of(lecture, progress);
-                })
                 .orElse(null);
     }
 
