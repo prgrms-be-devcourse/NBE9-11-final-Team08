@@ -1,10 +1,10 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcoupon.exception.JobAlreadyProcessingException;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobWriter.JobLockResult;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobWriter.JobLockResult;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.global.redis.stream.AbstractPendingRecoveryScheduler;

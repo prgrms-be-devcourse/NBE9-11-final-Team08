@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
 import com.team08.backend.global.redis.stream.AbstractScheduledBatchStreamWorker;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

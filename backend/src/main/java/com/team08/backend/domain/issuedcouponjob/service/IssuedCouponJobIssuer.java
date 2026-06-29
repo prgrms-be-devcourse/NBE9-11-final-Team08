@@ -1,12 +1,12 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponJobRepository;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

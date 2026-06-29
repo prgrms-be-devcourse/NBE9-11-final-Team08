@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcoupon.entity;
+package com.team08.backend.domain.issuedcouponjob.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

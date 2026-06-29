@@ -8,8 +8,9 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.strategy.CouponIssueResult;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -19,8 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.support.TransactionCallback;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -30,8 +29,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -57,19 +54,7 @@ class IssuedCouponServiceTest {
     private IssuedCouponWriter issuedCouponWriter;
 
     @Mock
-    private IssuedCouponJobWriter issuedCouponJobWriter;
-
-    @Mock
-    private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
-
-    @Mock
-    private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
-
-    @Mock
     private AllUsersCouponMaterializer allUsersCouponMaterializer;
-
-    @Mock
-    private TransactionTemplate transactionTemplate;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
@@ -83,18 +68,14 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
-                issuedCouponJobWriter,
-                issuedCouponJobStreamPublisher,
                 allUsersCouponMaterializer,
-                transactionTemplate,
-                clock,
-                fcfsCouponRedisIssuer
+                clock
         );
     }
 
     @Test
-    @DisplayName("성공: 쿠폰 다운로드 요청 시 팩토리를 통해 전략을 가져와 실행한다")
-    void downloadCoupon_success() {
+    @DisplayName("성공: 쿠폰 다운로드 요청 시 전략을 실행하고 발급 완료 응답을 반환한다")
+    void downloadCoupon_success_issued() {
         // given
         Long userId = 1L;
         Long policyId = 1L;
@@ -103,45 +84,43 @@ class IssuedCouponServiceTest {
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
-        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
-            TransactionCallback<?> callback = invocation.getArgument(0);
-            return callback.doInTransaction(null);
-        });
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
-        when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-        when(issuedCouponWriter.saveWithConcurrencyProtection(any(IssuedCoupon.class))).thenReturn(issuedCoupon);
+        
+        CouponIssueResult issueResult = CouponIssueResult.issued(issuedCoupon);
+        when(strategy.issue(userId, policyId)).thenReturn(issueResult);
 
         // when
         CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
 
         // then
         assertThat(response).isNotNull();
-        verify(transactionTemplate, times(1)).execute(any());
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
-        verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
     }
 
     @Test
-    @DisplayName("성공: 선착순 쿠폰 Stream 적재 실패 시 예외를 전파한다")
-    void downloadFcfsCoupon_streamPublishFail_throwException() {
+    @DisplayName("성공: 선착순 쿠폰 다운로드 요청 시 전략을 실행하고 비동기 접수 응답을 반환한다")
+    void downloadCoupon_success_requested() {
         // given
         Long userId = 1L;
         Long policyId = 1L;
         IssuedCouponStrategy strategy = mock(IssuedCouponStrategy.class);
-        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
-        IssuedCouponJob issuedCouponJob = mock(IssuedCouponJob.class);
 
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
         when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
-        when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-        when(issuedCouponJobStreamPublisher.publish(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(userId), org.mockito.ArgumentMatchers.eq(policyId)))
-                .thenThrow(new IllegalStateException("stream"));
+        
+        CouponIssueResult issueResult = CouponIssueResult.requested(userId, policyId);
+        when(strategy.issue(userId, policyId)).thenReturn(issueResult);
 
-        // when & then
-        assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
-                .isInstanceOf(com.team08.backend.domain.issuedcoupon.exception.CouponIssueFailedException.class);
+        // when
+        CouponDownloadResponse response = issuedCouponService.downloadCoupon(userId, policyId);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.jobStatus()).isEqualTo(IssuedCouponJobStatus.REQUESTED);
+        verify(strategyFactory, times(1)).getStrategy(CouponType.FCFS);
+        verify(strategy, times(1)).issue(userId, policyId);
     }
 
     @Test
@@ -280,5 +259,4 @@ class IssuedCouponServiceTest {
         verify(issuedCoupon).validateUsable(userId, now);
         verify(issuedCoupon).applyUsage(CouponUsageType.SINGLE_USE, now);
     }
-
 }

@@ -1,7 +1,7 @@
-package com.team08.backend.domain.issuedcoupon.repository;
+package com.team08.backend.domain.issuedcouponjob.repository;
 
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

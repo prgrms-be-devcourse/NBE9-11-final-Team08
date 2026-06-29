@@ -1,8 +1,8 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
-import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponJobRepository;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;

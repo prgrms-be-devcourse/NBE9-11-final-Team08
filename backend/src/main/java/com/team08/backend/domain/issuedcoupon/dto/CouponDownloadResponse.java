@@ -2,7 +2,7 @@ package com.team08.backend.domain.issuedcoupon.dto;
 
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 
 import java.time.LocalDateTime;
 
