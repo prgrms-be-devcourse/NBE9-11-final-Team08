@@ -16,10 +16,9 @@ import { formatDateTime, toDateValue } from '@/lib/utils'
 
 interface DashboardViewProps {
   courses: EnrolledCourse[]
-  feed: StudyActivityResponse[]
 }
 
-export function DashboardView({ courses, feed }: DashboardViewProps) {
+export function DashboardView({ courses }: DashboardViewProps) {
   const active = courses.filter((c) => c.status === '진행 중')
   const avgProgress = Math.round(
     courses.reduce((s, c) => s + c.progress, 0) / Math.max(courses.length, 1),
@@ -52,47 +51,36 @@ export function DashboardView({ courses, feed }: DashboardViewProps) {
         ))}
       </section>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_330px]">
-        <section>
-          <h2 className="mb-4 text-lg font-bold">강좌별 진행 현황</h2>
-          <ul className="space-y-3">
-            {active.map((c) => (
-              <li key={c.id} className="rounded-xl border bg-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{c.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {c.instructor} · {c.completedLectures}/{c.totalLectures}강
-                    </p>
-                  </div>
-                  {c.dday !== undefined && (
-                    <Badge variant="secondary" className="shrink-0">
-                      D-{c.dday}
-                    </Badge>
-                  )}
+      <div className="grid">
+        <h2 className="mb-4 text-lg font-bold">강좌별 진행 현황</h2>
+        <ul className="space-y-3">
+          {active.map((c) => (
+            <li key={c.id} className="rounded-xl border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{c.title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {c.instructor} · {c.completedLectures}/{c.totalLectures}강
+                  </p>
                 </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <Progress value={c.progress} className="h-2 flex-1" />
-                  <span className="w-10 text-right text-xs font-semibold">
-                    {c.progress}%
-                  </span>
-                </div>
-                <Button asChild size="sm" variant="ghost" className="mt-2 h-8 px-2 text-xs">
-                  <Link href={`/study/${c.id}`}>이어서 학습하기</Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section>
-          <h2 className="mb-4 text-lg font-bold">최근 스터디 활동</h2>
-          <ul className="space-y-3">
-            {feed.map((item, index) => (
-              <ActivityCard key={item.activityId?.toString() || `activity-${index}`} item={item} />
-            ))}
-          </ul>
-        </section>
+                {c.dday !== undefined && (
+                  <Badge variant="secondary" className="shrink-0">
+                    D-{c.dday}
+                  </Badge>
+                )}
+              </div>
+              <div className="mt-3 flex items-center gap-3">
+                <Progress value={c.progress} className="h-2 flex-1" />
+                <span className="w-10 text-right text-xs font-semibold">
+                  {c.progress}%
+                </span>
+              </div>
+              <Button asChild size="sm" variant="ghost" className="mt-2 h-8 px-2 text-xs">
+                <Link href={`/study/${c.id}`}>이어서 학습하기</Link>
+              </Button>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   )
