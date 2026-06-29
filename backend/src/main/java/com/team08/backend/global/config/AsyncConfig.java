@@ -37,4 +37,28 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "videoCleanupExecutor")
+    public Executor videoCleanupExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("VideoCleanup-");
+
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+
+        executor.setRejectedExecutionHandler((runnable, threadPoolExecutor) -> {
+            int maxPoolSize = threadPoolExecutor.getMaximumPoolSize();
+            int currentQueueSize = threadPoolExecutor.getQueue().size();
+            int totalQueueCapacity = currentQueueSize + threadPoolExecutor.getQueue().remainingCapacity();
+            log.warn("[비동기 삭제 작업 거절] 인프라 임계치 초과(Pool: {}, Queue: {}/{}). 작업을 거절합니다.",
+                    maxPoolSize, currentQueueSize, totalQueueCapacity);
+            throw new RejectedExecutionException("삭제 처리 시스템 대기열이 가득 찼습니다.");
+        });
+
+        executor.initialize();
+        return executor;
+    }
 }
