@@ -1,4 +1,4 @@
-// frontend/components/checkout/checkout-view.tsx
+﻿// frontend/components/checkout/checkout-view.tsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,7 +14,7 @@ import {
   savePendingPayment,
   type PaymentProvider,
 } from '@/lib/checkout-payment'
-import { requestNicepayPayment } from '@/lib/nicepay-payments'
+import { requestNicepayPayment, type NicepayAuthResult } from '@/lib/nicepay-payments'
 import { loadTossPayments } from '@/lib/toss-payments'
 import { formatKRW } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,6 +43,13 @@ type CouponOption = {
 }
 
 type CheckoutStep = 'idle' | 'loading-order' | 'creating-order' | 'mock-confirming' | 'opening-toss' | 'opening-nicepay'
+
+const resolveNicepayMethod = (result: NicepayAuthResult) => {
+  if (result.EasyPayCl === '16' || result.ClickpayCl === '16') {
+    return 'KAKAOPAY'
+  }
+  return result.EasyPayMethod || result.SelectPayMethod || result.PayMethod || 'CARD'
+}
 
 export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const router = useRouter()
@@ -339,27 +346,28 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       setStep('opening-nicepay')
       const result = await requestNicepayPayment(prepare)
 
-      const paymentKey = result.TxTid
+      const paymentKey = result.TxTid || result.TID || result.tid
       if (!paymentKey) {
         throw new Error('NICEPAY 결제 키를 확인할 수 없습니다.')
       }
+      const payMethod = result.PayMethod || 'CARD'
 
       const paymentResponse = await api.confirmProviderPayment(order.orderId, 'NICEPAY', {
         paymentKey,
-        method: result.PayMethod || 'CARD',
+        method: resolveNicepayMethod(result),
         amount: pendingPayment.amount,
         issuedCouponId: selectedCouponId,
         idempotencyKey: pendingPayment.idempotencyKey,
         authResultCode: result.AuthResultCode,
         authResultMsg: result.AuthResultMsg,
         authToken: result.AuthToken,
-        txTid: result.TxTid,
+        txTid: paymentKey,
         mid: result.MID,
-        moid: result.Moid,
+        moid: result.Moid || result.moid,
         signature: result.Signature,
         nextAppUrl: result.NextAppURL,
         netCancelUrl: result.NetCancelURL,
-        payMethod: result.PayMethod || 'CARD',
+        payMethod,
       })
 
       if (pendingPayment.fromCart && paymentResponse.orderStatus === 'PAID') {
@@ -479,7 +487,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
                     <SelectValue placeholder="사용할 쿠폰을 선택하세요" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">선택 안함</SelectItem>
+                    <SelectItem value="none">선택 안 함</SelectItem>
                     {userCoupons.map((couponOption) => {
                       const applicable = isCouponApplicable(couponOption)
                       return (

@@ -146,6 +146,46 @@ class NicepayPaymentProviderTest {
     }
 
     @Test
+    void unclearApprovalFailureCodeThrowsUnknownException() {
+        PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature());
+        given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
+                .willReturn(nicepayResponse("U116", "unclear easy pay result", "FAILED", 30_000, approvalSignature(30_000)));
+
+        assertThatThrownBy(() -> nicepayPaymentProvider.confirm(request))
+                .isInstanceOfSatisfying(PaymentProviderException.class,
+                        e -> {
+                            assertThat(e.getFailureType()).isEqualTo(PaymentProviderFailureType.UNKNOWN);
+                            assertThat(e.getFailureCode()).isEqualTo("NICEPAY_UNRECOGNIZED_RESULT_CODE");
+                            assertThat(e.getFailureMessage()).contains("U116");
+                        });
+    }
+
+    @Test
+    void kakaoPayInCardWindowSuccessMapsMethodToKakaoPay() {
+        PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature());
+        given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
+                .willReturn(nicepayResponse("3001", "OK", "DONE", 30_000, approvalSignature(30_000), "16"));
+
+        PaymentProviderConfirmResponse response = nicepayPaymentProvider.confirm(request);
+
+        assertThat(response.paymentKey()).isEqualTo(TID);
+        assertThat(response.method()).isEqualTo("KAKAOPAY");
+        assertThat(response.status()).isEqualTo("DONE");
+    }
+
+    @Test
+    void kakaoPayCallbackPayMethodIsApprovedThroughNicepayCardWindow() {
+        PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature(), "KAKAOPAY");
+        given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
+                .willReturn(nicepayResponse("3001", "OK", "DONE", 30_000, approvalSignature(30_000), "16"));
+
+        PaymentProviderConfirmResponse response = nicepayPaymentProvider.confirm(request);
+
+        assertThat(response.method()).isEqualTo("KAKAOPAY");
+        verify(nicepayPaymentClient).confirm(toNicepayRequest(request));
+    }
+
+    @Test
     void lookupCardSuccessCodeWithoutStatusMapsToDone() {
         given(nicepayPaymentClient.findByPaymentKey(TID))
                 .willReturn(Optional.of(nicepayResponse("3001", "OK", null, 30_000, approvalSignature(30_000))));
@@ -159,6 +199,10 @@ class NicepayPaymentProviderTest {
     }
 
     private PaymentProviderConfirmRequest nicepayConfirmRequest(String signature) {
+        return nicepayConfirmRequest(signature, "CARD");
+    }
+
+    private PaymentProviderConfirmRequest nicepayConfirmRequest(String signature, String payMethod) {
         return new PaymentProviderConfirmRequest(
                 TID,
                 "ORD-1",
@@ -172,7 +216,7 @@ class NicepayPaymentProviderTest {
                 signature,
                 "https://web.nicepay.co.kr/approve",
                 "https://web.nicepay.co.kr/net-cancel",
-                "CARD"
+                payMethod
         );
     }
 
@@ -211,6 +255,37 @@ class NicepayPaymentProviderTest {
                 status,
                 null,
                 "CARD",
+                null,
+                null,
+                null,
+                MID,
+                signature,
+                amount,
+                OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+        );
+    }
+
+    private NicepayPaymentResponse nicepayResponse(
+            String resultCode,
+            String resultMsg,
+            String status,
+            long amount,
+            String signature,
+            String easyPayCl
+    ) {
+        return new NicepayPaymentResponse(
+                resultCode,
+                resultMsg,
+                null,
+                TID,
+                null,
+                "ORD-1",
+                status,
+                null,
+                "CARD",
+                easyPayCl,
+                null,
+                null,
                 MID,
                 signature,
                 amount,

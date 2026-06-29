@@ -5,25 +5,31 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import java.time.OffsetDateTime;
 
 public record NicepayPaymentResponse(
-        @JsonAlias("ResultCode")
+        @JsonAlias({"ResultCode", "resultCode"})
         String resultCode,
-        @JsonAlias("ResultMsg")
+        @JsonAlias({"ResultMsg", "resultMsg"})
         String resultMsg,
         String paymentKey,
-        @JsonAlias("TID")
+        @JsonAlias({"TID", "tid"})
         String tid,
         String orderId,
-        @JsonAlias("Moid")
+        @JsonAlias({"Moid", "moid"})
         String moid,
         String status,
         String method,
-        @JsonAlias("PayMethod")
+        @JsonAlias({"PayMethod", "payMethod"})
         String payMethod,
-        @JsonAlias("MID")
+        @JsonAlias({"EasyPayCl", "easyPayCl", "ClickpayCl", "clickpayCl"})
+        String easyPayCl,
+        @JsonAlias({"EasyPayMethod", "easyPayMethod"})
+        String easyPayMethod,
+        @JsonAlias({"SelectPayMethod", "selectPayMethod"})
+        String selectPayMethod,
+        @JsonAlias({"MID", "mid"})
         String mid,
-        @JsonAlias("Signature")
+        @JsonAlias({"Signature", "signature"})
         String signature,
-        @JsonAlias("Amt")
+        @JsonAlias({"Amt", "amount"})
         long amount,
         OffsetDateTime approvedAt
 ) {
@@ -38,6 +44,12 @@ public record NicepayPaymentResponse(
     public String resolvedMethod() {
         if (method != null) {
             return method;
+        }
+        if (easyPayMethod != null) {
+            return easyPayMethod;
+        }
+        if (selectPayMethod != null) {
+            return selectPayMethod;
         }
         return payMethod;
     }

@@ -149,7 +149,7 @@ public class PaymentService {
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public NicepayPreparePaymentResponse prepareNicepayPayment(
             LoginUserDto user,
             Long orderId,

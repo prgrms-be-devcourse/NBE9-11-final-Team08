@@ -5,13 +5,21 @@ export type NicepayAuthResult = {
   AuthResultMsg?: string
   AuthToken?: string
   TxTid?: string
+  TID?: string
+  tid?: string
   MID?: string
   Moid?: string
+  moid?: string
   Amt?: string
+  amt?: string
   Signature?: string
   NextAppURL?: string
   NetCancelURL?: string
   PayMethod?: string
+  EasyPayCl?: string
+  ClickpayCl?: string
+  EasyPayMethod?: string
+  SelectPayMethod?: string
 }
 
 declare global {
@@ -62,6 +70,7 @@ export async function requestNicepayPayment(prepare: NicepayPreparePaymentRespon
 
     const cleanup = () => {
       form.remove()
+      cleanupNicepayLayers()
       delete window.nicepaySubmit
       delete window.nicepayClose
     }
@@ -120,4 +129,19 @@ function createNicepayForm(prepare: NicepayPreparePaymentResponse) {
 function collectFormData(form: HTMLFormElement) {
   const formData = new FormData(form)
   return Object.fromEntries(Array.from(formData.entries()).map(([key, value]) => [key, String(value)])) as NicepayAuthResult
+}
+
+function cleanupNicepayLayers() {
+  const selectors = [
+    '#nice_layer',
+    '#nicepay_layer',
+    '#nicepayLayer',
+    '#nicepayOverlay',
+    '.nicepay-layer',
+    '.nicepay-overlay',
+  ]
+
+  selectors.forEach((selector) => {
+    document.querySelectorAll(selector).forEach((element) => element.remove())
+  })
 }

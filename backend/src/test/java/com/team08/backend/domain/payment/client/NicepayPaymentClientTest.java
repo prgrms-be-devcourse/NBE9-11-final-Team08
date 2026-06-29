@@ -3,6 +3,7 @@ package com.team08.backend.domain.payment.client;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.dto.nicepay.NicepayConfirmPaymentRequest;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.util.NicepaySignature;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.MultiValueMap;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.Mockito.mock;
 
 class NicepayPaymentClientTest {
@@ -53,5 +55,19 @@ class NicepayPaymentClientTest {
         assertThat(form.getFirst("SignData")).isEqualTo(
                 NicepaySignature.sha256("auth-token" + "nicepay00m" + "30000" + "20260618190000" + "merchant-key")
         );
+    }
+
+    @Test
+    void documentResponseIsRejectedAsInvalidConfirmResponse() {
+        NicepayPaymentClient client = new NicepayPaymentClient(
+                mock(RestClient.class),
+                new ObjectMapper(),
+                new NicepayPaymentProperties("https://api.nicepay.co.kr", "nicepay00m", "merchant-key", null, null),
+                Clock.fixed(Instant.parse("2026-06-18T10:00:00Z"), ZoneId.of("Asia/Seoul"))
+        );
+
+        assertThatExceptionOfType(PaymentProviderException.class)
+                .isThrownBy(() -> client.parseConfirmResponse("/* Licensed to the Apache Software Foundation */"))
+                .satisfies(exception -> assertThat(exception.getFailureCode()).isEqualTo("NICEPAY_INVALID_CONFIRM_RESPONSE"));
     }
 }

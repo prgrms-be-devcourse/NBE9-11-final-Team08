@@ -178,8 +178,15 @@ public class PaymentTransactionService {
         LocalDateTime completedAt = approvedAtOrNow(providerResponse.approvedAt());
 
         if (!isValidProviderPaymentResult(providerResponse, order, context.expectedDiscount())) {
-            attempt.markUnknown(providerMismatchCode(context.providerType()), "Provider payment result does not match order.", completedAt);
-            payment.markUnknown(providerMismatchCode(context.providerType()), "Provider payment result does not match order.", completedAt);
+            String mismatchCode = providerMismatchCode(context.providerType(), providerResponse, order, context.expectedDiscount());
+            attempt.markUnknown(mismatchCode, "Provider payment result does not match order.", completedAt);
+            payment.markUnknown(
+                    providerResponse.paymentKey(),
+                    providerResponse.method(),
+                    mismatchCode,
+                    "Provider payment result does not match order.",
+                    completedAt
+            );
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
         }
 
@@ -244,8 +251,8 @@ public class PaymentTransactionService {
             case DECLINED -> {
                 attempt.decline(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
                 payment.decline(
-                        request.paymentKey(),
-                        null,
+                        providerPaymentKey(request),
+                        providerPaymentMethod(request),
                         exception.getFailureCode(),
                         exception.getFailureMessage(),
                         completedAt
@@ -253,11 +260,23 @@ public class PaymentTransactionService {
             }
             case TIMEOUT -> {
                 attempt.markTimeout(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+                payment.markUnknown(
+                        providerPaymentKey(request),
+                        providerPaymentMethod(request),
+                        exception.getFailureCode(),
+                        exception.getFailureMessage(),
+                        completedAt
+                );
             }
             case UNKNOWN -> {
                 attempt.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
-                payment.markUnknown(exception.getFailureCode(), exception.getFailureMessage(), completedAt);
+                payment.markUnknown(
+                        providerPaymentKey(request),
+                        providerPaymentMethod(request),
+                        exception.getFailureCode(),
+                        exception.getFailureMessage(),
+                        completedAt
+                );
             }
         }
 
@@ -594,6 +613,21 @@ public class PaymentTransactionService {
         return providerType.name() + "_PAYMENT_MISMATCH";
     }
 
+    private String providerMismatchCode(
+            PaymentProviderType providerType,
+            PaymentProviderConfirmResponse response,
+            Order order,
+            int expectedDiscount
+    ) {
+        if (!order.getOrderNumber().equals(response.orderId())) {
+            return providerType.name() + "_ORDER_MISMATCH";
+        }
+        if ((order.getFinalPrice() - expectedDiscount) != response.totalAmount()) {
+            return providerType.name() + "_AMOUNT_MISMATCH";
+        }
+        return providerMismatchCode(providerType);
+    }
+
     private String providerNotDoneCode(PaymentProviderType providerType) {
         return providerType.name() + "_NOT_DONE";
     }
@@ -608,6 +642,14 @@ public class PaymentTransactionService {
 
     private String providerRecoveryDuplicateEnrollmentCode(PaymentProviderType providerType) {
         return providerType.name() + "_" + RECOVERY_DUPLICATE_ENROLLMENT;
+    }
+
+    private String providerPaymentKey(ConfirmPaymentRequest request) {
+        return StringUtils.hasText(request.paymentKey()) ? request.paymentKey() : request.txTid();
+    }
+
+    private String providerPaymentMethod(ConfirmPaymentRequest request) {
+        return StringUtils.hasText(request.method()) ? request.method() : request.payMethod();
     }
 
     public record TossPaymentProcessingContext(
