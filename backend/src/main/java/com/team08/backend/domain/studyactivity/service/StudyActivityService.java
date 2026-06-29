@@ -79,6 +79,25 @@ public class StudyActivityService {
     }
 
     @Transactional(readOnly = true)
+    public Page<StudyActivityResponse> getMyActivities(Long userId, Pageable pageable) {
+        Pageable latestFirstPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+
+        Page<StudyActivity> activities = studyActivityRepository
+                .findAllByAuthorIdAndDeletedAtIsNull(userId, latestFirstPageable);
+
+        String authorNickname = resolveNickname(userId);
+
+        return activities.map(activity -> StudyActivityResponse.from(activity, authorNickname));
+    }
+
+    @Transactional(readOnly = true)
     public StudyActivityResponse getActivity(
             Long studyId,
             Long activityId,

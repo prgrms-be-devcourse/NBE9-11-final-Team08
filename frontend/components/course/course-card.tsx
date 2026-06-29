@@ -43,14 +43,8 @@ export function CourseCard({ course }: { course: Course }) {
         <p className="text-xs text-muted-foreground">{course.instructor.name}</p>
 
         <div className="mt-auto flex items-center gap-3 pt-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1 text-amber-500">
-            <Star className="h-3.5 w-3.5 fill-current" />
-            <span className="font-medium text-foreground">{course.rating.toFixed(1)}</span>
-            <span>({course.reviewCount})</span>
-          </span>
           <span className="flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" />
-            {course.studentCount.toLocaleString('ko-KR')}+
+            조회수: {course.viewCount.toLocaleString('ko-KR')}
           </span>
         </div>
 

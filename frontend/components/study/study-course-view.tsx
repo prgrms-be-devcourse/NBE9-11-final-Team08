@@ -51,8 +51,12 @@ export function StudyCourseView({
         {course.chapters.map((ch) => {
           const isOpen = open.includes(ch.id)
           const total = ch.lectures.length
-          const done = ch.lectures.filter((l) => l.completed).length
-          const chapterProgress = Math.round((done / Math.max(total, 1)) * 100)
+          // 챕터 진행률은 완료 개수가 아니라 강의별 진행률(완료=100%)을 평균해 합산한다.
+          const progressSum = ch.lectures.reduce(
+            (sum, l) => sum + (l.completed ? 100 : l.progress),
+            0,
+          )
+          const chapterProgress = Math.round(progressSum / Math.max(total, 1))
           return (
             <div key={ch.id} className="border-b last:border-b-0">
               <button

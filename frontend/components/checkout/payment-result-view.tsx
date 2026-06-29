@@ -184,7 +184,7 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
                   <Link href="/orders">주문 내역</Link>
                 </Button>
                 <Button asChild className="flex-1">
-                  <Link href="/dashboard">학습 시작하기</Link>
+                  <Link href="/mypage">학습 시작하기</Link>
                 </Button>
               </>
             ) : (

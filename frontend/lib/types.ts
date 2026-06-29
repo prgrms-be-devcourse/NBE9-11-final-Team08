@@ -37,11 +37,7 @@ export interface Course {
   thumbnailUrl: string
   price: number
   discountRate?: number
-  rating: number
-  reviewCount: number
-  studentCount: number
-  level: '왕초보' | '입문' | '초급' | '중급' | '심화'
-  tags: string[]
+  viewCount: number
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
@@ -363,6 +359,14 @@ export interface LectureProgressResponse {
   completed: boolean
 }
 
+// 강좌 커리큘럼 화면용 — 사용자의 강의별 진행도(진행 이력이 있는 강의만 내려온다)
+export interface CourseLectureProgressResponse {
+  lectureId: number
+  lastPositionSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
 export type LearningEventType =
   | 'LECTURE_ENTER'
   | 'VIDEO_PAUSE'
@@ -422,6 +426,19 @@ export interface EnrolledCourse {
   completedLectures: number
   dday?: number
   status: '진행 중' | '완료'
+}
+
+export interface EnrolledCourseResponse {
+  enrollmentId: number
+  courseId: number
+  studyId?: number | null
+  title: string
+  instructorNickname: string
+  thumbnailUrl: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
+  enrolledAt: string
 }
 
 export interface MyComment {
