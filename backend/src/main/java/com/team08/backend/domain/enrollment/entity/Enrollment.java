@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "enrollments",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "course_id"}),
         indexes = {
                 @Index(name = "idx_enrollment_user_status_course", columnList = "user_id, status, course_id"),
                 @Index(name = "idx_enrollment_order_status", columnList = "order_id, status")
