@@ -90,13 +90,20 @@ public class CouponPolicyValidator {
             if (totalQuantity == null || totalQuantity < 1) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }
-        } else if (type == CouponType.NORMAL) {
+        } else if (type == CouponType.NORMAL || type == CouponType.ADMIN || type == CouponType.AUTO) {
             if (totalQuantity != null) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }
         }
-        if (autoIssueType != null && type != CouponType.AUTO) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+
+        if (type == CouponType.AUTO) {
+            if (autoIssueType == null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+        } else {
+            if (autoIssueType != null) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
         }
 
         // 할인 타입별 검증

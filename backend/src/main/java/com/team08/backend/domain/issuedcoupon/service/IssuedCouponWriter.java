@@ -24,4 +24,13 @@ public class IssuedCouponWriter {
             throw new CouponAlreadyIssuedException();
         }
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public java.util.List<IssuedCoupon> saveAllWithConcurrencyProtection(java.util.List<IssuedCoupon> coupons) {
+        try {
+            return issuedCouponRepository.saveAllAndFlush(coupons);
+        } catch (DataIntegrityViolationException e) {
+            throw new CouponAlreadyIssuedException();
+        }
+    }
 }

@@ -217,7 +217,7 @@ export interface Coupon {
   totalQuantity?: number | null
 }
 
-export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
+export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO' | 'ADMIN'
 export type AutoIssueType = 'SIGNUP' | 'ATTENDANCE_STREAK' | 'MONTHLY_ATTENDANCE'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'
@@ -834,4 +834,34 @@ export interface AuditResponse {
     count: number
     sampleIds: number[]
   }[]
+}
+
+export interface CouponIssueUsersRequest {
+  requestKey: string
+  userIds: number[]
+}
+
+export interface CouponIssueAllUsersRequest {
+  requestKey: string
+}
+
+export type CouponIssueRequestType = 'TARGETED' | 'ALL_USERS'
+export type CouponIssueRequestStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+
+export interface CouponIssueRequestResponse {
+  id: number
+  policyId: number
+  requestKey: string
+  issueType: CouponIssueRequestType
+  status: CouponIssueRequestStatus
+  requestedCount: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  targetUserMaxId: number | null
+  requestedBy: number
+  requestedAt: string | number[]
+  startedAt: string | number[] | null
+  completedAt: string | number[] | null
+  failureReason: string | null
 }

@@ -64,6 +64,9 @@ class IssuedCouponServiceTest {
     private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
 
     @Mock
+    private AllUsersCouponMaterializer allUsersCouponMaterializer;
+
+    @Mock
     private TransactionTemplate transactionTemplate;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
@@ -80,6 +83,7 @@ class IssuedCouponServiceTest {
                 issuedCouponWriter,
                 issuedCouponJobWriter,
                 issuedCouponJobStreamPublisher,
+                allUsersCouponMaterializer,
                 transactionTemplate,
                 clock
         );
@@ -166,6 +170,32 @@ class IssuedCouponServiceTest {
     }
 
     @Test
+    @DisplayName("전체 회원 쿠폰 발급 직후 내 쿠폰 조회 시 JIT 생성 후 목록을 반환한다")
+    void getMyCoupons_afterAllUsersIssue_materializesAndReturnsCoupons() {
+        // given
+        Long userId = 1L;
+        Long policyId = 10L;
+
+        IssuedCoupon materializedCoupon = mock(IssuedCoupon.class);
+        when(materializedCoupon.getPolicyId()).thenReturn(policyId);
+
+        CouponPolicy policy = mock(CouponPolicy.class);
+        when(policy.getId()).thenReturn(policyId);
+        when(policy.getName()).thenReturn("전체 회원 쿠폰");
+
+        when(issuedCouponRepository.findByUserIdOrderByExpiredAtAsc(userId)).thenReturn(List.of(materializedCoupon));
+        when(couponPolicyRepository.findAllById(anyList())).thenReturn(List.of(policy));
+
+        // when
+        List<CouponListResponse> responses = issuedCouponService.getMyCoupons(userId);
+
+        // then
+        verify(allUsersCouponMaterializer).materializeForUser(userId);
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).couponName()).isEqualTo("전체 회원 쿠폰");
+    }
+
+    @Test
     @DisplayName("성공: 쿠폰 적용 시 예상 할인 금액을 정확히 계산한다")
     void calculateExpectedDiscount_success() {
         // given
@@ -191,6 +221,36 @@ class IssuedCouponServiceTest {
         assertThat(response.discountAmount()).isEqualTo(1000);
         assertThat(response.finalPrice()).isEqualTo(9000);
         verify(issuedCoupon).validateUsable(userId, now);
+    }
+
+    @Test
+    @DisplayName("전체 회원 쿠폰 발급 직후 쿠폰 적용 시 JIT 생성 후 할인 금액을 계산한다")
+    void calculateExpectedDiscount_afterAllUsersIssue_materializesBeforeDiscountCalculation() {
+        // given
+        Long userId = 1L;
+        Long issuedCouponId = 100L;
+        int originalPrice = 30_000;
+        LocalDateTime now = LocalDateTime.now(clock);
+
+        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
+        when(issuedCoupon.getPolicyId()).thenReturn(10L);
+
+        CouponPolicy policy = mock(CouponPolicy.class);
+        when(policy.getName()).thenReturn("전체 회원 쿠폰");
+        when(policy.calculateDiscountAmount(originalPrice)).thenReturn(5_000);
+
+        when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
+        when(couponPolicyRepository.findById(10L)).thenReturn(Optional.of(policy));
+
+        // when
+        ExpectedDiscountResponse response = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, originalPrice);
+
+        // then
+        verify(allUsersCouponMaterializer).materializeForUser(userId);
+        verify(issuedCoupon).validateUsable(userId, now);
+        assertThat(response.couponName()).isEqualTo("전체 회원 쿠폰");
+        assertThat(response.discountAmount()).isEqualTo(5_000);
+        assertThat(response.finalPrice()).isEqualTo(25_000);
     }
 
     @Test
