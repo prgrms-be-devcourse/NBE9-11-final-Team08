@@ -24,7 +24,6 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -75,22 +74,10 @@ public class AuthController {
     @SecurityRequirements
     @GetMapping("/csrf")
     public ResponseEntity<Void> csrf(CsrfToken csrfToken) {
-        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken.getToken());
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
-                .build();
-    }
-
-    private ResponseCookie buildCsrfCookie(String token) {
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from("XSRF-TOKEN", token)
-                .httpOnly(false)
-                .secure(accessCookieProperties.secure())
-                .sameSite(accessCookieProperties.sameSite())
-                .path("/");
-        if (StringUtils.hasText(accessCookieProperties.domain())) {
-            builder.domain(accessCookieProperties.domain());
-        }
-        return builder.build();
+        // 토큰에 접근하면 CookieCsrfTokenRepository 가 XSRF-TOKEN 쿠키를 발급한다.
+        // 쿠키 속성은 SecurityConfig 의 CookieCsrfTokenRepository customizer 가 일괄 적용한다.
+        csrfToken.getToken();
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(
