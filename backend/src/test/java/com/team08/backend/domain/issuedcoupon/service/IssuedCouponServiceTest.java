@@ -34,7 +34,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,7 +141,7 @@ class IssuedCouponServiceTest {
 
         // when & then
         assertThatThrownBy(() -> issuedCouponService.downloadCoupon(userId, policyId))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(com.team08.backend.domain.issuedcoupon.exception.CouponIssueFailedException.class);
     }
 
     @Test
