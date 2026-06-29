@@ -12,6 +12,8 @@ import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
+import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
+import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +52,9 @@ class LearningEventServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private LectureProgressRepository lectureProgressRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -114,6 +119,46 @@ class LearningEventServiceTest {
                 .isEqualTo(ErrorCode.DUPLICATE_LEARNING_EVENT);
 
         verify(learningEventRepository, never()).save(any());
+    }
+
+    // ──── 완료 이벤트 서버 검증 ───────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("완료 이벤트: lecture_progresses 가 완료 상태면 적재 성공")
+    void recordEvent_lectureComplete_completed_success() {
+        Long userId = 1L;
+        RecordLearningEventRequest request = lectureCompleteRequest(10L, "complete-key");
+        LearningEvent saved = savedEvent(1L, userId, request);
+
+        given(learningEventRepository.existsByUniqueEventKey("complete-key")).willReturn(false);
+        given(lectureProgressRepository.findByUserIdAndLectureId(userId, 10L))
+                .willReturn(Optional.of(completedProgress(userId, 10L)));
+        given(learningEventRepository.save(any())).willReturn(saved);
+
+        LearningEventResponse response = learningEventService.recordEvent(userId, request);
+
+        assertThat(response.eventType()).isEqualTo(LearningEventType.LECTURE_COMPLETE);
+        verify(learningEventRepository).save(any());
+        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
+    }
+
+    @Test
+    @DisplayName("완료 이벤트: 진행 행이 완료 상태가 아니면 예외, 적재하지 않음")
+    void recordEvent_lectureComplete_notCompleted_throws() {
+        Long userId = 1L;
+        RecordLearningEventRequest request = lectureCompleteRequest(10L, "complete-key");
+
+        given(learningEventRepository.existsByUniqueEventKey("complete-key")).willReturn(false);
+        given(lectureProgressRepository.findByUserIdAndLectureId(userId, 10L))
+                .willReturn(Optional.of(inProgress(userId, 10L)));
+
+        assertThatThrownBy(() -> learningEventService.recordEvent(userId, request))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.LECTURE_NOT_COMPLETED);
+
+        verify(learningEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     // ──── 사용자별 활동 조회 ───────────────────────────────────────────────────────
@@ -360,6 +405,25 @@ class LearningEventServiceTest {
                 null,
                 eventKey
         );
+    }
+
+    private RecordLearningEventRequest lectureCompleteRequest(Long lectureId, String eventKey) {
+        return new RecordLearningEventRequest(
+                1L, 2L, lectureId,
+                LearningEventType.LECTURE_COMPLETE,
+                null,
+                eventKey
+        );
+    }
+
+    private LectureProgress completedProgress(Long userId, Long lectureId) {
+        LectureProgress progress = LectureProgress.start(userId, lectureId, 0, LocalDateTime.now());
+        ReflectionTestUtils.setField(progress, "completed", true);
+        return progress;
+    }
+
+    private LectureProgress inProgress(Long userId, Long lectureId) {
+        return LectureProgress.start(userId, lectureId, 0, LocalDateTime.now());
     }
 
     private LearningEvent savedEvent(Long id, Long userId, RecordLearningEventRequest req) {

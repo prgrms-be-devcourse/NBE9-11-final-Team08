@@ -137,6 +137,7 @@ public enum ErrorCode {
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),
     LEARNING_EVENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "LEARNING_002", "학습 이벤트에 접근할 권한이 없습니다."),
+    LECTURE_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "LEARNING_003", "아직 완료 기준에 도달하지 않은 강의입니다."),
 
     // ── Media ────────────────────────────────────────────────────────────
     INVALID_VIDEO_FORMAT(HttpStatus.BAD_REQUEST, "MEDIA_001", "올바르지 않은 비디오 파일 형식입니다."),

@@ -70,7 +70,11 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
     [],
   )
 
-  // 수강 완료: 진행 PATCH 먼저, 그 다음 LECTURE_COMPLETE. (실패는 호출측에서 처리하도록 전파)
+  // 수강 완료: 진행 PATCH 먼저, 그 다음 LECTURE_COMPLETE.
+  // 완료 이벤트는 백엔드가 실제로 완료(progressRate ≥ 90%)로 인정한 경우(res.completed)에만 적재한다.
+  // → 시청시간이 부족해 완료되지 않았는데도 learning_daily_stats.completed_count 가
+  //    부풀려지는(리포트와 lecture_progresses 가 어긋나는) 문제를 막는다.
+  // (실패는 호출측에서 처리하도록 전파)
   const complete = useCallback(
     async (
       lectureId: string,
@@ -78,7 +82,7 @@ export function useLearningSession({ courseId, chapterIdOf }: UseLearningSession
       delta: number,
     ): Promise<LectureProgressResponse> => {
       const res = await api.updateLectureProgress(lectureId, position, delta)
-      record(lectureId, 'LECTURE_COMPLETE', position)
+      if (res.completed) record(lectureId, 'LECTURE_COMPLETE', position)
       return res
     },
     [record],

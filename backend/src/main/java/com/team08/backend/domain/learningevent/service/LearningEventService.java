@@ -10,6 +10,8 @@ import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
 import com.team08.backend.domain.learningevent.repository.LearningEventRepository;
+import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
+import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class LearningEventService {
 
     private final LearningEventRepository learningEventRepository;
     private final CourseRepository courseRepository;
+    private final LectureProgressRepository lectureProgressRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     // ── 이벤트 기록 (중복 방지 포함) ───────────────────────────────────
@@ -40,6 +43,15 @@ public class LearningEventService {
         // 중복 이벤트 방지
         if (learningEventRepository.existsByUniqueEventKey(eventKey)) {
             throw new CustomException(ErrorCode.DUPLICATE_LEARNING_EVENT);
+        }
+
+        // 완료 이벤트는 클라이언트 주장(eventType)을 그대로 믿지 않고 서버 상태로 검증한다.
+        // lecture_progresses 의 누적 시청시간이 완료 기준(progressRate≥90%)에 도달해
+        // completed=true 인 경우에만 적재를 허용한다. (프론트 가드를 우회한 직접 호출로
+        // learning_daily_stats.completed_count 가 부풀려져 리포트가 어긋나는 것을 막는다.)
+        if (request.eventType() == LearningEventType.LECTURE_COMPLETE
+                && !isLectureCompleted(userId, request.lectureId())) {
+            throw new CustomException(ErrorCode.LECTURE_NOT_COMPLETED);
         }
 
         //1. 이벤트 적재
@@ -141,6 +153,16 @@ public class LearningEventService {
         }
         // 클라이언트가 키를 제공하지 않으면 서버가 생성
         return UUID.randomUUID().toString();
+    }
+
+    // 완료 이벤트 검증용: 해당 유저·강의의 진행 행이 실제 완료 상태인지 확인한다.
+    private boolean isLectureCompleted(Long userId, Long lectureId) {
+        if (lectureId == null) {
+            return false;
+        }
+        return lectureProgressRepository.findByUserIdAndLectureId(userId, lectureId)
+                .map(LectureProgress::getCompleted)
+                .orElse(false);
     }
 
     private boolean isAdmin(String role) {
