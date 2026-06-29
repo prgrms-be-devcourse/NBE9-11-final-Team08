@@ -379,6 +379,13 @@ public class DataSeeder {
     private static final int LECTURES_PER_LEARNER = 5;
     /** 학습 활동을 흩뿌릴 날짜 범위(잔디/일별진도용). */
     private static final int SPREAD_DAYS = 14;
+    /**
+     * 스터디 1개당 미리 집계해 둘 리포트 수(= 그 스터디 리포트를 가진 수강생 수).
+     * 리포트 "조회(LOADED)" 부하 테스트가 재집계 없이 단순 SELECT 경로만 두드리도록
+     * (user{1..R}, study{1..S}) 조합마다 리포트를 미리 만들어 둔다.
+     * 풀 크기 = studyCount × REPORTS_PER_STUDY (bulk 기준 20 × 20 = 400쌍).
+     */
+    private static final int REPORTS_PER_STUDY = 20;
 
     /**
      * 학습 연쇄 데이터: 모든 수강생이 강좌의 여러 강의를 여러 날에 걸쳐 시청한 것으로
@@ -508,6 +515,9 @@ public class DataSeeder {
     private void seedStudies(List<User> sellers, List<User> users, CatalogData catalog) {
         List<Course> courses = catalog.courses();
         int coursesPerSeller = courses.size() / Math.max(1, sellers.size());
+        // 스터디당 미리 집계해 둘 리포트 수(수강생 수 한도 내). 리포트 조회 부하 풀.
+        int reportsPerStudy = Math.min(REPORTS_PER_STUDY, users.size());
+        List<StudyReport> reports = new ArrayList<>();
         for (int s = 0; s < sellers.size(); s++) {
             User seller = sellers.get(s);
             Course course = courses.get(s * coursesPerSeller);
@@ -517,16 +527,21 @@ public class DataSeeder {
             studyMemberRepository.save(StudyMember.owner(seller, study));
             StudyActivity activity = studyActivityRepository.save(
                     StudyActivity.create(study.getId(), seller.getId(), "활동 내용 " + (s + 1)));
-            StudyReport report = StudyReport.create(users.get(s % users.size()).getId(), study.getId());
-            report.update(3600, 5, 8, 10, 10,
-                    "[{\"lectureId\":1,\"title\":\"Spring Core\",\"watchTimeSeconds\":1800}]",
-                    "[{\"date\":\"2026-06-07\",\"progressRate\":40.00},{\"date\":\"2026-06-14\",\"progressRate\":80.00}]",
-                    "{\"2026-06-07\":3,\"2026-06-08\":5,\"2026-06-14\":2}");
-            studyReportRepository.save(report);
+
+            // (user{1..R}, study{s}) 마다 리포트를 미리 집계해 둔다 → 조회 시 LOADED(단순 SELECT) 경로.
+            for (int u = 0; u < reportsPerStudy; u++) {
+                StudyReport report = StudyReport.create(users.get(u).getId(), study.getId());
+                report.update(3600, 5, 8, 10, 10,
+                        "[{\"lectureId\":1,\"title\":\"Spring Core\",\"watchTimeSeconds\":1800}]",
+                        "[{\"date\":\"2026-06-07\",\"progressRate\":40.00},{\"date\":\"2026-06-14\",\"progressRate\":80.00}]",
+                        "{\"2026-06-07\":3,\"2026-06-08\":5,\"2026-06-14\":2}");
+                reports.add(report);
+            }
             aiFeedbackRepository.save(AiFeedback.startProcessing(
                     seller.getId(), study.getId(), activity.getId(), "활동 스냅샷", "claude-opus-4-8", "v1"));
         }
-        log.info("[DataInit] 스터디 데이터 생성 ({}건)", sellers.size());
+        studyReportRepository.saveAll(reports);
+        log.info("[DataInit] 스터디 데이터 생성 (스터디 {}건, 리포트 {}건)", sellers.size(), reports.size());
     }
 
     // =========================================================================
