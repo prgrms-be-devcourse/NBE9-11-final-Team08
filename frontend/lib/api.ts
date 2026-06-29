@@ -71,6 +71,7 @@ const REFRESH_EXCLUDED_PATHS = new Set([
 ])
 
 let refreshAuthPromise: Promise<boolean> | null = null
+let csrfFetchPromise: Promise<string | undefined> | null = null
 
 const decodeCookieValue = (value: string): string => {
   try {
@@ -150,13 +151,24 @@ const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | un
     return undefined
   }
 
-  await fetch(`${BASE_URL}/api/auth/csrf`, {
-    method: 'GET',
-    credentials: 'include',
-    cache: 'no-store',
-  }).catch(() => undefined)
+  // 쿠키가 없을 때만 발급한다. 콜드스타트에 mutation 이 동시에 나가면
+  // 발급이 중복되어 토큰이 매번 갱신되고 쿠키-헤더가 어긋날 수 있으므로,
+  // refreshAuthPromise 와 동일하게 in-flight 요청을 하나로 합친다.
+  if (!csrfFetchPromise) {
+    csrfFetchPromise = (async () => {
+      await fetch(`${BASE_URL}/api/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => undefined)
 
-  return getCookieValue(CSRF_COOKIE_NAME)
+      return getCookieValue(CSRF_COOKIE_NAME)
+    })().finally(() => {
+      csrfFetchPromise = null
+    })
+  }
+
+  return csrfFetchPromise
 }
 
 const handleUnauthorized = () => {
@@ -222,11 +234,8 @@ async function request<T>(
   if (!BASE_URL) return defaultData
   try {
     const fetchRequest = async () => {
+      // GET 은 백엔드 CsrfFilter 가 검증하지 않으므로 CSRF 토큰을 붙이지 않는다.
       const authHeaders = await getCredentialHeaders(includeAuth)
-      const csrfToken = await ensureCsrfToken(includeAuth)
-      if (csrfToken) {
-        authHeaders[CSRF_HEADER_NAME] = csrfToken
-      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -266,11 +275,8 @@ async function requestText(
   if (!BASE_URL) return ''
   try {
     const fetchRequest = async () => {
+      // GET 은 백엔드 CsrfFilter 가 검증하지 않으므로 CSRF 토큰을 붙이지 않는다.
       const authHeaders = await getCredentialHeaders(includeAuth)
-      const csrfToken = await ensureCsrfToken(includeAuth)
-      if (csrfToken) {
-        authHeaders[CSRF_HEADER_NAME] = csrfToken
-      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           ...authHeaders,
