@@ -2,7 +2,6 @@ package com.team08.backend.domain.couponissuerequest.service;
 
 import com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequest;
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
-import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
@@ -245,7 +244,50 @@ class CouponIssueRequestServiceTest {
         assertThat(request.getSkippedCount()).isZero();
         assertThat(request.getTargetUserMaxId()).isEqualTo(123_456L);
         assertThat(request.getCompletedAt()).isEqualTo(java.time.LocalDateTime.now(clock));
-        then(streamPublisher).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("장기 미접속 회원 대상 발급 요청을 저장하고 청킹하여 메시지를 발행한다")
+    void requestInactiveUsersIssue_savesRequestAndPublishesChunkedMessages() {
+        // given
+        Long policyId = 10L;
+        Long adminId = 99L;
+        CouponPolicy policy = manualIssuePolicy();
+        given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
+
+        List<Long> mockUserIds = java.util.stream.LongStream.rangeClosed(1, 1002)
+                .boxed()
+                .toList();
+        given(attendanceRepository.findInactiveUserIds(any(), any())).willReturn(mockUserIds);
+        given(issuedCouponRepository.findIssuedUserIds(any(), any())).willReturn(List.of(1L, 2L));
+
+        given(couponIssueRequestRepository.saveAndFlush(any(CouponIssueRequest.class)))
+                .willAnswer(invocation -> {
+                    CouponIssueRequest request = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(request, "id", 101L);
+                    return request;
+                });
+
+        // when
+        couponIssueRequestService.requestInactiveUsersIssue(policyId, 7, 365, "INACTIVE_EVENT", adminId);
+
+        // then
+        ArgumentCaptor<CouponIssueRequest> requestCaptor = ArgumentCaptor.forClass(CouponIssueRequest.class);
+        then(couponIssueRequestRepository).should().saveAndFlush(requestCaptor.capture());
+
+        CouponIssueRequest savedRequest = requestCaptor.getValue();
+        assertThat(savedRequest.getPolicyId()).isEqualTo(policyId);
+        assertThat(savedRequest.getRequestKey()).isEqualTo("INACTIVE_EVENT");
+        assertThat(savedRequest.getRequestedCount()).isEqualTo(1002);
+        assertThat(savedRequest.getSkippedCount()).isEqualTo(2); // 1L, 2L
+        assertThat(savedRequest.getIssueType()).isEqualTo(com.team08.backend.domain.couponissuerequest.entity.CouponIssueRequestType.INACTIVE_USERS);
+
+        then(streamPublisher).should().publishAll(
+                org.mockito.ArgumentMatchers.eq(101L),
+                org.mockito.ArgumentMatchers.eq(policyId),
+                org.mockito.ArgumentMatchers.argThat(list -> list.size() == 1000 && list.contains(3L) && list.contains(1002L)),
+                org.mockito.ArgumentMatchers.eq("SELECTED_USERS_INACTIVE_EVENT")
+        );
     }
 
     private CouponPolicy manualIssuePolicy() {

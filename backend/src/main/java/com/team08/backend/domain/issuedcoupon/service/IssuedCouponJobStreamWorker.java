@@ -1,73 +1,65 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
+import com.team08.backend.global.redis.stream.AbstractScheduledBatchStreamWorker;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.ReadOffset;
-import org.springframework.data.redis.connection.stream.StreamOffset;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 @ConditionalOnProperty(name = "app.issued-coupon-job.stream-worker.enabled", havingValue = "true", matchIfMissing = true)
-public class IssuedCouponJobStreamWorker {
+public class IssuedCouponJobStreamWorker extends AbstractScheduledBatchStreamWorker {
 
     private static final String GROUP_NAME = "coupon-issue-workers";
-    private final String consumerName = "coupon-issue-worker-" + UUID.randomUUID();
+    private static final int BATCH_SIZE = 1000;
 
-    private final StringRedisTemplate redisTemplate;
     private final IssuedCouponJobProcessor issuedCouponJobProcessor;
 
-    @PostConstruct
-    public void createConsumerGroup() {
-        try {
-            redisTemplate.execute((RedisCallback<Object>) connection -> connection.execute(
-                    "XGROUP",
-                    "CREATE".getBytes(StandardCharsets.UTF_8),
-                    IssuedCouponJobStreamPublisher.STREAM_KEY.getBytes(StandardCharsets.UTF_8),
-                    GROUP_NAME.getBytes(StandardCharsets.UTF_8),
-                    "0".getBytes(StandardCharsets.UTF_8),
-                    "MKSTREAM".getBytes(StandardCharsets.UTF_8)
-            ));
-        } catch (RuntimeException ignored) {
-        }
+    public IssuedCouponJobStreamWorker(StringRedisTemplate redisTemplate, IssuedCouponJobProcessor issuedCouponJobProcessor) {
+        super(redisTemplate, "coupon-issue-worker");
+        this.issuedCouponJobProcessor = issuedCouponJobProcessor;
     }
 
-    // 선착순 쿠폰 발급 작업 처리
+    @Override
+    protected String getStreamKey() {
+        return IssuedCouponJobStreamPublisher.STREAM_KEY;
+    }
+
+    @Override
+    protected String getGroupName() {
+        return GROUP_NAME;
+    }
+
+    @Override
+    protected int getBatchSize() {
+        return BATCH_SIZE;
+    }
+
     @Scheduled(fixedDelay = 1000)
     public void processJobs() {
-        List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
-                Consumer.from(GROUP_NAME, consumerName),
-                StreamOffset.create(IssuedCouponJobStreamPublisher.STREAM_KEY, ReadOffset.lastConsumed())
-        );
-
-        if (records == null || records.isEmpty()) {
-            return;
-        }
-
-        for (MapRecord<String, Object, Object> record : records) {
-            process(record);
-            redisTemplate.opsForStream().acknowledge(
-                    IssuedCouponJobStreamPublisher.STREAM_KEY,
-                    GROUP_NAME,
-                    record.getId()
-            );
-        }
+        super.pollAndProcess();
     }
 
-    private void process(MapRecord<String, Object, Object> record) {
-        Map<Object, Object> value = record.getValue();
-        Long jobId = Long.valueOf(String.valueOf(value.get("jobId")));
-        issuedCouponJobProcessor.process(jobId);
+    @Override
+    protected void processBatch(List<MapRecord<String, Object, Object>> records, java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback) throws Exception {
+        for (MapRecord<String, Object, Object> record : records) {
+            try {
+                Map<Object, Object> value = record.getValue();
+                Long jobId = Long.valueOf(String.valueOf(value.get("jobId")));
+                issuedCouponJobProcessor.process(jobId);
+                
+                // 단건 처리 성공 시 즉시 ACK
+                ackCallback.accept(record);
+            } catch (Exception e) {
+                // 특정 건 실패 시 예외만 기록하고 ACK하지 않음 (PEL에 대기)
+                // 전체 배치가 중단되지 않도록 catch로 감싸서 다음 레코드 처리
+                org.slf4j.LoggerFactory.getLogger(IssuedCouponJobStreamWorker.class)
+                        .warn("IssuedCouponJobStreamWorker 처리 실패. recordId={}", record.getId(), e);
+            }
+        }
     }
 }
