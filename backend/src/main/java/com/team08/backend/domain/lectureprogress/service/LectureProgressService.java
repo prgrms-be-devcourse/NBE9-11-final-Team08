@@ -52,7 +52,7 @@ public class LectureProgressService {
 
     @Transactional
     public LectureProgress ensureStarted(Long userId, Lecture lecture, LocalDateTime now) {
-        // 무료 맛보기이거나 활성 수강권이 있을 때만 진행 행을 만든다.
+        //활성 수강권이 있을 때만 진행 행을 만든다.
         LectureProgress existing = lectureProgressRepository
                 .findByUserIdAndLectureId(userId, lecture.getId())
                 .orElse(null);
@@ -64,8 +64,12 @@ public class LectureProgressService {
         if (!canStartProgress(userId, lecture)) {
             return null;
         }
-        return lectureProgressRepository.save(
-                LectureProgress.start(userId, lecture.getId(), 0, now));
+        // 동시 입장(예: StrictMode 이중 마운트·더블클릭)으로 두 요청이 같은 행을 INSERT 하면
+        // uk_lecture_progress_user_lecture 중복 키로 터졌다. 멱등 INSERT 로 충돌을 무시하고 재조회한다.
+        lectureProgressRepository.insertIfAbsent(userId, lecture.getId(), 0, now);
+        return lectureProgressRepository
+                .findByUserIdAndLectureId(userId, lecture.getId())
+                .orElse(null);
     }
 
     @Transactional
@@ -89,7 +93,12 @@ public class LectureProgressService {
             if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
-            progress = LectureProgress.start(userId, lectureId, positionSeconds, eventTime);
+            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등 INSERT 후 재조회한다.
+            // previousBeatAt 은 null 로 유지해 최초 비트의 delta 산정 동작을 보존한다.
+            lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, eventTime);
+            progress = lectureProgressRepository
+                    .findByUserIdAndLectureId(userId, lectureId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
         }
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
