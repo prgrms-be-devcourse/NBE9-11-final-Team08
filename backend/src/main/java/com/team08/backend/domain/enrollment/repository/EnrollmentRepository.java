@@ -15,6 +15,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
             select e.courseId
             from Enrollment e
             where e.userId = :userId
+              and e.status = com.team08.backend.domain.enrollment.entity.EnrollmentStatus.ACTIVE
               and e.courseId in :courseIds
             """)
     List<Long> findCourseIdsByUserIdAndCourseIdIn(

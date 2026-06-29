@@ -98,6 +98,7 @@ public enum ErrorCode {
     INVALID_PAYMENT_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "PAYMENT_004", "잘못된 결제 상태 전이입니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_005", "결제 요청 금액이 주문 금액과 일치하지 않습니다."),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_006", "결제 정보를 찾을 수 없습니다."),
+    PAYMENT_REFUND_UNSUPPORTED(HttpStatus.CONFLICT, "PAYMENT_007", "현재 결제수단은 자동 환불을 지원하지 않습니다."),
 
     // ── Cart ─────────────────────────────────────────────────────────────
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND,        "CART_001", "장바구니 항목을 찾을 수 없습니다."),

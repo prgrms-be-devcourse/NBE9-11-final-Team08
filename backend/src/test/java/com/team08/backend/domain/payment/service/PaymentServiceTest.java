@@ -764,6 +764,55 @@ class PaymentServiceTest {
     }
 
     @Test
+    void couponUsageIsKeptWhenPaidOrderIsRefunded() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.SUCCESS);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+        given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE))
+                .willReturn(List.of());
+
+        paymentService.refundPayment(USER_ID, ORDER_ID);
+
+        verifyNoInteractions(issuedCouponService, orderCouponUsageRepository);
+    }
+
+    @Test
+    void providerPaymentCannotBeLocallyRefundedWithoutPgRefundSupport() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.SUCCESS, PaymentProviderType.TOSS);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> paymentService.refundPayment(USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYMENT_REFUND_UNSUPPORTED));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verifyNoInteractions(enrollmentRepository, paidCourseStudyMemberService);
+    }
+
+    @Test
+    void paidOrderWithNonSuccessPaymentCannotBeRefunded() {
+        Order order = order(OrderStatus.PAID);
+        Payment payment = payment(order, PaymentStatus.DECLINED);
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
+
+        assertThatThrownBy(() -> paymentService.refundPayment(USER_ID, ORDER_ID))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
+        verifyNoInteractions(enrollmentRepository, paidCourseStudyMemberService);
+    }
+
+    @Test
     void refundedOrderCannotBeRefundedAgain() {
         Order order = order(OrderStatus.REFUNDED);
 
@@ -807,7 +856,11 @@ class PaymentServiceTest {
     }
 
     private Payment payment(Order order, PaymentStatus status) {
-        Payment payment = Payment.createReady(order, FIXED_NOW.minusDays(1));
+        return payment(order, status, PaymentProviderType.MOCK);
+    }
+
+    private Payment payment(Order order, PaymentStatus status, PaymentProviderType providerType) {
+        Payment payment = Payment.createReady(order, providerType, FIXED_NOW.minusDays(1));
         ReflectionTestUtils.setField(payment, "id", PAYMENT_ID);
         if (status == PaymentStatus.SUCCESS) {
             payment.markProcessing(FIXED_NOW.minusDays(1));
