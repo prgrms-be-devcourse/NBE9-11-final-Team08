@@ -8,12 +8,15 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
@@ -26,6 +29,8 @@ import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
+import com.team08.backend.domain.payment.util.NicepaySignature;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -100,9 +106,17 @@ class PaymentServiceTest {
     private PaymentSuccessOutboxService paymentSuccessOutboxService;
 
     private PaymentService paymentService;
+    private NicepayPaymentProperties nicepayPaymentProperties;
 
     @BeforeEach
     void setUp() {
+        nicepayPaymentProperties = new NicepayPaymentProperties(
+                "https://api.nicepay.example",
+                "nicepay00m",
+                "merchant-key",
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(5)
+        );
         paymentService = new PaymentService(
                 paymentRepository,
                 paymentAttemptRepository,
@@ -115,6 +129,7 @@ class PaymentServiceTest {
                 orderCouponUsageRepository,
                 paidCourseStudyMemberService,
                 paymentSuccessOutboxService,
+                nicepayPaymentProperties,
                 FIXED_CLOCK
         );
     }
