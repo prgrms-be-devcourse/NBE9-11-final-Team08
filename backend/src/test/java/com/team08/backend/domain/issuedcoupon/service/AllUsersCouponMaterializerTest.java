@@ -1,6 +1,7 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
+import com.team08.backend.domain.couponissuerequest.service.CouponIssueSuccessCountRedisCounter;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponTarget;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
@@ -38,6 +39,9 @@ class AllUsersCouponMaterializerTest {
     @Mock
     private IssuedCouponWriter issuedCouponWriter;
 
+    @Mock
+    private CouponIssueSuccessCountRedisCounter successCountRedisCounter;
+
     private AllUsersCouponMaterializer materializer;
 
     private final Clock clock = Clock.fixed(
@@ -47,7 +51,12 @@ class AllUsersCouponMaterializerTest {
 
     @BeforeEach
     void setUp() {
-        materializer = new AllUsersCouponMaterializer(couponIssueRequestRepository, issuedCouponWriter, clock);
+        materializer = new AllUsersCouponMaterializer(
+                couponIssueRequestRepository,
+                successCountRedisCounter,
+                issuedCouponWriter,
+                clock
+        );
     }
 
     @Test
@@ -58,6 +67,8 @@ class AllUsersCouponMaterializerTest {
         LocalDateTime now = LocalDateTime.now(clock);
         given(couponIssueRequestRepository.findMaterializableAllUsersPolicies(1L, now))
                 .willReturn(List.of(policy, policy));
+        given(issuedCouponWriter.saveAllWithConcurrencyProtection(any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
         // when
         materializer.materializeForUser(1L);
@@ -73,7 +84,7 @@ class AllUsersCouponMaterializerTest {
         assertThat(coupon.getPolicyId()).isEqualTo(10L);
         assertThat(coupon.getIssueKey()).isEqualTo("ALL_USERS");
         assertThat(coupon.getIssuedAt()).isEqualTo(now);
-        // Verify success count increment is not tested here since saveAll returns null by default mock
+        then(successCountRedisCounter).should(times(1)).incrementSuccessCount(10L);
     }
 
     @Test
@@ -101,7 +112,7 @@ class AllUsersCouponMaterializerTest {
         CouponPolicy policy = CouponPolicy.createPolicy(
                 "전체 회원 쿠폰",
                 CouponTarget.ALL,
-                CouponType.AUTO,
+                CouponType.ADMIN_ISSUE,
                 null,
                 CouponUsageType.SINGLE_USE,
                 false,

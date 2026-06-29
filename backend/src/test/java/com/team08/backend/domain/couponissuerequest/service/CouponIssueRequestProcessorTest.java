@@ -1,10 +1,10 @@
 package com.team08.backend.domain.couponissuerequest.service;
 
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
-import com.team08.backend.domain.couponpolicy.entity.AutoIssueType;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponBulkRepository;
 import com.team08.backend.domain.issuedcoupon.service.CouponIssueExecutor;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +40,9 @@ class CouponIssueRequestProcessorTest {
     @Mock
     private CouponIssueExecutor couponIssueExecutor;
 
+    @Mock
+    private IssuedCouponBulkRepository issuedCouponBulkRepository;
+
     private CouponIssueRequestProcessor couponIssueRequestProcessor;
 
     private final Clock clock = Clock.fixed(
@@ -54,6 +57,7 @@ class CouponIssueRequestProcessorTest {
                 couponPolicyRepository,
                 userRepository,
                 couponIssueExecutor,
+                issuedCouponBulkRepository,
                 clock
         );
     }
@@ -104,7 +108,6 @@ class CouponIssueRequestProcessorTest {
         // given
         CouponPolicy policy = mock(CouponPolicy.class);
         given(policy.getCouponType()).willReturn(CouponType.AUTO);
-        given(policy.getAutoIssueType()).willReturn(AutoIssueType.SIGNUP);
         given(userRepository.existsById(1L)).willReturn(true);
         given(couponPolicyRepository.findById(10L)).willReturn(Optional.of(policy));
 
@@ -137,8 +140,7 @@ class CouponIssueRequestProcessorTest {
 
     private CouponPolicy manualIssuePolicy() {
         CouponPolicy policy = mock(CouponPolicy.class);
-        given(policy.getCouponType()).willReturn(CouponType.AUTO);
-        given(policy.getAutoIssueType()).willReturn(null);
+        given(policy.getCouponType()).willReturn(CouponType.ADMIN_ISSUE);
         return policy;
     }
 }

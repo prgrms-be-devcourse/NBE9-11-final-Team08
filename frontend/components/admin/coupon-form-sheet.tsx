@@ -67,7 +67,7 @@ type FormState = {
   name: string
   totalQuantity: string
   type: CouponPolicyType
-  autoIssueType: AutoIssueType | 'NONE'
+  autoIssueType: AutoIssueType
   target: CouponApplyTarget
   useType: CouponUseType
   stackable: boolean
@@ -85,7 +85,7 @@ const emptyForm: FormState = {
   name: '',
   totalQuantity: '',
   type: 'NORMAL',
-  autoIssueType: 'NONE',
+  autoIssueType: 'SIGNUP',
   target: 'ALL',
   useType: 'SINGLE',
   stackable: false,
@@ -104,7 +104,7 @@ function toForm(coupon: AdminCoupon): FormState {
     name: coupon.name,
     totalQuantity: coupon.totalQuantity?.toString() ?? '',
     type: coupon.type,
-    autoIssueType: coupon.autoIssueType ?? 'NONE',
+    autoIssueType: coupon.autoIssueType ?? 'SIGNUP',
     target: coupon.target,
     useType: coupon.useType,
     stackable: coupon.stackable,
@@ -219,7 +219,7 @@ export function CouponFormSheet({
       name: form.name.trim(),
       totalQuantity: form.type === 'FCFS' && form.totalQuantity ? Number(form.totalQuantity) : null,
       type: form.type,
-      autoIssueType: form.type === 'AUTO' && form.autoIssueType !== 'NONE' ? form.autoIssueType : null,
+      autoIssueType: form.type === 'AUTO' ? form.autoIssueType : null,
       target: form.target,
       useType: form.useType,
       stackable: form.stackable,
@@ -292,9 +292,6 @@ export function CouponFormSheet({
                       if (v !== 'FCFS') {
                         update('totalQuantity', '')
                       }
-                      if (v !== 'AUTO') {
-                        update('autoIssueType', 'NONE')
-                      }
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -306,6 +303,7 @@ export function CouponFormSheet({
                       <SelectItem value="AUTO">자동</SelectItem>
                       <SelectItem value="NORMAL">일반</SelectItem>
                       <SelectItem value="FCFS">선착순</SelectItem>
+                      <SelectItem value="ADMIN_ISSUE">관리자 발급</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -324,17 +322,14 @@ export function CouponFormSheet({
                   <Field label="자동 발급 용도">
                     <Select
                       value={form.autoIssueType}
-                      onValueChange={(v) => update('autoIssueType', v as AutoIssueType | 'NONE')}
+                      onValueChange={(v) => update('autoIssueType', v as AutoIssueType)}
                     >
                       <SelectTrigger className="w-full">
                         <SelectValue>
-                          {(v: string) =>
-                            v === 'NONE' ? '연결 안 함' : autoIssueTypeLabel[v as AutoIssueType]
-                          }
+                          {(v: string) => autoIssueTypeLabel[v as AutoIssueType]}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NONE">연결 안 함</SelectItem>
                         <SelectItem value="SIGNUP">회원가입</SelectItem>
                         <SelectItem value="ATTENDANCE_STREAK">연속 출석</SelectItem>
                         <SelectItem value="MONTHLY_ATTENDANCE">월간 출석</SelectItem>

@@ -62,3 +62,6 @@ CREATE TABLE coupon_issue_requests (
     INDEX idx_coupon_issue_requests_requested_by (requested_by, id),
     INDEX idx_coupon_issue_requests_all_grants (issue_type, status, target_user_max_id, policy_id, id)
 ) ENGINE=InnoDB;
+
+ALTER TABLE coupon_policies
+    MODIFY COLUMN coupon_type ENUM ('AUTO', 'FCFS', 'NORMAL', 'ADMIN_ISSUE') NOT NULL;

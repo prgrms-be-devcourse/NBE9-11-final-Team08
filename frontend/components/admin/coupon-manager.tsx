@@ -194,6 +194,7 @@ export function CouponManager({
             <SelectItem value="NORMAL">일반</SelectItem>
             <SelectItem value="FCFS">선착순</SelectItem>
             <SelectItem value="AUTO">자동</SelectItem>
+            <SelectItem value="ADMIN_ISSUE">관리자 발급</SelectItem>
           </SelectContent>
         </Select>
         <Select
@@ -264,7 +265,7 @@ export function CouponManager({
                           <Pencil className="h-4 w-4" /> 수정
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          disabled={c.status === 'ENDED'}
+                          disabled={c.status === 'ENDED' || c.type !== 'ADMIN_ISSUE'}
                           onClick={() => openIssue(c)}
                         >
                           <Send className="h-4 w-4" /> 발급하기

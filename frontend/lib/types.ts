@@ -217,7 +217,7 @@ export interface Coupon {
   totalQuantity?: number | null
 }
 
-export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
+export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO' | 'ADMIN_ISSUE'
 export type AutoIssueType = 'SIGNUP' | 'ATTENDANCE_STREAK' | 'MONTHLY_ATTENDANCE'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'

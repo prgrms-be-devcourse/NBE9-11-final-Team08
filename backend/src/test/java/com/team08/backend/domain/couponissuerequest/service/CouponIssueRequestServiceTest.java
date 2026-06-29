@@ -105,8 +105,7 @@ class CouponIssueRequestServiceTest {
         assertThat(requestCaptor.getValue().getRequestedCount()).isEqualTo(2);
         assertThat(requestCaptor.getValue().getRequestedBy()).isEqualTo(adminId);
 
-        then(streamPublisher).should().publish(100L, policyId, 1L, "SELECTED_USERS_VIP_EVENT_2026");
-        then(streamPublisher).should().publish(100L, policyId, 2L, "SELECTED_USERS_VIP_EVENT_2026");
+        then(streamPublisher).should().publishAll(100L, policyId, List.of(1L, 2L), "SELECTED_USERS_VIP_EVENT_2026");
     }
 
     @Test
@@ -140,18 +139,16 @@ class CouponIssueRequestServiceTest {
         assertThat(requestCaptor.getValue().getRequestedCount()).isEqualTo(2);
         assertThat(requestCaptor.getValue().getSkippedCount()).isEqualTo(1);
 
-        then(streamPublisher).should(never()).publish(100L, policyId, 1L, "SELECTED_USERS_VIP_EVENT_2026");
-        then(streamPublisher).should().publish(100L, policyId, 2L, "SELECTED_USERS_VIP_EVENT_2026");
+        then(streamPublisher).should().publishAll(100L, policyId, List.of(2L), "SELECTED_USERS_VIP_EVENT_2026");
     }
 
     @Test
-    @DisplayName("AUTO 타입이 아니거나 autoIssueType이 있으면 특정 회원 발급 요청을 거부한다")
+    @DisplayName("ADMIN_ISSUE 타입이 아니면 특정 회원 발급 요청을 거부한다")
     void requestUsersIssue_rejectsNonManualIssuePolicy() {
         // given
         Long policyId = 10L;
         CouponPolicy policy = mock(CouponPolicy.class);
         given(policy.getCouponType()).willReturn(CouponType.AUTO);
-        given(policy.getAutoIssueType()).willReturn(AutoIssueType.SIGNUP);
         given(couponPolicyRepository.findById(policyId)).willReturn(Optional.of(policy));
 
         // when & then
@@ -249,8 +246,7 @@ class CouponIssueRequestServiceTest {
 
     private CouponPolicy manualIssuePolicy() {
         CouponPolicy policy = mock(CouponPolicy.class);
-        given(policy.getCouponType()).willReturn(CouponType.AUTO);
-        given(policy.getAutoIssueType()).willReturn(null);
+        given(policy.getCouponType()).willReturn(CouponType.ADMIN_ISSUE);
         return policy;
     }
 }

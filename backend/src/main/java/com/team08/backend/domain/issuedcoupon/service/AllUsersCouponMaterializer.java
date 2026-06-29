@@ -1,6 +1,7 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
 import com.team08.backend.domain.couponissuerequest.repository.CouponIssueRequestRepository;
+import com.team08.backend.domain.couponissuerequest.service.CouponIssueSuccessCountRedisCounter;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyException;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
@@ -22,6 +23,7 @@ public class AllUsersCouponMaterializer {
     private static final String ALL_USERS_ISSUE_KEY = "ALL_USERS";
 
     private final CouponIssueRequestRepository couponIssueRequestRepository;
+    private final CouponIssueSuccessCountRedisCounter successCountRedisCounter;
     private final IssuedCouponWriter issuedCouponWriter;
     private final Clock clock;
 
@@ -47,13 +49,13 @@ public class AllUsersCouponMaterializer {
             try {
                 java.util.List<IssuedCoupon> savedCoupons = issuedCouponWriter.saveAllWithConcurrencyProtection(couponsToSave);
                 for (IssuedCoupon saved : savedCoupons) {
-                    couponIssueRequestRepository.incrementSuccessCountForAllUsers(saved.getPolicyId(), 1L);
+                    successCountRedisCounter.incrementSuccessCount(saved.getPolicyId());
                 }
             } catch (CouponAlreadyIssuedException e) {
                 for (IssuedCoupon coupon : couponsToSave) {
                     try {
                         IssuedCoupon saved = issuedCouponWriter.saveWithConcurrencyProtection(coupon);
-                        couponIssueRequestRepository.incrementSuccessCountForAllUsers(saved.getPolicyId(), 1L);
+                        successCountRedisCounter.incrementSuccessCount(saved.getPolicyId());
                     } catch (CouponAlreadyIssuedException ignore) {
                     }
                 }

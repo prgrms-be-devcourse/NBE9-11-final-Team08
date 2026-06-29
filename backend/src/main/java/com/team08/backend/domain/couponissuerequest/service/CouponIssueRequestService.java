@@ -92,9 +92,7 @@ public class CouponIssueRequestService {
 
         CouponIssueRequest savedRequest = saveRequest(request);
         String issueKey = SELECTED_USERS_ISSUE_KEY_PREFIX + normalizedRequestKey;
-        for (Long userId : targetUserIds) {
-            streamPublisher.publish(savedRequest.getId(), policyId, userId, issueKey);
-        }
+        streamPublisher.publishAll(savedRequest.getId(), policyId, targetUserIds, issueKey);
 
         return CouponIssueRequestResponse.from(savedRequest);
     }
@@ -136,7 +134,7 @@ public class CouponIssueRequestService {
     }
 
     private void validateManualIssuePolicy(CouponPolicy policy) {
-        if (policy.getCouponType() != CouponType.AUTO || policy.getAutoIssueType() != null) {
+        if (policy.getCouponType() != CouponType.ADMIN_ISSUE) {
             throw new CustomException(ErrorCode.INVALID_COUPON_TYPE);
         }
     }

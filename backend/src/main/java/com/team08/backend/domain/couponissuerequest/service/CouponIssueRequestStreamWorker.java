@@ -7,6 +7,7 @@ import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.connection.stream.StreamReadOptions;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,7 +23,9 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "app.coupon-issue-request.stream-worker.enabled", havingValue = "true", matchIfMissing = true)
 public class CouponIssueRequestStreamWorker {
 
-    private static final String GROUP_NAME = "coupon-issue-request-workers";
+    static final String GROUP_NAME = "coupon-issue-request-workers";
+    static final int BATCH_SIZE = 500;
+
     private final String consumerName = "coupon-issue-request-worker-" + UUID.randomUUID();
 
     private final StringRedisTemplate redisTemplate;
@@ -47,6 +50,7 @@ public class CouponIssueRequestStreamWorker {
     public void processRequests() {
         List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream().read(
                 Consumer.from(GROUP_NAME, consumerName),
+                StreamReadOptions.empty().count(BATCH_SIZE),
                 StreamOffset.create(CouponIssueRequestStreamPublisher.STREAM_KEY, ReadOffset.lastConsumed())
         );
 
@@ -54,23 +58,24 @@ public class CouponIssueRequestStreamWorker {
             return;
         }
 
-        for (MapRecord<String, Object, Object> record : records) {
-            process(record);
-            redisTemplate.opsForStream().acknowledge(
-                    CouponIssueRequestStreamPublisher.STREAM_KEY,
-                    GROUP_NAME,
-                    record.getId()
-            );
-        }
+        List<CouponIssueRequestProcessor.SelectedUserIssueCommand> commands = records.stream()
+                .map(this::toCommand)
+                .toList();
+        couponIssueRequestProcessor.processSelectedUsers(commands);
+        redisTemplate.opsForStream().acknowledge(
+                CouponIssueRequestStreamPublisher.STREAM_KEY,
+                GROUP_NAME,
+                records.stream().map(MapRecord::getId).toArray(org.springframework.data.redis.connection.stream.RecordId[]::new)
+        );
     }
 
-    private void process(MapRecord<String, Object, Object> record) {
+    private CouponIssueRequestProcessor.SelectedUserIssueCommand toCommand(MapRecord<String, Object, Object> record) {
         Map<Object, Object> value = record.getValue();
         Long requestId = Long.valueOf(String.valueOf(value.get("requestId")));
         Long policyId = Long.valueOf(String.valueOf(value.get("policyId")));
         Long userId = Long.valueOf(String.valueOf(value.get("userId")));
         String issueKey = String.valueOf(value.get("issueKey"));
 
-        couponIssueRequestProcessor.processSelectedUser(requestId, policyId, userId, issueKey);
+        return new CouponIssueRequestProcessor.SelectedUserIssueCommand(requestId, policyId, userId, issueKey);
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,8 +28,7 @@ public interface CouponIssueRequestRepository extends JpaRepository<CouponIssueR
             WHERE r.issueType = 'ALL_USERS'
               AND r.status = 'COMPLETED'
               AND r.targetUserMaxId >= :userId
-              AND p.couponType = 'AUTO'
-              AND p.autoIssueType IS NULL
+              AND p.couponType = 'ADMIN_ISSUE'
               AND (p.issueStartDate IS NULL OR p.issueStartDate <= :now)
               AND (p.issueEndDate IS NULL OR p.issueEndDate >= :now)
               AND NOT EXISTS (
@@ -74,6 +74,22 @@ public interface CouponIssueRequestRepository extends JpaRepository<CouponIssueR
     @Modifying
     @Query("""
             UPDATE CouponIssueRequest r
+            SET r.successCount = r.successCount + :successCount,
+                r.skippedCount = r.skippedCount + :skippedCount,
+                r.failedCount = r.failedCount + :failedCount
+            WHERE r.id = :id
+              AND r.status NOT IN ('COMPLETED', 'FAILED', 'CANCELED')
+            """)
+    int incrementProcessCounts(
+            @Param("id") Long id,
+            @Param("successCount") long successCount,
+            @Param("skippedCount") long skippedCount,
+            @Param("failedCount") long failedCount
+    );
+
+    @Modifying
+    @Query("""
+            UPDATE CouponIssueRequest r
             SET r.status = 'COMPLETED',
                 r.completedAt = :completedAt
             WHERE r.id = :id
@@ -93,7 +109,7 @@ public interface CouponIssueRequestRepository extends JpaRepository<CouponIssueR
             """)
     int markFailed(@Param("id") Long id, @Param("failureReason") String failureReason, @Param("completedAt") LocalDateTime completedAt);
 
-    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional
     @Modifying
     @Query("""
             UPDATE CouponIssueRequest r
@@ -102,5 +118,5 @@ public interface CouponIssueRequestRepository extends JpaRepository<CouponIssueR
               AND r.issueType = 'ALL_USERS'
               AND r.status = 'COMPLETED'
             """)
-    int incrementSuccessCountForAllUsers(@Param("policyId") Long policyId, @Param("count") long count);
+    int incrementAllUsersSuccessCount(@Param("policyId") Long policyId, @Param("count") long count);
 }
