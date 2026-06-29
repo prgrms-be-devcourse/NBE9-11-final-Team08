@@ -4,6 +4,7 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponQueryFacade;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicySummaryResponse;
 import com.team08.backend.domain.couponpolicy.dto.CouponPolicySearchRequest;
 import com.team08.backend.domain.couponpolicy.service.CouponPolicyService;
@@ -34,6 +35,7 @@ import java.util.List;
 public class IssuedCouponController {
 
     private final IssuedCouponService issuedCouponService;
+    private final IssuedCouponQueryFacade issuedCouponQueryFacade;
     private final CouponPolicyService couponPolicyService;
 
     // [사용자] 쿠폰 정책 목록 조회 /api/coupons
@@ -61,7 +63,7 @@ public class IssuedCouponController {
     @Operation(summary = "내 쿠폰 목록 조회", description = "현재 로그인한 사용자가 보유한 모든 쿠폰 목록을 조회합니다.")
     public List<CouponListResponse> getMyCoupons(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        return issuedCouponService.getMyCoupons(loginUserPrincipal.user().id());
+        return issuedCouponQueryFacade.getMyCoupons(loginUserPrincipal.user().id());
     }
 
     // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 /api/coupons/{issuedCouponId}/discount

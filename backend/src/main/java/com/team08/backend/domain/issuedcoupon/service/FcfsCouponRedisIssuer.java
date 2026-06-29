@@ -3,6 +3,7 @@ package com.team08.backend.domain.issuedcoupon.service;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponAlreadyIssuedException;
+import com.team08.backend.domain.issuedcoupon.exception.CouponIssueFailedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,12 +23,20 @@ public class FcfsCouponRedisIssuer {
     private static final String KEY_PREFIX = "coupon:fcfs:";
 
     private static final DefaultRedisScript<Long> ISSUE_SCRIPT = createIssueScript();
+    private static final DefaultRedisScript<Long> ROLLBACK_SCRIPT = createRollbackScript();
 
     private final StringRedisTemplate redisTemplate;
 
     private static DefaultRedisScript<Long> createIssueScript() {
         DefaultRedisScript<Long> script = new DefaultRedisScript<>();
         script.setScriptSource(new ResourceScriptSource(new ClassPathResource("redis/fcfs-coupon-issue.lua")));
+        script.setResultType(Long.class);
+        return script;
+    }
+
+    private static DefaultRedisScript<Long> createRollbackScript() {
+        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+        script.setScriptSource(new ResourceScriptSource(new ClassPathResource("redis/fcfs-coupon-rollback.lua")));
         script.setResultType(Long.class);
         return script;
     }
@@ -51,8 +60,16 @@ public class FcfsCouponRedisIssuer {
             throw new CouponExhaustedException();
         }
         if (!ISSUE_SUCCESS.equals(result)) {
-            throw new IllegalStateException("선착순 쿠폰 Redis 발급 처리에 실패했습니다.");
+            throw new CouponIssueFailedException();
         }
+    }
+
+    public void rollback(Long userId, Long policyId) {
+        redisTemplate.execute(
+                ROLLBACK_SCRIPT,
+                List.of(issuedKey(policyId), stockKey(policyId)),
+                String.valueOf(userId)
+        );
     }
 
     private String stockKey(Long policyId) {
