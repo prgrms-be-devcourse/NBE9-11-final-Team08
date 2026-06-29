@@ -1,12 +1,13 @@
-package com.team08.backend.domain.issuedcoupon.service;
+package com.team08.backend.domain.issuedcouponjob.service;
 
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcouponjob.repository.IssuedCouponJobRepository;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +24,8 @@ public class IssuedCouponJobIssuer {
     private final IssuedCouponRepository issuedCouponRepository;
     private final Clock clock;
 
-    // 쿠폰 발급 작업 DB 반영
     @Transactional
-    public void issueCoupon(Long jobId) {
+    public void issueCoupon(Long jobId, Long userId, Long policyId) {
         LocalDateTime now = LocalDateTime.now(clock);
         IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
                 .orElseThrow();
@@ -33,16 +33,22 @@ public class IssuedCouponJobIssuer {
             return;
         }
 
-        CouponPolicy policy = couponPolicyRepository.findByIdWithLock(job.getPolicyId())
+        CouponPolicy policy = couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        if (issuedCouponRepository.existsByUserIdAndPolicyId(job.getUserId(), job.getPolicyId())) {
+        if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
             job.markIssued(now);
             return;
         }
 
-        policy.decreaseQuantity();
-        IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, job.getUserId(), now);
+        if (policy.getTotalQuantity() != null) {
+            int updated = couponPolicyRepository.decreaseQuantity(policyId);
+            if (updated == 0) {
+                throw new CouponExhaustedException();
+            }
+        }
+
+        IssuedCoupon issuedCoupon = IssuedCoupon.create(policy, userId, now);
         issuedCouponRepository.saveAndFlush(issuedCoupon);
         job.markIssued(now);
     }

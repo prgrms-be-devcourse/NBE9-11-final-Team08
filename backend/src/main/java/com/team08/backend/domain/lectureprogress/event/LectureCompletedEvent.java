@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public record LectureCompletedEvent(
         Long userId,
         Long courseId,
+        Long chapterId,
         Long lectureId,
         LocalDateTime eventTime
 ) {

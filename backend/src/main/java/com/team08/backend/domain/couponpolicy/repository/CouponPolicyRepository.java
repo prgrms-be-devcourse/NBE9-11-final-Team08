@@ -11,6 +11,9 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.Modifying;
+import java.time.LocalDateTime;
+
 public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long>, CouponPolicyRepositoryCustom {
 
     // 쿠폰 타입으로 정책 단건 조회 (주로 자동 발급용 AUTO 타입 조회 시 사용)
@@ -28,6 +31,10 @@ public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long
     @Query("SELECT c.couponType FROM CouponPolicy c WHERE c.id = :id")
     Optional<CouponType> findCouponTypeById(@Param("id") Long id);
 
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE CouponPolicy c SET c.totalQuantity = c.totalQuantity - 1 WHERE c.id = :id AND c.totalQuantity > 0")
+    int decreaseQuantity(@Param("id") Long id);
+
     @Query("""
             SELECT c
             FROM CouponPolicy c
@@ -37,7 +44,7 @@ public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long
             """)
     Optional<CouponPolicy> findActiveByAutoIssueType(
             @Param("autoIssueType") AutoIssueType autoIssueType,
-            @Param("now") java.time.LocalDateTime now
+            @Param("now") LocalDateTime now
     );
 
     @Query("""
@@ -49,7 +56,7 @@ public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long
             """)
     boolean existsActiveByAutoIssueType(
             @Param("autoIssueType") AutoIssueType autoIssueType,
-            @Param("now") java.time.LocalDateTime now
+            @Param("now") LocalDateTime now
     );
 
     @Query("""
@@ -63,6 +70,6 @@ public interface CouponPolicyRepository extends JpaRepository<CouponPolicy, Long
     boolean existsActiveByAutoIssueTypeAndIdNot(
             @Param("autoIssueType") AutoIssueType autoIssueType,
             @Param("id") Long id,
-            @Param("now") java.time.LocalDateTime now
+            @Param("now") LocalDateTime now
     );
 }

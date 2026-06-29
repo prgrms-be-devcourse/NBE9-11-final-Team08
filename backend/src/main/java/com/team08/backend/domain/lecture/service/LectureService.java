@@ -50,7 +50,7 @@ public class LectureService {
         // 검증된 Lecture(chapter·course 조인페치 완료)를 돌려준다.
         Lecture lecture = lectureAccessValidator.validateForEnter(courseId, chapterId, lectureId, userId);
 
-        // 진행 행은 수강권/무료맛보기일 때만 생긴다(아니면 null).
+        // 진행 행은 수강권 있을 때만 생긴다(아니면 null).
         LectureProgress progress = lectureProgressService.ensureStarted(userId, lecture, LocalDateTime.now());
 
         // 강좌별 "마지막 시청 강의" 갱신 — progress 가 생긴 정상 시청자에게만.

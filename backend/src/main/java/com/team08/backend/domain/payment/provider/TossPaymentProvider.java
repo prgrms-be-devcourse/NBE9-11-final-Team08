@@ -7,6 +7,9 @@ import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -42,5 +45,32 @@ public class TossPaymentProvider implements PaymentProvider {
                 case UNKNOWN -> PaymentProviderException.unknown(e.getFailureCode(), e.getFailureMessage());
             };
         }
+    }
+
+    @Override
+    public Optional<PaymentProviderLookupResponse> lookup(PaymentProviderLookupRequest request) {
+        try {
+            Optional<TossPaymentResponse> response = StringUtils.hasText(request.paymentKey())
+                    ? tossPaymentClient.findByPaymentKey(request.paymentKey())
+                    : tossPaymentClient.findByOrderId(request.orderId());
+            return response.map(this::toLookupResponse);
+        } catch (TossPaymentException e) {
+            throw switch (e.getFailureType()) {
+                case DECLINED -> PaymentProviderException.declined(e.getFailureCode(), e.getFailureMessage());
+                case TIMEOUT -> PaymentProviderException.timeout(e.getFailureCode(), e.getFailureMessage());
+                case UNKNOWN -> PaymentProviderException.unknown(e.getFailureCode(), e.getFailureMessage());
+            };
+        }
+    }
+
+    private PaymentProviderLookupResponse toLookupResponse(TossPaymentResponse response) {
+        return new PaymentProviderLookupResponse(
+                response.paymentKey(),
+                response.orderId(),
+                response.status(),
+                response.method(),
+                response.totalAmount(),
+                response.approvedAt()
+        );
     }
 }

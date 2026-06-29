@@ -8,6 +8,7 @@ import com.team08.backend.domain.lectureqna.entity.QnaQuestion;
 import com.team08.backend.domain.lectureqna.fixture.QnaFixture;
 import com.team08.backend.domain.lectureqna.repository.QnaAnswerRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
+import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +41,7 @@ class QnaQuestionServiceTest {
     @Mock private QnaQuestionRepository qnaQuestionRepository;
     @Mock private QnaAnswerRepository qnaAnswerRepository;
     @Mock private CourseAccessAuthorizer courseAccessAuthorizer;
+    @Mock private UserRepository userRepository;
 
     @InjectMocks
     private QnaQuestionService qnaQuestionService;

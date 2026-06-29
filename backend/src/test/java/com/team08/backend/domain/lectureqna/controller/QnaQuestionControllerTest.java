@@ -136,7 +136,7 @@ class QnaQuestionControllerTest {
 
     private QnaQuestionResponse sampleQuestion(Long id) {
         return new QnaQuestionResponse(
-                id, 5L, 1L, "제목", "내용",
+                id, 5L, 1L, "수강생닉네임", "제목", "내용",
                 LocalDateTime.of(2026, 6, 13, 10, 0),
                 LocalDateTime.of(2026, 6, 13, 10, 0),
                 new QnaAnswerSummary(1L, "답변 내용", LocalDateTime.of(2026, 6, 13, 11, 0))

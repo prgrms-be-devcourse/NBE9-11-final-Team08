@@ -4,25 +4,32 @@ import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.issuedcoupon.exception.CouponIssueFailedException;
 import com.team08.backend.domain.issuedcoupon.service.FcfsCouponRedisIssuer;
+import com.team08.backend.domain.issuedcouponjob.service.IssuedCouponJobStreamPublisher;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Component
 public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
 
     private final CouponPolicyRepository couponPolicyRepository;
     private final FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
+    private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
 
     public FcfsIssuedCouponStrategy(
             Clock clock,
             CouponPolicyRepository couponPolicyRepository,
-            FcfsCouponRedisIssuer fcfsCouponRedisIssuer
+            FcfsCouponRedisIssuer fcfsCouponRedisIssuer,
+            IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher
     ) {
         super(clock);
         this.couponPolicyRepository = couponPolicyRepository;
         this.fcfsCouponRedisIssuer = fcfsCouponRedisIssuer;
+        this.issuedCouponJobStreamPublisher = issuedCouponJobStreamPublisher;
     }
 
     @Override
@@ -42,11 +49,18 @@ public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
     protected void validateDuplicateIssue(Long userId, Long policyId) {
     }
 
-    // 선착순 쿠폰 발급 전 처리
     @Override
-    protected void beforeIssue(Long userId, Long policyId, CouponPolicy policy) {
+    protected CouponIssueResult processIssue(Long userId, CouponPolicy policy, LocalDateTime now) {
         // Redis 선착순 발급 확정
         fcfsCouponRedisIssuer.issue(userId, policy);
-    }
 
+        String requestId = UUID.randomUUID().toString();
+        try {
+            issuedCouponJobStreamPublisher.publish(requestId, userId, policy.getId());
+        } catch (Exception e) {
+            fcfsCouponRedisIssuer.rollback(userId, policy.getId());
+            throw new CouponIssueFailedException();
+        }
+        return CouponIssueResult.requested(userId, policy.getId());
+    }
 }

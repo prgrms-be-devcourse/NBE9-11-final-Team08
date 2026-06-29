@@ -6,6 +6,7 @@ import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +63,11 @@ class PaymentProviderRouterTest {
                         request.amount(),
                         null
                 );
+            }
+
+            @Override
+            public Optional<PaymentProviderLookupResponse> lookup(PaymentProviderLookupRequest request) {
+                return Optional.empty();
             }
         };
     }

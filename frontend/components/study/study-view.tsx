@@ -23,14 +23,15 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ReflectionEditor } from '@/components/study/reflection-editor'
 import { StudyReportDialog } from '@/components/study/study-report-dialog'
-import { cn } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useLearningSession } from '@/lib/hooks/use-learning-session'
-import type { Course, Lecture, QnaQuestionResponse } from '@/lib/types'
+import type { Course, Lecture, QnaQuestionResponse, QnaAnswerSummary } from '@/lib/types'
 import Hls from 'hls.js'
 
 interface StudyViewProps {
@@ -38,6 +39,8 @@ interface StudyViewProps {
   studyId?: string
   // 스터디가 읽기 전용/비활성 상태이면 QnA·회고 등 쓰기 작업을 막는다.
   readOnly?: boolean
+  // 현재 로그인 사용자 id. 강좌 강사(instructor.id)와 같으면 QnA 답변 권한이 있다.
+  viewerId?: string
   qna?: any[]
 }
 
@@ -65,12 +68,14 @@ const formatClock = (totalSeconds: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 }
 
-export function StudyView({ course, studyId, readOnly = false }: StudyViewProps) {
+export function StudyView({ course, studyId, readOnly = false, viewerId }: StudyViewProps) {
   const lectures = useMemo(
     () => course.chapters.flatMap((c) => c.lectures),
     [course],
   )
   const courseId = Number(course.id)
+  // 이 강좌의 강사(판매자)인지 여부. 강사는 답변만, 일반 수강생은 질문만 작성한다.
+  const isCourseSeller = !!viewerId && String(viewerId) === String(course.instructor.id)
 
   // 강의별 진행 상태(서버 동기화). 진행률/완료 표시에 사용.
   const [progressMap, setProgressMap] = useState<
@@ -95,6 +100,7 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     course.chapters.map((c) => c.id),
   )
   const [posts, setPosts] = useState<QnaQuestionResponse[]>([])
+  const [questionTitle, setQuestionTitle] = useState('')
   const [question, setQuestion] = useState('')
 
   const active = lectures.find((l) => l.id === activeId) ?? lectures[0]
@@ -444,6 +450,10 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
       )
       return
     }
+    if (!questionTitle.trim()) {
+      toast.error('제목을 입력해주세요.')
+      return
+    }
     if (!question.trim()) return
     if (!active?.id) {
       toast.error('강의를 선택해주세요.')
@@ -451,10 +461,10 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
     }
 
     try {
-      const title = question.trim().substring(0, 50)
-      const res = await api.createQuestion(active.id, title, question.trim())
+      const res = await api.createQuestion(active.id, questionTitle.trim(), question.trim())
       if (res && res.id) {
         setPosts((prev) => [res, ...prev])
+        setQuestionTitle('')
         setQuestion('')
         toast.success('질문이 게시되었습니다.')
       } else {
@@ -595,15 +605,13 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
                 <span className="w-10 text-right text-xs font-semibold">
                   {activeProgress}%
                 </span>
+                {active && lectureCompleted(active) && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                    <CheckCircle2 className="h-4 w-4" />
+                    완료됨
+                  </span>
+                )}
               </div>
-              <Button
-                size="sm"
-                onClick={markComplete}
-                disabled={accessDenied || entering || (active ? lectureCompleted(active) : true)}
-              >
-                <CheckCircle2 className="mr-1 h-4 w-4" />
-                {active && lectureCompleted(active) ? '완료됨' : '수강 완료'}
-              </Button>
             </div>
           </div>
 
@@ -642,7 +650,11 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
             </Badge>
           </div>
           <Separator />
-          {qnaDisabled ? (
+          {isCourseSeller ? (
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              이 강좌의 강사입니다. 수강생의 질문에 답변할 수 있어요.
+            </p>
+          ) : qnaDisabled ? (
             <p className="px-4 py-3 text-xs text-muted-foreground">
               {accessDenied
                 ? '입장 권한이 없어 질문은 열람만 가능해요.'
@@ -650,6 +662,12 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
             </p>
           ) : (
             <div className="space-y-2 p-4">
+              <Input
+                value={questionTitle}
+                onChange={(e) => setQuestionTitle(e.target.value)}
+                placeholder="제목"
+                maxLength={50}
+              />
               <Textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
@@ -664,7 +682,16 @@ export function StudyView({ course, studyId, readOnly = false }: StudyViewProps)
           <Separator />
           <ul className="space-y-4 p-4 lg:max-h-[calc(100vh-20rem)] lg:overflow-y-auto">
             {posts.map((post) => (
-              <QnaThread key={post.id} post={post} />
+              <QnaThread
+                key={post.id}
+                post={post}
+                canAnswer={isCourseSeller && !readOnly}
+                onAnswered={(questionId, answer) =>
+                  setPosts((prev) =>
+                    prev.map((p) => (p.id === questionId ? { ...p, answer } : p)),
+                  )
+                }
+              />
             ))}
           </ul>
         </aside>
@@ -719,8 +746,42 @@ function LectureRow({
   )
 }
 
-function QnaThread({ post }: { post: QnaQuestionResponse }) {
-  const askerLabel = post.userId ? `수강생 #${post.userId}` : '수강생'
+function QnaThread({
+  post,
+  canAnswer = false,
+  onAnswered,
+}: {
+  post: QnaQuestionResponse
+  canAnswer?: boolean
+  onAnswered?: (questionId: number, answer: QnaAnswerSummary) => void
+}) {
+  const askerLabel = post.nickname || '수강생'
+  const [answerText, setAnswerText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submitAnswer = async () => {
+    if (!answerText.trim()) return
+    setSubmitting(true)
+    try {
+      const res = await api.createAnswer(post.id, answerText.trim())
+      if (res && res.id) {
+        onAnswered?.(post.id, {
+          id: res.id,
+          content: res.content,
+          createdAt: res.createdAt,
+        })
+        setAnswerText('')
+        toast.success('답변이 등록되었습니다.')
+      } else {
+        throw new Error('Failed to create answer')
+      }
+    } catch (err) {
+      toast.error('답변 등록에 실패했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <li className="rounded-lg border p-3">
       <div className="flex items-center gap-2">
@@ -732,22 +793,41 @@ function QnaThread({ post }: { post: QnaQuestionResponse }) {
         <div className="min-w-0">
           <p className="text-xs font-semibold">Q. {askerLabel}</p>
           <p className="text-[11px] text-muted-foreground">
-            {new Date(post.createdAt).toLocaleString()}
+            {formatDateTime(post.createdAt)}
           </p>
         </div>
       </div>
       <p className="mt-2 text-sm font-semibold">{post.title}</p>
-      <p className="mt-1 text-sm leading-relaxed">{post.content}</p>
+      {post.content.trim() !== post.title.trim() && (
+        <p className="mt-1 text-sm leading-relaxed">{post.content}</p>
+      )}
 
-      {post.answer && (
+      {post.answer ? (
         <div className="mt-3 rounded-md bg-secondary/60 p-3">
           <p className="text-xs font-semibold text-primary">A. 강사</p>
           <p className="mt-1 text-sm leading-relaxed">{post.answer.content}</p>
           <p className="mt-1 text-[11px] text-muted-foreground">
-            {new Date(post.answer.createdAt).toLocaleString()}
+            {formatDateTime(post.answer.createdAt)}
           </p>
         </div>
-      )}
+      ) : canAnswer ? (
+        <div className="mt-3 space-y-2">
+          <Textarea
+            value={answerText}
+            onChange={(e) => setAnswerText(e.target.value)}
+            placeholder="이 질문에 답변을 작성해주세요."
+            className="min-h-16 resize-none"
+          />
+          <Button
+            onClick={submitAnswer}
+            size="sm"
+            className="w-full"
+            disabled={submitting || !answerText.trim()}
+          >
+            <Send className="mr-1 h-4 w-4" /> 답변 등록
+          </Button>
+        </div>
+      ) : null}
     </li>
   )
 }

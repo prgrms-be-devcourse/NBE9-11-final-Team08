@@ -411,6 +411,8 @@ class PaymentTransactionServiceTest {
         );
 
         assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(savedPayment.get().getPaymentKey()).isEqualTo("payment-key");
+        assertThat(savedPayment.get().getFailureCode()).isEqualTo("TOSS_ORDER_MISMATCH");
         assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.UNKNOWN);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(response.enrolledCourseIds()).isEmpty();
@@ -440,6 +442,7 @@ class PaymentTransactionServiceTest {
         );
 
         assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(savedPayment.get().getPaymentKey()).isEqualTo("payment-key");
         assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.TIMEOUT);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(response.enrolledCourseIds()).isEmpty();
@@ -476,6 +479,7 @@ class PaymentTransactionServiceTest {
         );
 
         assertThat(savedPayment.get().getStatus()).isEqualTo(PaymentStatus.UNKNOWN);
+        assertThat(savedPayment.get().getPaymentKey()).isEqualTo("payment-key");
         assertThat(savedAttempt.get().getStatus()).isEqualTo(PaymentAttemptStatus.TIMEOUT);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING_PAYMENT);
         assertThat(response.enrolledCourseIds()).isEmpty();

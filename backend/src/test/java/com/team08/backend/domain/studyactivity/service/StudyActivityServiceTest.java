@@ -138,6 +138,31 @@ class StudyActivityServiceTest {
     }
 
     @Test
+    void 내_스터디_활동_목록을_최신순으로_조회한다() {
+        Long userId = 2L;
+        Pageable requestPageable = PageRequest.of(0, 5, Sort.by(Sort.Direction.ASC, "content"));
+        Pageable expectedPageable = PageRequest.of(
+                0,
+                5,
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+        StudyActivity activity = activity(100L, 1L, userId);
+
+        given(studyActivityRepository.findAllByAuthorIdAndDeletedAtIsNull(userId, expectedPageable))
+                .willReturn(new PageImpl<>(List.of(activity), expectedPageable, 1));
+
+        Page<StudyActivityResponse> result = studyActivityService.getMyActivities(userId, requestPageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).activityId()).isEqualTo(100L);
+        assertThat(result.getContent().get(0).authorId()).isEqualTo(userId);
+        verify(studyActivityRepository).findAllByAuthorIdAndDeletedAtIsNull(userId, expectedPageable);
+    }
+
+    @Test
     void 스터디_활동_상세를_조회한다() {
         Long studyId = 1L;
         Long activityId = 100L;

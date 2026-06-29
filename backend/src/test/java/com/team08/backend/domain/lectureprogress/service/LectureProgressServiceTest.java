@@ -98,6 +98,40 @@ class LectureProgressServiceTest {
         assertThat(updated.getUpdatedAt()).isEqualTo(laterExit);
     }
 
+    // ── 동시 입장 레이스(중복 키) 회귀 방지 ───────────────────────────────
+    @Test
+    @DisplayName("같은 (user, lecture) 로 insertIfAbsent 가 두 번 호출돼도 중복 키 예외 없이 한 행만 유지한다")
+    void insertIfAbsent_idempotent_noDuplicate() {
+        Long lectureId = persistLecture(true).getId();
+        LocalDateTime now = LocalDateTime.of(2026, 6, 13, 10, 0);
+
+        // 동시 입장으로 두 요청이 모두 "없음" 판정 후 INSERT 하는 상황 재현
+        lectureProgressRepository.insertIfAbsent(USER_ID, lectureId, 0, now);
+        lectureProgressRepository.insertIfAbsent(USER_ID, lectureId, 99, now); // 두 번째: 충돌 → no-op
+        em.flush();
+        em.clear();
+
+        assertThat(lectureProgressRepository.count()).isEqualTo(1);
+        LectureProgress saved =
+                lectureProgressRepository.findByUserIdAndLectureId(USER_ID, lectureId).orElseThrow();
+        assertThat(saved.getLastPositionSeconds()).isEqualTo(0); // 두 번째 삽입은 무시되어 첫 값 유지
+    }
+
+    @Test
+    @DisplayName("ensureStarted 를 같은 강의로 두 번 호출해도 같은 진행 행을 돌려준다(멱등)")
+    void ensureStarted_idempotent_returnsSameRow() {
+        Lecture lecture = persistLecture(true); // 무료 맛보기 → 수강권 없이 생성 허용
+        LocalDateTime now = LocalDateTime.of(2026, 6, 13, 10, 0);
+
+        LectureProgress first = lectureProgressService.ensureStarted(USER_ID, lecture, now);
+        LectureProgress second = lectureProgressService.ensureStarted(USER_ID, lecture, now);
+
+        assertThat(first).isNotNull();
+        assertThat(second).isNotNull();
+        assertThat(second.getId()).isEqualTo(first.getId());
+        assertThat(lectureProgressRepository.count()).isEqualTo(1);
+    }
+
     // ── 하트비트 + 수강권 검증 ────────────────────────────────────────────
     @Test
     @DisplayName("수강권이 있으면 하트비트로 진행 행을 생성하고 시청시간을 누적한다")

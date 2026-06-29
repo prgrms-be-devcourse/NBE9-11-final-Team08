@@ -1,4 +1,4 @@
-package com.team08.backend.domain.issuedcoupon.entity;
+package com.team08.backend.domain.issuedcouponjob.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -24,6 +24,9 @@ public class IssuedCouponJob {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, unique = true, length = 36)
+    private String requestId;
+
     @Column(nullable = false)
     private Long policyId;
 
@@ -41,7 +44,8 @@ public class IssuedCouponJob {
 
     private LocalDateTime completedAt;
 
-    private IssuedCouponJob(Long userId, Long policyId, LocalDateTime requestedAt) {
+    private IssuedCouponJob(String requestId, Long userId, Long policyId, LocalDateTime requestedAt) {
+        this.requestId = requestId;
         this.userId = userId;
         this.policyId = policyId;
         this.status = IssuedCouponJobStatus.REQUESTED;
@@ -49,8 +53,8 @@ public class IssuedCouponJob {
     }
 
     // 쿠폰 발급 작업 생성
-    public static IssuedCouponJob request(Long userId, Long policyId, LocalDateTime requestedAt) {
-        return new IssuedCouponJob(userId, policyId, requestedAt);
+    public static IssuedCouponJob request(String requestId, Long userId, Long policyId, LocalDateTime requestedAt) {
+        return new IssuedCouponJob(requestId, userId, policyId, requestedAt);
     }
 
     // 쿠폰 발급 성공 처리
@@ -58,6 +62,22 @@ public class IssuedCouponJob {
         this.status = IssuedCouponJobStatus.ISSUED;
         this.lastTriedAt = completedAt;
         this.completedAt = completedAt;
+    }
+
+    public void startProcessing(LocalDateTime now) {
+        this.status = IssuedCouponJobStatus.PROCESSING;
+        this.lastTriedAt = now;
+    }
+
+    public void markFailed(LocalDateTime now) {
+        this.status = IssuedCouponJobStatus.FAILED;
+        this.lastTriedAt = now;
+        this.completedAt = now;
+    }
+
+    public void markRetry(LocalDateTime now) {
+        this.status = IssuedCouponJobStatus.RETRY;
+        this.lastTriedAt = now;
     }
 
     public boolean isProcessable() {
