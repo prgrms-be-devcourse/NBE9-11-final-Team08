@@ -1,10 +1,17 @@
+import { redirect } from 'next/navigation'
 import { InstructorHeader } from '@/components/instructor/instructor-header'
+import { api } from '@/lib/api'
 
-export default function InstructorLayout({
+export default async function InstructorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const userProfile = await api.getProfile()
+  if (!userProfile || !userProfile.isSeller) {
+    redirect('/')
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-secondary/30">
       <InstructorHeader />
