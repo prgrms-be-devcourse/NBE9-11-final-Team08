@@ -53,8 +53,6 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponWriter issuedCouponWriter;
 
-    @Mock
-    private AllUsersCouponMaterializer allUsersCouponMaterializer;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
@@ -68,7 +66,6 @@ class IssuedCouponServiceTest {
                 userRepository,
                 strategyFactory,
                 issuedCouponWriter,
-                allUsersCouponMaterializer,
                 clock
         );
     }
@@ -169,7 +166,6 @@ class IssuedCouponServiceTest {
         List<CouponListResponse> responses = issuedCouponService.getMyCoupons(userId);
 
         // then
-        verify(allUsersCouponMaterializer).materializeForUser(userId);
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).couponName()).isEqualTo("전체 회원 쿠폰");
     }
@@ -202,35 +198,6 @@ class IssuedCouponServiceTest {
         verify(issuedCoupon).validateUsable(userId, now);
     }
 
-    @Test
-    @DisplayName("전체 회원 쿠폰 발급 직후 쿠폰 적용 시 JIT 생성 후 할인 금액을 계산한다")
-    void calculateExpectedDiscount_afterAllUsersIssue_materializesBeforeDiscountCalculation() {
-        // given
-        Long userId = 1L;
-        Long issuedCouponId = 100L;
-        int originalPrice = 30_000;
-        LocalDateTime now = LocalDateTime.now(clock);
-
-        IssuedCoupon issuedCoupon = mock(IssuedCoupon.class);
-        when(issuedCoupon.getPolicyId()).thenReturn(10L);
-
-        CouponPolicy policy = mock(CouponPolicy.class);
-        when(policy.getName()).thenReturn("전체 회원 쿠폰");
-        when(policy.calculateDiscountAmount(originalPrice)).thenReturn(5_000);
-
-        when(issuedCouponRepository.findById(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
-        when(couponPolicyRepository.findById(10L)).thenReturn(Optional.of(policy));
-
-        // when
-        ExpectedDiscountResponse response = issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, originalPrice);
-
-        // then
-        verify(allUsersCouponMaterializer).materializeForUser(userId);
-        verify(issuedCoupon).validateUsable(userId, now);
-        assertThat(response.couponName()).isEqualTo("전체 회원 쿠폰");
-        assertThat(response.discountAmount()).isEqualTo(5_000);
-        assertThat(response.finalPrice()).isEqualTo(25_000);
-    }
 
     @Test
     @DisplayName("성공: 단회성 쿠폰 사용 시 상태가 USED로 변경된다")
