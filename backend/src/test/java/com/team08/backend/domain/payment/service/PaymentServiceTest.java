@@ -8,12 +8,15 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
@@ -26,6 +29,8 @@ import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
+import com.team08.backend.domain.payment.util.NicepaySignature;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -100,9 +106,17 @@ class PaymentServiceTest {
     private PaymentSuccessOutboxService paymentSuccessOutboxService;
 
     private PaymentService paymentService;
+    private NicepayPaymentProperties nicepayPaymentProperties;
 
     @BeforeEach
     void setUp() {
+        nicepayPaymentProperties = new NicepayPaymentProperties(
+                "https://api.nicepay.example",
+                "nicepay00m",
+                "merchant-key",
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(5)
+        );
         paymentService = new PaymentService(
                 paymentRepository,
                 paymentAttemptRepository,
@@ -115,6 +129,7 @@ class PaymentServiceTest {
                 orderCouponUsageRepository,
                 paidCourseStudyMemberService,
                 paymentSuccessOutboxService,
+                nicepayPaymentProperties,
                 FIXED_CLOCK
         );
     }
@@ -234,6 +249,48 @@ class PaymentServiceTest {
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
         assertThat(response.amount()).isEqualTo(25_000);
         assertThat(response.orderStatus()).isEqualTo(OrderStatus.PAID);
+    }
+
+    @Test
+    void prepareNicepayPaymentCreatesCardFormParametersWithoutMerchantKey() {
+        Order order = order(OrderStatus.PENDING_PAYMENT);
+        OrderItem orderItem = orderItem(1L, COURSE_ID, 30_000);
+        LoginUserDto user = new LoginUserDto(USER_ID, "user@example.com", "tester", "ROLE_USER");
+
+        given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+
+        NicepayPreparePaymentResponse response = paymentService.prepareNicepayPayment(
+                user,
+                ORDER_ID,
+                new NicepayPreparePaymentRequest("CARD", null)
+        );
+
+        assertThat(response.goodsName()).isEqualTo("Spring");
+        assertThat(response.amt()).isEqualTo(30_000);
+        assertThat(response.mid()).isEqualTo("nicepay00m");
+        assertThat(response.moid()).isEqualTo("ORD-20260612100000-ABC12345");
+        assertThat(response.payMethod()).isEqualTo("CARD");
+        assertThat(response.buyerName()).isEqualTo("tester");
+        assertThat(response.buyerEmail()).isEqualTo("user@example.com");
+        assertThat(response.signData()).isEqualTo(
+                NicepaySignature.sha256("20260618190000" + "nicepay00m" + 30_000 + "merchant-key")
+        );
+        assertThat(response.toString()).doesNotContain("merchant-key");
+    }
+
+    @Test
+    void prepareNicepayPaymentAllowsOnlyCardPayMethod() {
+        LoginUserDto user = new LoginUserDto(USER_ID, "user@example.com", "tester", "ROLE_USER");
+
+        assertThatThrownBy(() -> paymentService.prepareNicepayPayment(
+                user,
+                ORDER_ID,
+                new NicepayPreparePaymentRequest("BANK", null)
+        ))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE));
     }
 
     @Test

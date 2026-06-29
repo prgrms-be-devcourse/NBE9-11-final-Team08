@@ -14,6 +14,8 @@ import type {
   OrderDetailResponse,
   ConfirmPaymentResponse,
   ConfirmTossPaymentRequest,
+  NicepayPreparePaymentRequest,
+  NicepayPreparePaymentResponse,
   PaymentResponse,
   EnrolledCourse,
   EnrolledCourseResponse,
@@ -1224,6 +1226,10 @@ export const api = {
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
+  confirmProviderPayment: (orderId: number, providerType: string, request: ConfirmTossPaymentRequest) =>
+    mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/providers/${providerType}/confirm`, 'POST', request),
+  prepareNicepayPayment: (orderId: number, request: NicepayPreparePaymentRequest) =>
+    mutate<NicepayPreparePaymentResponse>(`/api/payments/${orderId}/nicepay/prepare`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
   confirmPayment: (

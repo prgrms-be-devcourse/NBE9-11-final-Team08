@@ -26,14 +26,18 @@ export type PaymentResultParams = {
 
 type ResultState = 'checking' | 'success' | 'fail' | 'api-error'
 
+function initialResultState(params: PaymentResultParams): ResultState {
+  if (params.payment === 'toss' && params.status !== 'fail') return 'checking'
+  if (params.status === 'success') return 'success'
+  if (params.status === 'pending') return 'checking'
+  if (params.status === 'fail' || params.status === 'failed' || params.status === 'unknown') return 'fail'
+  return 'api-error'
+}
+
 export function PaymentResultView({ params }: { params: PaymentResultParams }) {
   const { clear } = useCart()
   const calledRef = useRef(false)
-  const [state, setState] = useState<ResultState>(() => {
-    if (params.payment === 'toss' && params.status !== 'fail') return 'checking'
-    if (params.status === 'fail') return 'fail'
-    return 'success'
-  })
+  const [state, setState] = useState<ResultState>(() => initialResultState(params))
   const [detailMessage, setDetailMessage] = useState(params.message || '')
   const [confirmedPayment, setConfirmedPayment] = useState<ConfirmPaymentResponse | null>(null)
 
@@ -49,6 +53,18 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
     if (params.payment !== 'toss') {
       if (params.status === 'success' && pendingPayment) {
         removePendingPayment(pendingPayment)
+        setState('success')
+        return
+      }
+      if (params.status === 'pending') {
+        setState('checking')
+        setDetailMessage('결제 승인 결과 확인이 지연되고 있습니다. 주문 내역에서 최종 상태를 다시 확인해주세요.')
+        return
+      }
+      if (params.status === 'fail' || params.status === 'failed' || params.status === 'unknown') {
+        setState('fail')
+        setDetailMessage(params.message || '결제가 완료되지 않았거나 결과 확인이 필요합니다.')
+        return
       }
       return
     }
@@ -77,13 +93,13 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
 
     if (tossOrderId !== pendingPayment.orderNumber) {
       setState('api-error')
-      setDetailMessage('Toss에서 돌아온 주문번호가 생성된 주문번호와 다릅니다.')
+      setDetailMessage('Toss에서 받은 주문번호가 생성된 주문번호와 다릅니다.')
       return
     }
 
     if (amount !== pendingPayment.amount) {
       setState('api-error')
-      setDetailMessage('Toss에서 돌아온 금액이 주문 금액과 다릅니다.')
+      setDetailMessage('Toss에서 받은 금액이 주문 금액과 다릅니다.')
       return
     }
 
@@ -132,7 +148,7 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
   const copy = {
     checking: {
       title: '결제 결과 확인 중입니다',
-      description: detailMessage || 'Toss 결제 결과를 백엔드 confirm API로 승인하고 있습니다.',
+      description: detailMessage || '결제 결과를 백엔드에서 확인하고 있습니다.',
       icon: <Loader2 className="size-16 animate-spin text-primary" />,
     },
     success: {
@@ -141,8 +157,8 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
       icon: <CheckCircle2 className="size-16 text-primary" />,
     },
     fail: {
-      title: '결제에 실패했습니다',
-      description: detailMessage || '결제가 완료되지 않았습니다. 주문은 결제 대기 상태로 남아있을 수 있습니다.',
+      title: '결제가 완료되지 않았습니다',
+      description: detailMessage || '주문은 결제 대기 상태로 남아 있을 수 있습니다.',
       icon: <XCircle className="size-16 text-destructive" />,
     },
     'api-error': {

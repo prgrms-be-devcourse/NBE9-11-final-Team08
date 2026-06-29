@@ -1,6 +1,6 @@
 import type { OrderDetailResponse } from './types'
 
-export type PaymentProvider = 'mock' | 'toss'
+export type PaymentProvider = 'mock' | 'toss' | 'nicepay'
 
 export interface PendingPayment {
   serviceOrderId: number
