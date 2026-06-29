@@ -428,6 +428,19 @@ export interface EnrolledCourse {
   status: '진행 중' | '완료'
 }
 
+export interface EnrolledCourseResponse {
+  enrollmentId: number
+  courseId: number
+  studyId?: number | null
+  title: string
+  instructorNickname: string
+  thumbnailUrl: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
+  enrolledAt: string
+}
+
 export interface MyComment {
   id: number
   lectureId: number
