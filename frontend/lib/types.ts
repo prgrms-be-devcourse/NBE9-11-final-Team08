@@ -178,6 +178,36 @@ export interface ConfirmTossPaymentRequest {
   amount: number
   issuedCouponId?: number | null
   idempotencyKey?: string | null
+  authResultCode?: string | null
+  authResultMsg?: string | null
+  authToken?: string | null
+  txTid?: string | null
+  mid?: string | null
+  moid?: string | null
+  signature?: string | null
+  nextAppUrl?: string | null
+  netCancelUrl?: string | null
+  payMethod?: string | null
+}
+
+export interface NicepayPreparePaymentRequest {
+  payMethod: 'CARD'
+  issuedCouponId?: number | null
+}
+
+export interface NicepayPreparePaymentResponse {
+  goodsName: string
+  amt: number
+  mid: string
+  ediDate: string
+  moid: string
+  signData: string
+  payMethod: 'CARD'
+  buyerName: string
+  buyerTel: string
+  buyerEmail: string
+  charSet: string
+  reqReserved?: string | null
 }
 
 export interface PaymentResponse {

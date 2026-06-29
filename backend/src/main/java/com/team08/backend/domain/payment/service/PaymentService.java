@@ -24,7 +24,12 @@ import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentProcessingContext;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
+import com.team08.backend.domain.payment.util.NicepaySignature;
+import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -34,12 +39,17 @@ import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
+
+    private static final String NICEPAY_CARD_PAY_METHOD = "CARD";
+    private static final String NICEPAY_CHARSET = "utf-8";
+    private static final DateTimeFormatter NICEPAY_EDI_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final PaymentRepository paymentRepository;
     private final PaymentAttemptRepository paymentAttemptRepository;
@@ -52,6 +62,7 @@ public class PaymentService {
     private final OrderCouponUsageRepository orderCouponUsageRepository;
     private final PaidCourseStudyMemberService paidCourseStudyMemberService;
     private final PaymentSuccessOutboxService paymentSuccessOutboxService;
+    private final NicepayPaymentProperties nicepayPaymentProperties;
     private final Clock clock;
 
     @Transactional
@@ -117,7 +128,17 @@ public class PaymentService {
             PaymentProviderConfirmRequest providerRequest = new PaymentProviderConfirmRequest(
                     request.paymentKey(),
                     context.orderNumber(),
-                    context.amount()
+                    context.amount(),
+                    request.authResultCode(),
+                    request.authResultMsg(),
+                    request.authToken(),
+                    request.txTid(),
+                    request.mid(),
+                    request.moid(),
+                    request.signature(),
+                    request.nextAppUrl(),
+                    request.netCancelUrl(),
+                    request.payMethod()
             );
             return paymentTransactionService.completeProviderPayment(
                     context,
@@ -126,6 +147,46 @@ public class PaymentService {
         } catch (PaymentProviderException e) {
             return paymentTransactionService.failProviderPayment(context, request, e);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public NicepayPreparePaymentResponse prepareNicepayPayment(
+            LoginUserDto user,
+            Long orderId,
+            NicepayPreparePaymentRequest request
+    ) {
+        validateNicepayCardPayMethod(request.payMethod());
+        if (!StringUtils.hasText(nicepayPaymentProperties.mid())
+                || !StringUtils.hasText(nicepayPaymentProperties.merchantKey())) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Order order = findMyPaymentOrder(user.id(), orderId);
+        validateConfirmableOrder(order);
+        validateConfirmablePayment(paymentRepository.findByOrder_Id(orderId));
+
+        int expectedDiscount = calculateExpectedDiscount(user.id(), request.issuedCouponId(), order);
+        int amount = order.getFinalPrice() - expectedDiscount;
+        String ediDate = LocalDateTime.now(clock).format(NICEPAY_EDI_DATE_FORMATTER);
+        String signData = NicepaySignature.sha256(
+                ediDate + nicepayPaymentProperties.mid() + amount + nicepayPaymentProperties.merchantKey()
+        );
+        String goodsName = getOrderName(findOrderItems(order));
+
+        return new NicepayPreparePaymentResponse(
+                goodsName,
+                amount,
+                nicepayPaymentProperties.mid(),
+                ediDate,
+                order.getOrderNumber(),
+                signData,
+                NICEPAY_CARD_PAY_METHOD,
+                user.nickname(),
+                "",
+                user.email(),
+                NICEPAY_CHARSET,
+                request.issuedCouponId() == null ? null : String.valueOf(request.issuedCouponId())
+        );
     }
 
     @Transactional
@@ -219,6 +280,31 @@ public class PaymentService {
         if (order.getFinalPrice() - expectedDiscount != requestAmount) {
             throw new CustomException(ErrorCode.PAYMENT_AMOUNT_MISMATCH);
         }
+    }
+
+    private int calculateExpectedDiscount(Long userId, Long issuedCouponId, Order order) {
+        if (issuedCouponId == null) {
+            return 0;
+        }
+        return issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, order.getTotalPrice()).discountAmount();
+    }
+
+    private void validateNicepayCardPayMethod(String payMethod) {
+        if (!NICEPAY_CARD_PAY_METHOD.equals(payMethod)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private String getOrderName(List<OrderItem> orderItems) {
+        if (orderItems.isEmpty()) {
+            return "주문";
+        }
+
+        String firstTitle = orderItems.get(0).getCourseTitle();
+        if (orderItems.size() == 1) {
+            return firstTitle;
+        }
+        return firstTitle + " 외 " + (orderItems.size() - 1) + "건";
     }
 
     private void validateDuplicateEnrollment(Long userId, List<OrderItem> orderItems) {

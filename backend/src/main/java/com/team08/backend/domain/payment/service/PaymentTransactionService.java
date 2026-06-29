@@ -20,6 +20,7 @@ import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
 import com.team08.backend.domain.payment.provider.PaymentProviderConfirmResponse;
 import com.team08.backend.domain.payment.provider.PaymentProviderException;
+import com.team08.backend.domain.payment.provider.PaymentProviderLookupResponse;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -40,11 +41,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class PaymentTransactionService {
 
-    private static final String TOSS_PAYMENT_MISMATCH = "TOSS_PAYMENT_MISMATCH";
-    private static final String TOSS_NOT_DONE = "TOSS_NOT_DONE";
-    private static final String TOSS_PAYMENT_NOT_FOUND = "TOSS_PAYMENT_NOT_FOUND";
-    private static final String TOSS_PAYMENT_LOOKUP_UNKNOWN = "TOSS_PAYMENT_LOOKUP_UNKNOWN";
-    private static final String TOSS_RECOVERY_DUPLICATE_ENROLLMENT = "TOSS_RECOVERY_DUPLICATE_ENROLLMENT";
+    private static final String RECOVERY_DUPLICATE_ENROLLMENT = "RECOVERY_DUPLICATE_ENROLLMENT";
     private static final String TOSS_RECOVERY_DUPLICATE_ENROLLMENT_MESSAGE =
             "Toss 결제는 성공으로 조회됐지만 이미 수강권이 있어 자동 복구를 완료할 수 없습니다.";
     private static final List<PaymentStatus> RECOVERABLE_PAYMENT_STATUSES = List.of(
@@ -90,6 +87,26 @@ public class PaymentTransactionService {
                         payment.getOrder().getOrderNumber(),
                         payment.getAmount()
                 ));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaymentRecoveryTarget> findProviderRecoveryTargets(LocalDateTime threshold, int limit) {
+        return paymentRepository.findRecoverablePayments(
+                        RECOVERABLE_PAYMENT_STATUSES,
+                        threshold,
+                        PageRequest.of(0, limit)
+                ).stream()
+                .map(this::toRecoveryTarget)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PaymentRecoveryTarget> findProviderRecoveryTargetByOrderNumber(
+            PaymentProviderType providerType,
+            String orderNumber
+    ) {
+        return paymentRepository.findByProviderAndOrder_OrderNumber(providerType, orderNumber)
+                .map(this::toRecoveryTarget);
     }
 
     @Transactional
@@ -249,34 +266,47 @@ public class PaymentTransactionService {
 
     @Transactional
     public boolean recoverTossPayment(TossPaymentRecoveryTarget target, TossPaymentResponse tossResponse) {
+        return recoverProviderPayment(target.toProviderTarget(), toProviderLookupResponse(tossResponse));
+    }
+
+    @Transactional
+    public boolean recoverProviderPayment(
+            PaymentRecoveryTarget target,
+            PaymentProviderLookupResponse providerResponse
+    ) {
         Order order = findMyPaymentOrderForUpdate(target.userId(), target.orderId());
         Payment payment = findPayment(target.paymentId());
         if (!isRecoverable(payment)) {
             return false;
         }
 
-        LocalDateTime recoveredAt = approvedAtOrNow(tossResponse.approvedAt());
-        if (!isValidRecoveredTossPayment(tossResponse, target)) {
-            recoverUnknown(payment, TOSS_PAYMENT_MISMATCH, "Toss Payments 조회 응답이 주문 정보와 일치하지 않습니다.", recoveredAt);
+        LocalDateTime recoveredAt = approvedAtOrNow(providerResponse.approvedAt());
+        if (!isValidRecoveredProviderPayment(providerResponse, target)) {
+            recoverUnknown(payment, providerMismatchCode(target.providerType()), "Provider lookup result does not match order.", recoveredAt);
             return true;
         }
 
-        if (isDoneTossPayment(tossResponse)) {
-            recoverSuccess(order, payment, tossResponse, recoveredAt);
+        if (isDoneProviderPayment(providerResponse)) {
+            recoverSuccess(order, payment, providerResponse, recoveredAt);
             return true;
         }
 
-        if (isDeclinedTossPayment(tossResponse)) {
-            recoverDecline(payment, tossResponse, recoveredAt);
+        if (isDeclinedProviderPayment(providerResponse)) {
+            recoverDecline(payment, providerResponse, recoveredAt);
             return true;
         }
 
-        recoverUnknown(payment, TOSS_PAYMENT_LOOKUP_UNKNOWN, "Toss Payments 조회 결과를 확정할 수 없습니다.", recoveredAt);
+        recoverUnknown(payment, providerLookupUnknownCode(target.providerType()), "Provider lookup result is unclear.", recoveredAt);
         return true;
     }
 
     @Transactional
     public boolean recoverTossPaymentNotFound(TossPaymentRecoveryTarget target) {
+        return recoverProviderPaymentNotFound(target.toProviderTarget());
+    }
+
+    @Transactional
+    public boolean recoverProviderPaymentNotFound(PaymentRecoveryTarget target) {
         findMyPaymentOrderForUpdate(target.userId(), target.orderId());
         Payment payment = findPayment(target.paymentId());
         if (!isRecoverable(payment)) {
@@ -284,14 +314,20 @@ public class PaymentTransactionService {
         }
 
         LocalDateTime recoveredAt = LocalDateTime.now(clock);
-        payment.recoverReady(TOSS_PAYMENT_NOT_FOUND, "Toss Payments 결제 내역이 없어 재시도 가능한 상태로 복구합니다.", recoveredAt);
+        String failureCode = providerPaymentNotFoundCode(target.providerType());
+        payment.recoverReady(failureCode, "Provider payment was not found. Payment can be retried.", recoveredAt);
         findLatestAttempt(payment.getId())
-                .ifPresent(attempt -> attempt.recoverUnknown(TOSS_PAYMENT_NOT_FOUND, "Toss Payments 결제 내역이 없습니다.", recoveredAt));
+                .ifPresent(attempt -> attempt.recoverUnknown(failureCode, "Provider payment was not found.", recoveredAt));
         return true;
     }
 
     @Transactional
     public boolean keepTossPaymentUnknown(TossPaymentRecoveryTarget target, String failureCode, String failureMessage) {
+        return keepProviderPaymentUnknown(target.toProviderTarget(), failureCode, failureMessage);
+    }
+
+    @Transactional
+    public boolean keepProviderPaymentUnknown(PaymentRecoveryTarget target, String failureCode, String failureMessage) {
         findMyPaymentOrderForUpdate(target.userId(), target.orderId());
         Payment payment = findPayment(target.paymentId());
         if (!isRecoverable(payment)) {
@@ -302,7 +338,6 @@ public class PaymentTransactionService {
         recoverUnknown(payment, failureCode, failureMessage, recoveredAt);
         return true;
     }
-
     private Order findMyPaymentOrderForUpdate(Long userId, Long orderId) {
         return orderRepository.findByIdAndUserIdForUpdate(orderId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
@@ -416,10 +451,17 @@ public class PaymentTransactionService {
         return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
     }
 
-    private boolean isDeclinedTossPayment(TossPaymentResponse response) {
+    private boolean isDoneProviderPayment(PaymentProviderLookupResponse response) {
+        return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
+    }
+
+    private boolean isDeclinedProviderPayment(PaymentProviderLookupResponse response) {
         return "CANCELED".equals(response.status())
+                || "CANCELLED".equals(response.status())
                 || "ABORTED".equals(response.status())
-                || "EXPIRED".equals(response.status());
+                || "EXPIRED".equals(response.status())
+                || "FAILED".equals(response.status())
+                || "DECLINED".equals(response.status());
     }
 
     private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order, int expectedDiscount) {
@@ -432,7 +474,7 @@ public class PaymentTransactionService {
                 && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
     }
 
-    private boolean isValidRecoveredTossPayment(TossPaymentResponse response, TossPaymentRecoveryTarget target) {
+    private boolean isValidRecoveredProviderPayment(PaymentProviderLookupResponse response, PaymentRecoveryTarget target) {
         return target.orderNumber().equals(response.orderId())
                 && target.amount() == response.totalAmount();
     }
@@ -442,13 +484,17 @@ public class PaymentTransactionService {
     }
 
     private void recoverSuccess(Order order, Payment payment, TossPaymentResponse tossResponse, LocalDateTime recoveredAt) {
+        recoverSuccess(order, payment, toProviderLookupResponse(tossResponse), recoveredAt);
+    }
+
+    private void recoverSuccess(Order order, Payment payment, PaymentProviderLookupResponse providerResponse, LocalDateTime recoveredAt) {
         List<OrderItem> orderItems = List.of();
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
             orderItems = findOrderItems(order);
             if (hasDuplicateEnrollment(order.getUserId(), orderItems)) {
                 recoverUnknown(
                         payment,
-                        TOSS_RECOVERY_DUPLICATE_ENROLLMENT,
+                        providerRecoveryDuplicateEnrollmentCode(payment.getProvider()),
                         TOSS_RECOVERY_DUPLICATE_ENROLLMENT_MESSAGE,
                         recoveredAt
                 );
@@ -456,9 +502,9 @@ public class PaymentTransactionService {
             }
         }
 
-        payment.recoverSucceed(tossResponse.paymentKey(), tossResponse.method(), recoveredAt);
+        payment.recoverSucceed(providerResponse.paymentKey(), providerResponse.method(), recoveredAt);
         findLatestAttempt(payment.getId())
-                .ifPresent(attempt -> attempt.recoverSucceed(tossResponse.paymentKey(), recoveredAt));
+                .ifPresent(attempt -> attempt.recoverSucceed(providerResponse.paymentKey(), recoveredAt));
         paymentRepository.save(payment);
 
         if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
@@ -468,18 +514,23 @@ public class PaymentTransactionService {
     }
 
     private void recoverDecline(Payment payment, TossPaymentResponse tossResponse, LocalDateTime recoveredAt) {
+        recoverDecline(payment, toProviderLookupResponse(tossResponse), recoveredAt);
+    }
+
+    private void recoverDecline(Payment payment, PaymentProviderLookupResponse providerResponse, LocalDateTime recoveredAt) {
+        String failureCode = providerNotDoneCode(payment.getProvider());
+        String failureMessage = "Provider lookup result is not done.";
         payment.recoverDecline(
-                tossResponse.paymentKey(),
-                tossResponse.method(),
-                TOSS_NOT_DONE,
-                "Toss Payments 조회 결과 결제가 완료되지 않았습니다.",
+                providerResponse.paymentKey(),
+                providerResponse.method(),
+                failureCode,
+                failureMessage,
                 recoveredAt
         );
         findLatestAttempt(payment.getId())
-                .ifPresent(attempt -> attempt.recoverDecline(TOSS_NOT_DONE, "Toss Payments 조회 결과 결제가 완료되지 않았습니다.", recoveredAt));
+                .ifPresent(attempt -> attempt.recoverDecline(failureCode, failureMessage, recoveredAt));
         paymentRepository.save(payment);
     }
-
     private void recoverUnknown(Payment payment, String failureCode, String failureMessage, LocalDateTime recoveredAt) {
         payment.recoverUnknown(failureCode, failureMessage, recoveredAt);
         findLatestAttempt(payment.getId())
@@ -509,6 +560,28 @@ public class PaymentTransactionService {
         );
     }
 
+    private PaymentProviderLookupResponse toProviderLookupResponse(TossPaymentResponse tossResponse) {
+        return new PaymentProviderLookupResponse(
+                tossResponse.paymentKey(),
+                tossResponse.orderId(),
+                tossResponse.status(),
+                tossResponse.method(),
+                tossResponse.totalAmount(),
+                tossResponse.approvedAt()
+        );
+    }
+
+    private PaymentRecoveryTarget toRecoveryTarget(Payment payment) {
+        return new PaymentRecoveryTarget(
+                payment.getProvider(),
+                payment.getId(),
+                payment.getOrder().getId(),
+                payment.getOrder().getUserId(),
+                payment.getOrder().getOrderNumber(),
+                payment.getAmount()
+        );
+    }
+
     private PaymentProviderException toProviderException(TossPaymentException exception) {
         return switch (exception.getFailureType()) {
             case DECLINED -> PaymentProviderException.declined(exception.getFailureCode(), exception.getFailureMessage());
@@ -523,6 +596,18 @@ public class PaymentTransactionService {
 
     private String providerNotDoneCode(PaymentProviderType providerType) {
         return providerType.name() + "_NOT_DONE";
+    }
+
+    private String providerPaymentNotFoundCode(PaymentProviderType providerType) {
+        return providerType.name() + "_PAYMENT_NOT_FOUND";
+    }
+
+    private String providerLookupUnknownCode(PaymentProviderType providerType) {
+        return providerType.name() + "_PAYMENT_LOOKUP_UNKNOWN";
+    }
+
+    private String providerRecoveryDuplicateEnrollmentCode(PaymentProviderType providerType) {
+        return providerType.name() + "_" + RECOVERY_DUPLICATE_ENROLLMENT;
     }
 
     public record TossPaymentProcessingContext(
@@ -595,6 +680,26 @@ public class PaymentTransactionService {
     }
 
     public record TossPaymentRecoveryTarget(
+            Long paymentId,
+            Long orderId,
+            Long userId,
+            String orderNumber,
+            int amount
+    ) {
+        private PaymentRecoveryTarget toProviderTarget() {
+            return new PaymentRecoveryTarget(
+                    PaymentProviderType.TOSS,
+                    paymentId,
+                    orderId,
+                    userId,
+                    orderNumber,
+                    amount
+            );
+        }
+    }
+
+    public record PaymentRecoveryTarget(
+            PaymentProviderType providerType,
             Long paymentId,
             Long orderId,
             Long userId,

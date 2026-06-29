@@ -5,9 +5,14 @@ import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPaymentWebhookRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.service.PaymentService;
+import com.team08.backend.domain.payment.service.NicepayPaymentWebhookService;
+import com.team08.backend.domain.payment.service.NicepayPaymentWebhookService.NicepayPaymentWebhookResult;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
@@ -39,6 +44,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final TossPaymentWebhookService tossPaymentWebhookService;
+    private final NicepayPaymentWebhookService nicepayPaymentWebhookService;
     private final TossPaymentProperties tossPaymentProperties;
 
     @PostMapping("/{orderId}/confirm")
@@ -78,6 +84,20 @@ public class PaymentController {
         return paymentService.confirmProviderPayment(principal.user().id(), orderId, providerType, request);
     }
 
+    @PostMapping("/{orderId}/nicepay/prepare")
+    @Operation(
+            summary = "NICEPAY 결제창 파라미터 생성",
+            description = "주문 금액과 MerchantKey 기반 서명을 서버에서 생성해 NICEPAY PC 인증결제 form 파라미터를 반환합니다."
+    )
+    public NicepayPreparePaymentResponse prepareNicepayPayment(
+            @AuthenticationPrincipal LoginUserPrincipal principal,
+            @Parameter(description = "주문 ID", example = "1")
+            @PathVariable Long orderId,
+            @RequestBody NicepayPreparePaymentRequest request
+    ) {
+        return paymentService.prepareNicepayPayment(principal.user(), orderId, request);
+    }
+
     @PostMapping("/toss/webhook")
     @Operation(summary = "Toss Payments webhook", description = "Toss Payments webhook 이벤트를 받아 결제 결과를 다시 조회하고 상태를 보정합니다.")
     public ResponseEntity<Void> handleTossWebhook(
@@ -94,6 +114,18 @@ public class PaymentController {
             return ResponseEntity.status(503).build();
         }
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/nicepay/webhook")
+    @Operation(summary = "NICEPAY webhook", description = "NICEPAY webhook event is verified by provider lookup before payment state recovery.")
+    public ResponseEntity<String> handleNicepayWebhook(
+            @RequestBody NicepayPaymentWebhookRequest request
+    ) {
+        NicepayPaymentWebhookResult result = nicepayPaymentWebhookService.handle(request);
+        if (result == NicepayPaymentWebhookResult.RETRYABLE_FAILURE) {
+            return ResponseEntity.status(503).body("RETRY");
+        }
+        return ResponseEntity.ok("OK");
     }
 
     @PostMapping("/{orderId}/fail")
