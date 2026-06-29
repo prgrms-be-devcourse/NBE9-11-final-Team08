@@ -3,6 +3,7 @@ package com.team08.backend.domain.aifeedback.controller;
 import com.team08.backend.domain.aifeedback.dto.AiFeedbackResponse;
 import com.team08.backend.domain.aifeedback.service.AiFeedbackService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Hidden
 @Tag(
         name = "스터디 활동 AI 피드백",
         description = "스터디 활동의 AI 피드백 생성 및 조회 API"

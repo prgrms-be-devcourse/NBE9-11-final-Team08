@@ -3,6 +3,7 @@ package com.team08.backend.domain.media.service;
 import com.team08.backend.domain.media.entity.EncodingPurpose;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
+import com.team08.backend.global.exception.MediaCleanupException;
 import com.team08.backend.global.util.S3FileStorageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -93,6 +94,7 @@ public class S3VideoEncodingService extends VideoEncodingTemplate implements Med
             s3FileStorageService.deleteDirectory(s3FolderPath);
         } catch (Exception e) {
             log.error("Failed to rollback delete encoded HLS folder in S3. lectureId: {}, folder: {}", lectureId, s3FolderPath, e);
+            throw new MediaCleanupException("Failed to delete S3 folder: " + s3FolderPath, e);
         }
     }
 }
