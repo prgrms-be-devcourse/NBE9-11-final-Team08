@@ -146,6 +146,33 @@ class NicepayPaymentProviderTest {
     }
 
     @Test
+    void approvalSignatureUsesRawResponseTidMidAndAmount() {
+        PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature());
+        String rawAmount = "030000";
+        String rawTid = "raw-tid-1";
+        String rawMid = "raw-mid-1";
+        String signature = NicepaySignature.sha256(rawTid + rawMid + rawAmount + MERCHANT_KEY);
+        given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
+                .willReturn(nicepayResponseWithRawApprovalFields(rawTid, rawMid, rawAmount, signature));
+
+        PaymentProviderConfirmResponse response = nicepayPaymentProvider.confirm(request);
+
+        assertThat(response.paymentKey()).isEqualTo(rawTid);
+        assertThat(response.totalAmount()).isEqualTo(30_000);
+    }
+
+    @Test
+    void approvalSignatureComparisonIgnoresCase() {
+        PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature());
+        given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
+                .willReturn(nicepayResponse("3001", "OK", "DONE", 30_000, approvalSignature(30_000).toUpperCase()));
+
+        PaymentProviderConfirmResponse response = nicepayPaymentProvider.confirm(request);
+
+        assertThat(response.paymentKey()).isEqualTo(TID);
+    }
+
+    @Test
     void unclearApprovalFailureCodeThrowsUnknownException() {
         PaymentProviderConfirmRequest request = nicepayConfirmRequest(authSignature());
         given(nicepayPaymentClient.confirm(toNicepayRequest(request)))
@@ -290,6 +317,36 @@ class NicepayPaymentProviderTest {
                 signature,
                 amount,
                 OffsetDateTime.parse("2026-06-18T19:00:00+09:00")
+        );
+    }
+
+    private NicepayPaymentResponse nicepayResponseWithRawApprovalFields(
+            String rawTid,
+            String rawMid,
+            String rawAmount,
+            String signature
+    ) {
+        return new NicepayPaymentResponse(
+                "3001",
+                "OK",
+                null,
+                rawTid,
+                null,
+                "ORD-1",
+                "DONE",
+                null,
+                "CARD",
+                null,
+                null,
+                null,
+                rawMid,
+                signature,
+                30_000,
+                OffsetDateTime.parse("2026-06-18T19:00:00+09:00"),
+                rawTid,
+                rawMid,
+                rawAmount,
+                signature
         );
     }
 

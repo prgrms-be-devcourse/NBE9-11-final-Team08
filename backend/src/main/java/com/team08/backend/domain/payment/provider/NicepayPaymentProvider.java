@@ -159,13 +159,26 @@ public class NicepayPaymentProvider implements PaymentProvider {
     }
 
     private void validateApprovalSignature(NicepayPaymentResponse response) {
-        String mid = StringUtils.hasText(response.mid()) ? response.mid() : properties.mid();
-        String expected = NicepaySignature.sha256(
-                response.resolvedPaymentKey() + mid + response.amount() + properties.merchantKey()
-        );
-        if (!expected.equalsIgnoreCase(response.signature())) {
-            log.warn("NICEPAY approval signature mismatch. tid={}, mid={}, moid={}, amount={}, payMethod={}, easyPayCl={}, signature={}",
-                    response.resolvedPaymentKey(), mid, response.resolvedOrderId(), response.amount(), response.payMethod(), response.easyPayCl(), response.signature());
+        String tid = StringUtils.hasText(response.rawTid()) ? response.rawTid() : response.resolvedPaymentKey();
+        String mid = StringUtils.hasText(response.rawMid()) ? response.rawMid() : properties.mid();
+        String amount = StringUtils.hasText(response.rawAmount()) ? response.rawAmount() : String.valueOf(response.amount());
+        String signature = StringUtils.hasText(response.rawSignature()) ? response.rawSignature() : response.signature();
+        String baseWithoutSecret = tid + mid + amount;
+        String expected = NicepaySignature.sha256(baseWithoutSecret + properties.merchantKey());
+        if (!StringUtils.hasText(signature) || !expected.equalsIgnoreCase(signature)) {
+            log.warn(
+                    "NICEPAY approval signature mismatch. resultCode={}, responseTid={}, responseMid={}, responseAmt={}, parsedAmount={}, responseSignature={}, calculatedSignature={}, signatureBaseWithoutSecret={}, payMethod={}, moid={}",
+                    response.resultCode(),
+                    tid,
+                    mid,
+                    amount,
+                    response.amount(),
+                    signature,
+                    expected,
+                    baseWithoutSecret,
+                    response.payMethod(),
+                    response.resolvedOrderId()
+            );
             throw PaymentProviderException.unknown(NICEPAY_SIGNATURE_MISMATCH, "NICEPAY approval signature does not match.");
         }
     }
