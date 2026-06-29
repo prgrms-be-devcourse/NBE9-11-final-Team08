@@ -366,11 +366,18 @@ public class PaymentService {
     private Payment refundSuccessfulPayment(Order order, LocalDateTime refundedAt) {
         Payment payment = paymentRepository.findByOrder_Id(order.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.PAYMENT_NOT_FOUND));
+        validateRefundSupportedProvider(payment);
         if (!payment.canRefund()) {
             throw new CustomException(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION);
         }
         payment.refund(refundedAt);
         return payment;
+    }
+
+    private void validateRefundSupportedProvider(Payment payment) {
+        if (payment.getProvider() != PaymentProviderType.MOCK) {
+            throw new CustomException(ErrorCode.PAYMENT_REFUND_UNSUPPORTED);
+        }
     }
 
     private void refundOrder(Order order, LocalDateTime refundedAt) {
