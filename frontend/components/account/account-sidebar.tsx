@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils'
 import type { UserProfile } from '@/lib/types'
 
 const links = [
-  { label: '대시보드', href: '/dashboard' },
   { label: '내 강좌 & 스터디', href: '/mypage' },
   { label: '스터디 리포트', href: '/mypage/report' },
   { label: '주문 내역', href: '/orders' },
@@ -35,7 +34,6 @@ export function AccountSidebar({ profile }: { profile: UserProfile | null }) {
       <nav className="mt-4 space-y-1">
         {links.map((l) => {
           const isActive = pathname === l.href || (
-            l.href !== '/dashboard' && // Keep this condition for dashboard
             l.href !== '/mypage' && // Prevent /mypage from activating when on child routes
             pathname.startsWith(l.href)
           )
