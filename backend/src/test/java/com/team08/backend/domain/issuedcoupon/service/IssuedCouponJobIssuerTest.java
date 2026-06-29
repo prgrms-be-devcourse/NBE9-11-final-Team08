@@ -69,16 +69,17 @@ class IssuedCouponJobIssuerTest {
         CouponPolicy policy = fcfsPolicy(policyId);
 
         when(issuedCouponJobRepository.findById(jobId)).thenReturn(Optional.of(job));
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(false);
+        when(couponPolicyRepository.decreaseQuantity(policyId)).thenReturn(1);
 
         // when
-        issuedCouponJobIssuer.issueCoupon(jobId);
+        issuedCouponJobIssuer.issueCoupon(jobId, userId, policyId);
 
         // then
         ArgumentCaptor<IssuedCoupon> couponCaptor = ArgumentCaptor.forClass(IssuedCoupon.class);
         verify(issuedCouponRepository).saveAndFlush(couponCaptor.capture());
-        assertThat(policy.getTotalQuantity()).isEqualTo(1);
+        verify(couponPolicyRepository).decreaseQuantity(policyId);
         assertThat(job.getStatus()).isEqualTo(IssuedCouponJobStatus.ISSUED);
         assertThat(couponCaptor.getValue().getUserId()).isEqualTo(userId);
         assertThat(couponCaptor.getValue().getPolicyId()).isEqualTo(policyId);
@@ -95,20 +96,20 @@ class IssuedCouponJobIssuerTest {
         CouponPolicy policy = fcfsPolicy(policyId);
 
         when(issuedCouponJobRepository.findById(jobId)).thenReturn(Optional.of(job));
-        when(couponPolicyRepository.findByIdWithLock(policyId)).thenReturn(Optional.of(policy));
+        when(couponPolicyRepository.findById(policyId)).thenReturn(Optional.of(policy));
         when(issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)).thenReturn(true);
 
         // when
-        issuedCouponJobIssuer.issueCoupon(jobId);
+        issuedCouponJobIssuer.issueCoupon(jobId, userId, policyId);
 
         // then
         verify(issuedCouponRepository, never()).saveAndFlush(any());
-        assertThat(policy.getTotalQuantity()).isEqualTo(2);
+        verify(couponPolicyRepository, never()).decreaseQuantity(any());
         assertThat(job.getStatus()).isEqualTo(IssuedCouponJobStatus.ISSUED);
     }
 
     private IssuedCouponJob requestedJob(Long jobId, Long userId, Long policyId) {
-        IssuedCouponJob job = IssuedCouponJob.request(userId, policyId, LocalDateTime.now(clock));
+        IssuedCouponJob job = IssuedCouponJob.request(java.util.UUID.randomUUID().toString(), userId, policyId, LocalDateTime.now(clock));
         ReflectionTestUtils.setField(job, "id", jobId);
         ReflectionTestUtils.setField(job, "status", IssuedCouponJobStatus.PROCESSING);
         return job;

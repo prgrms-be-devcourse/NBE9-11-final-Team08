@@ -43,10 +43,13 @@ public class IssuedCouponJobPendingRecoveryScheduler extends AbstractPendingReco
     protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) throws Exception {
         for (ClaimedRecord record : records) {
             try {
-                String jobIdStr = record.payload().get("jobId");
-                if (jobIdStr != null) {
-                    Long jobId = Long.valueOf(jobIdStr);
-                    issuedCouponJobProcessor.process(jobId);
+                String requestId = record.payload().get("requestId");
+                String userIdStr = record.payload().get("userId");
+                String policyIdStr = record.payload().get("policyId");
+                if (requestId != null && userIdStr != null && policyIdStr != null) {
+                    Long userId = Long.valueOf(userIdStr);
+                    Long policyId = Long.valueOf(policyIdStr);
+                    issuedCouponJobProcessor.process(requestId, userId, policyId);
                 }
                 ackCallback.accept(record.recordId());
             } catch (Exception e) {

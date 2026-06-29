@@ -1,5 +1,11 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
+import com.team08.backend.domain.couponpolicy.exception.CouponExhaustedException;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcoupon.exception.JobAlreadyProcessingException;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobWriter.JobLockResult;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -14,13 +20,29 @@ public class IssuedCouponJobProcessor {
     private final IssuedCouponJobIssuer issuedCouponJobIssuer;
     private final Clock clock;
 
-    // 쿠폰 발급 작업 처리
-    public void process(Long jobId) {
+    public void process(String requestId, Long userId, Long policyId) {
         LocalDateTime now = LocalDateTime.now(clock);
-        if (!issuedCouponJobWriter.markProcessing(jobId, now)) {
-            return;
+        
+        JobLockResult lockResult = issuedCouponJobWriter.tryAcquireProcessing(requestId, userId, policyId, now);
+        IssuedCouponJob job = lockResult.job();
+
+        if (!lockResult.isAcquired()) {
+            if (job.getStatus() == IssuedCouponJobStatus.ISSUED || 
+                job.getStatus() == IssuedCouponJobStatus.FAILED) {
+                return;
+            }
+            throw new JobAlreadyProcessingException();
         }
 
-        issuedCouponJobIssuer.issueCoupon(jobId);
+        try {
+            issuedCouponJobIssuer.issueCoupon(job.getId(), userId, policyId);
+        } catch (CouponExhaustedException e) {
+            issuedCouponJobWriter.markFailed(job.getId(), LocalDateTime.now(clock));
+        } catch (Exception e) {
+            try {
+                issuedCouponJobWriter.markRetry(job.getId(), LocalDateTime.now(clock));
+            } catch (Exception ignored) {}
+            throw e;
+        }
     }
 }

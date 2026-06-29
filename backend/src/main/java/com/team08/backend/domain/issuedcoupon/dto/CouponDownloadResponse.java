@@ -2,7 +2,6 @@ package com.team08.backend.domain.issuedcoupon.dto;
 
 import com.team08.backend.domain.issuedcoupon.entity.CouponStatus;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
 
 import java.time.LocalDateTime;
@@ -30,14 +29,14 @@ public record CouponDownloadResponse(
         );
     }
 
-    public static CouponDownloadResponse requested(Long userId, Long policyId, IssuedCouponJob job) {
+    public static CouponDownloadResponse requested(Long userId, Long policyId) {
         return new CouponDownloadResponse(
                 null,
-                job.getId(),
+                null,
                 policyId,
                 userId,
                 null,
-                job.getStatus(),
+                IssuedCouponJobStatus.REQUESTED,
                 null,
                 null
         );

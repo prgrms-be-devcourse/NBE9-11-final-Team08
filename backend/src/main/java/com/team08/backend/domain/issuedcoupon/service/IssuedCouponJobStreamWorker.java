@@ -49,8 +49,11 @@ public class IssuedCouponJobStreamWorker extends AbstractScheduledBatchStreamWor
         for (MapRecord<String, Object, Object> record : records) {
             try {
                 Map<Object, Object> value = record.getValue();
-                Long jobId = Long.valueOf(String.valueOf(value.get("jobId")));
-                issuedCouponJobProcessor.process(jobId);
+                String requestId = String.valueOf(value.get("requestId"));
+                Long userId = Long.valueOf(String.valueOf(value.get("userId")));
+                Long policyId = Long.valueOf(String.valueOf(value.get("policyId")));
+                
+                issuedCouponJobProcessor.process(requestId, userId, policyId);
                 
                 // 단건 처리 성공 시 즉시 ACK
                 ackCallback.accept(record);

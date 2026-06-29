@@ -8,13 +8,11 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
+import com.team08.backend.domain.issuedcoupon.exception.CouponIssueFailedException;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobStreamPublisher;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -45,6 +43,7 @@ public class IssuedCouponService {
     private final AllUsersCouponMaterializer allUsersCouponMaterializer;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
+    private final FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
 
     // TODO 나중에 회원가입에 추가
     // [시스템] 가입 기념 쿠폰 자동 발급
@@ -99,13 +98,14 @@ public class IssuedCouponService {
             // 쿠폰 발급 로직 실행
             strategy.issue(userId, policyId);
 
-            IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
-                    userId,
-                    policyId,
-                    LocalDateTime.now(clock)
-            );
-            issuedCouponJobStreamPublisher.publish(issuedCouponJob.getId(), userId, policyId);
-            return CouponDownloadResponse.requested(userId, policyId, issuedCouponJob);
+            String requestId = java.util.UUID.randomUUID().toString();
+            try {
+                issuedCouponJobStreamPublisher.publish(requestId, userId, policyId);
+            } catch (Exception e) {
+                fcfsCouponRedisIssuer.rollback(userId, policyId);
+                throw new CouponIssueFailedException();
+            }
+            return CouponDownloadResponse.requested(userId, policyId);
         }
 
         return transactionTemplate.execute(status -> {

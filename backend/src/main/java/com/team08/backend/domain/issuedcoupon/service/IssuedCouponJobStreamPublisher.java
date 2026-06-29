@@ -18,9 +18,9 @@ public class IssuedCouponJobStreamPublisher {
     private final StringRedisTemplate redisTemplate;
 
     // 선착순 쿠폰 발급 작업 적재
-    public RecordId publish(Long jobId, Long userId, Long policyId) {
+    public RecordId publish(String requestId, Long userId, Long policyId) {
         MapRecord<String, String, String> record = StreamRecords.mapBacked(Map.of(
-                        "jobId", String.valueOf(jobId),
+                        "requestId", requestId,
                         "userId", String.valueOf(userId),
                         "policyId", String.valueOf(policyId)
                 ))

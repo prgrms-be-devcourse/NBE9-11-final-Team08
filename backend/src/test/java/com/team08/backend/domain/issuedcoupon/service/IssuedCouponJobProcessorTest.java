@@ -1,20 +1,25 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
+import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.issuedcoupon.exception.JobAlreadyProcessingException;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobWriter.JobLockResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,26 +48,40 @@ class IssuedCouponJobProcessorTest {
     @DisplayName("성공: 쿠폰 발급 작업 처리 중 예외가 발생하면 그대로 전파한다")
     void process_fail_throwException() {
         // given
-        Long jobId = 1L;
-        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(true);
-        doThrow(new IllegalStateException()).when(issuedCouponJobIssuer).issueCoupon(jobId);
+        Long userId = 1L;
+        Long policyId = 2L;
+        Long jobId = 10L;
+        String requestId = UUID.randomUUID().toString();
+
+        IssuedCouponJob job = Mockito.mock(IssuedCouponJob.class);
+        when(job.getId()).thenReturn(jobId);
+
+        JobLockResult lockResult = new JobLockResult(job, true);
+        when(issuedCouponJobWriter.tryAcquireProcessing(requestId, userId, policyId, LocalDateTime.now(clock))).thenReturn(lockResult);
+        doThrow(new IllegalStateException()).when(issuedCouponJobIssuer).issueCoupon(jobId, userId, policyId);
 
         // when & then
-        assertThatThrownBy(() -> issuedCouponJobProcessor.process(jobId))
+        assertThatThrownBy(() -> issuedCouponJobProcessor.process(requestId, userId, policyId))
                 .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    @DisplayName("성공: 다른 처리자가 이미 선점한 작업이면 발급을 실행하지 않는다")
-    void process_alreadyProcessing_skip() {
+    @DisplayName("성공: 락 획득 실패 시 JobAlreadyProcessingException을 던진다")
+    void process_failToAcquireLock_throwException() {
         // given
-        Long jobId = 1L;
-        when(issuedCouponJobWriter.markProcessing(jobId, java.time.LocalDateTime.now(clock))).thenReturn(false);
+        Long userId = 1L;
+        Long policyId = 2L;
+        Long jobId = 10L;
+        String requestId = UUID.randomUUID().toString();
 
-        // when
-        issuedCouponJobProcessor.process(jobId);
+        IssuedCouponJob job = Mockito.mock(IssuedCouponJob.class);
+        when(job.getStatus()).thenReturn(IssuedCouponJobStatus.PROCESSING);
 
-        // then
-        verify(issuedCouponJobIssuer, never()).issueCoupon(jobId);
+        JobLockResult lockResult = new JobLockResult(job, false);
+        when(issuedCouponJobWriter.tryAcquireProcessing(requestId, userId, policyId, LocalDateTime.now(clock))).thenReturn(lockResult);
+
+        // when & then
+        assertThatThrownBy(() -> issuedCouponJobProcessor.process(requestId, userId, policyId))
+                .isInstanceOf(JobAlreadyProcessingException.class);
     }
 }

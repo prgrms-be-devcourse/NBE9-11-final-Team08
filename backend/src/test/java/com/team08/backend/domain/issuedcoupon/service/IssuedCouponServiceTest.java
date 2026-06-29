@@ -64,6 +64,9 @@ class IssuedCouponServiceTest {
     private IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
 
     @Mock
+    private FcfsCouponRedisIssuer fcfsCouponRedisIssuer;
+
+    @Mock
     private AllUsersCouponMaterializer allUsersCouponMaterializer;
 
     @Mock
@@ -85,7 +88,8 @@ class IssuedCouponServiceTest {
                 issuedCouponJobStreamPublisher,
                 allUsersCouponMaterializer,
                 transactionTemplate,
-                clock
+                clock,
+                fcfsCouponRedisIssuer
         );
     }
 
@@ -117,7 +121,6 @@ class IssuedCouponServiceTest {
         verify(strategyFactory, times(1)).getStrategy(CouponType.NORMAL);
         verify(strategy, times(1)).issue(userId, policyId);
         verify(issuedCouponWriter, times(1)).saveWithConcurrencyProtection(any());
-        verify(issuedCouponJobWriter, never()).createRequested(any(), any(), any());
     }
 
     @Test
@@ -134,9 +137,7 @@ class IssuedCouponServiceTest {
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
         when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
         when(strategy.issue(userId, policyId)).thenReturn(issuedCoupon);
-        when(issuedCouponJobWriter.createRequested(any(), any(), any())).thenReturn(issuedCouponJob);
-        when(issuedCouponJob.getId()).thenReturn(1L);
-        when(issuedCouponJobStreamPublisher.publish(1L, userId, policyId))
+        when(issuedCouponJobStreamPublisher.publish(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(userId), org.mockito.ArgumentMatchers.eq(policyId)))
                 .thenThrow(new IllegalStateException("stream"));
 
         // when & then

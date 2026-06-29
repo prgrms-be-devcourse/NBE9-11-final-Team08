@@ -17,15 +17,46 @@ public class IssuedCouponJobWriter {
 
     private final IssuedCouponJobRepository issuedCouponJobRepository;
 
-    // 쿠폰 발급 작업 생성
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public IssuedCouponJob createRequested(Long userId, Long policyId, LocalDateTime requestedAt) {
-        return issuedCouponJobRepository.save(
-                IssuedCouponJob.request(userId, policyId, requestedAt)
-        );
+    public record JobLockResult(IssuedCouponJob job, boolean isAcquired) {
     }
 
-    // 처리 가능한 작업을 PROCESSING 상태로 선점
+    // 쿠폰 발급 작업 생성
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public JobLockResult tryAcquireProcessing(String requestId, Long userId, Long policyId, LocalDateTime now) {
+        IssuedCouponJob job = issuedCouponJobRepository.findByRequestId(requestId).orElse(null);
+
+        if (job == null) {
+            try {
+                IssuedCouponJob newJob = IssuedCouponJob.request(requestId, userId, policyId, now);
+                newJob.startProcessing(now);
+                issuedCouponJobRepository.saveAndFlush(newJob);
+                return new JobLockResult(newJob, true);
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                job = issuedCouponJobRepository.findByRequestId(requestId).orElseThrow();
+            }
+        }
+
+        if (job.getStatus() == IssuedCouponJobStatus.ISSUED || job.getStatus() == IssuedCouponJobStatus.FAILED) {
+            return new JobLockResult(job, false);
+        }
+
+        LocalDateTime staleThreshold = now.minusMinutes(5);
+        int updatedCount = issuedCouponJobRepository.acquireProcessingLock(
+                requestId,
+                IssuedCouponJobStatus.PROCESSING,
+                List.of(IssuedCouponJobStatus.REQUESTED, IssuedCouponJobStatus.RETRY),
+                now,
+                staleThreshold
+        );
+
+        if (updatedCount > 0) {
+            job.startProcessing(now);
+            return new JobLockResult(job, true);
+        } else {
+            return new JobLockResult(job, false);
+        }
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public boolean markProcessing(Long jobId, LocalDateTime startedAt) {
         int updatedCount = issuedCouponJobRepository.markProcessing(
@@ -37,12 +68,24 @@ public class IssuedCouponJobWriter {
         return updatedCount == 1;
     }
 
-    // 쿠폰 발급 성공 처리
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markIssued(Long jobId, LocalDateTime completedAt) {
-        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId)
-                .orElseThrow();
+        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId).orElseThrow();
         job.markIssued(completedAt);
+        issuedCouponJobRepository.flush();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markFailed(Long jobId, LocalDateTime now) {
+        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId).orElseThrow();
+        job.markFailed(now);
+        issuedCouponJobRepository.flush();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markRetry(Long jobId, LocalDateTime now) {
+        IssuedCouponJob job = issuedCouponJobRepository.findById(jobId).orElseThrow();
+        job.markRetry(now);
         issuedCouponJobRepository.flush();
     }
 }

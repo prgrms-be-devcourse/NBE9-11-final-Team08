@@ -104,7 +104,9 @@ Enum feed_item_type {
 Enum issued_coupon_job_status {
   REQUESTED
   PROCESSING
+  RETRY
   ISSUED
+  FAILED
 }
 Enum coupon_issue_request_type {
   SELECTED_USERS
@@ -439,6 +441,7 @@ Table coupon_reward_outbox_events {
 }
 Table issued_coupon_jobs {
   id bigint [pk, increment]
+  request_id varchar(36) [not null]
   policy_id bigint [not null]
   user_id bigint [not null]
   status issued_coupon_job_status [not null]
@@ -446,8 +449,9 @@ Table issued_coupon_jobs {
   last_tried_at datetime
   completed_at datetime
   indexes {
-    (policy_id, user_id)
-    (status)
+    request_id [unique, name: "uk_issued_coupon_jobs_request_id"]
+    (policy_id, user_id) [name: "idx_issued_coupon_jobs_policy_user"]
+    status [name: "idx_issued_coupon_jobs_status"]
   }
 }
 Table coupon_issue_requests {
