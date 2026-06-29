@@ -90,7 +90,7 @@ public class CouponPolicyValidator {
             if (totalQuantity == null || totalQuantity < 1) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }
-        } else if (type == CouponType.NORMAL || type == CouponType.ADMIN) {
+        } else if (type == CouponType.NORMAL || type == CouponType.ADMIN || type == CouponType.AUTO) {
             if (totalQuantity != null) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
             }

@@ -17,7 +17,7 @@ export const couponTypeLabel: Record<CouponPolicyType, string> = {
   AUTO: '자동',
   NORMAL: '일반',
   FCFS: '선착순',
-  ADMIN: '관리자 발급',
+  ADMIN: '관리자',
 }
 
 export const couponTargetLabel: Record<CouponApplyTarget, string> = {

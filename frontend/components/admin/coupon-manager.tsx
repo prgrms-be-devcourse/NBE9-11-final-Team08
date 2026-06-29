@@ -194,7 +194,7 @@ export function CouponManager({
             <SelectItem value="NORMAL">일반</SelectItem>
             <SelectItem value="FCFS">선착순</SelectItem>
             <SelectItem value="AUTO">자동</SelectItem>
-            <SelectItem value="ADMIN">관리자 발급</SelectItem>
+            <SelectItem value="ADMIN">관리자</SelectItem>
           </SelectContent>
         </Select>
         <Select

@@ -303,21 +303,20 @@ export function CouponFormSheet({
                       <SelectItem value="AUTO">자동</SelectItem>
                       <SelectItem value="NORMAL">일반</SelectItem>
                       <SelectItem value="FCFS">선착순</SelectItem>
-                      <SelectItem value="ADMIN">관리자 발급</SelectItem>
+                      <SelectItem value="ADMIN">관리자</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
-                {form.type === 'FCFS' && (
-                  <Field label="총 발급 수량 *" htmlFor="coupon-qty">
-                    <Input
-                      id="coupon-qty"
-                      type="number"
-                      value={form.totalQuantity}
-                      onChange={(e) => update('totalQuantity', e.target.value)}
-                      placeholder="예) 100"
-                    />
-                  </Field>
-                )}
+                <Field label={form.type === 'FCFS' ? '총 발급 수량 *' : '총 발급 수량'} htmlFor="coupon-qty">
+                  <Input
+                    id="coupon-qty"
+                    type={form.type === 'FCFS' ? 'number' : 'text'}
+                    value={form.type === 'FCFS' ? form.totalQuantity : '무제한'}
+                    onChange={(e) => update('totalQuantity', e.target.value)}
+                    placeholder="예) 100"
+                    disabled={form.type !== 'FCFS'}
+                  />
+                </Field>
                 {form.type === 'AUTO' && (
                   <Field label="자동 발급 용도">
                     <Select
