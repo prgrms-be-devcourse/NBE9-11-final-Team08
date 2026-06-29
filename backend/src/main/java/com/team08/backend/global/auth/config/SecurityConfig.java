@@ -74,6 +74,7 @@ public class SecurityConfig {
                                 "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/signup",
+                                "/api/auth/seller/signup",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
                                 "/api/payments/toss/webhook",

@@ -19,7 +19,6 @@ public enum ErrorCode {
     // ── Auth ─────────────────────────────────────────────────────────────
     LOGIN_FAILED(HttpStatus.BAD_REQUEST, "AUTH_001", "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_002", "이미 존재하는 이메일입니다."),
-    INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "AUTH_003", "회원가입에 불가능한 역할입니다."),
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_004", "인증이 필요합니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_005", "유효하지 않은 refresh token입니다."),
 
@@ -133,6 +132,7 @@ public enum ErrorCode {
     COUPON_POLICY_ALREADY_ISSUED(HttpStatus.BAD_REQUEST, "COUPON_010", "이미 발급된 쿠폰이 있는 정책은 수정할 수 없습니다."),
     COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE(HttpStatus.BAD_REQUEST, "COUPON_011", "이미 발급된 쿠폰이 있는 정책은 삭제할 수 없습니다."),
     COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS(HttpStatus.CONFLICT, "COUPON_012", "이미 해당 자동 발급 용도의 쿠폰 정책이 존재합니다."),
+    COUPON_ISSUE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_013", "쿠폰 발급 요청을 찾을 수 없습니다."),
 
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),

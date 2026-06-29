@@ -14,12 +14,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
+import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.test.JobLauncherTestUtils;
 import org.springframework.batch.test.context.SpringBatchTest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -40,6 +42,10 @@ class CouponExpirationBatchConfigTest {
     private JobLauncherTestUtils jobLauncherTestUtils;
 
     @Autowired
+    @Qualifier("couponExpirationJob")
+    private Job couponExpirationJob;
+
+    @Autowired
     private CouponPolicyRepository couponPolicyRepository;
 
     @Autowired
@@ -49,6 +55,7 @@ class CouponExpirationBatchConfigTest {
 
     @BeforeEach
     void setUp() {
+        jobLauncherTestUtils.setJob(couponExpirationJob);
         mockPolicy = CouponPolicy.createPolicy(
                 "Test Policy",
                 CouponTarget.ALL,

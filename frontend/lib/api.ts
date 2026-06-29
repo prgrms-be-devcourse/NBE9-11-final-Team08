@@ -40,6 +40,7 @@ import type {
   AdminCouponPolicyResponse,
   LectureEnterResponse,
   LectureProgressResponse,
+  CourseLectureProgressResponse,
   LearningEventType,
   LearningEventResponse,
   QnaQuestionResponse,
@@ -57,6 +58,7 @@ import type {
   LecturePauses,
   FeedCursor,
   FeedCursorResponse,
+  CouponIssueRequestResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -68,6 +70,7 @@ const REFRESH_EXCLUDED_PATHS = new Set([
   '/api/auth/logout',
   '/api/auth/refresh',
   '/api/auth/signup',
+  '/api/auth/seller/signup',
 ])
 
 let refreshAuthPromise: Promise<boolean> | null = null
@@ -181,6 +184,7 @@ const handleUnauthorized = () => {
       pathname === '/events' ||
       pathname === '/login' ||
       pathname === '/signup' ||
+      pathname === '/seller/signup' ||
       pathname === '/cart'
 
     if (!isPublicRoute) {
@@ -379,11 +383,7 @@ const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
   subCategory: '',
   thumbnailUrl: card.thumbnail || '/placeholder.svg',
   price: card.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: card.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: card.viewCount || 0,
   instructor: { id: card.instructorId?.toString() || '0', name: `강사 ${card.instructorId || ''}`, title: '' },
   chapters: [],
 })
@@ -397,11 +397,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
   subCategory: '',
   thumbnailUrl: detail.thumbnail || '/placeholder.svg',
   price: detail.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: detail.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: detail.viewCount || 0,
   instructor: { id: detail.instructorId?.toString() || '0', name: `강사 ${detail.instructorId || ''}`, title: '' },
   chapters: detail.chapters?.map((ch) => ({
     id: ch.id.toString(),
@@ -895,6 +891,7 @@ const getCurrentUserId = async (): Promise<number> => {
 export const api = {
   // Auth
   signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
+  sellerSignup: (data: SignupRequest) => mutate<void>('/api/auth/seller/signup', 'POST', data, false, true),
   login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
     return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
@@ -1090,6 +1087,50 @@ export const api = {
 
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
+
+  // 강좌 내 사용자별 강의 진행도 목록 (진행 이력이 있는 강의만 내려옴)
+  getCourseLectureProgress: (courseId: string | number) =>
+    request<CourseLectureProgressResponse[]>(
+      `/api/courses/${courseId}/lectures/progress`,
+      [],
+      true,
+      false,
+    ),
+
+  // 강좌 상세 + 사용자별 강의 진행도를 머지해서 반환 (커리큘럼 화면용)
+  getCourseWithProgress: async (
+    courseId: string | number,
+  ): Promise<Course | undefined> => {
+    const [course, progressList] = await Promise.all([
+      api.getCourse(courseId),
+      api.getCourseLectureProgress(courseId),
+    ])
+    if (!course) return undefined
+
+    const byLectureId = new Map(
+      (Array.isArray(progressList) ? progressList : []).map((p) => [
+        p.lectureId.toString(),
+        p,
+      ]),
+    )
+
+    return {
+      ...course,
+      chapters: course.chapters.map((ch) => ({
+        ...ch,
+        lectures: ch.lectures.map((lec) => {
+          const p = byLectureId.get(lec.id)
+          if (!p) return lec
+          return {
+            ...lec,
+            progress: p.progressRate,
+            completed: p.completed,
+            lastPositionSeconds: p.lastPositionSeconds,
+          }
+        }),
+      })),
+    }
+  },
 
   enterFirstLecture: (courseId: string | number, chapterId: string | number) =>
     request<LectureEnterResponse | null>(
@@ -1363,7 +1404,39 @@ export const api = {
   terminateAdminCoupon: (couponId: number) =>
     mutate<void>(`/api/admin/coupons/${couponId}/terminate`, 'PATCH'),
   deleteAdminCoupon: (couponId: number) =>
-    mutate<void>(`/api/admin/coupons/${couponId}`, 'DELETE'),
+    mutate(`/api/admin/coupons/${couponId}`, 'DELETE'),
+
+  issueCouponToUsers: async (policyId: number, userIds: number[], requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/users`,
+      'POST',
+      { userIds, requestKey }
+    )
+  },
+
+  issueCouponToAll: async (policyId: number, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/all`,
+      'POST',
+      { requestKey }
+    )
+  },
+
+  issueCouponToInactiveUsers: async (policyId: number, inactiveDays: number, maxInactiveDays: number | undefined, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/inactive`,
+      'POST',
+      { inactiveDays, maxInactiveDays, requestKey }
+    )
+  },
+
+  getCouponIssueRequests: async (page = 0, size = 20) => {
+    const result = await request<PageResponse<CouponIssueRequestResponse> | null>(
+      `/api/admin/coupons/issue-requests?page=${page}&size=${size}`,
+      null
+    )
+    return result
+  },
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
@@ -1555,11 +1628,11 @@ export const api = {
     const aggregate: MyStudyReport | null =
       raws.length > 1
         ? {
-            studyId: 'all',
-            studyName: `전체 ${reports.length}개 스터디`,
-            userName,
-            ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
-          }
+          studyId: 'all',
+          studyName: `전체 ${reports.length}개 스터디`,
+          userName,
+          ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
+        }
         : null
 
     return { reports, aggregate }

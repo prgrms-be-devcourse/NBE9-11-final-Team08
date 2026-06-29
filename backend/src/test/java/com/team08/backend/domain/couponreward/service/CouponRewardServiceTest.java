@@ -7,6 +7,7 @@ import com.team08.backend.domain.couponreward.entity.CouponRewardHistory;
 import com.team08.backend.domain.couponreward.repository.CouponRewardHistoryRepository;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.service.CouponIssueExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,10 +52,14 @@ class CouponRewardServiceTest {
 
     @BeforeEach
     void setUp() {
-        couponRewardService = new CouponRewardService(
-                couponPolicyRepository,
+        CouponIssueExecutor couponIssueExecutor = new CouponIssueExecutor(
                 couponRewardHistoryRepository,
                 issuedCouponRepository,
+                clock
+        );
+        couponRewardService = new CouponRewardService(
+                couponPolicyRepository,
+                couponIssueExecutor,
                 clock
         );
     }
@@ -67,7 +72,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(10L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "SIGNUP"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -97,6 +102,38 @@ class CouponRewardServiceTest {
     }
 
     @Test
+    @DisplayName("회원가입 후 보상 처리 시 회원가입 쿠폰이 발급됐는지 확인한다")
+    void issueSignupReward_afterSignupCouponRewardIssuesCoupon() {
+        // given
+        Long signedUpUserId = 1L;
+        CouponPolicy signupPolicy = policy(10L);
+        given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
+                .willReturn(Optional.of(signupPolicy));
+        given(issuedCouponRepository.findByUserIdAndPolicyId(signedUpUserId, 10L))
+                .willReturn(Optional.empty());
+        given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(issuedCouponRepository.save(any(IssuedCoupon.class)))
+                .willAnswer(invocation -> {
+                    IssuedCoupon coupon = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(coupon, "id", 100L);
+                    return coupon;
+                });
+
+        // when
+        couponRewardService.issueSignupReward(signedUpUserId);
+
+        // then
+        ArgumentCaptor<IssuedCoupon> couponCaptor = ArgumentCaptor.forClass(IssuedCoupon.class);
+        then(issuedCouponRepository).should().save(couponCaptor.capture());
+        IssuedCoupon issuedCoupon = couponCaptor.getValue();
+        assertThat(issuedCoupon.getUserId()).isEqualTo(signedUpUserId);
+        assertThat(issuedCoupon.getPolicyId()).isEqualTo(10L);
+        assertThat(issuedCoupon.getIssueKey()).isEqualTo("SIGNUP");
+        assertThat(issuedCoupon.getIssuedAt()).isEqualTo(LocalDateTime.now(clock));
+    }
+
+    @Test
     @DisplayName("연속 출석일이 7의 배수이면 회차별 보상키로 쿠폰을 발급한다")
     void issueAttendanceStreakReward_issuesCouponWhenConsecutiveDaysIsMultipleOfSeven() {
         // given
@@ -104,7 +141,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(10L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.ATTENDANCE_STREAK), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "ATTENDANCE_STREAK_14"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -136,7 +173,7 @@ class CouponRewardServiceTest {
         CouponPolicy policy = policy(20L);
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.MONTHLY_ATTENDANCE), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 20L, "MONTHLY_ATTENDANCE_15_2026-06"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 20L))
                 .willReturn(Optional.empty());
         given(couponRewardHistoryRepository.save(any(CouponRewardHistory.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
@@ -196,7 +233,7 @@ class CouponRewardServiceTest {
 
         given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.SIGNUP), any(LocalDateTime.class)))
                 .willReturn(Optional.of(policy));
-        given(issuedCouponRepository.findByUserIdAndPolicyIdAndIssueKey(userId, 10L, "SIGNUP"))
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
                 .willReturn(Optional.of(issuedCoupon));
 
         // when
@@ -205,6 +242,36 @@ class CouponRewardServiceTest {
         // then
         ArgumentCaptor<CouponRewardHistory> historyCaptor = ArgumentCaptor.forClass(CouponRewardHistory.class);
         then(couponRewardHistoryRepository).should().save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getIssuedCouponId()).isEqualTo(100L);
+        then(issuedCouponRepository).should(never()).save(any(IssuedCoupon.class));
+    }
+
+    @Test
+    @DisplayName("보상키가 달라도 같은 정책 쿠폰을 이미 받았으면 중복 발급하지 않는다")
+    void issueReward_doesNotIssueDuplicateCouponWhenSamePolicyAlreadyIssuedWithDifferentRewardKey() {
+        // given
+        Long userId = 1L;
+        CouponPolicy policy = policy(10L);
+        IssuedCoupon issuedCoupon = IssuedCoupon.create(
+                policy,
+                userId,
+                "SIGNUP",
+                LocalDateTime.of(2026, 6, 15, 9, 0)
+        );
+        ReflectionTestUtils.setField(issuedCoupon, "id", 100L);
+
+        given(couponPolicyRepository.findActiveByAutoIssueType(eq(AutoIssueType.ATTENDANCE_STREAK), any(LocalDateTime.class)))
+                .willReturn(Optional.of(policy));
+        given(issuedCouponRepository.findByUserIdAndPolicyId(userId, 10L))
+                .willReturn(Optional.of(issuedCoupon));
+
+        // when
+        couponRewardService.issueAttendanceStreakReward(userId, 14);
+
+        // then
+        ArgumentCaptor<CouponRewardHistory> historyCaptor = ArgumentCaptor.forClass(CouponRewardHistory.class);
+        then(couponRewardHistoryRepository).should().save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getRewardKey()).isEqualTo("ATTENDANCE_STREAK_14");
         assertThat(historyCaptor.getValue().getIssuedCouponId()).isEqualTo(100L);
         then(issuedCouponRepository).should(never()).save(any(IssuedCoupon.class));
     }

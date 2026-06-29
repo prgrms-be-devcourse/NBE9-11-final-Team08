@@ -1,8 +1,9 @@
 // frontend/components/admin/coupon-manager.tsx
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { Eye, MoreHorizontal, Pencil, Plus, Search, StopCircle, Trash2, Loader2 } from 'lucide-react'
+import { Eye, MoreHorizontal, Pencil, Plus, Search, StopCircle, Trash2, Loader2, Send, ListOrdered } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +42,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { CouponFormSheet } from '@/components/admin/coupon-form-sheet'
 import { CouponDetailDialog } from '@/components/admin/coupon-detail-dialog'
+import { IssueCouponDialog } from '@/components/admin/issue-coupon-dialog'
 import { formatKRW } from '@/lib/utils'
 import {
   couponStatusMeta,
@@ -66,6 +68,8 @@ export function CouponManager({
   const [editing, setEditing] = useState<AdminCoupon | null>(null)
   const [detail, setDetail] = useState<AdminCoupon | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [issueTarget, setIssueTarget] = useState<AdminCoupon | null>(null)
+  const [issueOpen, setIssueOpen] = useState(false)
   const [confirm, setConfirm] = useState<ConfirmAction>(null)
   const [processing, setProcessing] = useState(false)
 
@@ -93,6 +97,11 @@ export function CouponManager({
   const openDetail = (coupon: AdminCoupon) => {
     setDetail(coupon)
     setDetailOpen(true)
+  }
+
+  const openIssue = (coupon: AdminCoupon) => {
+    setIssueTarget(coupon)
+    setIssueOpen(true)
   }
 
   const handleSave = async (coupon: AdminCoupon) => {
@@ -147,9 +156,16 @@ export function CouponManager({
             쿠폰을 생성하고 발급 상태를 관리하세요.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-1 h-4 w-4" /> 쿠폰 생성
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/coupons/requests">
+              <ListOrdered className="mr-1 h-4 w-4" /> 발급 내역 조회
+            </Link>
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="mr-1 h-4 w-4" /> 쿠폰 생성
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
@@ -178,6 +194,7 @@ export function CouponManager({
             <SelectItem value="NORMAL">일반</SelectItem>
             <SelectItem value="FCFS">선착순</SelectItem>
             <SelectItem value="AUTO">자동</SelectItem>
+            <SelectItem value="ADMIN">관리자</SelectItem>
           </SelectContent>
         </Select>
         <Select
@@ -248,6 +265,12 @@ export function CouponManager({
                           <Pencil className="h-4 w-4" /> 수정
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          disabled={c.status === 'ENDED' || c.type !== 'ADMIN'}
+                          onClick={() => openIssue(c)}
+                        >
+                          <Send className="h-4 w-4" /> 발급하기
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           disabled={c.status === 'ENDED'}
                           onClick={() => setConfirm({ type: 'end', coupon: c })}
                         >
@@ -291,6 +314,12 @@ export function CouponManager({
         open={detailOpen}
         onOpenChange={setDetailOpen}
         coupon={detail}
+      />
+
+      <IssueCouponDialog
+        open={issueOpen}
+        onOpenChange={setIssueOpen}
+        coupon={issueTarget}
       />
 
       <AlertDialog

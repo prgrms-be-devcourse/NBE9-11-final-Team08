@@ -56,8 +56,9 @@ Enum coupon_status {
 }
 Enum coupon_type { 
   AUTO
+  FCFS
   NORMAL
-  FCFS 
+  ADMIN
 }
 Enum coupon_target { 
   ALL
@@ -104,6 +105,22 @@ Enum issued_coupon_job_status {
   REQUESTED
   PROCESSING
   ISSUED
+}
+Enum coupon_issue_request_type {
+  SELECTED_USERS
+  ALL_USERS
+  INACTIVE_USERS
+}
+Enum coupon_issue_request_status {
+  REQUESTED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+Enum dlq_status {
+  PENDING
+  DEAD
 }
 // =====================================
 // USER DOMAIN
@@ -200,11 +217,23 @@ Table lecture_modification_requests {
   created_at datetime [not null]
   updated_at datetime [not null]
 }
+Table s3_cleanup_dlq {
+  id bigint [pk, increment]
+  lecture_id bigint [not null]
+  target_dir_name varchar(255) [not null]
+  status dlq_status [not null, default: "PENDING"]
+  retry_count int [not null, default: 0]
+  last_error text
+  failed_at datetime [not null]
+  next_retry_at datetime
+  created_at datetime [not null]
+  updated_at datetime [not null]
 
-  managed_by bigint                 // 검토한 관리자 식별자
-  created_at timestamp [not null]   // 신청 일시
-  updated_at timestamp [not null]   // 처리 일시
+  indexes {
+    (status, next_retry_at) [name: "idx_s3_cleanup_dlq_status_retry"]
+  }
 }
+
 // =====================================
 // LEARNING DOMAIN
 // =====================================
@@ -368,7 +397,7 @@ Table issued_coupons {
   used_at datetime
 
   indexes {
-    (user_id, policy_id, issue_key) [unique, name: "uk_issued_coupon_user_policy_issue_key"]
+    (user_id, policy_id) [unique, name: "uk_issued_coupon_user_policy"]
   }
 }
 Table coupon_reward_histories {
@@ -419,6 +448,33 @@ Table issued_coupon_jobs {
   indexes {
     (policy_id, user_id)
     (status)
+  }
+}
+Table coupon_issue_requests {
+  id bigint [pk, increment]
+  policy_id bigint [not null]
+  request_key varchar(100) [not null]
+  issue_type coupon_issue_request_type [not null]
+  status coupon_issue_request_status [not null]
+  requested_count bigint [not null, default: 0]
+  success_count bigint [not null, default: 0]
+  failed_count bigint [not null, default: 0]
+  skipped_count bigint [not null, default: 0]
+  target_user_max_id bigint
+  requested_by bigint
+  requested_at datetime [not null]
+  started_at datetime
+  completed_at datetime
+  failure_reason longtext
+  created_at datetime [not null]
+  updated_at datetime [not null]
+
+  indexes {
+    (issue_type, request_key) [unique, name: "uk_coupon_issue_request_key"]
+    (status, id) [name: "idx_coupon_issue_requests_status_id"]
+    (policy_id, id) [name: "idx_coupon_issue_requests_policy_id"]
+    (requested_by, id) [name: "idx_coupon_issue_requests_requested_by"]
+    (issue_type, status, target_user_max_id, policy_id, id) [name: "idx_coupon_issue_requests_all_grants"]
   }
 }
 Table orders {
@@ -594,6 +650,7 @@ Ref: lectures.chapter_id > chapters.id
 Ref: lecture_modification_requests.lecture_id > lectures.id
 Ref: lecture_modification_requests.instructor_id > users.id
 Ref: lecture_modification_requests.managed_by > users.id
+Ref: s3_cleanup_dlq.lecture_id > lectures.id
 Ref: enrollments.user_id > users.id
 Ref: enrollments.course_id > courses.id
 Ref: enrollments.order_id > orders.id
@@ -628,6 +685,8 @@ Ref: coupon_reward_histories.issued_coupon_id > issued_coupons.id
 Ref: coupon_reward_outbox_events.user_id > users.id
 Ref: issued_coupon_jobs.policy_id > coupon_policies.id
 Ref: issued_coupon_jobs.user_id > users.id
+Ref: coupon_issue_requests.policy_id > coupon_policies.id
+Ref: coupon_issue_requests.requested_by > users.id
 Ref: seller.user_id > users.id
 Ref: orders.user_id > users.id
 Ref: order_items.order_id > orders.id

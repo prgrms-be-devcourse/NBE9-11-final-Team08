@@ -3,6 +3,7 @@ package com.team08.backend.domain.lectureprogress.service;
 import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lectureprogress.dto.CourseLectureProgressResponse;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.event.LectureCompletedEvent;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +36,18 @@ public class LectureProgressService {
                                           int watchedDeltaSeconds, LocalDateTime eventTime) {
         // 실제 누적량은 applyProgress 에서 절대 상한 + 벽시계 경과 경계로 보정한다.
         return applyProgress(userId, lectureId, positionSeconds, watchedDeltaSeconds, eventTime);
+    }
+
+    // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 강의별 진행도 목록(진행 이력이 있는 강의만 포함)
+    @Transactional(readOnly = true)
+    public List<CourseLectureProgressResponse> getCourseProgress(Long userId, Long courseId) {
+        List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
+        if (lectureIds.isEmpty()) {
+            return List.of();
+        }
+        return lectureProgressRepository.findByUserIdAndLectureIdIn(userId, lectureIds).stream()
+                .map(CourseLectureProgressResponse::from)
+                .toList();
     }
 
     @Transactional

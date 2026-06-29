@@ -2,7 +2,6 @@ package com.team08.backend.domain.auth.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 public record SignupRequest(
         @NotBlank(message = "이메일은 필수입니다.")
@@ -15,9 +14,6 @@ public record SignupRequest(
         @NotBlank(message = "닉네임은 필수입니다.")
         String nickname,
 
-        String profileImage,
-
-        @NotNull
-        SignupRole userRole
+        String profileImage
 ) {
 }

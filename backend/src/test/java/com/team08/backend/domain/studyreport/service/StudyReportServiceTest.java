@@ -1,6 +1,7 @@
 package com.team08.backend.domain.studyreport.service;
 
 import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
 import com.team08.backend.domain.lectureqna.repository.QnaQuestionRepository;
@@ -13,6 +14,8 @@ import com.team08.backend.domain.studyreport.repository.StudyDailyStatRepository
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.team08.backend.domain.study.exception.StudyNotFoundException;
+import com.team08.backend.global.exception.CustomException;
+import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.domain.studyreport.repository.StudyReportRepository;
 import com.team08.backend.domain.studyreport.util.StudyReportJson;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,6 +52,7 @@ class StudyReportServiceTest {
     @Mock LectureProgressRepository lectureProgressRepository;
     @Mock LectureRepository lectureRepository;
     @Mock QnaQuestionRepository qnaQuestionRepository;
+    @Mock LectureAccessValidator lectureAccessValidator;
 
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private final StudyReportJson studyReportJson = new StudyReportJson(objectMapper);
@@ -124,7 +129,9 @@ class StudyReportServiceTest {
     void getOrRefresh_refreshWithinCooldown_returnsCooldown() {
         Long userId = 1L;
         Long studyId = 10L;
+        Long courseId = 100L;
 
+        stubStudy(studyId, courseId); // 접근 권한 검증 통과
         StudyReport recent = StudyReport.create(userId, studyId);
         recent.update(1234, 5, 0, 0, 3, "[]", "[]", "{}");
         ReflectionTestUtils.setField(recent, "id", 7L);
@@ -137,8 +144,8 @@ class StudyReportServiceTest {
         assertThat(response.status()).isEqualTo(ReportStatus.COOLDOWN);
         assertThat(response.totalWatchTime()).isEqualTo(1234);
         assertThat(response.nextRegenerableAt()).isEqualTo(updatedAt.plusHours(1));
-        // 쿨다운: 비싼 집계 경로(스터디/강의 조회·저장)를 타지 않아야 한다
-        verify(studyRepository, never()).findById(any());
+        // 쿨다운: 비싼 집계 경로(강의 조회·저장)를 타지 않아야 한다
+        verify(lectureRepository, never()).findIdsByCourseId(any());
         verify(studyReportRepository, never()).save(any());
     }
 
@@ -149,7 +156,9 @@ class StudyReportServiceTest {
     void getOrRefresh_loadExisting_returnsLoaded() {
         Long userId = 1L;
         Long studyId = 10L;
+        Long courseId = 100L;
 
+        stubStudy(studyId, courseId); // 접근 권한 검증 통과
         StudyReport report = StudyReport.create(userId, studyId);
         // progressRate(75.00)는 completed/total(3/4)에서 파생된다.
         report.update(5000, 4, 3, 4, 10, "[]", "[]", "{}");
@@ -165,8 +174,9 @@ class StudyReportServiceTest {
         assertThat(response.totalQnaCount()).isEqualTo(4);
         assertThat(response.progressRate()).isEqualByComparingTo(BigDecimal.valueOf(75.00));
         assertThat(response.studyDays()).isEqualTo(10);
-        // 조회는 집계 경로를 타지 않는다
-        verify(studyRepository, never()).findById(any());
+        // 접근 권한 검증은 거치되, 조회는 집계 경로를 타지 않는다
+        verify(lectureAccessValidator).validateCourseAccess(courseId, userId);
+        verify(lectureRepository, never()).findIdsByCourseId(any());
         verify(studyReportRepository, never()).save(any());
     }
 
@@ -192,20 +202,36 @@ class StudyReportServiceTest {
     }
 
     @Test
-    @DisplayName("리포트가 없어 집계해야 하는데 스터디가 없으면 예외가 발생한다")
+    @DisplayName("스터디가 없으면 예외가 발생한다")
     void getOrRefresh_studyNotFound_throwsException() {
-        given(studyReportRepository.findByUserIdAndStudyId(1L, 99L)).willReturn(Optional.empty());
-        given(studyRepository.findById(99L)).willReturn(Optional.empty());
+        given(studyRepository.findByIdWithCourse(99L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> studyReportService.getReport(1L, 99L, false))
                 .isInstanceOf(StudyNotFoundException.class);
     }
 
+    @Test
+    @DisplayName("스터디 상태와 무관하게, 강좌 접근 권한이 없으면 리포트를 조회할 수 없다")
+    void getReport_courseAccessDenied_throwsBeforeReportLookup() {
+        Long userId = 1L;
+        Long studyId = 10L;
+        Long courseId = 100L;
+
+        stubStudy(studyId, courseId);
+        willThrow(new CustomException(ErrorCode.COURSE_ACCESS_DENIED))
+                .given(lectureAccessValidator).validateCourseAccess(courseId, userId);
+
+        assertThatThrownBy(() -> studyReportService.getReport(userId, studyId, false))
+                .isInstanceOf(CustomException.class);
+
+        // 권한 검증이 리포트 조회보다 먼저 일어나, 권한 없으면 리포트에 접근조차 하지 않는다.
+        verify(studyReportRepository, never()).findByUserIdAndStudyId(any(), any());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     private void stubCommon(Long userId, Long studyId, Long courseId, List<Long> lectureIds) {
-        Study study = mockStudy(studyId, courseId);
-        given(studyRepository.findById(studyId)).willReturn(Optional.of(study));
+        stubStudy(studyId, courseId);
         given(lectureRepository.findIdsByCourseId(courseId)).willReturn(lectureIds);
 
         given(lectureProgressRepository.findTop3ByUserIdAndLectureIdInOrderByWatchedSecondsDesc(userId, lectureIds))
@@ -214,6 +240,12 @@ class StudyReportServiceTest {
         given(studyDailyStatRepository.findByUserIdAndCourseIdOrderByActivityDateAsc(userId, courseId))
                 .willReturn(List.of());
         given(lectureRepository.findIdAndTitleByIdIn(any())).willReturn(List.of());
+    }
+
+    /** getReport 진입 시 항상 수행되는 "스터디→강좌 조회 + 강좌 접근 권한 검증"을 통과하도록 스텁한다. */
+    private void stubStudy(Long studyId, Long courseId) {
+        Study study = mockStudy(studyId, courseId); // 중첩 스터빙 방지: given() 밖에서 먼저 생성
+        given(studyRepository.findByIdWithCourse(studyId)).willReturn(Optional.of(study));
     }
 
     private Study mockStudy(Long studyId, Long courseId) {

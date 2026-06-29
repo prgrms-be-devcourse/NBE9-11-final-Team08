@@ -37,11 +37,7 @@ export interface Course {
   thumbnailUrl: string
   price: number
   discountRate?: number
-  rating: number
-  reviewCount: number
-  studentCount: number
-  level: '왕초보' | '입문' | '초급' | '중급' | '심화'
-  tags: string[]
+  viewCount: number
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
@@ -217,7 +213,7 @@ export interface Coupon {
   totalQuantity?: number | null
 }
 
-export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
+export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO' | 'ADMIN'
 export type AutoIssueType = 'SIGNUP' | 'ATTENDANCE_STREAK' | 'MONTHLY_ATTENDANCE'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'
@@ -363,6 +359,14 @@ export interface LectureProgressResponse {
   completed: boolean
 }
 
+// 강좌 커리큘럼 화면용 — 사용자의 강의별 진행도(진행 이력이 있는 강의만 내려온다)
+export interface CourseLectureProgressResponse {
+  lectureId: number
+  lastPositionSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
 export type LearningEventType =
   | 'LECTURE_ENTER'
   | 'VIDEO_PAUSE'
@@ -435,14 +439,11 @@ export interface MyComment {
   answered: boolean
 }
 
-export type SignupRole = 'USER' | 'SELLER'
-
 export interface SignupRequest {
   email: string
   password: string
   nickname: string
   profileImage?: string
-  userRole: SignupRole
 }
 
 export interface CourseCreateRequest {
@@ -837,4 +838,34 @@ export interface AuditResponse {
     count: number
     sampleIds: number[]
   }[]
+}
+
+export interface CouponIssueUsersRequest {
+  requestKey: string
+  userIds: number[]
+}
+
+export interface CouponIssueAllUsersRequest {
+  requestKey: string
+}
+
+export type CouponIssueRequestType = 'TARGETED' | 'ALL_USERS'
+export type CouponIssueRequestStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+
+export interface CouponIssueRequestResponse {
+  id: number
+  policyId: number
+  requestKey: string
+  issueType: CouponIssueRequestType
+  status: CouponIssueRequestStatus
+  requestedCount: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  targetUserMaxId: number | null
+  requestedBy: number
+  requestedAt: string | number[]
+  startedAt: string | number[] | null
+  completedAt: string | number[] | null
+  failureReason: string | null
 }
