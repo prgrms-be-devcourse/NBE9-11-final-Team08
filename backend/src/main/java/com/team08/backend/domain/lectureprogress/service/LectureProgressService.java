@@ -65,11 +65,8 @@ public class LectureProgressService {
             return null;
         }
         // 동시 입장(예: StrictMode 이중 마운트·더블클릭)으로 두 요청이 같은 행을 INSERT 하면
-        // uk_lecture_progress_user_lecture 중복 키로 터졌다. 멱등 INSERT 로 충돌을 무시하고 재조회한다.
-        lectureProgressRepository.insertIfAbsent(userId, lecture.getId(), 0, now);
-        return lectureProgressRepository
-                .findByUserIdAndLectureId(userId, lecture.getId())
-                .orElse(null);
+        // uk_lecture_progress_user_lecture 중복 키로 터졌다. 멱등 확보로 충돌을 흡수한다.
+        return getOrCreateStarted(userId, lecture.getId(), 0, now);
     }
 
     @Transactional
@@ -93,12 +90,9 @@ public class LectureProgressService {
             if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
-            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등 INSERT 후 재조회한다.
+            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등으로 행을 확보한다.
             // previousBeatAt 은 null 로 유지해 최초 비트의 delta 산정 동작을 보존한다.
-            lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, eventTime);
-            progress = lectureProgressRepository
-                    .findByUserIdAndLectureId(userId, lectureId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+            progress = getOrCreateStarted(userId, lectureId, positionSeconds, eventTime);
         }
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
@@ -117,6 +111,18 @@ public class LectureProgressService {
             ));
         }
         return saved;
+    }
+
+    /**
+     * 진행 행을 동시성에 안전하게 확보한다. 없으면 멱등 INSERT 로 만들고, 동시 요청이 먼저
+     * 만들었더라도 중복 키 예외 없이 그 행을 재조회해 영속(managed) 엔티티로 돌려준다.
+     * INSERT 직후이므로 재조회는 항상 존재한다(없으면 내부 오류로 간주).
+     */
+    private LectureProgress getOrCreateStarted(Long userId, Long lectureId, int positionSeconds, LocalDateTime now) {
+        lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, now);
+        return lectureProgressRepository
+                .findByUserIdAndLectureId(userId, lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
     }
 
     private boolean canStartProgress(Long userId, Lecture lecture) {
