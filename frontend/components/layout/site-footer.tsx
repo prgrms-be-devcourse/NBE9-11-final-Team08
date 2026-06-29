@@ -4,7 +4,7 @@ import { GraduationCap } from 'lucide-react'
 export function SiteFooter() {
   return (
     <footer className="mt-16 border-t bg-card">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-4">
+      {/* <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-4">
         <div className="md:col-span-1">
           <div className="flex items-center gap-2">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -34,10 +34,10 @@ export function SiteFooter() {
             </ul>
           </div>
         ))}
-      </div>
+      </div> */}
       <div className="border-t py-6">
         <p className="mx-auto max-w-7xl px-4 text-xs text-muted-foreground">
-          © 2026 PlayLearn. React 프론트엔드 · Java/Spring 백엔드 연동 데모.
+          © 2026 PlayLearn.
         </p>
       </div>
     </footer>
