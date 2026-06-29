@@ -249,21 +249,12 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
                           <span className="line-clamp-1">{c.title}</span>
                           <div className="flex items-center gap-2 text-[11px] font-normal text-muted-foreground">
                             <a
-                              href={`/courses/${c.id}`}
+                              href={`/admin/courses/${c.id}/preview`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="hover:underline hover:text-primary transition-colors text-blue-600 dark:text-blue-400 font-semibold"
                             >
-                              [커머스 미리보기]
-                            </a>
-                            <span>|</span>
-                            <a
-                              href={`/study/${c.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="hover:underline hover:text-primary transition-colors text-blue-600 dark:text-blue-400 font-semibold"
-                            >
-                              [스터디 미리보기]
+                              [강좌 메인 미리보기]
                             </a>
                           </div>
                         </div>
