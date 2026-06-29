@@ -81,7 +81,7 @@ class FeedOutboxEventListenerTest {
 
     @Test
     void feed_대상이_아닌_학습_이벤트는_무시한다() {
-        LearningEventRecorded event = learningEvent(LearningEventType.VIDEO_START);
+        LearningEventRecorded event = learningEvent(LearningEventType.VIDEO_PAUSE);
 
         listener.onLearningEventRecorded(event);
 

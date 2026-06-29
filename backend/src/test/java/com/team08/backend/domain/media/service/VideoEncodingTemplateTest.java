@@ -31,6 +31,7 @@ class VideoEncodingTemplateTest {
     private boolean isHandleCalled;
     private boolean isDbPathCalled;
     private boolean isCompleteCalled;
+    private boolean isDeleteCalled;
     private boolean shouldThrowInPrepare;
 
     @BeforeEach
@@ -39,6 +40,7 @@ class VideoEncodingTemplateTest {
         isHandleCalled = false;
         isDbPathCalled = false;
         isCompleteCalled = false;
+        isDeleteCalled = false;
         shouldThrowInPrepare = false;
 
         EncodingResultHandler mockHandler = context -> isCompleteCalled = true;
@@ -63,6 +65,11 @@ class VideoEncodingTemplateTest {
                 isDbPathCalled = true;
                 return "dummy/path";
             }
+
+            @Override
+            protected void deleteEncodedFolder(String targetDirName, Long lectureId) {
+                isDeleteCalled = true;
+            }
         };
 
         mockFile = new File("dummy.mp4");
@@ -81,7 +88,7 @@ class VideoEncodingTemplateTest {
     }
 
     @Test
-    void 소스_파일_준비_단계에서_예외_발생_시_후속_단계는_실행되지_않는다() {
+    void 소스_파일_준비_단계에서_예외_발생_시_후속_단계는_실행되지_않고_삭제Fallback이_트리거된다() {
         shouldThrowInPrepare = true;
 
         assertThrows(RuntimeException.class, () ->
@@ -91,6 +98,7 @@ class VideoEncodingTemplateTest {
         assertThat(isHandleCalled).isFalse();
         assertThat(isDbPathCalled).isFalse();
         assertThat(isCompleteCalled).isFalse();
+        assertThat(isDeleteCalled).isTrue(); // Fallback 삭제 성공 검증!
         verifyNoInteractions(lectureDbService);
     }
 }

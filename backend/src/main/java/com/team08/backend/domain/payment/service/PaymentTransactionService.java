@@ -18,6 +18,8 @@ import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
+import com.team08.backend.domain.payment.provider.PaymentProviderConfirmResponse;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
 import com.team08.backend.global.exception.CustomException;
@@ -92,6 +94,16 @@ public class PaymentTransactionService {
 
     @Transactional
     public TossPaymentProcessingContext prepareTossPayment(Long userId, Long orderId, ConfirmPaymentRequest request) {
+        return prepareProviderPayment(userId, orderId, PaymentProviderType.TOSS, request);
+    }
+
+    @Transactional
+    public TossPaymentProcessingContext prepareProviderPayment(
+            Long userId,
+            Long orderId,
+            PaymentProviderType providerType,
+            ConfirmPaymentRequest request
+    ) {
         Order order = findMyPaymentOrderForUpdate(userId, orderId);
 
         Optional<Payment> existingPayment = paymentRepository.findByOrder_Id(orderId);
@@ -109,16 +121,17 @@ public class PaymentTransactionService {
         validateDuplicateEnrollment(userId, orderItems);
 
         LocalDateTime requestedAt = LocalDateTime.now(clock);
-        Payment payment = processTossPaymentRequested(order, existingPayment, requestedAt);
+        Payment payment = processProviderPaymentRequested(order, existingPayment, providerType, requestedAt);
         PaymentAttempt attempt = paymentAttemptRepository.save(PaymentAttempt.requested(
                 payment,
-                PaymentProviderType.TOSS,
+                providerType,
                 request.amount(),
                 request.idempotencyKey(),
                 requestedAt
         ));
 
         return TossPaymentProcessingContext.requested(
+                providerType,
                 userId,
                 order.getId(),
                 order.getOrderNumber(),
@@ -132,26 +145,34 @@ public class PaymentTransactionService {
 
     @Transactional
     public ConfirmPaymentResponse completeTossPayment(TossPaymentProcessingContext context, TossPaymentResponse tossResponse) {
+        return completeProviderPayment(context, toProviderResponse(tossResponse));
+    }
+
+    @Transactional
+    public ConfirmPaymentResponse completeProviderPayment(
+            TossPaymentProcessingContext context,
+            PaymentProviderConfirmResponse providerResponse
+    ) {
         Order order = findMyPaymentOrderForUpdate(context.userId(), context.orderId());
         validateConfirmableOrder(order);
 
         Payment payment = findPayment(context.paymentId());
         PaymentAttempt attempt = findAttempt(context.attemptId());
-        LocalDateTime completedAt = approvedAtOrNow(tossResponse.approvedAt());
+        LocalDateTime completedAt = approvedAtOrNow(providerResponse.approvedAt());
 
-        if (!isValidTossPaymentResult(tossResponse, order, context.expectedDiscount())) {
-            attempt.markUnknown(TOSS_PAYMENT_MISMATCH, "Toss payment result does not match order.", completedAt);
-            payment.markUnknown(TOSS_PAYMENT_MISMATCH, "Toss payment result does not match order.", completedAt);
+        if (!isValidProviderPaymentResult(providerResponse, order, context.expectedDiscount())) {
+            attempt.markUnknown(providerMismatchCode(context.providerType()), "Provider payment result does not match order.", completedAt);
+            payment.markUnknown(providerMismatchCode(context.providerType()), "Provider payment result does not match order.", completedAt);
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
         }
 
-        if (!isDoneTossPayment(tossResponse)) {
-            attempt.decline(TOSS_NOT_DONE, "Toss payment confirm result is not done.", completedAt);
+        if (!isDoneProviderPayment(providerResponse)) {
+            attempt.decline(providerNotDoneCode(context.providerType()), "Provider payment confirm result is not done.", completedAt);
             payment.decline(
-                    tossResponse.paymentKey(),
-                    tossResponse.method(),
-                    TOSS_NOT_DONE,
-                    "Toss payment confirm result is not done.",
+                    providerResponse.paymentKey(),
+                    providerResponse.method(),
+                    providerNotDoneCode(context.providerType()),
+                    "Provider payment confirm result is not done.",
                     completedAt
             );
             return ConfirmPaymentResponse.from(paymentRepository.save(payment), order);
@@ -160,8 +181,8 @@ public class PaymentTransactionService {
         List<OrderItem> orderItems = findOrderItems(order);
         validateDuplicateEnrollment(context.userId(), orderItems);
 
-        attempt.succeed(tossResponse.paymentKey(), completedAt);
-        payment.succeed(tossResponse.paymentKey(), tossResponse.method(), completedAt);
+        attempt.succeed(providerResponse.paymentKey(), completedAt);
+        payment.succeed(providerResponse.paymentKey(), providerResponse.method(), completedAt);
         Payment savedPayment = paymentRepository.save(payment);
 
         if (context.issuedCouponId() != null) {
@@ -185,6 +206,15 @@ public class PaymentTransactionService {
             TossPaymentProcessingContext context,
             ConfirmPaymentRequest request,
             TossPaymentException exception
+    ) {
+        return failProviderPayment(context, request, toProviderException(exception));
+    }
+
+    @Transactional
+    public ConfirmPaymentResponse failProviderPayment(
+            TossPaymentProcessingContext context,
+            ConfirmPaymentRequest request,
+            PaymentProviderException exception
     ) {
         Order order = findMyPaymentOrderForUpdate(context.userId(), context.orderId());
         validateConfirmableOrder(order);
@@ -353,13 +383,14 @@ public class PaymentTransactionService {
         return !existingCourseIds.isEmpty();
     }
 
-    private Payment processTossPaymentRequested(
+    private Payment processProviderPaymentRequested(
             Order order,
             Optional<Payment> existingPayment,
+            PaymentProviderType providerType,
             LocalDateTime requestedAt
     ) {
-        Payment payment = existingPayment.orElseGet(() -> Payment.createReady(order, PaymentProviderType.TOSS, requestedAt));
-        payment.markProcessing(PaymentProviderType.TOSS, requestedAt);
+        Payment payment = existingPayment.orElseGet(() -> Payment.createReady(order, providerType, requestedAt));
+        payment.markProcessing(providerType, requestedAt);
         return paymentRepository.save(payment);
     }
 
@@ -381,6 +412,10 @@ public class PaymentTransactionService {
         return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
     }
 
+    private boolean isDoneProviderPayment(PaymentProviderConfirmResponse response) {
+        return "DONE".equals(response.status()) || "SUCCESS".equals(response.status());
+    }
+
     private boolean isDeclinedTossPayment(TossPaymentResponse response) {
         return "CANCELED".equals(response.status())
                 || "ABORTED".equals(response.status())
@@ -388,6 +423,11 @@ public class PaymentTransactionService {
     }
 
     private boolean isValidTossPaymentResult(TossPaymentResponse response, Order order, int expectedDiscount) {
+        return order.getOrderNumber().equals(response.orderId())
+                && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
+    }
+
+    private boolean isValidProviderPaymentResult(PaymentProviderConfirmResponse response, Order order, int expectedDiscount) {
         return order.getOrderNumber().equals(response.orderId())
                 && (order.getFinalPrice() - expectedDiscount) == response.totalAmount();
     }
@@ -458,7 +498,35 @@ public class PaymentTransactionService {
         order.markPaid(paidAt);
     }
 
+    private PaymentProviderConfirmResponse toProviderResponse(TossPaymentResponse tossResponse) {
+        return new PaymentProviderConfirmResponse(
+                tossResponse.paymentKey(),
+                tossResponse.orderId(),
+                tossResponse.status(),
+                tossResponse.method(),
+                tossResponse.totalAmount(),
+                tossResponse.approvedAt()
+        );
+    }
+
+    private PaymentProviderException toProviderException(TossPaymentException exception) {
+        return switch (exception.getFailureType()) {
+            case DECLINED -> PaymentProviderException.declined(exception.getFailureCode(), exception.getFailureMessage());
+            case TIMEOUT -> PaymentProviderException.timeout(exception.getFailureCode(), exception.getFailureMessage());
+            case UNKNOWN -> PaymentProviderException.unknown(exception.getFailureCode(), exception.getFailureMessage());
+        };
+    }
+
+    private String providerMismatchCode(PaymentProviderType providerType) {
+        return providerType.name() + "_PAYMENT_MISMATCH";
+    }
+
+    private String providerNotDoneCode(PaymentProviderType providerType) {
+        return providerType.name() + "_NOT_DONE";
+    }
+
     public record TossPaymentProcessingContext(
+            PaymentProviderType providerType,
             Long userId,
             Long orderId,
             String orderNumber,
@@ -479,7 +547,32 @@ public class PaymentTransactionService {
                 Long issuedCouponId,
                 int expectedDiscount
         ) {
+            return requested(
+                    PaymentProviderType.TOSS,
+                    userId,
+                    orderId,
+                    orderNumber,
+                    amount,
+                    paymentId,
+                    attemptId,
+                    issuedCouponId,
+                    expectedDiscount
+            );
+        }
+
+        public static TossPaymentProcessingContext requested(
+                PaymentProviderType providerType,
+                Long userId,
+                Long orderId,
+                String orderNumber,
+                int amount,
+                Long paymentId,
+                Long attemptId,
+                Long issuedCouponId,
+                int expectedDiscount
+        ) {
             return new TossPaymentProcessingContext(
+                    providerType,
                     userId,
                     orderId,
                     orderNumber,
@@ -493,7 +586,7 @@ public class PaymentTransactionService {
         }
 
         public static TossPaymentProcessingContext replay(ConfirmPaymentResponse response) {
-            return new TossPaymentProcessingContext(null, null, null, 0, null, null, null, 0, response);
+            return new TossPaymentProcessingContext(null, null, null, null, 0, null, null, null, 0, response);
         }
 
         public boolean isIdempotentReplay() {

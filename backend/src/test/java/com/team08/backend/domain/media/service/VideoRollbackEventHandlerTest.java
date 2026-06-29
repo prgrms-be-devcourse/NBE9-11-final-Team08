@@ -1,19 +1,17 @@
 package com.team08.backend.domain.media.service;
 
+import com.team08.backend.domain.media.entity.S3CleanupDlq;
 import com.team08.backend.domain.media.event.VideoCleanUpEvent;
 import com.team08.backend.domain.media.event.VideoRollbackEvent;
-import com.team08.backend.global.util.S3FileStorageService;
+import com.team08.backend.domain.media.repository.S3CleanupDlqRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.mockito.Mockito.*;
 
@@ -23,17 +21,11 @@ class VideoRollbackEventHandlerTest {
     @InjectMocks
     private VideoRollbackEventHandler videoRollbackEventHandler;
 
-    @Spy
-    private List<MediaEncodingService> mediaEncodingServices = new ArrayList<>();
+    @Mock
+    private VideoCleanupService videoCleanupService;
 
     @Mock
-    private S3FileStorageService s3FileStorageService;
-
-    @Mock
-    private EncodingResultHandler encodingResultHandler;
-
-    private S3VideoEncodingService s3VideoEncodingService;
-    private LocalVideoEncodingService localVideoEncodingService;
+    private S3CleanupDlqRepository dlqRepository;
 
     private VideoRollbackEvent videoRollbackEvent;
     private VideoCleanUpEvent videoCleanUpEvent;
@@ -42,21 +34,6 @@ class VideoRollbackEventHandlerTest {
 
     @BeforeEach
     void setUp() {
-        s3VideoEncodingService = spy(new S3VideoEncodingService(
-                encodingResultHandler,
-                s3FileStorageService
-        ));
-
-        LocalVideoEncodingService concreteLocalService = new LocalVideoEncodingService(
-                encodingResultHandler
-        );
-        ReflectionTestUtils.setField(concreteLocalService, "uploadDir", "src/test/resources/temp-upload");
-        localVideoEncodingService = spy(concreteLocalService);
-
-        mediaEncodingServices.clear();
-        mediaEncodingServices.add(s3VideoEncodingService);
-        mediaEncodingServices.add(localVideoEncodingService);
-
         lectureId = 1L;
         targetDirName = "rollback-test-uuid";
         videoRollbackEvent = new VideoRollbackEvent(lectureId, targetDirName);
@@ -64,30 +41,38 @@ class VideoRollbackEventHandlerTest {
     }
 
     @Test
-    void 커밋_완료_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_다형성_메시징으로_트리거된다() {
+    void 커밋_완료_이벤트_소비_시_비동기_정리_서비스가_트리거된다() {
         videoRollbackEventHandler.cleanUpOldVideos(videoCleanUpEvent);
 
-        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
-        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(videoCleanupService, times(1)).cleanUpOldVideosAsync(videoCleanUpEvent);
     }
 
     @Test
-    void 트랜잭션_롤백_이벤트_소비_시_주입된_모든_인코딩_서비스의_물리_폴더_삭제_메서드가_다형성_메시징으로_트리거된다() {
+    void 트랜잭션_롤백_이벤트_소비_시_비동기_정리_서비스가_트리거된다() {
         videoRollbackEventHandler.cleanUpLeftoverVideosOnRollback(videoRollbackEvent);
 
-        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
-        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(videoCleanupService, times(1)).cleanUpLeftoverVideosOnRollbackAsync(videoRollbackEvent);
     }
 
     @Test
-    void 특정_서비스에서_삭제_중_예외가_터져도_다른_서비스의_삭제_흐름에_영향을_주지_않는다() {
-        doThrow(new RuntimeException())
-                .when(s3FileStorageService)
-                .deleteDirectory(anyString());
+    void 비동기_구영상_정리_작업이_스레드_풀에서_거절되면_즉시_DLQ에_기록한다() {
+        doThrow(new RejectedExecutionException("풀 포화"))
+                .when(videoCleanupService)
+                .cleanUpOldVideosAsync(videoCleanUpEvent);
 
         videoRollbackEventHandler.cleanUpOldVideos(videoCleanUpEvent);
 
-        verify(s3VideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
-        verify(localVideoEncodingService, times(1)).deleteEncodedFolder(targetDirName, lectureId);
+        verify(dlqRepository, times(1)).save(any(S3CleanupDlq.class));
+    }
+
+    @Test
+    void 비동기_찌꺼기_정리_작업이_스레드_풀에서_거절되면_즉시_DLQ에_기록한다() {
+        doThrow(new RejectedExecutionException("풀 포화"))
+                .when(videoCleanupService)
+                .cleanUpLeftoverVideosOnRollbackAsync(videoRollbackEvent);
+
+        videoRollbackEventHandler.cleanUpLeftoverVideosOnRollback(videoRollbackEvent);
+
+        verify(dlqRepository, times(1)).save(any(S3CleanupDlq.class));
     }
 }

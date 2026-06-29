@@ -142,7 +142,7 @@ public class DashboardQueryRepository {
                 SELECT l.id, ch.title AS chapterTitle, l.title,
                   (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_ENTER') AS enterCount,
                   (SELECT COUNT(*) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='LECTURE_COMPLETE') AS completeCount,
-                  (SELECT COALESCE(AVG(le.position_seconds),0) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='VIDEO_END') AS avgWatch
+                  (SELECT COALESCE(AVG(le.position_seconds),0) FROM learning_events le WHERE le.lecture_id=l.id AND le.event_type='VIDEO_PAUSE') AS avgWatch
                 FROM lectures l
                 JOIN chapters ch ON l.chapter_id = ch.id
                 WHERE ch.course_id = :courseId AND l.deleted_at IS NULL

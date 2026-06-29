@@ -65,6 +65,9 @@ CLOUDFRONT_PRIVATE_KEY: test-dummy-private-key-value
 JWT_SECRET: test-secret-key-test-secret-key-test-secret-key
 
 app:
+  order:
+    expiration:
+      scheduler-enabled: false
   issued-coupon-job:
     stream-worker:
       enabled: false

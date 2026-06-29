@@ -112,7 +112,7 @@ class OrderPaymentStateTransitionTest {
         Payment declinedPayment = payment(PaymentStatus.READY, null);
         declinedPayment.markProcessing(declinedAt);
 
-        declinedPayment.decline("network error", declinedAt);
+        declinedPayment.decline(null, null, "network error", declinedAt);
 
         assertThat(declinedPayment.getStatus()).isEqualTo(PaymentStatus.DECLINED);
         assertThat(declinedPayment.getFailedReason()).isEqualTo("network error");
@@ -155,7 +155,7 @@ class OrderPaymentStateTransitionTest {
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).succeed("payment-key", "CARD", changedAt))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
-        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).decline("network error", changedAt))
+        assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).decline(null, null, "network error", changedAt))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_PAYMENT_STATUS_TRANSITION));
         assertThatThrownBy(() -> payment(PaymentStatus.SUCCESS, null).cancel(changedAt))
@@ -218,7 +218,7 @@ class OrderPaymentStateTransitionTest {
             payment.succeed("payment-key", "CARD", CREATED_AT.plusSeconds(2));
         } else if (status == PaymentStatus.DECLINED) {
             payment.markProcessing(CREATED_AT.plusSeconds(1));
-            payment.decline(failedReason, CREATED_AT.plusSeconds(2));
+            payment.decline(null, null, failedReason, CREATED_AT.plusSeconds(2));
         } else if (status == PaymentStatus.UNKNOWN) {
             payment.markProcessing(CREATED_AT.plusSeconds(1));
             payment.markUnknown("UNKNOWN", failedReason, CREATED_AT.plusSeconds(2));

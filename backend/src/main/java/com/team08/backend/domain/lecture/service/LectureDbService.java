@@ -24,7 +24,7 @@ public class LectureDbService {
     public void updateLectureM3u8(Long lectureId, String dbSavePath, String targetDirName) {
         validateTargetDirName(targetDirName);
 
-        Lecture lecture = lectureRepository.findById(lectureId)
+        Lecture lecture = lectureRepository.findByIdWithPessimisticLock(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
         String oldVideoUuid = lecture.getVideoUuid();

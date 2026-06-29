@@ -87,7 +87,7 @@ class PaymentTest {
     @Test
     void declinedPaymentCanBeConfirmedAgain() {
         Payment payment = processingPayment();
-        payment.decline("잔액 부족", LocalDateTime.parse("2026-06-18T12:01:00"));
+        payment.decline(null, null, "잔액 부족", LocalDateTime.parse("2026-06-18T12:01:00"));
 
         assertThat(payment.canBeConfirmed()).isTrue();
 
