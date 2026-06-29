@@ -46,6 +46,12 @@ public class LectureProgress {
     public void applyProgress(int positionSeconds, int watchedDeltaSeconds, int durationSeconds, LocalDateTime now) {
         if (watchedDeltaSeconds > 0) {
             this.watchedSeconds += watchedDeltaSeconds;
+            // 누적 시청시간은 강의 길이를 넘을 수 없다. 비트 간격을 벌리며 매번 delta 를 상한치로
+            // 보내 watchedSeconds 를 부풀려 완료(90%)를 위조하는 것을 총량 상한으로 차단한다.
+            // (duration 미상(<=0)인 강의는 캡하지 않는다.)
+            if (durationSeconds > 0 && this.watchedSeconds > durationSeconds) {
+                this.watchedSeconds = durationSeconds;
+            }
         }
         this.lastPositionSeconds = positionSeconds;
         recomputeProgressRate(durationSeconds, now);
