@@ -40,6 +40,7 @@ import type {
   AdminCouponPolicyResponse,
   LectureEnterResponse,
   LectureProgressResponse,
+  CourseLectureProgressResponse,
   LearningEventType,
   LearningEventResponse,
   QnaQuestionResponse,
@@ -1094,6 +1095,50 @@ export const api = {
 
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
+
+  // 강좌 내 사용자별 강의 진행도 목록 (진행 이력이 있는 강의만 내려옴)
+  getCourseLectureProgress: (courseId: string | number) =>
+    request<CourseLectureProgressResponse[]>(
+      `/api/courses/${courseId}/lectures/progress`,
+      [],
+      true,
+      false,
+    ),
+
+  // 강좌 상세 + 사용자별 강의 진행도를 머지해서 반환 (커리큘럼 화면용)
+  getCourseWithProgress: async (
+    courseId: string | number,
+  ): Promise<Course | undefined> => {
+    const [course, progressList] = await Promise.all([
+      api.getCourse(courseId),
+      api.getCourseLectureProgress(courseId),
+    ])
+    if (!course) return undefined
+
+    const byLectureId = new Map(
+      (Array.isArray(progressList) ? progressList : []).map((p) => [
+        p.lectureId.toString(),
+        p,
+      ]),
+    )
+
+    return {
+      ...course,
+      chapters: course.chapters.map((ch) => ({
+        ...ch,
+        lectures: ch.lectures.map((lec) => {
+          const p = byLectureId.get(lec.id)
+          if (!p) return lec
+          return {
+            ...lec,
+            progress: p.progressRate,
+            completed: p.completed,
+            lastPositionSeconds: p.lastPositionSeconds,
+          }
+        }),
+      })),
+    }
+  },
 
   enterFirstLecture: (courseId: string | number, chapterId: string | number) =>
     request<LectureEnterResponse | null>(

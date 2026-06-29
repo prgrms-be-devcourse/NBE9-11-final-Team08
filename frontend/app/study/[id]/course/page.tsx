@@ -12,7 +12,7 @@ export default async function StudyCoursePage({
   const study = await api.getStudyForEntry(id)
   if (!study) notFound()
 
-  const course = await api.getCourse(study.courseId)
+  const course = await api.getCourseWithProgress(study.courseId)
   if (!course) notFound()
 
   return (
