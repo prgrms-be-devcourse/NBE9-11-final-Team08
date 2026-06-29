@@ -382,11 +382,7 @@ const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
   subCategory: '',
   thumbnailUrl: card.thumbnail || '/placeholder.svg',
   price: card.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: card.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: card.viewCount || 0,
   instructor: { id: card.instructorId?.toString() || '0', name: `강사 ${card.instructorId || ''}`, title: '' },
   chapters: [],
 })
@@ -400,11 +396,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
   subCategory: '',
   thumbnailUrl: detail.thumbnail || '/placeholder.svg',
   price: detail.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: detail.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: detail.viewCount || 0,
   instructor: { id: detail.instructorId?.toString() || '0', name: `강사 ${detail.instructorId || ''}`, title: '' },
   chapters: detail.chapters?.map((ch) => ({
     id: ch.id.toString(),
@@ -1591,11 +1583,11 @@ export const api = {
     const aggregate: MyStudyReport | null =
       raws.length > 1
         ? {
-            studyId: 'all',
-            studyName: `전체 ${reports.length}개 스터디`,
-            userName,
-            ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
-          }
+          studyId: 'all',
+          studyName: `전체 ${reports.length}개 스터디`,
+          userName,
+          ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
+        }
         : null
 
     return { reports, aggregate }
