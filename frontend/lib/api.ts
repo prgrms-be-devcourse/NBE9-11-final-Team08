@@ -916,8 +916,8 @@ export const api = {
     const res = await request<PageResponse<CourseCardResponse>>(
       `/api/admin/courses?page=${page}&size=${size}${statusQuery}`,
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
-      false,
-      false,
+      true,
+      true,
     )
     return {
       ...res,

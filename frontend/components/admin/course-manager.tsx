@@ -74,10 +74,10 @@ const statusMeta: Record<string, { label: string; variant: 'default' | 'secondar
 }
 
 export function CourseManager({ initialCourses }: { initialCourses: Course[] }) {
-  const [courses, setCourses] = useState<Course[]>(initialCourses)
+  const [courses, setCourses] = useState<Course[]>([])
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | string>('ALL')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const [confirmModal, setConfirmModal] = useState<{
     type: 'approve' | 'reject' | 'suspend' | 'delete'
