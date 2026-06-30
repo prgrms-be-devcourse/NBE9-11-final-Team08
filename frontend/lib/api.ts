@@ -840,6 +840,8 @@ const mapStudyReportToDisplay = (
     progressData,
     calendar,
     topLectures: (raw.topLectures ?? []).map((l) => l.title),
+    updatedAt: raw.updatedAt,
+    nextRegenerableAt: raw.nextRegenerableAt,
   }
 }
 
