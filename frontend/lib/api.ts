@@ -391,6 +391,8 @@ const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
   viewCount: card.viewCount || 0,
   instructor: { id: card.instructorId?.toString() || '0', name: `강사 ${card.instructorId || ''}`, title: '' },
   chapters: [],
+  status: card.status,
+  statusReason: card.statusReason ?? null,
 })
 
 const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
@@ -422,6 +424,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
     })) || [],
   })) || [],
   status: detail.status,
+  statusReason: detail.statusReason ?? null,
 })
 
 const mapStudyDetailToStudy = (
@@ -928,6 +931,20 @@ export const api = {
     }
   },
 
+  getAdminCourses: async (status?: string, page = 0, size = 20): Promise<PageResponse<Course>> => {
+    const statusQuery = status && status !== 'ALL' ? `&status=${status}` : ''
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/admin/courses?page=${page}&size=${size}${statusQuery}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
+      true,
+      true,
+    )
+    return {
+      ...res,
+      content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
+    }
+  },
+
   // Categories
   getCategories: () => request<CategoryResponse[]>('/api/categories', [], false, false),
 
@@ -935,109 +952,55 @@ export const api = {
     const detail = await request<CourseDetailResponse | undefined>(
       `/api/courses/${id}`,
       undefined,
-      true,
+      false,
       false,
     )
     if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
+  },
 
-    const chapters = await request<ChapterInfoResponse[]>(
-      `/api/courses/${id}/chapters`,
-      [],
+  getInstructorCourses: async (status?: string, page = 0, size = 100): Promise<PageResponse<Course>> => {
+    const statusQuery = status && status !== 'ALL' ? `&status=${status}` : ''
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/courses/instructor?page=${page}&size=${size}${statusQuery}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
       true,
-      false,
+      true,
     )
-
-    let generalInfo = SEEDED_COURSES[Number(id)]
-    if (!generalInfo) {
-      generalInfo = await getCourseDraftFromCookies(id)
+    return {
+      ...res,
+      content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
     }
+  },
 
-    if (!generalInfo) {
-      try {
-        const coursesPage = await api.getCourses(0, 100)
-        const found = coursesPage.content.find(c => c.id.toString() === id.toString())
-        if (found) {
-          generalInfo = {
-            title: found.title,
-            description: found.description || `${found.title}에 대한 설명입니다.`,
-            price: found.price,
-            categoryId: Number(found.category),
-            instructorId: Number(found.instructor.id),
-            thumbnail: found.thumbnailUrl,
-            status: 'PUBLISHED'
-          }
-        }
-      } catch (e) {
-        console.error('Failed to find course in public list:', e)
-      }
-    }
+  getAdminCourse: async (id: string | number): Promise<Course | undefined> => {
+    const detail = await request<CourseDetailResponse | undefined>(
+      `/api/admin/courses/${id}`,
+      undefined,
+      true,
+      true,
+    )
+    if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
+  },
 
-    if (!generalInfo) {
-      generalInfo = {
-        title: `강좌 ${id}`,
-        description: `강좌 ${id}에 대한 설명입니다.`,
-        price: 0,
-        categoryId: 1,
-        instructorId: 1,
-        thumbnail: 'https://via.placeholder.com/800x450',
-        status: 'PUBLISHED'
-      }
-    }
-
-    const detailResponse: CourseDetailResponse = {
-      id: Number(id),
-      instructorId: generalInfo.instructorId || 1,
-      categoryId: generalInfo.categoryId || 1,
-      title: generalInfo.title || '',
-      description: generalInfo.description || '',
-      thumbnail: generalInfo.thumbnail || '',
-      price: generalInfo.price || 0,
-      status: generalInfo.status || 'PUBLISHED',
-      viewCount: 0,
-      chapters: chapters
-    }
-
-    return mapCourseDetailToCourse(detailResponse)
+  getInstructorCourse: async (id: string | number): Promise<Course | undefined> => {
+    const detail = await request<CourseDetailResponse | undefined>(
+      `/api/courses/instructor/${id}`,
+      undefined,
+      true,
+      true,
+    )
+    if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
   },
 
   createCourse: async (formData: FormData) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
-    if (courseId) {
-      const instructorId = await getCurrentUserId()
-
-      const requestBlob = formData.get('request') as Blob
-      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-
-      saveCourseDraft(courseId, {
-        instructorId,
-        categoryId: Number(requestData.categoryId),
-        title: requestData.title || '',
-        description: requestData.description || '',
-        thumbnail: requestData.thumbnail || '',
-        price: Number(requestData.price),
-        status: 'DRAFT'
-      })
-    }
-    return courseId
+    return mutate<number>('/api/courses', 'POST', formData, true)
   },
 
   updateCourse: async (courseId: string | number, formData: FormData) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
-    const instructorId = await getCurrentUserId()
-
-    const requestBlob = formData.get('request') as Blob
-    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-
-    saveCourseDraft(courseId, {
-      instructorId,
-      categoryId: Number(requestData.categoryId),
-      title: requestData.title || '',
-      description: requestData.description || '',
-      thumbnail: requestData.thumbnail || '',
-      price: Number(requestData.price),
-      status: 'DRAFT'
-    })
-    return res
+    return mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
   },
 
   requestCourseReview: async (courseId: string | number) => {
@@ -1061,8 +1024,11 @@ export const api = {
   closeCourse: (courseId: string | number) =>
     mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
 
-  deleteCourse: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}`, 'DELETE'),
+  deleteCourse: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'DELETE')
+    removeCourseDraft(courseId)
+    return res
+  },
 
   uploadLectureVideo: (lectureId: string | number, file: File) => {
     const formData = new FormData()

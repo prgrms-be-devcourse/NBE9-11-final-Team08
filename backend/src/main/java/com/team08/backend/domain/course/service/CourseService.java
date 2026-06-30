@@ -7,7 +7,6 @@ import com.team08.backend.domain.course.dto.CourseUpdateRequest;
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
-import com.team08.backend.domain.course.event.AdminCourseRejectedEvent;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
 import com.team08.backend.domain.media.event.CourseThumbnailEvent;
@@ -77,21 +76,48 @@ public class CourseService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public CourseDetailResponse getCourseDetail(Long courseId) {
-        // 1. Redis 조회수 증가 처리 (Write-Behind)
-        int delta = 0;
+        CourseDetailResponse response = getCourseDetailInternal(courseId);
+        if (response.status() != CourseStatus.ON_SALE) {
+            throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
+        int delta = incrementViewCount(courseId);
+        return response.withViewCount(response.viewCount() + delta);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public CourseDetailResponse getCourseDetailForAdmin(Long courseId) {
+        CourseDetailResponse response = getCourseDetailInternal(courseId);
+        return response.withStatusReason(getLatestStatusReason(courseId, response.status()));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public CourseDetailResponse getCourseDetailForInstructor(Long courseId, Long instructorId) {
+        CourseDetailResponse response = getCourseDetailInternal(courseId);
+        if (!response.instructorId().equals(instructorId)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED_COURSE_OWNER);
+        }
+        return response.withStatusReason(getLatestStatusReason(courseId, response.status()));
+    }
+
+    private int incrementViewCount(Long courseId) {
         try {
             courseViewCountRedisManager.increaseViewCount(courseId);
-            delta = courseViewCountRedisManager.getViewCountDelta(courseId);
+            return courseViewCountRedisManager.getViewCountDelta(courseId);
         } catch (Exception e) {
             log.error("Failed to process Redis view count caching for courseId: {}", courseId, e);
+            courseViewCountManager.increaseViewCountRequiresNew(courseId);
+            return 1;
         }
+    }
+
+    private CourseDetailResponse getCourseDetailInternal(Long courseId) {
+        // 1. Redis 조회수 증가 처리 (Write-Behind)
  
         // 2. Cache-Aside 패턴으로 DTO 캐시 조회
         CourseDetailResponse cachedResponse = courseDetailCacheManager.getCache(courseId);
         if (cachedResponse != null) {
             // 캐시 히트 시 실시간 조회수만 복제하여 RDB 조회 없이 즉시 반환
-            int totalViewCount = cachedResponse.viewCount() + delta;
-            return cachedResponse.withViewCount(totalViewCount);
+            return cachedResponse;
         }
  
         // 3. Cache Miss: RDB 조회 수행
@@ -105,8 +131,7 @@ public class CourseService {
         courseDetailCacheManager.setCache(courseId, originalResponse);
  
         // 5. 실시간 조회수 합산 반환
-        int totalViewCount = course.getViewCount() + delta;
-        return CourseDetailResponse.from(course, totalViewCount, fileUrlFormatter);
+        return originalResponse;
     }
 
     public Page<CourseCardResponse> getCourses(CourseSortType sortType, Pageable pageable) {
@@ -117,7 +142,37 @@ public class CourseService {
 
     public Page<CourseCardResponse> getCoursesByInstructor(Long instructorId, CourseStatus status, Pageable pageable) {
         return courseRepository.findAllByInstructorIdAndStatus(instructorId, status, pageable)
-                .map(course -> CourseCardResponse.from(course, fileUrlFormatter));
+                .map(course -> CourseCardResponse.from(
+                        course,
+                        fileUrlFormatter,
+                        getLatestStatusReason(course.getId(), course.getStatus())
+                ));
+    }
+
+    public Page<CourseCardResponse> getCoursesForAdmin(CourseStatus status, Pageable pageable) {
+        if (status == null) {
+            return courseRepository.findAll(pageable)
+                    .map(course -> CourseCardResponse.from(
+                            course,
+                            fileUrlFormatter,
+                            getLatestStatusReason(course.getId(), course.getStatus())
+                    ));
+        }
+        return courseRepository.findAllByStatus(status, pageable)
+                .map(course -> CourseCardResponse.from(
+                        course,
+                        fileUrlFormatter,
+                        getLatestStatusReason(course.getId(), course.getStatus())
+                ));
+    }
+
+    private String getLatestStatusReason(Long courseId, CourseStatus status) {
+        if (status != CourseStatus.SUSPENDED && status != CourseStatus.DRAFT) {
+            return null;
+        }
+        return courseStatusHistoryRepository.findTopByCourseIdAndToStatusAndReasonIsNotNullOrderByCreatedAtDesc(courseId, status)
+                .map(CourseStatusHistory::getReason)
+                .orElse(null);
     }
 
     @Transactional
@@ -196,7 +251,6 @@ public class CourseService {
         CourseStatusHistory history = course.reject(adminId, reason);
         courseStatusHistoryRepository.save(history);
 
-        eventPublisher.publishEvent(new AdminCourseRejectedEvent(courseId));
         courseDetailCacheManager.evictCache(courseId);
     }
 

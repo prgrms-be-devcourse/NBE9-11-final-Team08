@@ -74,9 +74,10 @@ const statusMeta: Record<string, { label: string; variant: 'default' | 'secondar
 }
 
 export function CourseManager({ initialCourses }: { initialCourses: Course[] }) {
-  const [courses, setCourses] = useState<Course[]>(initialCourses)
+  const [courses, setCourses] = useState<Course[]>([])
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | string>('ALL')
+  const [loading, setLoading] = useState(true)
 
   const [confirmModal, setConfirmModal] = useState<{
     type: 'approve' | 'reject' | 'suspend' | 'delete'
@@ -86,103 +87,28 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
   const [reason, setReason] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
+  const fetchAdminCourses = async (filter: string) => {
+    setLoading(true)
     try {
-      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]') as string[]
-      const drafts = draftIds
-        .map((id): Course | null => {
-          const raw = localStorage.getItem(`course_draft_${id}`)
-          if (!raw) return null
-          const draft = JSON.parse(raw)
-          return {
-            id,
-            title: draft.title || '',
-            subtitle: '',
-            description: draft.description || '',
-            category: String(draft.categoryId || ''),
-            subCategory: '',
-            thumbnailUrl: draft.thumbnail || '/placeholder.svg',
-            price: draft.price || 0,
-            viewCount: 0,
-            instructor: { id: String(draft.instructorId || ''), name: `강사 ${draft.instructorId || ''}`, title: '' },
-            chapters: [],
-            status: draft.status || 'DRAFT',
-          }
-        })
-        .filter((course): course is Course => Boolean(course))
-
-      setCourses((prev) => {
-        const idSet = new Set(prev.map((c) => c.id.toString()))
-        const newDrafts = drafts.filter((c) => !idSet.has(c.id.toString()))
-        const merged = [...prev, ...newDrafts]
-
-        // Seed mock courses if empty so admin console is interactive
-        if (merged.length === 0) {
-          return [
-            {
-              id: '101',
-              title: '인공지능을 활용한 웹 서비스 개발 초급 과정',
-              subtitle: '',
-              description: 'AI API를 연동하여 완성도 높은 서비스를 만드는 실무 과정입니다.',
-              category: 'IT/프로그래밍',
-              subCategory: '웹 개발',
-              thumbnailUrl: '/placeholder.svg',
-              price: 99000,
-              viewCount: 45,
-              instructor: { id: '2', name: '김코딩 강사', title: '' },
-              chapters: [],
-              status: 'IN_REVIEW',
-            },
-            {
-              id: '102',
-              title: '실전 디자인 시스템 설계와 Tailwind CSS 마스터',
-              subtitle: '',
-              description: '디자인 토큰부터 컴포넌트 라이브러리 제작까지 다룹니다.',
-              category: '크리에이티브',
-              subCategory: 'UI/UX',
-              thumbnailUrl: '/placeholder.svg',
-              price: 49000,
-              viewCount: 128,
-              level: '중급',
-              tags: ['Tailwind', 'Design System'],
-              instructor: { id: '3', name: '이디자인 강사', title: '' },
-              chapters: [],
-              status: 'ON_SALE',
-            },
-            {
-              id: '103',
-              title: 'Spring Boot와 MSA 아키텍처 완전 정복',
-              subtitle: '',
-              description: '대규모 분산 환경을 위한 설계 기법과 클라우드 배포.',
-              category: 'IT/프로그래밍',
-              subCategory: '백엔드',
-              thumbnailUrl: '/placeholder.svg',
-              price: 150000,
-              viewCount: 20,
-              instructor: { id: '4', name: '박서버 강사', title: '' },
-              chapters: [],
-              status: 'SUSPENDED',
-            }
-          ]
-        }
-        return merged
-      })
+      const response = await api.getAdminCourses(filter, 0, 100)
+      setCourses(response.content)
     } catch (e) {
-      console.error('Failed to load local drafts:', e)
+      console.error('Failed to fetch admin courses:', e)
+      toast.error('강좌 목록을 불러오는 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
     }
-  }, [initialCourses])
+  }
+
+  useEffect(() => {
+    fetchAdminCourses(statusFilter)
+  }, [statusFilter])
 
   const filtered = useMemo(() => {
     return courses.filter((c) => {
-      const matchQuery = c.title.toLowerCase().includes(query.toLowerCase())
-      const matchStatus =
-        statusFilter === 'ALL' ||
-        c.status === statusFilter ||
-        (statusFilter === 'ON_SALE' && c.status === 'PUBLISHED') ||
-        (statusFilter === 'IN_REVIEW' && c.status === 'REVIEW')
-      return matchQuery && matchStatus
+      return c.title.toLowerCase().includes(query.toLowerCase())
     })
-  }, [courses, query, statusFilter])
+  }, [courses, query])
 
   const handleAction = async () => {
     if (!confirmModal) return
@@ -191,9 +117,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
 
     try {
       if (type === 'approve') {
-        if (!course.id.toString().startsWith('10')) {
-          await api.approveCourseByAdmin(course.id)
-        }
+        await api.approveCourseByAdmin(course.id)
         setCourses((prev) =>
           prev.map((c) => (c.id === course.id ? { ...c, status: 'ON_SALE' } : c))
         )
@@ -203,36 +127,31 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
           toast.error('반려 사유를 입력해주세요.')
           return
         }
-        if (!course.id.toString().startsWith('10')) {
-          await api.rejectCourseByAdmin(course.id, reason)
-        }
+        await api.rejectCourseByAdmin(course.id, reason)
         setCourses((prev) =>
-          prev.map((c) => (c.id === course.id ? { ...c, status: 'DRAFT' } : c))
+          prev.map((c) => (c.id === course.id ? { ...c, status: 'DRAFT', statusReason: reason } : c))
         )
-        toast.success(`"${course.title}" 강좌의 심사 요청을 반려(DRAFT) 처리했습니다.`)
+        toast.success(`"${course.title}" 강좌의 심사 요청을 반려했습니다. 판매자가 수정 후 다시 신청할 수 있습니다.`)
       } else if (type === 'suspend') {
         if (!reason.trim()) {
           toast.error('판매 중지 사유를 입력해주세요.')
           return
         }
-        if (!course.id.toString().startsWith('10')) {
-          await api.suspendCourseByAdmin(course.id, reason)
-        }
+        await api.suspendCourseByAdmin(course.id, reason)
         setCourses((prev) =>
           prev.map((c) => (c.id === course.id ? { ...c, status: 'SUSPENDED' } : c))
         )
         toast.success(`"${course.title}" 강좌를 강제 판매 중지(SUSPENDED) 처리했습니다.`)
       } else if (type === 'delete') {
-        if (!course.id.toString().startsWith('10')) {
-          await api.deleteCourseByAdmin(course.id)
-        }
+        await api.deleteCourseByAdmin(course.id)
         setCourses((prev) => prev.filter((c) => c.id !== course.id))
         toast.success(`"${course.title}" 강좌를 삭제했습니다.`)
       }
       setConfirmModal(null)
       setReason('')
     } catch (e: any) {
-      toast.error(`작업 실패: ${e.message || e}`)
+      const message = e.message || String(e)
+      toast.error(message.includes('수강생이 존재') ? '수강생이 존재하므로 삭제할 수 없습니다' : `작업 실패: ${message}`)
     } finally {
       setProcessing(false)
     }
@@ -289,108 +208,125 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((c) => {
-              const status = statusMeta[c.status ?? 'DRAFT'] || statusMeta['DRAFT']
-              const isReviewable = c.status === 'IN_REVIEW' || c.status === 'REVIEW'
-              const isSuspendedable = c.status === 'ON_SALE' || c.status === 'PUBLISHED'
-              const isDeletable =
-                c.status === 'DRAFT' ||
-                c.status === 'CLOSED' ||
-                c.status === 'SUSPENDED' ||
-                c.status === 'DELETED'
-
-              return (
-                <TableRow key={c.id}>
-                  <TableCell className="text-muted-foreground">{c.id}</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="line-clamp-1">{c.title}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <User className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{c.instructor?.name || `강사 ${c.instructor?.id}`}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{c.category || '기타'}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground font-semibold">
-                    {formatKRW(c.price)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                          <span className="sr-only">관리 메뉴</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {isReviewable && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() => setConfirmModal({ type: 'approve', course: c })}
-                              className="text-emerald-600 hover:text-emerald-700"
-                            >
-                              <Check className="mr-2 h-4 w-4" /> 심사 승인
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setReason('')
-                                setConfirmModal({ type: 'reject', course: c })
-                              }}
-                              className="text-rose-600 hover:text-rose-700"
-                            >
-                              <XCircle className="mr-2 h-4 w-4" /> 심사 반려
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {isSuspendedable && (
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setReason('')
-                              setConfirmModal({ type: 'suspend', course: c })
-                            }}
-                            className="text-amber-600 hover:text-amber-700"
-                          >
-                            <AlertTriangle className="mr-2 h-4 w-4" /> 판매 중지
-                          </DropdownMenuItem>
-                        )}
-                        {isDeletable && (
-                          <>
-                            {isReviewable || isSuspendedable ? <DropdownMenuSeparator /> : null}
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setConfirmModal({ type: 'delete', course: c })}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> 강좌 삭제
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {!isReviewable && !isSuspendedable && !isDeletable && (
-                          <DropdownMenuItem disabled>수행할 작업 없음</DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-            {filtered.length === 0 && (
+            {loading ? (
               <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="py-12 text-center text-sm text-muted-foreground"
-                >
+                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                  강좌 목록을 불러오는 중입니다...
+                </TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-12 text-center text-sm text-muted-foreground">
                   조건에 맞는 강좌가 없습니다.
                 </TableCell>
               </TableRow>
+            ) : (
+              filtered.map((c) => {
+                const status = statusMeta[c.status ?? 'DRAFT'] || statusMeta['DRAFT']
+                const isReviewable = c.status === 'IN_REVIEW' || c.status === 'REVIEW'
+                const isSuspendedable = c.status === 'ON_SALE' || c.status === 'PUBLISHED'
+                const isDeletable =
+                  c.status === 'DRAFT' ||
+                  c.status === 'CLOSED' ||
+                  c.status === 'SUSPENDED' ||
+                  c.status === 'DELETED'
+
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-muted-foreground">{c.id}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-start gap-2">
+                        <BookOpen className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="line-clamp-1">{c.title}</span>
+                          <div className="flex items-center gap-2 text-[11px] font-normal text-muted-foreground">
+                            <a
+                              href={`/admin/courses/${c.id}/preview`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline hover:text-primary transition-colors text-blue-600 dark:text-blue-400 font-semibold"
+                            >
+                              [강좌 메인 미리보기]
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{c.instructor?.name || `강사 ${c.instructor?.id}`}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{c.category || '기타'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-semibold">
+                      {formatKRW(c.price)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">관리 메뉴</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {isReviewable && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => setConfirmModal({ type: 'approve', course: c })}
+                                className="text-emerald-600 hover:text-emerald-700"
+                              >
+                                <Check className="mr-2 h-4 w-4" /> 심사 승인
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setReason('')
+                                  setConfirmModal({ type: 'reject', course: c })
+                                }}
+                                className="text-rose-600 hover:text-rose-700"
+                              >
+                                <XCircle className="mr-2 h-4 w-4" /> 심사 반려
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {isSuspendedable && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setReason('')
+                                setConfirmModal({ type: 'suspend', course: c })
+                              }}
+                              className="text-amber-600 hover:text-amber-700"
+                            >
+                              <AlertTriangle className="mr-2 h-4 w-4" /> 판매 중지
+                            </DropdownMenuItem>
+                          )}
+                          {isDeletable && (
+                            <>
+                              {isReviewable || isSuspendedable ? <DropdownMenuSeparator /> : null}
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setConfirmModal({ type: 'delete', course: c })}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> 강좌 삭제
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {!isReviewable && !isSuspendedable && !isDeletable && (
+                            <DropdownMenuItem disabled>수행할 작업 없음</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             )}
           </TableBody>
         </Table>

@@ -61,6 +61,14 @@ public class CourseController {
         return courseService.getCoursesByInstructor(loginUserPrincipal.user().id(), status, pageable);
     }
 
+    @GetMapping("/instructor/{courseId}")
+    @ResponseStatus(HttpStatus.OK)
+    public CourseDetailResponse getCourseDetailForInstructor(
+            @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
+        return courseService.getCourseDetailForInstructor(courseId, loginUserPrincipal.user().id());
+    }
+
     @PutMapping(value = "/{courseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateCourseGeneralInfo(

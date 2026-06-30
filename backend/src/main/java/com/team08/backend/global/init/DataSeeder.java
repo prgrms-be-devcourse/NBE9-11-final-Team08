@@ -1187,6 +1187,7 @@ public class DataSeeder {
         Set<Long> studyCourseIds = studies.stream()
                 .map(study -> study.getCourse().getId())
                 .collect(java.util.stream.Collectors.toSet());
+        studyCourseIds.add(rejected.getId());
 
         // 신규: DRAFT 강좌 → DRAFT 스터디 (생성자/관리자만 조회 가능)
         Course draftCourse = courses.stream()
