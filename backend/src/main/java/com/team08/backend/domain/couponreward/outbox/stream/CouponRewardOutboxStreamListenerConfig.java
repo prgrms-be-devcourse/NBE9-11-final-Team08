@@ -8,6 +8,7 @@ import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
+import org.springframework.util.ErrorHandler;
 
 import java.time.Duration;
 
@@ -15,6 +16,16 @@ import java.time.Duration;
 public class CouponRewardOutboxStreamListenerConfig {
 
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(2);
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CouponRewardOutboxStreamListenerConfig.class);
+    private static final ErrorHandler REDIS_STREAM_ERROR_HANDLER = error -> {
+        if (isRedisConnectionError(error)) {
+            log.warn("Redis Stream polling interrupted. The listener will keep polling after Redis is available again. message={}",
+                    error.getMessage());
+            return;
+        }
+
+        log.error("Unexpected error occurred while polling Redis Stream.", error);
+    };
 
     @Bean(destroyMethod = "stop")
     public StreamMessageListenerContainer<String, MapRecord<String, String, String>> couponRewardOutboxStreamContainer(
@@ -24,6 +35,7 @@ public class CouponRewardOutboxStreamListenerConfig {
         StreamMessageListenerContainer.StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>>
                 options = StreamMessageListenerContainer.StreamMessageListenerContainerOptions.builder()
                 .pollTimeout(POLL_TIMEOUT)
+                .errorHandler(REDIS_STREAM_ERROR_HANDLER)
                 .build();
 
         StreamMessageListenerContainer<String, MapRecord<String, String, String>> container =
@@ -37,5 +49,24 @@ public class CouponRewardOutboxStreamListenerConfig {
         container.start();
 
         return container;
+    }
+
+    private static boolean isRedisConnectionError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            String className = current.getClass().getName();
+            String message = current.getMessage();
+            if (className.startsWith("io.lettuce.core.")
+                    || className.startsWith("org.springframework.data.redis.")
+                    || (message != null && (
+                    message.contains("Connection closed")
+                            || message.contains("Command timed out")
+                            || message.contains("Connection reset")
+            ))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
