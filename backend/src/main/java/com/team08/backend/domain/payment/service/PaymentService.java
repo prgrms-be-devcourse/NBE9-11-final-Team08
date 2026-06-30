@@ -3,15 +3,22 @@ package com.team08.backend.domain.payment.service;
 import com.team08.backend.domain.enrollment.entity.Enrollment;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
+import com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult;
+import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
+import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
+import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
 import com.team08.backend.domain.payment.dto.PaymentResponse;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
+import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
@@ -21,13 +28,7 @@ import com.team08.backend.domain.payment.provider.PaymentProviderException;
 import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
 import com.team08.backend.domain.payment.repository.PaymentAttemptRepository;
 import com.team08.backend.domain.payment.repository.PaymentRepository;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponService;
-import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
-import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
-import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentProcessingContext;
-import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentRequest;
-import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.util.NicepaySignature;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.global.exception.CustomException;
@@ -82,20 +83,25 @@ public class PaymentService {
         validateConfirmableOrder(order);
         validateConfirmablePayment(existingPayment);
 
+        List<OrderItem> orderItems = findOrderItems(order);
+
         int expectedDiscount = 0;
-        if (request.issuedCouponId() != null) {
-            expectedDiscount = issuedCouponService.calculateExpectedDiscount(userId, request.issuedCouponId(), order.getTotalPrice()).discountAmount();
+        if ((request.itemCouponIds() != null && !request.itemCouponIds().isEmpty()) || request.stackableCouponId() != null) {
+            expectedDiscount = issuedCouponService.calculateExpectedDiscounts(
+                    userId, request.itemCouponIds(), request.stackableCouponId(), orderItems, order.getTotalPrice()
+            );
         }
 
         validatePaymentAmount(order, request.amount(), expectedDiscount);
 
-        List<OrderItem> orderItems = findOrderItems(order);
         validateDuplicateEnrollment(userId, orderItems);
 
-        if (request.issuedCouponId() != null) {
-            int actualDiscount = issuedCouponService.useCouponForOrder(userId, request.issuedCouponId(), order.getTotalPrice());
-            order.applyDiscount(actualDiscount);
-            orderCouponUsageRepository.save(new OrderCouponUsage(order.getId(), request.issuedCouponId(), actualDiscount));
+        if ((request.itemCouponIds() != null && !request.itemCouponIds().isEmpty()) || request.stackableCouponId() != null) {
+            CouponUsageResult usageResult = issuedCouponService.useCouponsForOrder(
+                    userId, request.itemCouponIds(), request.stackableCouponId(), orderItems, order.getTotalPrice(), order.getId()
+            );
+            order.applyDiscount(usageResult.totalDiscount());
+            orderCouponUsageRepository.saveAll(usageResult.usages());
         }
 
         LocalDateTime paidAt = LocalDateTime.now(clock);
@@ -165,13 +171,20 @@ public class PaymentService {
         validateConfirmableOrder(order);
         validateConfirmablePayment(paymentRepository.findByOrder_Id(orderId));
 
-        int expectedDiscount = calculateExpectedDiscount(user.id(), request.issuedCouponId(), order);
+        int expectedDiscount = calculateExpectedDiscounts(user.id(), request.itemCouponIds(), request.stackableCouponId(), order, findOrderItems(order));
         int amount = order.getFinalPrice() - expectedDiscount;
         String ediDate = LocalDateTime.now(clock).format(NICEPAY_EDI_DATE_FORMATTER);
         String signData = NicepaySignature.sha256(
                 ediDate + nicepayPaymentProperties.mid() + amount + nicepayPaymentProperties.merchantKey()
         );
         String goodsName = getOrderName(findOrderItems(order));
+
+        String firstCouponId = null;
+        if (request.stackableCouponId() != null) {
+            firstCouponId = String.valueOf(request.stackableCouponId());
+        } else if (request.itemCouponIds() != null && !request.itemCouponIds().isEmpty()) {
+            firstCouponId = String.valueOf(request.itemCouponIds().values().iterator().next());
+        }
 
         return new NicepayPreparePaymentResponse(
                 goodsName,
@@ -185,7 +198,7 @@ public class PaymentService {
                 "",
                 user.email(),
                 NICEPAY_CHARSET,
-                request.issuedCouponId() == null ? null : String.valueOf(request.issuedCouponId())
+                firstCouponId
         );
     }
 
@@ -209,8 +222,8 @@ public class PaymentService {
         refundOrder(order, refundedAt);
         cancelActiveEnrollmentsForRefund(order, refundedAt);
 
-        orderCouponUsageRepository.findByOrderId(orderId)
-                .ifPresent(usage -> issuedCouponService.refundCoupon(usage.getIssuedCouponId()));
+        List<OrderCouponUsage> usages = orderCouponUsageRepository.findByOrderId(orderId);
+        usages.forEach(usage -> issuedCouponService.refundCoupon(usage.getIssuedCouponId()));
 
         return PaymentResponse.from(payment, order);
     }
@@ -285,11 +298,11 @@ public class PaymentService {
         }
     }
 
-    private int calculateExpectedDiscount(Long userId, Long issuedCouponId, Order order) {
-        if (issuedCouponId == null) {
+    private int calculateExpectedDiscounts(Long userId, java.util.Map<Long, Long> itemCouponIds, Long stackableCouponId, Order order, List<OrderItem> orderItems) {
+        if ((itemCouponIds == null || itemCouponIds.isEmpty()) && stackableCouponId == null) {
             return 0;
         }
-        return issuedCouponService.calculateExpectedDiscount(userId, issuedCouponId, order.getTotalPrice()).discountAmount();
+        return issuedCouponService.calculateExpectedDiscounts(userId, itemCouponIds, stackableCouponId, orderItems, order.getTotalPrice());
     }
 
     private void validateNicepayCardPayMethod(String payMethod) {

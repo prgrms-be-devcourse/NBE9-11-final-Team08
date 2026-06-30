@@ -6,6 +6,7 @@ import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundExce
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
 import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
+import com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
@@ -13,6 +14,8 @@ import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.CouponIssueResult;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
+import com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage;
+import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,8 +34,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class IssuedCouponService {
 
-    private static final String ATTENDANCE_REWARD_COUPON_NAME = "연속 출석 보상 쿠폰";
-
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
@@ -39,49 +41,11 @@ public class IssuedCouponService {
     private final IssuedCouponWriter issuedCouponWriter;
     private final Clock clock;
 
-    // TODO 나중에 회원가입에 추가
-    // [시스템] 가입 기념 쿠폰 자동 발급
-    @Transactional
-    public void issueSignUpCoupon(Long userId) {
-        // 쿠폰 타입으로 정책 조회 및 발급
-        CouponPolicy policy = couponPolicyRepository.findByCouponType(CouponType.AUTO)
-                .orElseThrow(CouponPolicyNotFoundException::new);
-
-        issueSystemCoupon(userId, policy);
-    }
-
-    // [시스템] 출석 보상 쿠폰 자동 발급
-    @Transactional
-    public void issueAttendanceCoupon(Long userId) {
-        // 쿠폰 이름으로 정책 조회 및 발급
-        CouponPolicy policy = couponPolicyRepository.findByName(ATTENDANCE_REWARD_COUPON_NAME)
-                .orElseThrow(CouponPolicyNotFoundException::new);
-
-        issueSystemCoupon(userId, policy);
-    }
-
-    // 시스템 공통 쿠폰 발급 처리
-    private void issueSystemCoupon(Long userId, CouponPolicy policy) {
-        // 사용자 존재 확인
-        if (!userRepository.existsById(userId)) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
-        }
-
-        // 쿠폰 발급 기록 생성
-        IssuedCoupon newCoupon = IssuedCoupon.create(policy, userId, LocalDateTime.now(clock));
-
-        // 쿠폰 발급 저장 및 동시성 방어
-        issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
-    }
-
-    // [사용자] 쿠폰 다운로드
     public CouponDownloadResponse downloadCoupon(Long userId, Long policyId) {
-        // 사용자 존재 확인
         if (!userRepository.existsById(userId)) {
             throw new CustomException(ErrorCode.USER_NOT_FOUND);
         }
 
-        // 쿠폰 타입 조회
         CouponType couponType = couponPolicyRepository.findCouponTypeById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
@@ -94,18 +58,15 @@ public class IssuedCouponService {
         return CouponDownloadResponse.issued(result.issuedCoupon());
     }
 
-    // [사용자] 내 쿠폰 목록 조회
     @Transactional(readOnly = true)
     public List<CouponListResponse> getMyCoupons(Long userId) {
         List<IssuedCoupon> issuedCoupons = issuedCouponRepository.findByUserIdOrderByExpiredAtAsc(userId);
 
-        // 쿠폰 정책 ID 목록 추출
         List<Long> policyIds = issuedCoupons.stream()
                 .map(IssuedCoupon::getPolicyId)
                 .distinct()
                 .toList();
 
-        // 정책 정보 한꺼번에 조회 및 맵으로 변환
         Map<Long, CouponPolicy> policyMap = couponPolicyRepository.findAllById(policyIds).stream()
                 .collect(Collectors.toMap(CouponPolicy::getId, policy -> policy));
 
@@ -121,19 +82,14 @@ public class IssuedCouponService {
                 .toList();
     }
 
-    // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 (결제 전 화면 용 API)
     @Transactional(readOnly = true)
     public ExpectedDiscountResponse calculateExpectedDiscount(Long userId, Long issuedCouponId, int originalPrice) {
         CouponUsageContext context = getUsableCouponContext(userId, issuedCouponId, LocalDateTime.now(clock));
         CouponPolicy policy = context.couponPolicy();
 
-        // 할인 예상 금액 계산
         int discountAmount = policy.calculateDiscountAmount(originalPrice);
-
-        // 할인된 최종 가격 계산 (0원 이하 방어)
         int finalPrice = Math.max(0, originalPrice - discountAmount);
 
-        // 결과 DTO 반환
         return new ExpectedDiscountResponse(
                 policy.getName(),
                 originalPrice,
@@ -142,37 +98,93 @@ public class IssuedCouponService {
         );
     }
 
-    // [시스템] 결제 시 쿠폰 사용 처리
-    @Transactional
-    public int useCouponForOrder(Long userId, Long issuedCouponId, int originalPrice) {
+    @Transactional(readOnly = true)
+    public int calculateExpectedDiscounts(Long userId, Map<Long, Long> itemCouponIds, Long stackableCouponId, List<OrderItem> orderItems, int orderTotalPrice) {
         LocalDateTime now = LocalDateTime.now(clock);
+        int totalDiscount = 0;
 
-        // 비관적 락 조회
-        IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(issuedCouponId)
-                .orElseThrow(CouponNotFoundException::new);
+        if (itemCouponIds != null) {
+            for (OrderItem item : orderItems) {
+                Long couponId = itemCouponIds.get(item.getCourseId());
+                if (couponId != null) {
+                    CouponUsageContext context = getUsableCouponContext(userId, couponId, now);
+                    if (context.couponPolicy().getIsStackable() || !context.couponPolicy().isApplicableTo(item.getCourseId(), null)) {
+                        throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+                    }
+                    totalDiscount += context.couponPolicy().calculateDiscountAmount(item.getPrice());
+                }
+            }
+        }
 
-        // 사용 가능 여부 검증
-        issuedCoupon.validateUsable(userId, now);
+        if (stackableCouponId != null) {
+            CouponUsageContext stackableContext = getUsableCouponContext(userId, stackableCouponId, now);
+            if (!stackableContext.couponPolicy().getIsStackable()) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+            totalDiscount += stackableContext.couponPolicy().calculateDiscountAmount(orderTotalPrice);
+        }
 
-        CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
-                .orElseThrow(CouponPolicyNotFoundException::new);
-
-        // 할인 금액 계산
-        int discountAmount = policy.calculateDiscountAmount(originalPrice);
-
-        // 쿠폰 사용 처리
-        issuedCoupon.applyUsage(policy.getUsageType(), now);
-
-        // 최종 할인된 금액 반환
-        return discountAmount;
+        return Math.min(totalDiscount, orderTotalPrice);
     }
 
-    // 사용 가능한 쿠폰과 정책 조회
+    @Transactional
+    public CouponUsageResult useCouponsForOrder(Long userId, Map<Long, Long> itemCouponIds, Long stackableCouponId, List<OrderItem> orderItems, int orderTotalPrice, Long orderId) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        int totalDiscount = 0;
+        List<OrderCouponUsage> usages = new ArrayList<>();
+
+        if (itemCouponIds != null) {
+            for (OrderItem item : orderItems) {
+                Long couponId = itemCouponIds.get(item.getCourseId());
+                if (couponId != null) {
+                    IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(couponId)
+                            .orElseThrow(CouponNotFoundException::new);
+                    issuedCoupon.validateUsable(userId, now);
+                    CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
+                            .orElseThrow(CouponPolicyNotFoundException::new);
+
+                    if (policy.getIsStackable() || !policy.isApplicableTo(item.getCourseId(), null)) {
+                        throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+                    }
+
+                    int discount = policy.calculateDiscountAmount(item.getPrice());
+                    if (totalDiscount + discount > orderTotalPrice) {
+                        discount = Math.max(0, orderTotalPrice - totalDiscount);
+                    }
+                    totalDiscount += discount;
+                    usages.add(new OrderCouponUsage(orderId, couponId, discount));
+                    issuedCoupon.applyUsage(policy.getUsageType(), now);
+                }
+            }
+        }
+
+        if (stackableCouponId != null) {
+            IssuedCoupon stackableCoupon = issuedCouponRepository.findByIdWithLock(stackableCouponId)
+                    .orElseThrow(CouponNotFoundException::new);
+            stackableCoupon.validateUsable(userId, now);
+            CouponPolicy stackablePolicy = couponPolicyRepository.findById(stackableCoupon.getPolicyId())
+                    .orElseThrow(CouponPolicyNotFoundException::new);
+
+            if (!stackablePolicy.getIsStackable()) {
+                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+            }
+
+            int discount = stackablePolicy.calculateDiscountAmount(orderTotalPrice);
+            if (totalDiscount + discount > orderTotalPrice) {
+                discount = Math.max(0, orderTotalPrice - totalDiscount);
+            }
+            totalDiscount += discount;
+            usages.add(new OrderCouponUsage(orderId, stackableCouponId, discount));
+            stackableCoupon.applyUsage(stackablePolicy.getUsageType(), now);
+        }
+
+        return new CouponUsageResult(totalDiscount, usages);
+    }
+
     private CouponUsageContext getUsableCouponContext(Long userId, Long issuedCouponId, LocalDateTime now) {
         IssuedCoupon issuedCoupon = issuedCouponRepository.findById(issuedCouponId)
                 .orElseThrow(CouponNotFoundException::new);
 
-        // 사용 가능 여부 검증
         issuedCoupon.validateUsable(userId, now);
 
         CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())

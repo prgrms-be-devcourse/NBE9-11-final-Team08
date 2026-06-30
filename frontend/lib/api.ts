@@ -546,12 +546,13 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
     type: isRate ? 'discount' : 'firstcome',
     status: isAvailable ? 'ACTIVE' : 'ENDED',
     usageType: usageTypeStr,
-    isStackable: coupon.isStackable,
+    isStackable: coupon.isStackable ?? (coupon as any).stackable ?? false,
     maxDiscountAmount: coupon.maxDiscountAmount,
     minOrderAmount: coupon.minOrderAmount,
     couponTarget: couponTargetStr,
     categoryIds: coupon.categoryIds || [],
     courseIds: coupon.courseIds || [],
+    endDate: expiredAtStr,
   }
 }
 
@@ -616,7 +617,7 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
     validDays: policy.validDays,
     couponTarget: couponTargetStr,
     usageType: usageTypeStr,
-    isStackable: policy.isStackable,
+    isStackable: policy.isStackable ?? (policy as any).stackable ?? false,
     maxDiscountAmount: policy.maxDiscountAmount,
     minOrderAmount: policy.minOrderAmount,
     categoryIds: policy.categoryIds || [],
@@ -639,7 +640,7 @@ const mapAdminCouponPolicyToCoupon = (policy: AdminCouponPolicyResponse): AdminC
     autoIssueType: policy.autoIssueType ?? null,
     target: policy.couponTarget,
     useType: mapUseTypeToFrontend(policy.usageType),
-    stackable: policy.isStackable,
+    stackable: policy.isStackable ?? (policy as any).stackable ?? false,
     discountType: mapDiscountTypeToFrontend(policy.discountType),
     discountValue: policy.discountValue,
     maxDiscount: policy.maxDiscountAmount ?? null,
@@ -1214,14 +1215,16 @@ export const api = {
     paymentKey: string,
     method: string,
     amount: number,
-    issuedCouponId?: number | null,
+    itemCouponIds?: Record<number, number> | null,
+    stackableCouponId?: number | null,
     idempotencyKey?: string | null,
   ) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
       paymentKey,
       method,
       amount,
-      issuedCouponId,
+      itemCouponIds,
+      stackableCouponId,
       idempotencyKey,
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>

@@ -176,7 +176,8 @@ export interface ConfirmTossPaymentRequest {
   paymentKey: string
   method: string
   amount: number
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
   idempotencyKey?: string | null
   authResultCode?: string | null
   authResultMsg?: string | null
@@ -192,7 +193,8 @@ export interface ConfirmTossPaymentRequest {
 
 export interface NicepayPreparePaymentRequest {
   payMethod: 'CARD'
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
 }
 
 export interface NicepayPreparePaymentResponse {
