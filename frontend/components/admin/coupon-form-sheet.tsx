@@ -54,6 +54,7 @@ import type {
   CouponPolicyType,
   CouponUseType,
   Course,
+  CategoryResponse,
 } from '@/lib/types'
 
 interface CouponFormSheetProps {
@@ -167,6 +168,7 @@ export function CouponFormSheet({
   const [form, setForm] = useState<FormState>(emptyForm)
   const [targetOpen, setTargetOpen] = useState(false)
   const [courses, setCourses] = useState<Course[]>([])
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
   const [saving, setSaving] = useState(false)
   const isEdit = Boolean(coupon)
 
@@ -177,13 +179,17 @@ export function CouponFormSheet({
   useEffect(() => {
     if (!open) return
     let active = true
-    api.getCourses(0, 100)
-      .then((response) => {
-        if (active) setCourses(response.content)
-      })
-      .catch(() => {
-        if (active) setCourses([])
-      })
+
+    Promise.all([
+      api.getCourses(0, 100).catch(() => ({ content: [] })),
+      api.getCategories().catch(() => [])
+    ]).then(([coursesRes, categoriesRes]) => {
+      if (active) {
+        setCourses(coursesRes.content || [])
+        setCategories(categoriesRes || [])
+      }
+    })
+
     return () => {
       active = false
     }
@@ -248,9 +254,8 @@ export function CouponFormSheet({
     }
   }
 
-  const courseOptions = courses.map((c) => ({ label: c.title, value: c.id }))
-  const categoryOptions = Array.from(new Set(courses.map((c) => c.category).filter(Boolean)))
-    .map((category) => ({ label: `카테고리 ${category}`, value: category }))
+  const courseOptions = courses.map((c) => ({ label: c.title, value: String(c.id) }))
+  const categoryOptions = categories.map((c) => ({ label: c.name, value: String(c.id) }))
 
   const targetList =
     form.target === 'CATEGORY'

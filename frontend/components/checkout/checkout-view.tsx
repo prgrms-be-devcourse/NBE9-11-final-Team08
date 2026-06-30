@@ -40,6 +40,7 @@ type CouponOption = {
   originalAmountString?: string
   minOrderAmount?: number
   maxDiscountAmount?: number | null
+  categoryIds?: number[]
   courseIds?: number[]
   isStackable?: boolean
   endDate?: string
@@ -70,6 +71,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
   const [agree, setAgree] = useState(false)
   const [step, setStep] = useState<CheckoutStep>(initialOrderId ? 'loading-order' : 'idle')
   const [userCoupons, setUserCoupons] = useState<CouponOption[]>([])
+  const [courseCategoryMap, setCourseCategoryMap] = useState<Record<number, number[]>>({})
 
   useEffect(() => {
     if (!canUseToss && provider === 'toss') {
@@ -125,6 +127,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
             originalAmountString: c.amount,
             minOrderAmount: c.minOrderAmount || 0,
             maxDiscountAmount: c.maxDiscountAmount || null,
+            categoryIds: c.categoryIds || [],
             courseIds: c.courseIds || [],
             isStackable: c.isStackable || false,
             endDate: c.endDate,
@@ -159,6 +162,32 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       price: item.price,
     }))
   }, [directOrder, items])
+
+  useEffect(() => {
+    let active = true
+    const courseIds = Array.from(new Set(checkoutItems.map((item) => Number(item.courseId)).filter(Boolean)))
+    if (courseIds.length > 0) {
+      Promise.all([
+        api.getCategories().catch(() => []),
+        Promise.all(courseIds.map((id) => api.getCourse(id).catch(() => undefined)))
+      ]).then(([categories, courses]) => {
+        if (!active) return
+        const catMap = new Map(categories.map((c) => [c.id, c.parentCategoryId]))
+        const map: Record<number, number[]> = {}
+        courses.forEach((c) => {
+          if (c?.category) {
+            const catId = Number(c.category)
+            const parentId = catMap.get(catId)
+            map[Number(c.id)] = parentId ? [catId, parentId] : [catId]
+          }
+        })
+        setCourseCategoryMap(map)
+      })
+    }
+    return () => {
+      active = false
+    }
+  }, [checkoutItems])
 
   const subtotal = useMemo(() => {
     if (directOrder) return directOrder.totalPrice
@@ -552,7 +581,15 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
                               </Button>
                             </DialogClose>
                             {userCoupons
-                              .filter((c) => !c.isStackable && (!c.courseIds?.length || c.courseIds.includes(Number(item.courseId))))
+                              .filter((c) => {
+                                if (c.isStackable) return false
+                                if (c.courseIds?.length) return c.courseIds.includes(Number(item.courseId))
+                                if (c.categoryIds?.length) {
+                                  const categoryIds = courseCategoryMap[Number(item.courseId)]
+                                  return categoryIds ? categoryIds.some(id => c.categoryIds!.includes(id)) : false
+                                }
+                                return true
+                              })
                               .map((c) => ({ couponOption: c, discount: calculateDiscount(c, item.price) }))
                               .sort((a, b) => {
                                 if (a.discount !== b.discount) return b.discount - a.discount
@@ -601,11 +638,10 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">추가 할인 (중복 적용 쿠폰)</CardTitle>
+              <CardTitle className="text-base">장바구니 쿠폰 목록</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
-                <Label>장바구니 전체 쿠폰</Label>
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full justify-between font-normal px-3">
