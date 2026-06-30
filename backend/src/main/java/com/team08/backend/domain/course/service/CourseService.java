@@ -9,13 +9,13 @@ import com.team08.backend.domain.course.entity.CourseSortType;
 import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.event.CourseClosedEvent;
 import com.team08.backend.domain.course.event.CourseDeletedEvent;
-import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.coursestatushistory.entity.CourseStatusHistory;
 import com.team08.backend.domain.coursestatushistory.repository.CourseStatusHistoryRepository;
 import com.team08.backend.domain.enrollment.entity.EnrollmentStatus;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.media.event.CourseThumbnailEvent;
 import com.team08.backend.domain.media.service.CourseThumbnailService;
 import com.team08.backend.domain.media.service.MediaEncodingService;
 import com.team08.backend.domain.study.command.CourseStudyCreateCommand;
@@ -33,11 +33,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.springframework.web.multipart.MultipartFile;
 
 import static java.util.UUID.randomUUID;
 
@@ -111,26 +112,18 @@ public class CourseService {
     }
 
     private CourseDetailResponse getCourseDetailInternal(Long courseId) {
-        // 1. Redis 조회수 증가 처리 (Write-Behind)
- 
-        // 2. Cache-Aside 패턴으로 DTO 캐시 조회
         CourseDetailResponse cachedResponse = courseDetailCacheManager.getCache(courseId);
         if (cachedResponse != null) {
-            // 캐시 히트 시 실시간 조회수만 복제하여 RDB 조회 없이 즉시 반환
             return cachedResponse;
         }
- 
-        // 3. Cache Miss: RDB 조회 수행
+
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
- 
-        // 4. 원본 DTO 생성 및 Redis 캐시 기록
+
         CourseDetailResponse originalResponse = CourseDetailResponse.from(course, fileUrlFormatter);
         courseDetailCacheManager.setCache(courseId, originalResponse);
- 
-        // 5. 실시간 조회수 합산 반환
+
         return originalResponse;
     }
 
@@ -192,8 +185,7 @@ public class CourseService {
             course.updateThumbnail(newS3Key);
             eventPublisher.publishEvent(new CourseThumbnailEvent(course.getId(), oldThumbnail, newS3Key));
         }
-        
-        // 변경 완료 후 캐시 무효화 처리
+
         courseDetailCacheManager.evictCache(courseId);
     }
 
@@ -201,7 +193,6 @@ public class CourseService {
     public void requestCourseReview(Long courseId, Long instructorId) {
         Course course = courseRepository.findWithChaptersAsc(courseId)
                 .orElseThrow(() -> new CustomException(ErrorCode.COURSE_NOT_FOUND));
-        // 두 번째 fetch 로 각 챕터의 lectures 를 초기화한다(MultipleBagFetchException 회피).
         courseRepository.findChaptersWithLecturesAsc(courseId);
 
         course.validateOwner(instructorId);

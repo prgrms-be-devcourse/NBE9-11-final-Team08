@@ -42,7 +42,6 @@ public class ChapterService {
     //챕터생성
     @Transactional
     public Long createChapter(Long courseId, Long userId, ChapterCreateRequest request) {
-        // TODO: course access 검증 추가됨. 도훈님 확인 필요
         courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
 
         Course course = courseRepository.findById(courseId)
