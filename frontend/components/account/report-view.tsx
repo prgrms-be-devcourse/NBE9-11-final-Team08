@@ -122,7 +122,7 @@ export function ReportView({
 }) {
   const stats = [
     { icon: Clock, label: '총 학습시간', value: report.totalStudyTime },
-    { icon: MessageSquare, label: '작성 댓글 수', value: report.commentCount === -1 ? '기능 없음' : `${report.commentCount}개` },
+    { icon: MessageSquare, label: '작성 질문 수', value: report.commentCount === -1 ? '기능 없음' : `${report.commentCount}개` },
     { icon: CalendarDays, label: '수강일 수', value: report.studyDays === -1 ? '기능 없음' : `${report.studyDays}일` },
   ]
 
