@@ -125,16 +125,10 @@ export function ReportView({ report }: { report: StudyReport }) {
           <h1 className="mt-1 text-2xl font-bold">{report.userName}님의 리포트</h1>
           <p className="mt-1 text-sm text-muted-foreground">{report.period}</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => toast.success('PDF 다운로드를 준비 중입니다.')}
-        >
-          <Download className="mr-1 h-4 w-4" /> PDF 다운로드
-        </Button>
       </div>
 
       <div className="rounded-xl border bg-foreground p-6 text-background">
-        <p className="text-sm text-background/70">완주를 축하드립니다!</p>
+        <p className="text-sm text-background/70">오늘도 화이팅!</p>
         <p className="mt-1 text-lg font-semibold text-balance">
           {report.studyDays !== -1 ? (
             <>
