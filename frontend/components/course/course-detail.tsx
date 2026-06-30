@@ -29,7 +29,7 @@ import { discountedPrice, formatKRW } from '@/lib/utils'
 import { api } from '@/lib/api'
 import Hls from 'hls.js'
 
-export function CourseDetail({ course }: { course: Course }) {
+export function CourseDetail({ course, adminPreview = false }: { course: Course; adminPreview?: boolean }) {
   const router = useRouter()
   const { addItem, has } = useCart()
   const [buying, setBuying] = useState(false)
@@ -226,7 +226,7 @@ export function CourseDetail({ course }: { course: Course }) {
                       <ul className="space-y-1">
                         {ch.lectures.map((lec) => {
                           const isFreePreview = lec.isFreePreview === true;
-                          const showPreviewButton = isFreePreview && !isPurchased;
+                          const showPreviewButton = adminPreview ? true : (isFreePreview && !isPurchased);
 
                           return (
                             <li
@@ -240,9 +240,14 @@ export function CourseDetail({ course }: { course: Course }) {
                                   <PlayCircle className="h-4 w-4 text-muted-foreground" />
                                 )}
                                 <span className="font-medium">{lec.title}</span>
-                                {isFreePreview && (
+                                {!adminPreview && isFreePreview && (
                                   <Badge variant="secondary" className="px-1.5 py-0 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border-none font-semibold">
                                     무료 미리보기
+                                  </Badge>
+                                )}
+                                {adminPreview && (
+                                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none font-semibold">
+                                    관리자 전용
                                   </Badge>
                                 )}
                               </span>
@@ -297,68 +302,103 @@ export function CourseDetail({ course }: { course: Course }) {
 
         <div className="mt-8 lg:mt-0">
           <div className="lg:sticky lg:top-20">
-            <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
-              <div className="relative aspect-video bg-muted">
-                <Image
-                  src={course.thumbnailUrl || '/placeholder.svg'}
-                  alt={`${course.title} 썸네일`}
-                  fill
-                  sizes="360px"
-                  className="object-cover"
-                />
+            {adminPreview ? (
+              <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
+                <div className="relative aspect-video bg-muted">
+                  <Image
+                    src={course.thumbnailUrl || '/placeholder.svg'}
+                    alt={`${course.title} 썸네일`}
+                    fill
+                    sizes="360px"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="space-y-3 p-5">
+                  <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-3">
+                    <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">🔒 관리자 전용 미리보기</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">이 페이지는 관리자만 접근할 수 있습니다. 모든 강의 영상을 미리보기할 수 있습니다.</p>
+                  <Separator />
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex justify-between">
+                      <span>강의 수</span>
+                      <span className="font-medium text-foreground">{totalLectures}개</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span>강좌 상태</span>
+                      <span className="font-medium text-foreground">{course.status || '-'}</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span>가격</span>
+                      <span className="font-medium text-foreground">{formatKRW(course.price)}</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
-              <div className="space-y-4 p-5">
-                {canPurchase ? (
-                  <>
-                    <div className="flex items-baseline gap-2">
-                      {course.discountRate ? (
-                        <>
-                          <span className="text-lg font-bold text-destructive">
-                            {course.discountRate}%
-                          </span>
+            ) : (
+              <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
+                <div className="relative aspect-video bg-muted">
+                  <Image
+                    src={course.thumbnailUrl || '/placeholder.svg'}
+                    alt={`${course.title} 썸네일`}
+                    fill
+                    sizes="360px"
+                    className="object-cover"
+                  />
+                </div>
+                <div className="space-y-4 p-5">
+                  {canPurchase ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        {course.discountRate ? (
+                          <>
+                            <span className="text-lg font-bold text-destructive">
+                              {course.discountRate}%
+                            </span>
+                            <span className="text-2xl font-bold">{formatKRW(final)}</span>
+                          </>
+                        ) : (
                           <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                        </>
-                      ) : (
-                        <span className="text-2xl font-bold">{formatKRW(final)}</span>
-                      )}
-                    </div>
-                    {course.discountRate ? (
-                      <p className="-mt-2 text-sm text-muted-foreground line-through">
-                        {formatKRW(course.price)}
-                      </p>
-                    ) : null}
-                    <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
-                      {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      코스 구매하기
+                        )}
+                      </div>
+                      {course.discountRate ? (
+                        <p className="-mt-2 text-sm text-muted-foreground line-through">
+                          {formatKRW(course.price)}
+                        </p>
+                      ) : null}
+                      <Button onClick={handleBuy} className="w-full" size="lg" disabled={buying}>
+                        {buying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        코스 구매하기
+                      </Button>
+                      <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && inCart)}>
+                        {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
+                      </Button>
+                    </>
+                  ) : null}
+                  {hasStudyAccess && studyId ? (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/study/${studyId}`}>스터디 입장</Link>
                     </Button>
-                    <Button onClick={handleAdd} variant="secondary" className="w-full" disabled={adding || (isLoggedIn && inCart)}>
-                      {adding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isLoggedIn && inCart) ? '장바구니에 담김' : '장바구니 담기'}
+                  ) : (isAdmin || isPurchased) ? (
+                    <Button variant="outline" className="w-full" disabled>
+                      스터디 미개설
                     </Button>
-                  </>
-                ) : null}
-                {hasStudyAccess && studyId ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/study/${studyId}`}>스터디 입장</Link>
-                  </Button>
-                ) : (isAdmin || isPurchased) ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    스터디 미개설
-                  </Button>
-                ) : null}
+                  ) : null}
 
-                <Separator />
-                <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex justify-between">
-                    <span>강의 수</span>
-                    <span className="font-medium text-foreground">{totalLectures}개</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>수강 대상</span>
-                    <span className="font-medium text-foreground">{course.subCategory || '분류 없음'}</span>
-                  </li>
-                </ul>
+                  <Separator />
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex justify-between">
+                      <span>강의 수</span>
+                      <span className="font-medium text-foreground">{totalLectures}개</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span>수강 대상</span>
+                      <span className="font-medium text-foreground">{course.subCategory || '분류 없음'}</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

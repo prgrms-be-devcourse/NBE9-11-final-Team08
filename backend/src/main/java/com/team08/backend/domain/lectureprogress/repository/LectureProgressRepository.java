@@ -1,7 +1,9 @@
 package com.team08.backend.domain.lectureprogress.repository;
 
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,17 @@ import java.util.Optional;
 public interface LectureProgressRepository extends JpaRepository<LectureProgress, Long> {
 
     Optional<LectureProgress> findByUserIdAndLectureId(Long userId, Long lectureId);
+
+    /**
+     * 하트비트 누적(watchedSeconds += delta)용 쓰기 락 조회.
+     * 같은 (user, lecture) 행에 대한 동시 하트비트가 각자 읽고 더한 뒤 저장하면 한쪽 delta 가
+     * 사라지는 lost update 가 발생한다. SELECT ... FOR UPDATE 로 행을 잠가
+     * read-modify-write 를 행 단위로 직렬화한다(서로 다른 행은 경합하지 않음).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM LectureProgress p WHERE p.userId = :userId AND p.lectureId = :lectureId")
+    Optional<LectureProgress> findByUserIdAndLectureIdForUpdate(@Param("userId") Long userId,
+                                                               @Param("lectureId") Long lectureId);
 
     /**
      * 진행 행을 race-safe 하게 생성한다. (user_id, lecture_id) 유니크 제약 위에서
@@ -35,9 +48,6 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
 
     // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 모든 강의 진행 정보(있는 것만)
     List<LectureProgress> findByUserIdAndLectureIdIn(Long userId, List<Long> lectureIds);
-
-    // 강좌 내 강의들 중 사용자가 가장 최근 학습한 진행 정보
-    Optional<LectureProgress> findTopByUserIdAndLectureIdInOrderByUpdatedAtDesc(Long userId, List<Long> lectureIds);
 
     // 사용자의 강좌 내 완료한 강의 수
     long countByUserIdAndLectureIdInAndCompleted(Long userId, List<Long> lectureIds, Boolean completed);

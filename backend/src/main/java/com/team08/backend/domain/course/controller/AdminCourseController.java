@@ -1,10 +1,17 @@
 package com.team08.backend.domain.course.controller;
 
+import com.team08.backend.domain.course.dto.CourseCardResponse;
+import com.team08.backend.domain.course.dto.CourseDetailResponse;
 import com.team08.backend.domain.course.dto.CourseRejectRequest;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.service.CourseService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +22,20 @@ import org.springframework.web.bind.annotation.*;
 public class AdminCourseController {
 
     private final CourseService courseService;
+
+    @GetMapping
+    @ResponseStatus(HttpStatus.OK)
+    public Page<CourseCardResponse> getCoursesForAdmin(
+            @RequestParam(name = "status", required = false) CourseStatus status,
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
+        return courseService.getCoursesForAdmin(status, pageable);
+    }
+
+    @GetMapping("/{courseId}")
+    @ResponseStatus(HttpStatus.OK)
+    public CourseDetailResponse getCourseDetailForAdmin(@PathVariable("courseId") Long courseId) {
+        return courseService.getCourseDetailForAdmin(courseId);
+    }
 
     @PostMapping("/{courseId}/approve")
     @ResponseStatus(HttpStatus.NO_CONTENT)

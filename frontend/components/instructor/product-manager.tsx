@@ -8,7 +8,7 @@ import { Pencil, Plus, Trash2, Ban, RotateCcw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatKRW } from '@/lib/utils'
-import type { Course } from '@/lib/types'
+import type { CategoryResponse, Course } from '@/lib/types'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
@@ -25,65 +25,35 @@ const statusLabel: Record<string, { label: string; variant: 'default' | 'seconda
 }
 
 export function ProductManager({ courses }: { courses: Course[] }) {
-  const [draftCourses, setDraftCourses] = useState<Course[]>([])
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
   const router = useRouter()
 
   useEffect(() => {
-    try {
-      const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]') as string[]
-      const drafts = draftIds
-        .map((id): Course | null => {
-          const raw = localStorage.getItem(`course_draft_${id}`)
-          if (!raw) return null
-          const draft = JSON.parse(raw)
-          return {
-            id,
-            title: draft.title || '',
-            subtitle: '',
-            description: draft.description || '',
-            category: String(draft.categoryId || ''),
-            subCategory: '',
-            thumbnailUrl: draft.thumbnail || '/placeholder.svg',
-            price: draft.price || 0,
-            viewCount: 0,
-            instructor: { id: String(draft.instructorId || ''), name: `강사 ${draft.instructorId || ''}`, title: '' },
-            chapters: [],
-            status: draft.status || 'DRAFT',
-          }
-        })
-        .filter((course): course is Course => Boolean(course))
-      setDraftCourses(drafts)
-    } catch {
-      setDraftCourses([])
-    }
+    api.getCategories()
+      .then(setCategories)
+      .catch(() => setCategories([]))
   }, [])
 
-  const visibleCourses = useMemo(() => {
-    const byId = new Map<string, Course>()
-    courses.forEach((course) => byId.set(course.id, course))
-    draftCourses.forEach((course) => byId.set(course.id, course))
-    return Array.from(byId.values())
-  }, [courses, draftCourses])
+  const categoryLabelById = useMemo(() => {
+    const byId = new Map(categories.map((category) => [String(category.id), category]))
+    return Object.fromEntries(categories.map((category) => {
+      const parent = category.parentCategoryId ? byId.get(String(category.parentCategoryId)) : null
+      const label = parent ? `${parent.name} > ${category.name}` : category.name
+      return [String(category.id), label]
+    }))
+  }, [categories])
 
   const handleDelete = async (courseId: string) => {
     if (!confirm('정말 이 강의를 삭제하시겠습니까?')) return
     setLoadingId(courseId)
     try {
-      if (courseId.startsWith('tmp_')) {
-        const draftIds = JSON.parse(localStorage.getItem('course_draft_ids') || '[]') as string[]
-        const nextDraftIds = draftIds.filter(id => id !== courseId)
-        localStorage.setItem('course_draft_ids', JSON.stringify(nextDraftIds))
-        localStorage.removeItem(`course_draft_${courseId}`)
-        setDraftCourses(prev => prev.filter(c => c.id !== courseId))
-        toast.success('임시저장 강의가 삭제되었습니다.')
-      } else {
-        await api.deleteCourse(courseId)
-        toast.success('강의가 성공적으로 삭제되었습니다.')
-        router.refresh()
-      }
+      await api.deleteCourse(courseId)
+      toast.success('강의가 성공적으로 삭제되었습니다.')
+      router.refresh()
     } catch (e: any) {
-      toast.error(`강의 삭제 실패: ${e.message || e}`)
+      const message = e.message || String(e)
+      toast.error(message.includes('수강생이 존재') ? '수강생이 존재하므로 삭제할 수 없습니다' : `강의 삭제 실패: ${message}`)
     } finally {
       setLoadingId(null)
     }
@@ -134,7 +104,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
       </div>
 
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleCourses.map((c) => {
+        {courses.map((c) => {
           const status = statusLabel[c.status ?? 'DRAFT'] || statusLabel['DRAFT']
           const isInReview = c.status === 'IN_REVIEW' || c.status === 'REVIEW'
           const isOnSale = c.status === 'ON_SALE' || c.status === 'PUBLISHED'
@@ -160,9 +130,19 @@ export function ProductManager({ courses }: { courses: Course[] }) {
                 <div className="p-4 space-y-1">
                   <p className="line-clamp-2 text-sm font-semibold h-10">{c.title}</p>
                   <p className="text-xs text-muted-foreground">
-                    카테고리: {c.category}
+                    카테고리: {categoryLabelById[c.category] ?? c.category}
                   </p>
                   <p className="text-sm font-bold">{formatKRW(c.price)}</p>
+                  {c.status === 'DRAFT' && c.statusReason && (
+                    <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                      심사 반려 사유: {c.statusReason}
+                    </p>
+                  )}
+                  {c.status === 'SUSPENDED' && c.statusReason && (
+                    <p className="rounded-md bg-destructive/10 px-2 py-1 text-xs text-destructive">
+                      판매 중지 사유: {c.statusReason}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -246,7 +226,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
         })}
       </ul>
 
-      {visibleCourses.length === 0 && (
+      {courses.length === 0 && (
         <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
           등록한 강의가 없습니다. 첫 강의를 등록해보세요!
         </div>

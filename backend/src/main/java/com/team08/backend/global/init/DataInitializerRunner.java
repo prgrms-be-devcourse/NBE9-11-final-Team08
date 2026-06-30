@@ -22,7 +22,8 @@ public class DataInitializerRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        switch (mode.toLowerCase()) {
+        String normalizedMode = mode == null ? "none" : mode.trim().toLowerCase();
+        switch (normalizedMode) {
             case "simple" -> {
                 log.info("[DataInit] 간이 데이터 초기화 시작");
                 simpleDataInitializer.init();

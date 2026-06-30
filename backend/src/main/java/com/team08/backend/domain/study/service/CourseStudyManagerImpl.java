@@ -51,18 +51,14 @@ public class CourseStudyManagerImpl implements CourseStudyManager {
     @Transactional
     @Override
     public void closeForCourse(Long courseId) {
-        Study study = studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.DRAFT)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-
-        study.changeToReadOnly();
+        studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.DRAFT)
+                .ifPresent(Study::changeToReadOnly);
     }
 
     @Transactional
     @Override
     public void rejectForCourse(Long courseId) {
-        Study study = studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.ACTIVE)
-                .orElseThrow(() -> new CustomException(ErrorCode.STUDY_NOT_FOUND));
-
-        study.changeToInactive();
+        studyRepository.findByCourseIdAndStatusNot(courseId, StudyStatus.ACTIVE)
+                .ifPresent(Study::changeToInactive);
     }
 }

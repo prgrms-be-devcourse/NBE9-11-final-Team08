@@ -4,6 +4,7 @@ import com.team08.backend.domain.chapter.entity.Chapter;
 import com.team08.backend.domain.chapter.repository.ChapterRepository;
 import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
 import com.team08.backend.domain.course.access.CourseAction;
+import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.lastwatchedlecture.service.LastWatchedLectureService;
 import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.dto.LectureCreateRequest;
@@ -17,11 +18,13 @@ import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.global.util.FileUrlFormatter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -74,14 +77,18 @@ public class LectureService {
 
     @Transactional
     public Long createLecture(Long courseId, Long chapterId, Long userId, LectureCreateRequest request) {
-        // TODO: course access 검증 추가. 도훈님 확인 필요
-         courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
+        courseAccessAuthorizer.authorizeByCourseId(courseId, userId, CourseAction.MANAGE_COURSE);
 
         Chapter chapter = chapterRepository.findByIdWithCourse(chapterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHAPTER_NOT_FOUND));
 
         if (!chapter.getCourse().getId().equals(courseId)) {
             throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
+        }
+
+        CourseStatus status = chapter.getCourse().getStatus();
+        if (status == CourseStatus.ON_SALE || status == CourseStatus.SUSPENDED) {
+            throw new CustomException(ErrorCode.COURSE_ALREADY_ON_SALE);
         }
 
         Lecture lecture = request.toEntity(chapter);

@@ -13,8 +13,6 @@ import com.team08.backend.domain.studymember.entity.StudyMemberStatus;
 import com.team08.backend.domain.studymember.repository.StudyMemberRepository;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
-import com.team08.backend.global.exception.CustomException;
-import com.team08.backend.global.exception.ErrorCode;
 import com.team08.backend.support.TestEntityFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -127,10 +125,7 @@ public class CourseStudyManagerTest {
                 .willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() ->
-                courseStudyManager.closeForCourse(courseId)
-        ).isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.STUDY_NOT_FOUND.getMessage());
+        courseStudyManager.closeForCourse(courseId);
     }
 
     @Test
@@ -158,10 +153,7 @@ public class CourseStudyManagerTest {
                 .willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() ->
-                courseStudyManager.rejectForCourse(courseId)
-        ).isInstanceOf(CustomException.class)
-                .hasMessageContaining(ErrorCode.STUDY_NOT_FOUND.getMessage());
+        courseStudyManager.rejectForCourse(courseId);
     }
 
     @Test

@@ -12,10 +12,10 @@ import type { Course } from '@/lib/types'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-const sorts = ['VIEW_DESC', 'LATEST', 'PRICE_ASC'] as const
+const sorts = ['VIEW_DESC', 'CREATED_DESC', 'PRICE_ASC'] as const
 const sortLabels: Record<string, string> = {
   VIEW_DESC: '인기순',
-  LATEST: '최신순',
+  CREATED_DESC: '최신순',
   PRICE_ASC: '낮은가격순',
 }
 

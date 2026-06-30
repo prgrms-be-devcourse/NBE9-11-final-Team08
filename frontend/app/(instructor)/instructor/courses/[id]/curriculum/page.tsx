@@ -12,7 +12,7 @@ export default async function EditCurriculumPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const course = await api.getCourse(id)
+  const course = await api.getInstructorCourse(id)
   if (!course) notFound()
   return (
     <CurriculumPage
