@@ -549,6 +549,7 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
     category: category,
     type: isRate ? 'discount' : 'firstcome',
     status: isAvailable ? 'ACTIVE' : 'ENDED',
+    originalStatus: coupon.status,
     usageType: usageTypeStr,
     isStackable: coupon.isStackable ?? (coupon as any).stackable ?? false,
     maxDiscountAmount: coupon.maxDiscountAmount,

@@ -167,7 +167,17 @@ function CouponCard({
               <Ticket className="h-4 w-4" />
             </span>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap justify-end gap-1.5">
+            {!isActive && coupon.originalStatus === 'USED' && (
+              <Badge className="bg-slate-500 hover:bg-slate-500 text-white text-[10px] border-transparent">
+                사용 완료
+              </Badge>
+            )}
+            {!isActive && coupon.originalStatus === 'EXPIRED' && (
+              <Badge variant="destructive" className="text-[10px]">
+                기간 만료
+              </Badge>
+            )}
             {coupon.isStackable && (
               <Badge variant="outline" className={isActive ? 'border-primary/30 bg-primary/5 text-primary text-[10px]' : 'text-[10px]'}>
                 중복 가능

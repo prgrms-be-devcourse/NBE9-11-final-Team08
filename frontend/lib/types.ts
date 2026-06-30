@@ -240,6 +240,7 @@ export interface Coupon {
   category: '진행 중인 이벤트' | '종료된 이벤트'
   type: 'discount' | 'attendance' | 'firstcome'
   status?: 'SCHEDULED' | 'ACTIVE' | 'ENDED'
+  originalStatus?: string
   startDate?: string | null
   endDate?: string | null
   validDays?: number | null
