@@ -1,6 +1,6 @@
 'use client'
 
-import { CalendarDays, Clock, Download, MessageSquare, PlayCircle } from 'lucide-react'
+import { CalendarDays, Clock, Download, MessageSquare, PlayCircle, RefreshCw } from 'lucide-react'
 import {
   Area,
   AreaChart,
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/chart'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { cn } from '@/lib/utils'
+import { cn, formatDateTime } from '@/lib/utils'
 import type { StudyReport } from '@/lib/types'
 
 const chartConfig = {
@@ -110,10 +110,19 @@ function StudyCalendar({ calendar }: { calendar: CalendarDay[] }) {
   )
 }
 
-export function ReportView({ report }: { report: StudyReport }) {
+export function ReportView({
+  report,
+  onRefresh,
+  refreshing = false,
+}: {
+  report: StudyReport
+  // 제공되면 헤더에 "갱신하기" 버튼을 노출한다. 미제공(예: 정적 미리보기)이면 버튼을 숨긴다.
+  onRefresh?: () => void
+  refreshing?: boolean
+}) {
   const stats = [
     { icon: Clock, label: '총 학습시간', value: report.totalStudyTime },
-    { icon: MessageSquare, label: '작성 댓글 수', value: report.commentCount === -1 ? '기능 없음' : `${report.commentCount}개` },
+    { icon: MessageSquare, label: '작성 질문 수', value: report.commentCount === -1 ? '기능 없음' : `${report.commentCount}개` },
     { icon: CalendarDays, label: '수강일 수', value: report.studyDays === -1 ? '기능 없음' : `${report.studyDays}일` },
   ]
 
@@ -125,16 +134,21 @@ export function ReportView({ report }: { report: StudyReport }) {
           <h1 className="mt-1 text-2xl font-bold">{report.userName}님의 리포트</h1>
           <p className="mt-1 text-sm text-muted-foreground">{report.period}</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => toast.success('PDF 다운로드를 준비 중입니다.')}
-        >
-          <Download className="mr-1 h-4 w-4" /> PDF 다운로드
-        </Button>
+        {onRefresh && (
+          <div className="flex flex-col items-end gap-1.5">
+            <p className="text-xs text-muted-foreground">
+              마지막 갱신: {report.updatedAt ? formatDateTime(report.updatedAt) : '기록 없음'}
+            </p>
+            <Button size="sm" variant="outline" onClick={onRefresh} disabled={refreshing}>
+              <RefreshCw className={cn('mr-1.5 h-4 w-4', refreshing && 'animate-spin')} />
+              {refreshing ? '갱신 중…' : '갱신하기'}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border bg-foreground p-6 text-background">
-        <p className="text-sm text-background/70">완주를 축하드립니다!</p>
+        <p className="text-sm text-background/70">오늘도 화이팅!</p>
         <p className="mt-1 text-lg font-semibold text-balance">
           {report.studyDays !== -1 ? (
             <>

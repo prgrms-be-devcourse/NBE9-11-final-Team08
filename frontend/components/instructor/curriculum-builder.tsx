@@ -1,8 +1,8 @@
 // frontend/components/instructor/curriculum-builder.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
-import { FileVideo, GripVertical, ImageUp, Plus, Trash2, Save, Loader2 } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { FileVideo, GripVertical, ImageUp, Plus, Trash2, Save, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -50,6 +50,19 @@ export function CurriculumBuilder({
   const [saving, setSaving] = useState(false)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
 
+  // Accordion Expand State for Lectures
+  const [expandedLectureIds, setExpandedLectureIds] = useState<Record<string, boolean>>({})
+
+  // Drag and Drop State
+  const [draggedChapterIndex, setDraggedChapterIndex] = useState<number | null>(null)
+  const [draggedLectureIndex, setDraggedLectureIndex] = useState<number | null>(null)
+  const [dragOverChapterIndex, setDragOverChapterIndex] = useState<number | null>(null)
+  const [dragOverLectureIndex, setDragOverLectureIndex] = useState<number | null>(null)
+
+  const isReadOnly = useMemo(() => {
+    return course?.status === 'ON_SALE' || course?.status === 'SUSPENDED'
+  }, [course])
+
   const loadCurriculum = async (
     shouldShowToastError = true,
     preferredActiveIndex?: number,
@@ -60,7 +73,7 @@ export function CurriculumBuilder({
       return
     }
     try {
-      const course = await api.getCourse(courseId)
+      const course = await api.getInstructorCourse(courseId)
       setCourse(course ?? null)
       if (course) {
         const mappedChapters = (course.chapters ?? []).map((ch) => ({
@@ -121,6 +134,7 @@ export function CurriculumBuilder({
   const nextId = () => `tmp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
   const addChapter = () => {
+    if (isReadOnly) return
     const id = nextId()
     setChapters((prev) => [
       ...prev,
@@ -130,6 +144,7 @@ export function CurriculumBuilder({
   }
 
   const removeChapter = (cid: string) => {
+    if (isReadOnly) return
     setChapters((prev) => {
       const next = prev.filter((c) => c.id !== cid)
       if (cid === activeId) setActiveId(next[0]?.id ?? '')
@@ -140,7 +155,9 @@ export function CurriculumBuilder({
   const updateChapterTitle = (cid: string, title: string) =>
     setChapters((prev) => prev.map((c) => (c.id === cid ? { ...c, title } : c)))
 
-  const addLecture = (cid: string) =>
+  const addLecture = (cid: string) => {
+    if (isReadOnly) return
+    const id = nextId()
     setChapters((prev) =>
       prev.map((c) =>
         c.id === cid
@@ -148,19 +165,23 @@ export function CurriculumBuilder({
               ...c,
               lectures: [
                 ...c.lectures,
-                { id: nextId(), title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
+                { id, title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
               ],
             }
           : c,
       ),
     )
+    setExpandedLectureIds((prev) => ({ ...prev, [id]: true }))
+  }
 
-  const removeLecture = (cid: string, lid: string) =>
+  const removeLecture = (cid: string, lid: string) => {
+    if (isReadOnly) return
     setChapters((prev) =>
       prev.map((c) =>
         c.id === cid ? { ...c, lectures: c.lectures.filter((l) => l.id !== lid) } : c,
       ),
     )
+  }
 
   const updateLecture = (cid: string, lid: string, patch: Partial<LectureDraft>) =>
     setChapters((prev) =>
@@ -174,9 +195,7 @@ export function CurriculumBuilder({
       ),
     )
 
-  // 💡 비디오 파일 감지 및 로컬 큐(Queue) 상태 스태킹 전환
   const handleVideoSelect = (lectureId: string, file: File) => {
-    // 비디오 파일에서 실제 재생 시간(duration)을 감지합니다.
     const video = document.createElement('video')
     video.preload = 'metadata'
     video.onloadedmetadata = () => {
@@ -221,7 +240,6 @@ export function CurriculumBuilder({
       return
     }
 
-    // 💡 1. 업로드 대기 중인 비디오 파일들을 챕터 타이틀과 렉처 타이틀 기준으로 스케줄링 큐에 임시 적재합니다.
     const pendingUploads = chapters.flatMap((chapter, chapterIndex) =>
       chapter.lectures
         .map((lecture, lectureIndex) => ({
@@ -242,7 +260,6 @@ export function CurriculumBuilder({
       const parsedCategoryId = Number(rawCat);
       const safeCategoryId = Number.isFinite(parsedCategoryId) && parsedCategoryId > 0 ? parsedCategoryId : 1;
 
-      // 백엔드 CourseUpdateRequest DTO 규격 일치
       const requestData = {
         title: course.title || '임시 강좌 제목',
         description: course.description || '강좌 세부 커리큘럼 명세 및 강의 구성 정보 단락입니다.',
@@ -271,13 +288,10 @@ export function CurriculumBuilder({
       
       formData.append('request', requestBlob)
 
-      // 💡 2. [텍스트 커리큘럼 저장] 먼저 백엔드 DB에 영속화 시켜 진짜 PK ID 발급을 유도합니다.
       await api.updateCourse(courseId, formData)
 
-      // 💡 3. 저장 직후 최신 백엔드 정보를 다시 sync 조회해 옵니다.
-      const refreshedCourse = await api.getCourse(courseId)
+      const refreshedCourse = await api.getInstructorCourse(courseId)
       
-      // 💡 4. 새로 발급된 진짜 렉처 정수 ID를 역추적해서 대기 중이던 대용량 비디오 파일들을 연쇄 호출 업로드합니다.
       let videoUploadFailed = false
       const uploadedVideoNames: Record<string, string> = {}
       if (refreshedCourse && refreshedCourse.chapters) {
@@ -330,230 +344,402 @@ export function CurriculumBuilder({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-      <aside className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">챕터 목록</h2>
-          <span className="text-xs text-muted-foreground">{chapters.length}개</span>
+    <div className="space-y-4">
+      {isReadOnly && (
+        <div className="flex items-center gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 p-4 text-sm text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div>
+            <p className="font-semibold text-[13px]">공개 판매 중인 강좌 알림</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              이미 판매 중인 강좌는 수강생 보호를 위해 챕터 및 강의의 추가/삭제가 제한됩니다. 
+              기존 강의의 영상 교체나 텍스트 수정은 아래의 강의 상세 항목에서 정상적으로 수정하여 저장하실 수 있습니다.
+            </p>
+          </div>
         </div>
+      )}
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        <aside className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">챕터 목록</h2>
+            <span className="text-xs text-muted-foreground">{chapters.length}개</span>
+          </div>
 
-        <ul className="space-y-2">
-          {chapters.map((c) => {
-            const isActive = c.id === active?.id
-            return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={() => setActiveId(c.id)}
+          <ul className="space-y-2">
+            {chapters.map((c, index) => {
+              const isActive = c.id === active?.id
+              const isDragging = index === draggedChapterIndex
+              const isDragOver = index === dragOverChapterIndex
+              return (
+                <li
+                  key={c.id}
+                  draggable={!isReadOnly}
+                  onDragStart={(e) => {
+                    if (isReadOnly) return
+                    setDraggedChapterIndex(index)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragOver={(e) => {
+                    if (isReadOnly) return
+                    e.preventDefault()
+                    if (draggedChapterIndex === index) return
+                    setDragOverChapterIndex(index)
+                  }}
+                  onDragEnd={() => {
+                    setDraggedChapterIndex(null)
+                    setDragOverChapterIndex(null)
+                  }}
+                  onDrop={async (e) => {
+                    if (isReadOnly) return
+                    e.preventDefault()
+                    if (draggedChapterIndex === null || draggedChapterIndex === index) return
+
+                    const nextChapters = [...chapters]
+                    const [draggedItem] = nextChapters.splice(draggedChapterIndex, 1)
+                    nextChapters.splice(index, 0, draggedItem)
+
+                    const originalChapters = [...chapters]
+                    setChapters(nextChapters)
+
+                    const hasTempChapter = nextChapters.some((ch) => ch.id.startsWith('tmp_'))
+                    if (!hasTempChapter && courseId) {
+                      try {
+                        const reorders = nextChapters.map((ch, idx) => ({
+                          chapterId: Number(ch.id),
+                          orderNo: idx + 1,
+                        }))
+                        await api.reorderChapters(courseId, reorders)
+                        toast.success('챕터 순서가 변경되었습니다.')
+                      } catch (err: unknown) {
+                        setChapters(originalChapters)
+                        const msg = err instanceof Error ? err.message : String(err)
+                        toast.error(`순서 저장에 실패했습니다: ${msg}`)
+                      }
+                    } else if (hasTempChapter) {
+                      toast.info('저장되지 않은 챕터가 있습니다. 우측 하단의 [커리큘럼 저장] 버튼을 누르면 순서가 최종 저장됩니다.')
+                    }
+
+                    setDraggedChapterIndex(null)
+                    setDragOverChapterIndex(null)
+                  }}
                   className={cn(
-                    'flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-secondary',
-                    isActive && 'border-primary bg-secondary font-medium',
+                    'transition-all duration-200 rounded-lg',
+                    isDragging && 'opacity-40 border-dashed border-2 border-primary',
+                    isDragOver && 'border-t-2 border-primary pt-1',
                   )}
                 >
-                  <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="line-clamp-1 flex-1">{c.title}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {c.lectures.length}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+                  <button
+                    type="button"
+                    onClick={() => setActiveId(c.id)}
+                    className={cn(
+                      'flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-secondary cursor-grab active:cursor-grabbing',
+                      isActive && 'border-primary bg-secondary font-medium',
+                    )}
+                  >
+                    <GripVertical className="size-4 shrink-0 text-muted-foreground cursor-grab" aria-hidden />
+                    <span className="line-clamp-1 flex-1">{c.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {c.lectures.length}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
 
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addChapter}
-          className="w-full gap-1.5"
-        >
-          <Plus className="size-4" /> 새 챕터 추가
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addChapter}
+            disabled={isReadOnly}
+            className="w-full gap-1.5"
+          >
+            <Plus className="size-4" /> 새 챕터 추가
+          </Button>
 
-        <Button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="mt-6 w-full gap-1.5"
-        >
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-          커리큘럼 저장
-        </Button>
-      </aside>
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="mt-6 w-full gap-1.5"
+          >
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            커리큘럼 저장
+          </Button>
+        </aside>
 
-      <section className="space-y-4">
-        {active ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="chapter-title" className="text-xs text-muted-foreground">
-                  챕터명
-                </Label>
-                <Input
-                  id="chapter-title"
-                  value={active.title}
-                  onChange={(e) => updateChapterTitle(active.id, e.target.value)}
-                  className="h-9 font-medium"
-                />
+        <section className="space-y-4">
+          {active ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="chapter-title" className="text-xs text-muted-foreground">
+                    챕터명
+                  </Label>
+                  <Input
+                    id="chapter-title"
+                    value={active.title}
+                    onChange={(e) => updateChapterTitle(active.id, e.target.value)}
+                    className="h-9 font-medium"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeChapter(active.id)}
+                  disabled={isReadOnly}
+                  className="self-end text-muted-foreground hover:text-destructive"
+                >
+                  <Trash2 className="mr-1 size-4" /> 챕터 삭제
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => removeChapter(active.id)}
-                className="self-end text-muted-foreground hover:text-destructive"
-              >
-                <Trash2 className="mr-1 size-4" /> 챕터 삭제
-              </Button>
-            </div>
 
-            <p className="text-sm text-muted-foreground">
-              강의 목록 · 총 {totalLectures}개 강의 중 {active.lectures.length}개
-            </p>
+              <p className="text-sm text-muted-foreground">
+                강의 목록 · 총 {totalLectures}개 강의 중 {active.lectures.length}개
+              </p>
 
-            <div className="space-y-4">
-              {active.lectures.map((lecture, index) => (
-                <article key={lecture.id} className="rounded-xl border bg-card p-4">
-                  <div className="flex items-center gap-2">
-                    <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="text-sm font-semibold">강의 {index + 1}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="ml-auto size-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeLecture(active.id, lecture.id)}
-                      aria-label="강의 삭제"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
+              <div className="space-y-4">
+                {active.lectures.map((lecture, index) => {
+                  const isDragging = index === draggedLectureIndex
+                  const isDragOver = index === dragOverLectureIndex
+                  return (
+                    <article
+                      key={lecture.id}
+                      draggable={!isReadOnly}
+                      onDragStart={(e) => {
+                        if (isReadOnly) return
+                        setDraggedLectureIndex(index)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      onDragOver={(e) => {
+                        if (isReadOnly) return
+                        e.preventDefault()
+                        if (draggedLectureIndex === index) return
+                        setDragOverLectureIndex(index)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedLectureIndex(null)
+                        setDragOverLectureIndex(null)
+                      }}
+                      onDrop={async (e) => {
+                        if (isReadOnly) return
+                        e.preventDefault()
+                        if (draggedLectureIndex === null || draggedLectureIndex === index) return
 
-                  <div className="mt-3 grid gap-4">
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={`title-${lecture.id}`}>강의 제목</Label>
-                      <Input
-                        id={`title-${lecture.id}`}
-                        value={lecture.title}
-                        onChange={(e) =>
-                          updateLecture(active.id, lecture.id, { title: e.target.value })
+                        const nextLectures = [...active.lectures]
+                        const [draggedItem] = nextLectures.splice(draggedLectureIndex, 1)
+                        nextLectures.splice(index, 0, draggedItem)
+
+                        const originalChapters = [...chapters]
+                        const nextChapters = chapters.map((c) =>
+                          c.id === active.id ? { ...c, lectures: nextLectures } : c
+                        )
+                        setChapters(nextChapters)
+
+                        const hasTempLecture = nextLectures.some((lec) => lec.id.startsWith('tmp_'))
+                        const isTempChapter = active.id.startsWith('tmp_')
+
+                        if (!hasTempLecture && !isTempChapter) {
+                          try {
+                            const reorders = nextLectures.map((lec, idx) => ({
+                              lectureId: Number(lec.id),
+                              orderNo: idx + 1,
+                            }))
+                            await api.reorderLectures(active.id, reorders)
+                            toast.success('강의 순서가 변경되었습니다.')
+                          } catch (err: unknown) {
+                            setChapters(originalChapters)
+                            const msg = err instanceof Error ? err.message : String(err)
+                            toast.error(`순서 저장에 실패했습니다: ${msg}`)
+                          }
+                        } else {
+                          toast.info('저장되지 않은 강의/챕터가 있습니다. 우측 하단의 [커리큘럼 저장] 버튼을 누르면 순서가 최종 저장됩니다.')
                         }
-                        placeholder="예: What is OOP?"
-                      />
-                    </div>
 
-                    <div className="grid gap-1.5">
-                      <Label>강의 영상</Label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          id={`video-input-${lecture.id}`}
-                          accept="video/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            // 💡 임시 ID 가드를 해제하고 로컬 스케줄 큐에 안전 인서트 작동
-                            if (file) handleVideoSelect(lecture.id, file)
-                          }}
-                          disabled={saving || uploadingId !== null}
+                        setDraggedLectureIndex(null)
+                        setDragOverLectureIndex(null)
+                      }}
+                      className={cn(
+                        'rounded-xl border bg-card p-3 transition-all duration-200 shadow-sm hover:shadow',
+                        isDragging && 'opacity-40 border-dashed border-2 border-primary',
+                        isDragOver && 'border-t-2 border-primary pt-1',
+                      )}
+                    >
+                      {/* 카드 헤더 (토글 영역) */}
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer select-none py-1"
+                        onClick={() => setExpandedLectureIds(prev => ({ ...prev, [lecture.id]: !prev[lecture.id] }))}
+                      >
+                        <GripVertical 
+                          className="size-4 shrink-0 text-muted-foreground cursor-grab active:cursor-grabbing hover:text-foreground" 
+                          onClick={(e) => e.stopPropagation()} 
+                          aria-hidden 
                         />
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          강의 {index + 1}
+                        </span>
+                        <span className="text-sm font-medium line-clamp-1 flex-1 pl-1 text-foreground">
+                          {lecture.title || '제목 없는 강의'}
+                        </span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeLecture(active.id, lecture.id)}
+                            disabled={isReadOnly}
+                            aria-label="강의 삭제"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:bg-secondary"
+                            onClick={() => setExpandedLectureIds(prev => ({ ...prev, [lecture.id]: !prev[lecture.id] }))}
+                            aria-label="상세 토글"
+                          >
+                            {expandedLectureIds[lecture.id] ? (
+                              <ChevronUp className="size-4" />
+                            ) : (
+                              <ChevronDown className="size-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 카드 내용 (확장 시 노출) */}
+                      {expandedLectureIds[lecture.id] && (
+                        <div className="mt-4 pt-3 border-t grid gap-4 transition-all duration-200 animate-in fade-in-50 slide-in-from-top-1">
+                          <div className="grid gap-1.5">
+                        <Label htmlFor={`title-${lecture.id}`}>강의 제목</Label>
+                        <Input
+                          id={`title-${lecture.id}`}
+                          value={lecture.title}
+                          onChange={(e) =>
+                            updateLecture(active.id, lecture.id, { title: e.target.value })
+                          }
+                          placeholder="예: What is OOP?"
+                        />
+                      </div>
+
+                      <div className="grid gap-1.5">
+                        <Label>강의 영상</Label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id={`video-input-${lecture.id}`}
+                            accept="video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleVideoSelect(lecture.id, file)
+                            }}
+                            disabled={saving || uploadingId !== null}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.getElementById(`video-input-${lecture.id}`)?.click()
+                            }}
+                            disabled={saving || uploadingId !== null}
+                            className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary w-full"
+                          >
+                            {uploadingId === lecture.id ? (
+                              <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                                <Loader2 className="size-4 animate-spin" />
+                                업로드 중...
+                              </span>
+                            ) : (
+                              <>
+                                <span className="flex items-center gap-1.5 text-sm font-medium">
+                                  <FileVideo className="size-4" />
+                                  {lecture.videoName ??
+                                    (lecture.hasVideo ? '업로드된 영상' : '영상 파일 업로드')}
+                                </span>
+                                <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB · 언제든 파일 미리 대기 가능</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-1.5">
+                        <Label htmlFor={`desc-${lecture.id}`}>설명</Label>
+                        <Textarea
+                          id={`desc-${lecture.id}`}
+                          value={lecture.description}
+                          onChange={(e) =>
+                            updateLecture(active.id, lecture.id, {
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="강의 내용을 간략히 설명하세요."
+                          className="min-h-20"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 py-1">
+                        <Checkbox
+                          id={`free-preview-${lecture.id}`}
+                          checked={lecture.isFreePreview ?? false}
+                          onCheckedChange={(checked) =>
+                            updateLecture(active.id, lecture.id, { isFreePreview: !!checked })
+                          }
+                        />
+                        <Label
+                          htmlFor={`free-preview-${lecture.id}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          무료 미리보기 강의로 설정
+                        </Label>
+                      </div>
+
+                      <div className="grid gap-1.5">
+                        <Label>썸네일</Label>
                         <button
                           type="button"
-                          onClick={() => {
-                            document.getElementById(`video-input-${lecture.id}`)?.click()
-                          }}
-                          disabled={saving || uploadingId !== null}
-                          className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-6 text-muted-foreground transition-colors hover:bg-secondary w-full"
+                          onClick={() =>
+                            toast.info('썸네일 업로드는 데모에서 비활성화되어 있습니다.')
+                          }
+                          className="flex aspect-video w-32 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary"
                         >
-                          {uploadingId === lecture.id ? (
-                            <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
-                              <Loader2 className="size-4 animate-spin" />
-                              업로드 중...
-                            </span>
-                          ) : (
-                            <>
-                              <span className="flex items-center gap-1.5 text-sm font-medium">
-                                <FileVideo className="size-4" />
-                                {lecture.videoName ??
-                                  (lecture.hasVideo ? '업로드된 영상' : '영상 파일 업로드')}
-                              </span>
-                              <span className="text-[11px]">MP4, MOV 지원 · 최대 2GB · 언제든 파일 미리 대기 가능</span>
-                            </>
-                          )}
+                          <ImageUp className="size-5" />
+                          <span className="text-[11px]">썸네일 업로드</span>
                         </button>
                       </div>
                     </div>
-
-                    <div className="grid gap-1.5">
-                      <Label htmlFor={`desc-${lecture.id}`}>설명</Label>
-                      <Textarea
-                        id={`desc-${lecture.id}`}
-                        value={lecture.description}
-                        onChange={(e) =>
-                          updateLecture(active.id, lecture.id, {
-                            description: e.target.value,
-                          })
-                        }
-                        placeholder="강의 내용을 간략히 설명하세요."
-                        className="min-h-20"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 py-1">
-                      <Checkbox
-                        id={`free-preview-${lecture.id}`}
-                        checked={lecture.isFreePreview ?? false}
-                        onCheckedChange={(checked) =>
-                          updateLecture(active.id, lecture.id, { isFreePreview: !!checked })
-                        }
-                      />
-                      <Label
-                        htmlFor={`free-preview-${lecture.id}`}
-                        className="text-sm font-medium leading-none cursor-pointer"
-                      >
-                        무료 미리보기 강의로 설정
-                      </Label>
-                    </div>
-
-                    <div className="grid gap-1.5">
-                      <Label>썸네일</Label>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toast.info('썸네일 업로드는 데모에서 비활성화되어 있습니다.')
-                        }
-                        className="flex aspect-video w-32 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-muted-foreground transition-colors hover:bg-secondary"
-                      >
-                        <ImageUp className="size-5" />
-                        <span className="text-[11px]">썸네일 업로드</span>
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </article>
-              ))}
+                )
+              })}
 
-              {active.lectures.length === 0 ? (
-                <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
-                  아직 강의가 없습니다. 새 강의를 추가하세요.
-                </div>
-              ) : null}
+                {active.lectures.length === 0 ? (
+                  <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    아직 강의가 없습니다. 새 강의를 추가하세요.
+                  </div>
+                ) : null}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addLecture(active.id)}
+                disabled={isReadOnly}
+                className="w-full gap-1.5"
+              >
+                <Plus className="size-4" /> 새 강의 추가
+              </Button>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed py-20 text-center text-sm text-muted-foreground">
+              챕터를 추가해 커리큘럼 구성을 시작하세요.
             </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => addLecture(active.id)}
-              className="w-full gap-1.5"
-            >
-              <Plus className="size-4" /> 새 강의 추가
-            </Button>
-          </>
-        ) : (
-          <div className="rounded-xl border border-dashed py-20 text-center text-sm text-muted-foreground">
-            챕터를 추가해 커리큘럼 구성을 시작하세요.
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
     </div>
   )
 }

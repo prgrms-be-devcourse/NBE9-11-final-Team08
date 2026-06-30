@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import type { Chapter, Course } from '@/lib/types'
+import type { CategoryResponse, Chapter, Course } from '@/lib/types'
 
-const subCategories = ['백엔드', '프론트엔드', '데브옵스', '프로그래밍 언어', '업무 생산성']
+const allowedCourseCategoryNames = ['DevOps', '백엔드', '마케팅', '프론트엔드', 'UI/UX']
+const categoryId = (category: CategoryResponse) => String(category.id)
 
 const buildChapterUpdatePayload = (chapters: Chapter[]) =>
   chapters.map((chapter, chapterIndex) => ({
@@ -42,18 +43,15 @@ const buildChapterUpdatePayload = (chapters: Chapter[]) =>
 export function CourseForm({ course }: { course?: Course }) {
   const router = useRouter()
   const editing = Boolean(course)
-  
+
   const [title, setTitle] = useState(course?.title ?? '')
   const [mainCat, setMainCat] = useState(course?.category ?? '')
-  const [subCat, setSubCat] = useState(course?.subCategory ?? '')
   const [price, setPrice] = useState(course ? String(course.price) : '')
   const [description, setDescription] = useState(course?.description ?? '')
   const [tags, setTags] = useState<string[]>(course?.tags ?? [])
   const [tagInput, setTagInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [categoryOptions, setCategoryOptions] = useState<string[]>(
-    course?.category ? [course.category] : [],
-  )
+  const [categories, setCategories] = useState<CategoryResponse[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
@@ -67,32 +65,23 @@ export function CourseForm({ course }: { course?: Course }) {
 
   useEffect(() => {
     let active = true
-    api.getCourses(0, 100)
+    api.getCategories()
       .then((response) => {
         if (!active) return
-        const next = Array.from(
-          new Set(
-            response.content
-              .map((item) => item.category)
-              .filter((value): value is string => Boolean(value)),
-          ),
-        )
-        setCategoryOptions(
-          Array.from(new Set([course?.category, ...next].filter(Boolean) as string[])),
-        )
+        setCategories(response)
       })
-      .catch(() => {
-        if (course?.category) setCategoryOptions([course.category])
-      })
+      .catch(() => setCategories([]))
     return () => {
       active = false
     }
   }, [course?.category])
 
+  const mainCategories = categories.filter((category) => allowedCourseCategoryNames.includes(category.name))
+
   useEffect(() => {
     if (!course?.id) return
     let active = true
-    api.getCourse(course.id).then((fresh) => {
+    api.getInstructorCourse(course.id).then((fresh) => {
       if (!active || !fresh?.chapters?.length) return
       setCourseChapters(fresh.chapters)
     })
@@ -127,7 +116,8 @@ export function CourseForm({ course }: { course?: Course }) {
       toast.success('강의가 성공적으로 삭제되었습니다.')
       router.push('/instructor')
     } catch (error: any) {
-      toast.error(`강의 삭제 실패: ${error.message || error}`)
+      const message = error.message || String(error)
+      toast.error(message.includes('수강생이 존재') ? '수강생이 존재하므로 삭제할 수 없습니다' : `강의 삭제 실패: ${message}`)
     } finally {
       setLoading(false)
     }
@@ -162,8 +152,9 @@ export function CourseForm({ course }: { course?: Course }) {
   }
 
   const handleSubmit = async (status: 'DRAFT' | 'REVIEW') => {
-    const categoryId = Number(mainCat)
-    if (!title.trim() || !price || !Number.isFinite(categoryId)) {
+    const selectedCategoryId = mainCat
+    const selectedCategoryNumber = Number(selectedCategoryId)
+    if (!title.trim() || !price || !selectedCategoryId || !Number.isFinite(selectedCategoryNumber)) {
       toast.error('필수 항목(제목, 가격, 대분류)을 입력해주세요.')
       return
     }
@@ -171,7 +162,7 @@ export function CourseForm({ course }: { course?: Course }) {
     setLoading(true)
     try {
       if (editing && course) {
-        const freshCourse = await api.getCourse(course.id)
+        const freshCourse = await api.getInstructorCourse(course.id)
         const chaptersForUpdate =
           freshCourse?.chapters?.length ? freshCourse.chapters : courseChapters
 
@@ -194,17 +185,17 @@ export function CourseForm({ course }: { course?: Course }) {
         const requestData = {
           title,
           description,
-          categoryId,
+          categoryId: selectedCategoryNumber,
           price: Number(price),
           thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
           chapters: buildChapterUpdatePayload(chaptersForUpdate),
         }
 
         const requestBlob = new Blob(
-          [JSON.stringify(requestData)], 
+          [JSON.stringify(requestData)],
           { type: 'application/json' }
         )
-        
+
         formData.append('request', requestBlob)
 
         if (thumbnailFile) {
@@ -228,16 +219,16 @@ export function CourseForm({ course }: { course?: Course }) {
         const requestData = {
           title,
           description,
-          categoryId,
+          categoryId: selectedCategoryNumber,
           price: Number(price),
           thumbnail: previewUrl || 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
         }
 
         const requestBlob = new Blob(
-          [JSON.stringify(requestData)], 
+          [JSON.stringify(requestData)],
           { type: 'application/json' }
         )
-        
+
         formData.append('request', requestBlob)
 
         if (thumbnailFile) {
@@ -288,7 +279,7 @@ export function CourseForm({ course }: { course?: Course }) {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
               <div className="grid gap-2">
                 <Label>대분류</Label>
                 <Select value={mainCat} onValueChange={(value) => setMainCat(value ?? '')} disabled={isReadOnly || loading}>
@@ -296,24 +287,9 @@ export function CourseForm({ course }: { course?: Course }) {
                     <SelectValue placeholder="대분류 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categoryOptions.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          카테고리 {c}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>소분류</Label>
-                <Select value={subCat} onValueChange={(value) => setSubCat(value ?? '')} disabled={isReadOnly || loading}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="소분류 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subCategories.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
+                    {mainCategories.map((c) => (
+                      <SelectItem key={c.id} value={categoryId(c)}>
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -332,58 +308,11 @@ export function CourseForm({ course }: { course?: Course }) {
                 disabled={isReadOnly || loading}
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="tags">태그 / 키워드</Label>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="gap-1">
-                    {t}
-                    <button
-                      type="button"
-                      onClick={() => setTags((p) => p.filter((x) => x !== t))}
-                      aria-label={`${t} 삭제`}
-                      disabled={isReadOnly || loading}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  id="tags"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addTag()
-                    }
-                  }}
-                  placeholder="태그 입력 후 Enter"
-                  disabled={isReadOnly || loading}
-                />
-                <Button type="button" variant="outline" onClick={addTag} disabled={isReadOnly || loading}>
-                  추가
-                </Button>
-              </div>
-            </div>
           </section>
 
           <section className="space-y-3 rounded-xl border bg-card p-5">
             <div className="flex items-center justify-between">
               <Label htmlFor="desc">상세 설명</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground"
-                onClick={() => toast.info('AI 설명 생성 기능은 곧 제공될 예정입니다.')}
-                disabled={isReadOnly || loading}
-              >
-                <Sparkles className="mr-1 h-3.5 w-3.5" /> AI로 생성
-              </Button>
             </div>
             <Textarea
               id="desc"
@@ -418,11 +347,11 @@ export function CourseForm({ course }: { course?: Course }) {
         <div className="space-y-6">
           <section className="rounded-xl border bg-card p-5">
             <Label>커버 이미지</Label>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/jpeg, image/png" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/jpeg, image/png"
               onChange={handleFileChange}
               disabled={isReadOnly || loading}
             />
@@ -486,7 +415,7 @@ export function CourseForm({ course }: { course?: Course }) {
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {editing ? '수정 완료' : '임시저장'}
                 </Button>
-                
+
                 {isOnSale && (
                   <Button
                     type="button"
@@ -499,7 +428,7 @@ export function CourseForm({ course }: { course?: Course }) {
                     판매 종료
                   </Button>
                 )}
-                
+
                 {isDraft && editing && (
                   <Button
                     type="button"

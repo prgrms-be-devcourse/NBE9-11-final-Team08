@@ -41,7 +41,9 @@ export interface Course {
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
+  tags?: string[]
   status?: 'PUBLISHED' | 'DRAFT' | 'REVIEW' | 'ON_SALE' | 'IN_REVIEW' | 'CLOSED' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
 }
 
 export interface CourseCardResponse {
@@ -52,6 +54,8 @@ export interface CourseCardResponse {
   thumbnail: string
   price: number
   viewCount: number
+  status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'IN_REVIEW' | 'ON_SALE' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
 }
 
 export interface CategoryResponse {
@@ -88,6 +92,7 @@ export interface CourseDetailResponse {
   thumbnail: string
   price: number
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'IN_REVIEW' | 'ON_SALE' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
   viewCount: number
   chapters: ChapterInfoResponse[]
 }
@@ -107,6 +112,7 @@ export interface CartItemResponse {
   cartItemId: number
   courseId: number
   title: string
+  thumbnailUrl?: string | null
   price: number
 }
 
@@ -135,6 +141,7 @@ export interface OrderItemResponse {
   orderItemId: number
   courseId: number
   courseTitle: string
+  thumbnailUrl?: string | null
   price: number
   discountPrice: number
   finalPrice: number
@@ -720,6 +727,10 @@ export interface StudyReport {
   progressData: { day: string; progress: number; minutes: number }[]
   calendar: { date: string; active: boolean; level?: number }[]
   topLectures: string[]
+  // 리포트가 마지막으로 집계된 시각(백엔드 updatedAt). 갱신 버튼 안내용.
+  updatedAt?: string
+  // 쿨다운으로 다음 갱신이 가능한 시각. null 이면 즉시 갱신 가능.
+  nextRegenerableAt?: string | null
 }
 
 // 마이페이지 리포트 화면용: 화면 리포트 + 스터디 식별자(개별 갱신/구분용)
@@ -839,6 +850,7 @@ export interface CourseStatRow {
   enrollees: number
   enterCount: number
   completionCount: number
+  fullyCompleted: number
   incompletionRate: number
 }
 

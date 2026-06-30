@@ -234,7 +234,7 @@ class PaymentSuccessOutboxTransactionServiceTest {
     }
 
     private OrderItem orderItem(Order order) {
-        OrderItem orderItem = OrderItem.createSnapshot(order, COURSE_ID, "Spring", 30_000, 0, 30_000, PAID_AT);
+        OrderItem orderItem = OrderItem.createSnapshot(order, COURSE_ID, "Spring", "thumbnail.jpg", 30_000, 0, 30_000, PAID_AT);
         ReflectionTestUtils.setField(orderItem, "id", 1L);
         return orderItem;
     }

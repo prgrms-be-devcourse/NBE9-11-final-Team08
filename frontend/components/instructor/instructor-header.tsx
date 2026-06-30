@@ -2,14 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart2, GraduationCap, LayoutGrid, Settings } from 'lucide-react'
+import { BarChart2, GraduationCap, LayoutGrid, MessageSquare, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const links = [
   { href: '/instructor', label: '상품 관리', icon: LayoutGrid },
   { href: '/instructor/analytics', label: '판매 분석', icon: BarChart2 },
-  { href: '/instructor/settings', label: '설정', icon: Settings },
+  { href: '/instructor/comments', label: '내 답변', icon: MessageSquare },
 ]
 
 export function InstructorHeader() {

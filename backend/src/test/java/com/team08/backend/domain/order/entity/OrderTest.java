@@ -16,9 +16,9 @@ class OrderTest {
         LocalDateTime orderedAt = LocalDateTime.parse("2026-06-17T12:00:00");
         Order order = Order.createPendingPayment(1L, "ORD-20260617120000-ABC12345", orderedAt);
 
-        order.addItem(1000L, "Spring", 30_000, orderedAt);
+        order.addItem(1000L, "Spring", "thumbnail.jpg", 30_000, orderedAt);
 
-        assertThatThrownBy(() -> order.addItem(1000L, "Spring", 30_000, orderedAt))
+        assertThatThrownBy(() -> order.addItem(1000L, "Spring", "thumbnail.jpg", 30_000, orderedAt))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ORDER_ITEM_ALREADY_EXISTS));
     }

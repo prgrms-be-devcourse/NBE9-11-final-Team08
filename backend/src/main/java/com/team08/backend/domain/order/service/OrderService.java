@@ -117,7 +117,13 @@ public class OrderService {
                 orderedAt
         );
 
-        courses.forEach(course -> order.addItem(course.getId(), course.getTitle(), course.getPrice(), orderedAt));
+        courses.forEach(course -> order.addItem(
+                course.getId(),
+                course.getTitle(),
+                course.getThumbnail(),
+                course.getPrice(),
+                orderedAt
+        ));
         Order savedOrder = orderRepository.save(order);
 
         return OrderDetailResponse.from(savedOrder, savedOrder.getItems());

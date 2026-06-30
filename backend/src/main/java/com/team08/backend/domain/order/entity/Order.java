@@ -95,7 +95,7 @@ public class Order {
         );
     }
 
-    public void addItem(Long courseId, String courseTitle, int price, LocalDateTime createdAt) {
+    public void addItem(Long courseId, String courseTitle, String courseThumbnail, int price, LocalDateTime createdAt) {
         boolean alreadyAdded = items.stream()
                 .anyMatch(item -> Objects.equals(item.getCourseId(), courseId));
         if (alreadyAdded) {
@@ -105,7 +105,7 @@ public class Order {
         int discountPrice = 0;
         int finalPrice = price - discountPrice;
 
-        items.add(OrderItem.createSnapshot(this, courseId, courseTitle, price, discountPrice, finalPrice, createdAt));
+        items.add(OrderItem.createSnapshot(this, courseId, courseTitle, courseThumbnail, price, discountPrice, finalPrice, createdAt));
         this.totalPrice += price;
         this.discountPrice += discountPrice;
         this.finalPrice += finalPrice;

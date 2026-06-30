@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { cn } from '@/lib/utils'
+import { cn, toDateValue } from '@/lib/utils'
 import type {
   CourseStatRow,
   EnrolleeRow,
@@ -28,9 +28,12 @@ function fmtSeconds(s: number) {
   return `${m}:${String(sec).padStart(2, '0')}`
 }
 
-function fmtTime(iso: string | null) {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleString('ko-KR', {
+// 백엔드는 LocalDateTime 을 배열([year, month, day, ...])로 직렬화하므로
+// 공용 파서(toDateValue)로 받아야 한다. new Date(배열)은 Invalid Date 가 된다.
+function fmtTime(value: unknown) {
+  const date = toDateValue(value)
+  if (!date) return '-'
+  return date.toLocaleString('ko-KR', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -97,8 +100,8 @@ export function CourseDrilldown({ initialCourses }: { initialCourses: CourseStat
               <TableHead>강좌</TableHead>
               <TableHead>상태</TableHead>
               <TableHead className="text-right">수강자</TableHead>
-              <TableHead className="text-right">입장</TableHead>
-              <TableHead className="text-right">완강</TableHead>
+              <TableHead className="text-right">입장 이벤트</TableHead>
+              <TableHead className="text-right">완강 이벤트</TableHead>
               <TableHead className="text-right">미완강률</TableHead>
               <TableHead />
             </TableRow>

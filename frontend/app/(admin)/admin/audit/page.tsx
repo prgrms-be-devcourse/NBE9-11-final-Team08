@@ -1,10 +1,14 @@
 import { Database, Clock, History, FileSearch, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
+import { toDateValue } from '@/lib/utils'
 
-function fmt(iso: string | null) {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleString('ko-KR', {
+// 백엔드가 LocalDateTime 을 배열([year, month, day, ...])로 직렬화하므로
+// 공용 파서(toDateValue)로 받아야 한다. new Date(배열)은 Invalid Date 가 된다.
+function fmt(value: unknown) {
+  const date = toDateValue(value)
+  if (!date) return '-'
+  return date.toLocaleString('ko-KR', {
     year: '2-digit',
     month: '2-digit',
     day: '2-digit',
