@@ -1,7 +1,7 @@
 // frontend/app/(account)/orders/page.tsx
 import Link from 'next/link'
 import { api } from '@/lib/api'
-import { formatKRW } from '@/lib/utils'
+import { formatDateTime, formatKRW } from '@/lib/utils'
 import { formatOrderStatus, getOrderStatusVariant } from '@/lib/order-payment-labels'
 import type { OrderSummaryResponse } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
@@ -34,7 +34,7 @@ export default async function OrdersPage() {
                     </Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {order.orderedAt ? new Date(order.orderedAt).toLocaleString() : ''}
+                    {formatDateTime(order.orderedAt)}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">
                     주문 상세 보기
@@ -51,7 +51,7 @@ export default async function OrdersPage() {
             </Card>
           </Link>
         ))}
-        
+
         {orders.length === 0 && (
           <div className="py-12 text-center text-sm text-muted-foreground">
             주문 내역이 없습니다.

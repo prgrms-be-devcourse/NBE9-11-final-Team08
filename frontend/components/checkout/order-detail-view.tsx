@@ -7,7 +7,7 @@ import { ChevronLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { formatOrderStatus, formatPaymentStatus, getOrderStatusVariant } from '@/lib/order-payment-labels'
-import { formatKRW } from '@/lib/utils'
+import { formatDateTime, formatKRW, toDateValue } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +32,6 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null)
 
   const displayStatus = formatOrderStatus(order.status)
-  const orderedDate = order.orderedAt ? new Date(order.orderedAt).toLocaleString() : ''
   const canCancel = order.status === 'PENDING_PAYMENT'
   const canRefund = order.status === 'PAID'
 
@@ -101,7 +100,7 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
         </div>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        {order.orderNumber} · {orderedDate}
+        {order.orderNumber} · {formatDateTime(order.orderedAt)}
       </p>
 
       <Card className="mt-6">
@@ -116,7 +115,6 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
             >
               <div>
                 <p className="text-sm font-medium">{item.courseTitle}</p>
-                <p className="mt-1 text-xs text-muted-foreground">담당 강사</p>
               </div>
               <p className="shrink-0 text-sm font-semibold">{formatKRW(item.finalPrice)}</p>
             </div>
