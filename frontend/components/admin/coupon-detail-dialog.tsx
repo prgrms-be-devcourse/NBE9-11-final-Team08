@@ -15,6 +15,7 @@ import {
   couponTargetLabel,
   couponTypeLabel,
   couponUseTypeLabel,
+  autoIssueTypeLabel,
 } from '@/lib/coupon-labels'
 import type { AdminCoupon } from '@/lib/types'
 
@@ -65,6 +66,9 @@ export function CouponDetailDialog({
 
         <div className="divide-y">
           <Row label="쿠폰 타입" value={couponTypeLabel[coupon.type]} />
+          {coupon.type === 'AUTO' && coupon.autoIssueType && (
+            <Row label="자동 발급 조건" value={autoIssueTypeLabel[coupon.autoIssueType]} />
+          )}
           <Row label="적용 대상" value={couponTargetLabel[coupon.target]} />
           {targets && targets.length > 0 && (
             <Row
