@@ -110,7 +110,7 @@ public class CouponPolicy extends BaseTimeEntity {
             }
         }
     }
-    
+
     public static CouponPolicy createPolicy(
             String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
     ) {
@@ -188,11 +188,11 @@ public class CouponPolicy extends BaseTimeEntity {
         }
     }
 
-    public boolean isApplicableTo(Long targetCourseId, Long targetCategoryId) {
+    public boolean isApplicableTo(Long targetCourseId, List<Long> targetCategoryIds) {
         return switch (this.couponTarget) {
             case ALL -> true;
-            case CATEGORY -> targetCategoryId != null && this.targetCategories.stream()
-                    .anyMatch(tc -> tc.getCategoryId().equals(targetCategoryId));
+            case CATEGORY -> targetCategoryIds != null && !targetCategoryIds.isEmpty() && this.targetCategories.stream()
+                    .anyMatch(tc -> targetCategoryIds.contains(tc.getCategoryId()));
             case COURSE -> targetCourseId != null && this.targetCourses.stream()
                     .anyMatch(tc -> tc.getCourseId().equals(targetCourseId));
         };

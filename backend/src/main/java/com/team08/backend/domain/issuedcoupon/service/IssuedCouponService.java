@@ -1,9 +1,13 @@
 package com.team08.backend.domain.issuedcoupon.service;
 
+import com.team08.backend.domain.category.entity.Category;
+import com.team08.backend.domain.category.repository.CategoryRepository;
 import com.team08.backend.domain.couponpolicy.entity.CouponPolicy;
 import com.team08.backend.domain.couponpolicy.entity.CouponType;
 import com.team08.backend.domain.couponpolicy.exception.CouponPolicyNotFoundException;
 import com.team08.backend.domain.couponpolicy.repository.CouponPolicyRepository;
+import com.team08.backend.domain.course.entity.Course;
+import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult;
@@ -26,8 +30,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +42,8 @@ public class IssuedCouponService {
 
     private final IssuedCouponRepository issuedCouponRepository;
     private final CouponPolicyRepository couponPolicyRepository;
+    private final CourseRepository courseRepository;
+    private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
     private final Clock clock;
@@ -102,12 +110,39 @@ public class IssuedCouponService {
         LocalDateTime now = LocalDateTime.now(clock);
         int totalDiscount = 0;
 
+        List<Long> courseIds = orderItems.stream().map(OrderItem::getCourseId).toList();
+        List<Course> courses = courseRepository.findAllById(courseIds);
+
+        List<Long> categoryIds = courses.stream()
+                .map(Course::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
+                .collect(Collectors.toMap(Category::getId, c -> c));
+
+        Map<Long, List<Long>> courseCategoryIdsMap = new HashMap<>();
+        for (Course course : courses) {
+            List<Long> catIds = new ArrayList<>();
+            Long currentCatId = course.getCategoryId();
+            if (currentCatId != null) {
+                catIds.add(currentCatId);
+                Category cat = categoryMap.get(currentCatId);
+                if (cat != null && cat.getParentCategoryId() != null) {
+                    catIds.add(cat.getParentCategoryId());
+                }
+            }
+            courseCategoryIdsMap.put(course.getId(), catIds);
+        }
+
         if (itemCouponIds != null) {
             for (OrderItem item : orderItems) {
                 Long couponId = itemCouponIds.get(item.getCourseId());
                 if (couponId != null) {
                     CouponUsageContext context = getUsableCouponContext(userId, couponId, now);
-                    if (context.couponPolicy().getIsStackable() || !context.couponPolicy().isApplicableTo(item.getCourseId(), null)) {
+                    List<Long> targetCategoryIds = courseCategoryIdsMap.get(item.getCourseId());
+                    if (context.couponPolicy().getIsStackable() || !context.couponPolicy().isApplicableTo(item.getCourseId(), targetCategoryIds)) {
                         throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
                     }
                     totalDiscount += context.couponPolicy().calculateDiscountAmount(item.getPrice());
@@ -132,6 +167,32 @@ public class IssuedCouponService {
         int totalDiscount = 0;
         List<OrderCouponUsage> usages = new ArrayList<>();
 
+        List<Long> courseIds = orderItems.stream().map(OrderItem::getCourseId).toList();
+        List<Course> courses = courseRepository.findAllById(courseIds);
+
+        List<Long> categoryIds = courses.stream()
+                .map(Course::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Category> categoryMap = categoryRepository.findAllById(categoryIds).stream()
+                .collect(Collectors.toMap(Category::getId, c -> c));
+
+        Map<Long, List<Long>> courseCategoryIdsMap = new HashMap<>();
+        for (Course course : courses) {
+            List<Long> catIds = new ArrayList<>();
+            Long currentCatId = course.getCategoryId();
+            if (currentCatId != null) {
+                catIds.add(currentCatId);
+                Category cat = categoryMap.get(currentCatId);
+                if (cat != null && cat.getParentCategoryId() != null) {
+                    catIds.add(cat.getParentCategoryId());
+                }
+            }
+            courseCategoryIdsMap.put(course.getId(), catIds);
+        }
+
         if (itemCouponIds != null) {
             for (OrderItem item : orderItems) {
                 Long couponId = itemCouponIds.get(item.getCourseId());
@@ -142,7 +203,8 @@ public class IssuedCouponService {
                     CouponPolicy policy = couponPolicyRepository.findById(issuedCoupon.getPolicyId())
                             .orElseThrow(CouponPolicyNotFoundException::new);
 
-                    if (policy.getIsStackable() || !policy.isApplicableTo(item.getCourseId(), null)) {
+                    List<Long> targetCategoryIds = courseCategoryIdsMap.get(item.getCourseId());
+                    if (policy.getIsStackable() || !policy.isApplicableTo(item.getCourseId(), targetCategoryIds)) {
                         throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
                     }
 
