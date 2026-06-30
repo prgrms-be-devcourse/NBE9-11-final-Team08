@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils'
 const links = [
   { href: '/instructor', label: '상품 관리', icon: LayoutGrid },
   { href: '/instructor/analytics', label: '판매 분석', icon: BarChart2 },
-  { href: '/instructor/settings', label: '설정', icon: Settings },
 ]
 
 export function InstructorHeader() {
