@@ -36,7 +36,6 @@ public class CouponPolicyController {
 
     private final CouponPolicyService couponPolicyService;
 
-    // 쿠폰 정책 생성 /api/admin/coupons
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -45,7 +44,6 @@ public class CouponPolicyController {
         return couponPolicyService.createCouponPolicy(request);
     }
 
-    // 쿠폰 정책 목록 조회 /api/admin/coupons
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping
     @Operation(summary = "쿠폰 정책 목록 조회", description = "쿠폰명, 타입, 상태별 필터링과 페이징을 지원합니다.")
@@ -56,7 +54,6 @@ public class CouponPolicyController {
         return couponPolicyService.getCouponPolicies(condition, pageable);
     }
 
-    // 쿠폰 정책 상세 조회 /api/admin/coupons/{id}
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
     @Operation(summary = "쿠폰 정책 상세 조회", description = "특정 쿠폰 정책의 상세 정보와 적용 대상을 조회합니다.")
@@ -64,7 +61,6 @@ public class CouponPolicyController {
         return couponPolicyService.getCouponPolicy(id);
     }
 
-    // 쿠폰 정책 수정 /api/admin/coupons/{id}
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     @Operation(summary = "쿠폰 정책 수정", description = "발급 이력이 없는 정책의 핵심 정보를 수정합니다.")
@@ -72,7 +68,6 @@ public class CouponPolicyController {
         return couponPolicyService.updateCouponPolicy(id, request);
     }
 
-    // 쿠폰 정책 조기 종료 /api/admin/coupons/{id}/terminate
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/terminate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -81,7 +76,6 @@ public class CouponPolicyController {
         couponPolicyService.terminateCouponPolicy(id);
     }
 
-    // 쿠폰 정책 삭제 /api/admin/coupons/{id}
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

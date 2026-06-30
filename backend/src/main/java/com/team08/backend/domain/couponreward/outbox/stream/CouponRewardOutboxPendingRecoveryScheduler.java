@@ -41,7 +41,7 @@ public class CouponRewardOutboxPendingRecoveryScheduler extends AbstractPendingR
     }
 
     @Override
-    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) throws Exception {
+    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) {
         for (ClaimedRecord record : records) {
             try {
                 String payloadStr = record.payload().get("outboxEventId");

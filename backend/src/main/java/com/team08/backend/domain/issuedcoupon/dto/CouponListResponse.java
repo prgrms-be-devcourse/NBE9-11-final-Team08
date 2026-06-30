@@ -29,7 +29,6 @@ public record CouponListResponse(
         List<Long> courseIds
 ) {
     public static CouponListResponse of(IssuedCoupon coupon, CouponPolicy policy, LocalDateTime now) {
-        // 지연 평가
         CouponStatus effectiveStatus = coupon.getStatus();
         if (effectiveStatus == CouponStatus.ISSUED && coupon.getExpiredAt().isBefore(now)) {
             effectiveStatus = CouponStatus.EXPIRED;

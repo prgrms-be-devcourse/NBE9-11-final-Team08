@@ -45,7 +45,7 @@ public class IssuedCouponJobStreamWorker extends AbstractScheduledBatchStreamWor
     }
 
     @Override
-    protected void processBatch(List<MapRecord<String, Object, Object>> records, java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback) throws Exception {
+    protected void processBatch(List<MapRecord<String, Object, Object>> records, java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback) {
         for (MapRecord<String, Object, Object> record : records) {
             try {
                 Map<Object, Object> value = record.getValue();
@@ -55,11 +55,8 @@ public class IssuedCouponJobStreamWorker extends AbstractScheduledBatchStreamWor
                 
                 issuedCouponJobProcessor.process(requestId, userId, policyId);
                 
-                // 단건 처리 성공 시 즉시 ACK
                 ackCallback.accept(record);
             } catch (Exception e) {
-                // 특정 건 실패 시 예외만 기록하고 ACK하지 않음 (PEL에 대기)
-                // 전체 배치가 중단되지 않도록 catch로 감싸서 다음 레코드 처리
                 org.slf4j.LoggerFactory.getLogger(IssuedCouponJobStreamWorker.class)
                         .warn("IssuedCouponJobStreamWorker 처리 실패. recordId={}", record.getId(), e);
             }

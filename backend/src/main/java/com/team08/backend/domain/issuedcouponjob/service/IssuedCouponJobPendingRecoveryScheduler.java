@@ -40,7 +40,7 @@ public class IssuedCouponJobPendingRecoveryScheduler extends AbstractPendingReco
     }
 
     @Override
-    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) throws Exception {
+    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) {
         for (ClaimedRecord record : records) {
             try {
                 String requestId = record.payload().get("requestId");

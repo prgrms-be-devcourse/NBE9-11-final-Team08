@@ -21,7 +21,6 @@ public class CategoryTargetCouponCreator extends AbstractCouponPolicyCreator {
 
     @Override
     protected void validateSpecific(CouponPolicyCreateRequest request) {
-        // 카테고리 대상 특화 검증
         if (request.categoryIds() == null || request.categoryIds().isEmpty() ||
                 (request.courseIds() != null && !request.courseIds().isEmpty())) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);

@@ -20,7 +20,6 @@ public class IssuedCouponJobWriter {
     public record JobLockResult(IssuedCouponJob job, boolean isAcquired) {
     }
 
-    // 쿠폰 발급 작업 생성
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public JobLockResult tryAcquireProcessing(String requestId, Long userId, Long policyId, LocalDateTime now) {
         IssuedCouponJob job = issuedCouponJobRepository.findByRequestId(requestId).orElse(null);
