@@ -2,13 +2,17 @@ package com.team08.backend.domain.couponreward.outbox.stream;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
 import org.springframework.data.redis.connection.stream.StreamOffset;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.data.redis.stream.StreamMessageListenerContainer;
 import org.springframework.util.ErrorHandler;
+import io.lettuce.core.RedisException;
 
 import java.time.Duration;
 
@@ -54,19 +58,24 @@ public class CouponRewardOutboxStreamListenerConfig {
     private static boolean isRedisConnectionError(Throwable error) {
         Throwable current = error;
         while (current != null) {
-            String className = current.getClass().getName();
-            String message = current.getMessage();
-            if (className.startsWith("io.lettuce.core.")
-                    || className.startsWith("org.springframework.data.redis.")
-                    || (message != null && (
-                    message.contains("Connection closed")
-                            || message.contains("Command timed out")
-                            || message.contains("Connection reset")
-            ))) {
+            if (current instanceof RedisConnectionFailureException
+                    || current instanceof RedisSystemException
+                    || current instanceof QueryTimeoutException
+                    || current instanceof RedisException
+                    || hasRedisConnectionMessage(current)) {
                 return true;
             }
             current = current.getCause();
         }
         return false;
+    }
+
+    private static boolean hasRedisConnectionMessage(Throwable error) {
+        String message = error.getMessage();
+        return message != null && (
+                message.contains("Connection closed")
+                        || message.contains("Command timed out")
+                        || message.contains("Connection reset")
+        );
     }
 }
