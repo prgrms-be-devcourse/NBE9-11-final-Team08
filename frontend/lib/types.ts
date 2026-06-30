@@ -837,6 +837,7 @@ export interface CourseStatRow {
   enrollees: number
   enterCount: number
   completionCount: number
+  fullyCompleted: number
   incompletionRate: number
 }
 
