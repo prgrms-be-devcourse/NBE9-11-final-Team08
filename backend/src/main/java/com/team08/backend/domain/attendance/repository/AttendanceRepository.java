@@ -16,4 +16,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     // 특정 기간 동안의 출석 기록 목록 조회
     List<Attendance> findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(Long userId, LocalDate start, LocalDate end);
+
+    @org.springframework.data.jpa.repository.Query("SELECT u.id FROM User u WHERE NOT EXISTS (SELECT 1 FROM Attendance a WHERE a.userId = u.id AND a.attendanceDate >= :thresholdDate) AND EXISTS (SELECT 1 FROM Attendance a WHERE a.userId = u.id AND a.attendanceDate >= :limitDate)")
+    List<Long> findInactiveUserIds(@org.springframework.data.repository.query.Param("thresholdDate") LocalDate thresholdDate, @org.springframework.data.repository.query.Param("limitDate") LocalDate limitDate);
 }

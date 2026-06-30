@@ -19,7 +19,6 @@ public enum ErrorCode {
     // ── Auth ─────────────────────────────────────────────────────────────
     LOGIN_FAILED(HttpStatus.BAD_REQUEST, "AUTH_001", "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_002", "이미 존재하는 이메일입니다."),
-    INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "AUTH_003", "회원가입에 불가능한 역할입니다."),
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_004", "인증이 필요합니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_005", "유효하지 않은 refresh token입니다."),
 
@@ -98,6 +97,7 @@ public enum ErrorCode {
     INVALID_PAYMENT_STATUS_TRANSITION(HttpStatus.BAD_REQUEST, "PAYMENT_004", "잘못된 결제 상태 전이입니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "PAYMENT_005", "결제 요청 금액이 주문 금액과 일치하지 않습니다."),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAYMENT_006", "결제 정보를 찾을 수 없습니다."),
+    PAYMENT_REFUND_UNSUPPORTED(HttpStatus.CONFLICT, "PAYMENT_007", "현재 결제수단은 자동 환불을 지원하지 않습니다."),
 
     // ── Cart ─────────────────────────────────────────────────────────────
     CART_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND,        "CART_001", "장바구니 항목을 찾을 수 없습니다."),
@@ -133,10 +133,14 @@ public enum ErrorCode {
     COUPON_POLICY_ALREADY_ISSUED(HttpStatus.BAD_REQUEST, "COUPON_010", "이미 발급된 쿠폰이 있는 정책은 수정할 수 없습니다."),
     COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE(HttpStatus.BAD_REQUEST, "COUPON_011", "이미 발급된 쿠폰이 있는 정책은 삭제할 수 없습니다."),
     COUPON_AUTO_ISSUE_TYPE_ALREADY_EXISTS(HttpStatus.CONFLICT, "COUPON_012", "이미 해당 자동 발급 용도의 쿠폰 정책이 존재합니다."),
+    COUPON_ISSUE_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "COUPON_013", "쿠폰 발급 요청을 찾을 수 없습니다."),
+    COUPON_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "COUPON_014", "쿠폰 발급 처리에 실패했습니다. 다시 시도해주세요."),
+    JOB_ALREADY_PROCESSING(HttpStatus.CONFLICT, "COUPON_020", "현재 처리 중인 쿠폰 발급 작업입니다."),
 
     // ── LearningEvent ─────────────────────────────────────────────────────
     DUPLICATE_LEARNING_EVENT(HttpStatus.CONFLICT,  "LEARNING_001", "이미 처리된 이벤트입니다."),
     LEARNING_EVENT_ACCESS_DENIED(HttpStatus.FORBIDDEN, "LEARNING_002", "학습 이벤트에 접근할 권한이 없습니다."),
+    CLIENT_COMPLETE_EVENT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "LEARNING_003", "완료 이벤트는 클라이언트가 직접 기록할 수 없습니다."),
 
     // ── Media ────────────────────────────────────────────────────────────
     INVALID_VIDEO_FORMAT(HttpStatus.BAD_REQUEST, "MEDIA_001", "올바르지 않은 비디오 파일 형식입니다."),

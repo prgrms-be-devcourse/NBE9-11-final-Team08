@@ -8,5 +8,5 @@ public interface IssuedCouponStrategy {
     CouponType getSupportedType();
 
     // 쿠폰 발급 로직 실행
-    IssuedCoupon issue(Long userId, Long policyId);
+    CouponIssueResult issue(Long userId, Long policyId);
 }

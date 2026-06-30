@@ -25,8 +25,8 @@ public class NicepayPaymentConfig {
                 .baseUrl(StringUtils.hasText(properties.baseUrl()) ? properties.baseUrl() : DEFAULT_BASE_URL)
                 .requestFactory(requestFactory)
                 .defaultHeaders(headers -> {
-                    if (StringUtils.hasText(properties.secretKey())) {
-                        headers.setBasicAuth(properties.secretKey(), "");
+                    if (StringUtils.hasText(properties.merchantKey())) {
+                        headers.setBasicAuth(properties.merchantKey(), "");
                     }
                 })
                 .build();

@@ -1,35 +1,36 @@
 // frontend/app/(account)/mypage/page.tsx
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
-import { EnrolledCard } from '@/components/account/enrolled-card'
+import { MyStudyActivityList } from '@/components/account/my-study-activity-list'
+import { PurchasedCourseList } from '@/components/account/purchased-course-list'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 
 export const metadata = {
-  title: '내 스터디 — PlayLearn',
+  title: '내 강좌 & 스터디 — PlayLearn',
 }
 
 export default async function MyPage() {
-  const [enrolled, purchased] = await Promise.all([
-    api.getMyStudies(),
+  const [purchased, activities] = await Promise.all([
     api.getPurchasedCourses(),
+    api.getMyStudyActivities(0, 10),
   ])
 
-  const inProgress = enrolled.filter((c) => c.status === '진행 중')
-  const completed = enrolled.filter((c) => c.status === '완료')
+  const inProgress = purchased.filter((c) => c.status === '진행 중')
+  const recentActivities = activities.content ?? []
 
   const stats = [
-    { label: '진행 중인 스터디', value: `${inProgress.length}곳` },
-    { label: '완료한 스터디', value: `${completed.length}곳` },
     { label: '구매한 강좌', value: `${purchased.length}강좌` },
+    { label: '진행 중인 강좌', value: `${inProgress.length}강좌` },
+    { label: '작성한 활동', value: `${activities.totalElements ?? recentActivities.length}개` },
   ]
 
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold">내 스터디</h1>
+        <h1 className="text-2xl font-bold">내 강좌 & 스터디</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          참여 중인 스터디와 구매한 강좌를 한눈에 확인하세요.
+          구매한 강좌와 내가 작성한 스터디 활동을 한눈에 확인하세요.
         </p>
       </div>
 
@@ -44,42 +45,18 @@ export default async function MyPage() {
 
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">진행 중인 스터디</h2>
-          <Button asChild variant="ghost" size="sm" className="text-muted-foreground">
-            <Link href="/dashboard">
-              대시보드 <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
+          <h2 className="text-lg font-bold">구매한 강좌</h2>
         </div>
-        {inProgress.length > 0 ? (
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {inProgress.map((c) => (
-              <EnrolledCard key={c.id} course={c} />
-            ))}
-          </ul>
+        {purchased.length > 0 ? (
+          <PurchasedCourseList courses={purchased} />
         ) : (
           <EmptyState />
         )}
       </section>
 
-      {completed.length > 0 && (
-        <section>
-          <h2 className="mb-4 text-lg font-bold">완료한 스터디</h2>
-          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {completed.map((c) => (
-              <EnrolledCard key={c.id} course={c} />
-            ))}
-          </ul>
-        </section>
-      )}
-
       <section>
-        <h2 className="mb-4 text-lg font-bold">구매한 강좌</h2>
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {purchased.map((c) => (
-            <EnrolledCard key={c.id} course={c} />
-          ))}
-        </ul>
+        <h2 className="mb-4 text-lg font-bold">내 스터디 활동</h2>
+        <MyStudyActivityList initialPage={activities} />
       </section>
     </div>
   )
@@ -88,7 +65,7 @@ export default async function MyPage() {
 function EmptyState() {
   return (
     <div className="rounded-xl border border-dashed py-16 text-center">
-      <p className="text-sm text-muted-foreground">참여 중인 스터디가 없습니다.</p>
+      <p className="text-sm text-muted-foreground">구매한 강좌가 없습니다.</p>
       <Button asChild className="mt-4">
         <Link href="/">강좌 둘러보기</Link>
       </Button>

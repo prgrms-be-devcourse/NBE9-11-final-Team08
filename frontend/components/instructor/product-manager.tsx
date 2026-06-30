@@ -46,11 +46,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
             subCategory: '',
             thumbnailUrl: draft.thumbnail || '/placeholder.svg',
             price: draft.price || 0,
-            rating: 0,
-            reviewCount: 0,
-            studentCount: 0,
-            level: '입문' as const,
-            tags: [],
+            viewCount: 0,
             instructor: { id: String(draft.instructorId || ''), name: `강사 ${draft.instructorId || ''}`, title: '' },
             chapters: [],
             status: draft.status || 'DRAFT',
@@ -142,7 +138,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
           const status = statusLabel[c.status ?? 'DRAFT'] || statusLabel['DRAFT']
           const isInReview = c.status === 'IN_REVIEW' || c.status === 'REVIEW'
           const isOnSale = c.status === 'ON_SALE' || c.status === 'PUBLISHED'
-          
+
           return (
             <li key={c.id} className="overflow-hidden rounded-xl border bg-card flex flex-col justify-between">
               <div>
@@ -169,7 +165,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
                   <p className="text-sm font-bold">{formatKRW(c.price)}</p>
                 </div>
               </div>
-              
+
               <div className="p-4 pt-0 space-y-2">
                 <div className="flex gap-2">
                   <Button
@@ -203,7 +199,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
                     )}
                   </Button>
                 </div>
-                
+
                 <div className="flex gap-2">
                   {(c.status === 'DRAFT' || c.status === 'CLOSED' || c.status === 'SUSPENDED' || c.status === 'DELETED') && (
                     <Button
@@ -217,7 +213,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
                       강의 삭제
                     </Button>
                   )}
-                  
+
                   {isInReview && (
                     <Button
                       size="sm"
@@ -230,7 +226,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
                       심사 취소
                     </Button>
                   )}
-                  
+
                   {isOnSale && (
                     <Button
                       size="sm"
@@ -249,7 +245,7 @@ export function ProductManager({ courses }: { courses: Course[] }) {
           )
         })}
       </ul>
-      
+
       {visibleCourses.length === 0 && (
         <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">
           등록한 강의가 없습니다. 첫 강의를 등록해보세요!

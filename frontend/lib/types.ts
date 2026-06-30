@@ -37,11 +37,7 @@ export interface Course {
   thumbnailUrl: string
   price: number
   discountRate?: number
-  rating: number
-  reviewCount: number
-  studentCount: number
-  level: '왕초보' | '입문' | '초급' | '중급' | '심화'
-  tags: string[]
+  viewCount: number
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
@@ -182,6 +178,36 @@ export interface ConfirmTossPaymentRequest {
   amount: number
   issuedCouponId?: number | null
   idempotencyKey?: string | null
+  authResultCode?: string | null
+  authResultMsg?: string | null
+  authToken?: string | null
+  txTid?: string | null
+  mid?: string | null
+  moid?: string | null
+  signature?: string | null
+  nextAppUrl?: string | null
+  netCancelUrl?: string | null
+  payMethod?: string | null
+}
+
+export interface NicepayPreparePaymentRequest {
+  payMethod: 'CARD'
+  issuedCouponId?: number | null
+}
+
+export interface NicepayPreparePaymentResponse {
+  goodsName: string
+  amt: number
+  mid: string
+  ediDate: string
+  moid: string
+  signData: string
+  payMethod: 'CARD'
+  buyerName: string
+  buyerTel: string
+  buyerEmail: string
+  charSet: string
+  reqReserved?: string | null
 }
 
 export interface PaymentResponse {
@@ -217,7 +243,7 @@ export interface Coupon {
   totalQuantity?: number | null
 }
 
-export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO'
+export type CouponPolicyType = 'NORMAL' | 'FCFS' | 'AUTO' | 'ADMIN'
 export type AutoIssueType = 'SIGNUP' | 'ATTENDANCE_STREAK' | 'MONTHLY_ATTENDANCE'
 export type CouponApplyTarget = 'ALL' | 'CATEGORY' | 'COURSE'
 export type CouponUseType = 'SINGLE' | 'MULTI'
@@ -323,11 +349,22 @@ export interface QnaQuestionResponse {
   id: number
   lectureId: number
   userId: number
+  nickname: string
   title: string
   content: string
   createdAt: string
   updatedAt: string
   answer: QnaAnswerSummary | null
+}
+
+// 백엔드 QnaAnswerResponse(record)와 동일한 형태
+export interface QnaAnswerResponse {
+  id: number
+  questionId: number
+  instructorId: number
+  content: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface LectureReflectionResponse {
@@ -359,6 +396,14 @@ export interface LectureProgressResponse {
   lectureId: number
   lastPositionSeconds: number
   watchedSeconds: number
+  progressRate: number
+  completed: boolean
+}
+
+// 강좌 커리큘럼 화면용 — 사용자의 강의별 진행도(진행 이력이 있는 강의만 내려온다)
+export interface CourseLectureProgressResponse {
+  lectureId: number
+  lastPositionSeconds: number
   progressRate: number
   completed: boolean
 }
@@ -424,6 +469,19 @@ export interface EnrolledCourse {
   status: '진행 중' | '완료'
 }
 
+export interface EnrolledCourseResponse {
+  enrollmentId: number
+  courseId: number
+  studyId?: number | null
+  title: string
+  instructorNickname: string
+  thumbnailUrl: string
+  progressRate: number
+  completedLectures: number
+  totalLectures: number
+  enrolledAt: string
+}
+
 export interface MyComment {
   id: number
   lectureId: number
@@ -435,14 +493,24 @@ export interface MyComment {
   answered: boolean
 }
 
-export type SignupRole = 'USER' | 'SELLER'
+// 백엔드 MyAnswerResponse(record)와 동일한 형태 — 강사/판매자가 작성한 답변
+export interface MyAnswer {
+  answerId: number
+  questionId: number
+  lectureId: number
+  courseTitle: string
+  lectureTitle: string
+  questionTitle: string
+  questionContent: string
+  answerContent: string
+  createdAt: string
+}
 
 export interface SignupRequest {
   email: string
   password: string
   nickname: string
   profileImage?: string
-  userRole: SignupRole
 }
 
 export interface CourseCreateRequest {
@@ -837,4 +905,34 @@ export interface AuditResponse {
     count: number
     sampleIds: number[]
   }[]
+}
+
+export interface CouponIssueUsersRequest {
+  requestKey: string
+  userIds: number[]
+}
+
+export interface CouponIssueAllUsersRequest {
+  requestKey: string
+}
+
+export type CouponIssueRequestType = 'TARGETED' | 'ALL_USERS'
+export type CouponIssueRequestStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
+
+export interface CouponIssueRequestResponse {
+  id: number
+  policyId: number
+  requestKey: string
+  issueType: CouponIssueRequestType
+  status: CouponIssueRequestStatus
+  requestedCount: number
+  successCount: number
+  failedCount: number
+  skippedCount: number
+  targetUserMaxId: number | null
+  requestedBy: number
+  requestedAt: string | number[]
+  startedAt: string | number[] | null
+  completedAt: string | number[] | null
+  failureReason: string | null
 }

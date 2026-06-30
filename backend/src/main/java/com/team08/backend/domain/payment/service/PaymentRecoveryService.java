@@ -1,9 +1,10 @@
 package com.team08.backend.domain.payment.service;
 
-import com.team08.backend.domain.payment.client.TossPaymentClient;
-import com.team08.backend.domain.payment.client.TossPaymentException;
-import com.team08.backend.domain.payment.dto.toss.TossPaymentResponse;
-import com.team08.backend.domain.payment.service.PaymentTransactionService.TossPaymentRecoveryTarget;
+import com.team08.backend.domain.payment.provider.PaymentProviderException;
+import com.team08.backend.domain.payment.provider.PaymentProviderLookupRequest;
+import com.team08.backend.domain.payment.provider.PaymentProviderLookupResponse;
+import com.team08.backend.domain.payment.provider.PaymentProviderRouter;
+import com.team08.backend.domain.payment.service.PaymentTransactionService.PaymentRecoveryTarget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,7 +21,7 @@ import java.util.Optional;
 public class PaymentRecoveryService {
 
     private final PaymentTransactionService paymentTransactionService;
-    private final TossPaymentClient tossPaymentClient;
+    private final PaymentProviderRouter paymentProviderRouter;
     private final Clock clock;
 
     @Value("${app.payment.recovery.enabled:true}")
@@ -43,11 +44,11 @@ public class PaymentRecoveryService {
 
     public int recoverPayments() {
         LocalDateTime threshold = LocalDateTime.now(clock).minus(staleThreshold);
-        List<TossPaymentRecoveryTarget> targets =
-                paymentTransactionService.findTossRecoveryTargets(threshold, batchSize);
+        List<PaymentRecoveryTarget> targets =
+                paymentTransactionService.findProviderRecoveryTargets(threshold, batchSize);
 
         int recoveredCount = 0;
-        for (TossPaymentRecoveryTarget target : targets) {
+        for (PaymentRecoveryTarget target : targets) {
             if (recoverPayment(target)) {
                 recoveredCount++;
             }
@@ -55,15 +56,18 @@ public class PaymentRecoveryService {
         return recoveredCount;
     }
 
-    private boolean recoverPayment(TossPaymentRecoveryTarget target) {
+    private boolean recoverPayment(PaymentRecoveryTarget target) {
         try {
-            Optional<TossPaymentResponse> tossPayment = tossPaymentClient.findByOrderId(target.orderNumber());
-            if (tossPayment.isEmpty()) {
-                return paymentTransactionService.recoverTossPaymentNotFound(target);
+            Optional<PaymentProviderLookupResponse> providerPayment = paymentProviderRouter.lookup(
+                    target.providerType(),
+                    new PaymentProviderLookupRequest(null, target.orderNumber())
+            );
+            if (providerPayment.isEmpty()) {
+                return paymentTransactionService.recoverProviderPaymentNotFound(target);
             }
-            return paymentTransactionService.recoverTossPayment(target, tossPayment.get());
-        } catch (TossPaymentException e) {
-            return paymentTransactionService.keepTossPaymentUnknown(
+            return paymentTransactionService.recoverProviderPayment(target, providerPayment.get());
+        } catch (PaymentProviderException e) {
+            return paymentTransactionService.keepProviderPaymentUnknown(
                     target,
                     e.getFailureCode(),
                     e.getFailureMessage()

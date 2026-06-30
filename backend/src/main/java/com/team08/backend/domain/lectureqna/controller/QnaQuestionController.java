@@ -1,5 +1,6 @@
 package com.team08.backend.domain.lectureqna.controller;
 
+import com.team08.backend.domain.lectureqna.dto.MyAnswerResponse;
 import com.team08.backend.domain.lectureqna.dto.MyCommentResponse;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionRequest;
 import com.team08.backend.domain.lectureqna.dto.QnaQuestionResponse;
@@ -31,6 +32,13 @@ public class QnaQuestionController {
     public List<MyCommentResponse> getMyComments(
             @AuthenticationPrincipal LoginUserPrincipal principal) {
         return qnaQuestionService.getMyComments(principal.user().id());
+    }
+
+    @Operation(summary = "내가 작성한 QnA 답변 목록 조회 - 마이페이지(강사/판매자)")
+    @GetMapping("/api/me/answers")
+    public List<MyAnswerResponse> getMyAnswers(
+            @AuthenticationPrincipal LoginUserPrincipal principal) {
+        return qnaQuestionService.getMyAnswers(principal.user().id());
     }
 
     @Operation(summary = "강의 QnA 목록 조회 (질문+답변 페이징)")

@@ -4,7 +4,6 @@ import com.team08.backend.domain.auth.dto.request.SignupRequest;
 import com.team08.backend.domain.auth.entity.RefreshToken;
 import com.team08.backend.domain.auth.exception.DuplicateEmailException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
-import com.team08.backend.domain.auth.exception.InvalidSignupRoleException;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.repository.RefreshTokenRepository;
@@ -12,6 +11,8 @@ import com.team08.backend.domain.auth.token.JwtProvider;
 import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
+import com.team08.backend.domain.seller.entity.Seller;
+import com.team08.backend.domain.seller.repository.SellerRepository;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.repository.UserRepository;
@@ -42,6 +43,8 @@ public class AuthService {
     private final Clock clock;
 
     private final CouponRewardOutboxService couponRewardOutboxService;
+
+    private final SellerRepository sellerRepository;
 
     @Transactional
     public TokenPair login(String email, String password) {
@@ -102,19 +105,29 @@ public class AuthService {
         }
 
         String encodedPassword = passwordEncoder.encode(request.password());
-
-        User user;
-        switch (request.userRole()) {
-            case USER ->
-                user = User.createUser(request.email(), encodedPassword, request.nickname(), request.profileImage());
-            case SELLER ->
-                user = User.createSeller(request.email(), encodedPassword, request.nickname(), request.profileImage());
-            default -> throw new InvalidSignupRoleException();
-        }
+        User user = User.createUser(request.email(), encodedPassword, request.nickname(), request.profileImage());
 
         try {
             User savedUser = userRepository.saveAndFlush(user);
             couponRewardOutboxService.createUserSignedUpEvent(savedUser.getId());
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateEmailException();
+        }
+    }
+
+    @Transactional
+    public void signupSeller(SignupRequest request) {
+        if (userRepository.existsByEmail(request.email())) {
+            throw new DuplicateEmailException();
+        }
+
+        String encodedPassword = passwordEncoder.encode(request.password());
+        User user = User.createSeller(request.email(), encodedPassword, request.nickname(), request.profileImage());
+
+        try {
+            User savedUser = userRepository.saveAndFlush(user);
+            LocalDateTime now = LocalDateTime.now(clock);
+            sellerRepository.save(new Seller(null, savedUser.getId(), now, now));
         } catch (DataIntegrityViolationException e) {
             throw new DuplicateEmailException();
         }

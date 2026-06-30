@@ -31,6 +31,8 @@ export function SiteHeader() {
   const router = useRouter()
   const { items } = useCart()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isSeller, setIsSeller] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [userName, setUserName] = useState('')
   const [mounted, setMounted] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -48,10 +50,14 @@ export function SiteHeader() {
     api.getProfile()
       .then((profile) => {
         setIsLoggedIn(!!profile)
+        setIsSeller(profile?.isSeller ?? false)
+        setIsAdmin(profile?.isAdmin ?? false)
         setUserName(profile?.name || '')
       })
       .catch(() => {
         setIsLoggedIn(false)
+        setIsSeller(false)
+        setIsAdmin(false)
         setUserName('')
       })
   }, [pathname])
@@ -63,6 +69,8 @@ export function SiteHeader() {
       // Even if backend logout fails, we clear local state
     }
     setIsLoggedIn(false)
+    setIsSeller(false)
+    setIsAdmin(false)
     setUserName('')
     toast.success('로그아웃되었습니다.')
     router.push('/')
@@ -158,17 +166,18 @@ export function SiteHeader() {
                   <Link href="/mypage">마이페이지</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard">대시보드</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
                   <Link href="/mypage/report">내 스터디 리포트</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/instructor">판매자 센터</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/admin">관리자 콘솔</Link>
-                </DropdownMenuItem>
+                {isSeller && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/instructor">판매자 센터</Link>
+                  </DropdownMenuItem>
+                )}
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">관리자 콘솔</Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />

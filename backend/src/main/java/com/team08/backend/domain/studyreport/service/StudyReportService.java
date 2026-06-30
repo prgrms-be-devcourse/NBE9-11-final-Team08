@@ -1,6 +1,7 @@
 package com.team08.backend.domain.studyreport.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.team08.backend.domain.lecture.access.LectureAccessValidator;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -44,6 +45,7 @@ public class StudyReportService {
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
     private final QnaQuestionRepository qnaQuestionRepository;
+    private final LectureAccessValidator lectureAccessValidator;
     private final StudyReportJson studyReportJson;
     private final ObjectMapper objectMapper;
 
@@ -59,6 +61,13 @@ public class StudyReportService {
      */
     @Transactional
     public StudyReportResponse getReport(Long userId, Long studyId, boolean refresh) {
+        // 스터디의 상태(모집중/활성/종료 등)와 무관하게, 해당 강좌에 접근할 수 있으면
+        // (수강 중이거나 강좌 소유자) 리포트를 볼 수 있다. 스터디 권한이 아니라 강좌 접근 권한으로
+        // 판단하도록 LectureAccessValidator(강좌 단위 검증)에 위임한다.
+        Study study = studyRepository.findByIdWithCourse(studyId)
+                .orElseThrow(StudyNotFoundException::new);
+        lectureAccessValidator.validateCourseAccess(study.getCourse().getId(), userId);
+
         StudyReport existing = studyReportRepository.findByUserIdAndStudyId(userId, studyId).orElse(null);
 
         if (existing != null) {
@@ -72,15 +81,13 @@ public class StudyReportService {
         }
 
         // 여기 도달: 리포트가 없거나(최초 집계), 갱신 의도이면서 쿨다운이 지난 경우.
-        StudyReport report = regenerate(userId, studyId, existing);
+        StudyReport report = regenerate(userId, study, existing);
         return response(report, ReportStatus.REGENERATED);
     }
 
-    private StudyReport regenerate(Long userId, Long studyId, StudyReport existing) {
+    private StudyReport regenerate(Long userId, Study study, StudyReport existing) {
         // 레포트에 들어가는 내용: 총 시청시간 / 질문 개수 / 강좌 진행 률 / 학습한 일 수 / 최고 많이 학습한 강의 / 하루 학습량 맵 / 하루 학습량 맵
-        Study study = studyRepository.findById(studyId)
-                .orElseThrow(StudyNotFoundException::new);
-
+        Long studyId = study.getId();
         Long courseId = study.getCourse().getId();
 
         List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
@@ -130,7 +137,7 @@ public class StudyReportService {
         StudyReport existing = studyReportRepository
                 .findByUserIdAndStudyId(userId, study.getId())
                 .orElse(null);
-        regenerate(userId, study.getId(), existing);
+        regenerate(userId, study, existing);
     }
 
     private boolean isWithinCooldown(StudyReport report) {

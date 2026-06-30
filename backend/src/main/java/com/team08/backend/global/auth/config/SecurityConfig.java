@@ -54,7 +54,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-                        .ignoringRequestMatchers("/api/payments/toss/webhook")
+                        .ignoringRequestMatchers("/api/payments/toss/webhook", "/api/payments/nicepay/webhook")
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -74,9 +74,11 @@ public class SecurityConfig {
                                 "/api/auth/csrf",
                                 "/api/auth/login",
                                 "/api/auth/signup",
+                                "/api/auth/seller/signup",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
                                 "/api/payments/toss/webhook",
+                                "/api/payments/nicepay/webhook",
                                 "/error"
                         ).permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/courses", "/api/courses/**").permitAll()

@@ -4,6 +4,7 @@ import com.team08.backend.domain.payment.config.TossPaymentProperties;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest;
 import com.team08.backend.domain.payment.dto.toss.TossPaymentWebhookRequest.TossPaymentWebhookData;
 import com.team08.backend.domain.payment.service.PaymentService;
+import com.team08.backend.domain.payment.service.NicepayPaymentWebhookService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService;
 import com.team08.backend.domain.payment.service.TossPaymentWebhookService.TossPaymentWebhookResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,15 +26,18 @@ class PaymentControllerTest {
 
     private PaymentService paymentService;
     private TossPaymentWebhookService tossPaymentWebhookService;
+    private NicepayPaymentWebhookService nicepayPaymentWebhookService;
     private PaymentController paymentController;
 
     @BeforeEach
     void setUp() {
         paymentService = mock(PaymentService.class);
         tossPaymentWebhookService = mock(TossPaymentWebhookService.class);
+        nicepayPaymentWebhookService = mock(NicepayPaymentWebhookService.class);
         paymentController = new PaymentController(
                 paymentService,
                 tossPaymentWebhookService,
+                nicepayPaymentWebhookService,
                 new TossPaymentProperties(
                         "https://api.tosspayments.com",
                         "test-secret-key",
@@ -82,6 +86,7 @@ class PaymentControllerTest {
         PaymentController controllerWithoutSecret = new PaymentController(
                 paymentService,
                 tossPaymentWebhookService,
+                nicepayPaymentWebhookService,
                 new TossPaymentProperties(
                         "https://api.tosspayments.com",
                         "test-secret-key",

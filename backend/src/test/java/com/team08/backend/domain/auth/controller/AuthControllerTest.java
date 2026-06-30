@@ -3,7 +3,6 @@ package com.team08.backend.domain.auth.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.team08.backend.domain.auth.dto.request.LoginRequest;
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
-import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
 import com.team08.backend.domain.auth.model.TokenPair;
 import com.team08.backend.domain.auth.service.AuthService;
@@ -117,8 +116,7 @@ public class AuthControllerTest {
                 "test@email.com",
                 "password",
                 "nickname",
-                null,
-                SignupRole.USER
+                null
         );
 
         // when & then
@@ -128,6 +126,25 @@ public class AuthControllerTest {
                 .andExpect(status().isCreated());
 
         then(authService).should().signup(any(SignupRequest.class));
+    }
+
+    @Test
+    void 판매자_회원가입에_성공하면_201을_반환한다() throws Exception {
+        // given
+        SignupRequest request = new SignupRequest(
+                "seller@email.com",
+                "password",
+                "seller",
+                null
+        );
+
+        // when & then
+        mockMvc.perform(post("/api/auth/seller/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        then(authService).should().signupSeller(any(SignupRequest.class));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.team08.backend.domain.lectureprogress.service;
 import com.team08.backend.domain.enrollment.service.EnrollmentQueryService;
 import com.team08.backend.domain.lecture.entity.Lecture;
 import com.team08.backend.domain.lecture.repository.LectureRepository;
+import com.team08.backend.domain.lectureprogress.dto.CourseLectureProgressResponse;
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
 import com.team08.backend.domain.lectureprogress.event.LectureCompletedEvent;
 import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepository;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -36,9 +38,21 @@ public class LectureProgressService {
         return applyProgress(userId, lectureId, positionSeconds, watchedDeltaSeconds, eventTime);
     }
 
+    // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 강의별 진행도 목록(진행 이력이 있는 강의만 포함)
+    @Transactional(readOnly = true)
+    public List<CourseLectureProgressResponse> getCourseProgress(Long userId, Long courseId) {
+        List<Long> lectureIds = lectureRepository.findIdsByCourseId(courseId);
+        if (lectureIds.isEmpty()) {
+            return List.of();
+        }
+        return lectureProgressRepository.findByUserIdAndLectureIdIn(userId, lectureIds).stream()
+                .map(CourseLectureProgressResponse::from)
+                .toList();
+    }
+
     @Transactional
     public LectureProgress ensureStarted(Long userId, Lecture lecture, LocalDateTime now) {
-        // 무료 맛보기이거나 활성 수강권이 있을 때만 진행 행을 만든다.
+        //활성 수강권이 있을 때만 진행 행을 만든다.
         LectureProgress existing = lectureProgressRepository
                 .findByUserIdAndLectureId(userId, lecture.getId())
                 .orElse(null);
@@ -50,8 +64,9 @@ public class LectureProgressService {
         if (!canStartProgress(userId, lecture)) {
             return null;
         }
-        return lectureProgressRepository.save(
-                LectureProgress.start(userId, lecture.getId(), 0, now));
+        // 동시 입장(예: StrictMode 이중 마운트·더블클릭)으로 두 요청이 같은 행을 INSERT 하면
+        // uk_lecture_progress_user_lecture 중복 키로 터졌다. 멱등 확보로 충돌을 흡수한다.
+        return getOrCreateStarted(userId, lecture.getId(), 0, now);
     }
 
     @Transactional
@@ -64,18 +79,28 @@ public class LectureProgressService {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
+        // 같은 (user, lecture) 행에 대한 동시 하트비트의 lost update 를 막기 위해 행을
+        // 쓰기 락(SELECT ... FOR UPDATE)으로 읽는다. read-modify-write(watchedSeconds += delta)가
+        // 행 단위로 직렬화돼 누적분이 유실되지 않는다(다른 user/lecture 는 다른 행이라 경합 없음).
         LectureProgress progress = lectureProgressRepository
-                .findByUserIdAndLectureId(userId, lectureId)
+                .findByUserIdAndLectureIdForUpdate(userId, lectureId)
                 .orElse(null);
 
-        LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
-        boolean wasCompleted = progress != null && Boolean.TRUE.equals(progress.getCompleted());
-
+        LocalDateTime previousBeatAt;
+        boolean wasCompleted;
         if (progress == null) {
             if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
-            progress = LectureProgress.start(userId, lectureId, positionSeconds, eventTime);
+            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등으로 행을 확보한 뒤
+            // 다시 쓰기 락으로 읽어 이후 누적을 직렬화한다.
+            // previousBeatAt 은 null 로 유지해 최초 비트의 delta 산정 동작을 보존한다.
+            progress = getOrCreateStartedForUpdate(userId, lectureId, positionSeconds, eventTime);
+            previousBeatAt = null;
+            wasCompleted = false;
+        } else {
+            previousBeatAt = progress.getUpdatedAt();
+            wasCompleted = Boolean.TRUE.equals(progress.getCompleted());
         }
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
@@ -88,11 +113,35 @@ public class LectureProgressService {
             eventPublisher.publishEvent(new LectureCompletedEvent(
                     userId,
                     lecture.getChapter().getCourse().getId(),
+                    lecture.getChapter().getId(),
                     lectureId,
                     eventTime
             ));
         }
         return saved;
+    }
+
+    /**
+     * 진행 행을 동시성에 안전하게 확보한다. 없으면 멱등 INSERT 로 만들고, 동시 요청이 먼저
+     * 만들었더라도 중복 키 예외 없이 그 행을 재조회해 영속(managed) 엔티티로 돌려준다.
+     * INSERT 직후이므로 재조회는 항상 존재한다(없으면 내부 오류로 간주).
+     */
+    private LectureProgress getOrCreateStarted(Long userId, Long lectureId, int positionSeconds, LocalDateTime now) {
+        lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, now);
+        return lectureProgressRepository
+                .findByUserIdAndLectureId(userId, lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+    }
+
+    /**
+     * getOrCreateStarted 와 같되, 재조회를 쓰기 락으로 수행한다. 하트비트 누적 경로에서
+     * 최초 비트가 행을 만든 직후에도 이어지는 동시 갱신을 행 락으로 직렬화하기 위함이다.
+     */
+    private LectureProgress getOrCreateStartedForUpdate(Long userId, Long lectureId, int positionSeconds, LocalDateTime now) {
+        lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, now);
+        return lectureProgressRepository
+                .findByUserIdAndLectureIdForUpdate(userId, lectureId)
+                .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
     }
 
     private boolean canStartProgress(Long userId, Lecture lecture) {

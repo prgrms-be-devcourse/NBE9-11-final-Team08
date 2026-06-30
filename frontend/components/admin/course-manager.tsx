@@ -82,7 +82,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
     type: 'approve' | 'reject' | 'suspend' | 'delete'
     course: Course
   } | null>(null)
-  
+
   const [reason, setReason] = useState('')
   const [processing, setProcessing] = useState(false)
 
@@ -103,11 +103,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
             subCategory: '',
             thumbnailUrl: draft.thumbnail || '/placeholder.svg',
             price: draft.price || 0,
-            rating: 0,
-            reviewCount: 0,
-            studentCount: 0,
-            level: '입문',
-            tags: [],
+            viewCount: 0,
             instructor: { id: String(draft.instructorId || ''), name: `강사 ${draft.instructorId || ''}`, title: '' },
             chapters: [],
             status: draft.status || 'DRAFT',
@@ -132,11 +128,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
               subCategory: '웹 개발',
               thumbnailUrl: '/placeholder.svg',
               price: 99000,
-              rating: 5,
-              reviewCount: 12,
-              studentCount: 45,
-              level: '초급',
-              tags: ['AI', 'React', 'Next.js'],
+              viewCount: 45,
               instructor: { id: '2', name: '김코딩 강사', title: '' },
               chapters: [],
               status: 'IN_REVIEW',
@@ -150,9 +142,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
               subCategory: 'UI/UX',
               thumbnailUrl: '/placeholder.svg',
               price: 49000,
-              rating: 4.8,
-              reviewCount: 34,
-              studentCount: 128,
+              viewCount: 128,
               level: '중급',
               tags: ['Tailwind', 'Design System'],
               instructor: { id: '3', name: '이디자인 강사', title: '' },
@@ -168,11 +158,7 @@ export function CourseManager({ initialCourses }: { initialCourses: Course[] }) 
               subCategory: '백엔드',
               thumbnailUrl: '/placeholder.svg',
               price: 150000,
-              rating: 4.9,
-              reviewCount: 8,
-              studentCount: 20,
-              level: '심화',
-              tags: ['Spring Boot', 'MSA'],
+              viewCount: 20,
               instructor: { id: '4', name: '박서버 강사', title: '' },
               chapters: [],
               status: 'SUSPENDED',

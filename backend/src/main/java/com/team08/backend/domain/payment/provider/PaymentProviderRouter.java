@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class PaymentProviderRouter {
@@ -21,6 +22,10 @@ public class PaymentProviderRouter {
 
     public PaymentProviderConfirmResponse confirm(PaymentProviderType providerType, PaymentProviderConfirmRequest request) {
         return findProvider(providerType).confirm(request);
+    }
+
+    public Optional<PaymentProviderLookupResponse> lookup(PaymentProviderType providerType, PaymentProviderLookupRequest request) {
+        return findProvider(providerType).lookup(request);
     }
 
     private PaymentProvider findProvider(PaymentProviderType providerType) {

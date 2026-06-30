@@ -14,9 +14,13 @@ import type {
   OrderDetailResponse,
   ConfirmPaymentResponse,
   ConfirmTossPaymentRequest,
+  NicepayPreparePaymentRequest,
+  NicepayPreparePaymentResponse,
   PaymentResponse,
   EnrolledCourse,
+  EnrolledCourseResponse,
   MyComment,
+  MyAnswer,
   QnaPost,
   Study,
   StudyDetailResponse,
@@ -40,9 +44,11 @@ import type {
   AdminCouponPolicyResponse,
   LectureEnterResponse,
   LectureProgressResponse,
+  CourseLectureProgressResponse,
   LearningEventType,
   LearningEventResponse,
   QnaQuestionResponse,
+  QnaAnswerResponse,
   StudyReportResponse,
   AdminOverview,
   DailySessionPoint,
@@ -57,6 +63,7 @@ import type {
   LecturePauses,
   FeedCursor,
   FeedCursorResponse,
+  CouponIssueRequestResponse,
 } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8080'
@@ -68,9 +75,11 @@ const REFRESH_EXCLUDED_PATHS = new Set([
   '/api/auth/logout',
   '/api/auth/refresh',
   '/api/auth/signup',
+  '/api/auth/seller/signup',
 ])
 
 let refreshAuthPromise: Promise<boolean> | null = null
+let csrfFetchPromise: Promise<string | undefined> | null = null
 
 const decodeCookieValue = (value: string): string => {
   try {
@@ -150,13 +159,24 @@ const ensureCsrfToken = async (includeCredentials: boolean): Promise<string | un
     return undefined
   }
 
-  await fetch(`${BASE_URL}/api/auth/csrf`, {
-    method: 'GET',
-    credentials: 'include',
-    cache: 'no-store',
-  }).catch(() => undefined)
+  // 쿠키가 없을 때만 발급한다. 콜드스타트에 mutation 이 동시에 나가면
+  // 발급이 중복되어 토큰이 매번 갱신되고 쿠키-헤더가 어긋날 수 있으므로,
+  // refreshAuthPromise 와 동일하게 in-flight 요청을 하나로 합친다.
+  if (!csrfFetchPromise) {
+    csrfFetchPromise = (async () => {
+      await fetch(`${BASE_URL}/api/auth/csrf`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      }).catch(() => undefined)
 
-  return getCookieValue(CSRF_COOKIE_NAME)
+      return getCookieValue(CSRF_COOKIE_NAME)
+    })().finally(() => {
+      csrfFetchPromise = null
+    })
+  }
+
+  return csrfFetchPromise
 }
 
 const handleUnauthorized = () => {
@@ -169,6 +189,7 @@ const handleUnauthorized = () => {
       pathname === '/events' ||
       pathname === '/login' ||
       pathname === '/signup' ||
+      pathname === '/seller/signup' ||
       pathname === '/cart'
 
     if (!isPublicRoute) {
@@ -222,11 +243,8 @@ async function request<T>(
   if (!BASE_URL) return defaultData
   try {
     const fetchRequest = async () => {
+      // GET 은 백엔드 CsrfFilter 가 검증하지 않으므로 CSRF 토큰을 붙이지 않는다.
       const authHeaders = await getCredentialHeaders(includeAuth)
-      const csrfToken = await ensureCsrfToken(includeAuth)
-      if (csrfToken) {
-        authHeaders[CSRF_HEADER_NAME] = csrfToken
-      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -266,11 +284,8 @@ async function requestText(
   if (!BASE_URL) return ''
   try {
     const fetchRequest = async () => {
+      // GET 은 백엔드 CsrfFilter 가 검증하지 않으므로 CSRF 토큰을 붙이지 않는다.
       const authHeaders = await getCredentialHeaders(includeAuth)
-      const csrfToken = await ensureCsrfToken(includeAuth)
-      if (csrfToken) {
-        authHeaders[CSRF_HEADER_NAME] = csrfToken
-      }
       return fetch(`${BASE_URL}${path}`, {
         headers: {
           ...authHeaders,
@@ -373,11 +388,7 @@ const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
   subCategory: '',
   thumbnailUrl: card.thumbnail || '/placeholder.svg',
   price: card.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: card.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: card.viewCount || 0,
   instructor: { id: card.instructorId?.toString() || '0', name: `강사 ${card.instructorId || ''}`, title: '' },
   chapters: [],
 })
@@ -391,11 +402,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
   subCategory: '',
   thumbnailUrl: detail.thumbnail || '/placeholder.svg',
   price: detail.price || 0,
-  rating: 0,
-  reviewCount: 0,
-  studentCount: detail.viewCount || 0,
-  level: '입문',
-  tags: [],
+  viewCount: detail.viewCount || 0,
   instructor: { id: detail.instructorId?.toString() || '0', name: `강사 ${detail.instructorId || ''}`, title: '' },
   chapters: detail.chapters?.map((ch) => ({
     id: ch.id.toString(),
@@ -452,6 +459,18 @@ const mapStudyMemberResponseToMember = (
   progress: 0,
   role: member.role.toLowerCase() as StudyMember['role'],
   joinedAt: parseDateToString(member.joinedAt),
+})
+
+const mapEnrolledCourseResponseToCourse = (course: EnrolledCourseResponse): EnrolledCourse => ({
+  id: String(course.studyId ?? course.courseId),
+  courseId: String(course.courseId),
+  title: course.title,
+  instructor: course.instructorNickname,
+  thumbnailUrl: course.thumbnailUrl || '/placeholder.svg',
+  progress: course.progressRate ?? 0,
+  totalLectures: course.totalLectures ?? 0,
+  completedLectures: course.completedLectures ?? 0,
+  status: course.progressRate >= 100 ? '완료' : '진행 중',
 })
 
 const mapUseTypeToBackend = (useType: string): any => {
@@ -889,6 +908,7 @@ const getCurrentUserId = async (): Promise<number> => {
 export const api = {
   // Auth
   signup: (data: SignupRequest) => mutate<void>('/api/auth/signup', 'POST', data, false, true),
+  sellerSignup: (data: SignupRequest) => mutate<void>('/api/auth/seller/signup', 'POST', data, false, true),
   login: (data: LoginRequest) => mutate<void>('/api/auth/login', 'POST', data, false, true),
   logout: async () => {
     return mutate<void>('/api/auth/logout', 'POST', undefined, false, true)
@@ -1085,6 +1105,50 @@ export const api = {
   getLastWatched: (courseId: string | number) =>
     request<LectureEnterResponse | null>(`/api/courses/${courseId}/lectures/last-watched`, null),
 
+  // 강좌 내 사용자별 강의 진행도 목록 (진행 이력이 있는 강의만 내려옴)
+  getCourseLectureProgress: (courseId: string | number) =>
+    request<CourseLectureProgressResponse[]>(
+      `/api/courses/${courseId}/lectures/progress`,
+      [],
+      true,
+      false,
+    ),
+
+  // 강좌 상세 + 사용자별 강의 진행도를 머지해서 반환 (커리큘럼 화면용)
+  getCourseWithProgress: async (
+    courseId: string | number,
+  ): Promise<Course | undefined> => {
+    const [course, progressList] = await Promise.all([
+      api.getCourse(courseId),
+      api.getCourseLectureProgress(courseId),
+    ])
+    if (!course) return undefined
+
+    const byLectureId = new Map(
+      (Array.isArray(progressList) ? progressList : []).map((p) => [
+        p.lectureId.toString(),
+        p,
+      ]),
+    )
+
+    return {
+      ...course,
+      chapters: course.chapters.map((ch) => ({
+        ...ch,
+        lectures: ch.lectures.map((lec) => {
+          const p = byLectureId.get(lec.id)
+          if (!p) return lec
+          return {
+            ...lec,
+            progress: p.progressRate,
+            completed: p.completed,
+            lastPositionSeconds: p.lastPositionSeconds,
+          }
+        }),
+      })),
+    }
+  },
+
   enterFirstLecture: (courseId: string | number, chapterId: string | number) =>
     request<LectureEnterResponse | null>(
       `/api/courses/${courseId}/chapters/${chapterId}/lectures/first`,
@@ -1112,6 +1176,14 @@ export const api = {
     }),
   createQuestion: (lectureId: string | number, title: string, content: string) =>
     mutate<QnaQuestionResponse>(`/api/lectures/${lectureId}/qna/questions`, 'POST', { title, content }),
+
+  // QnA 답변 (해당 강좌의 강사/판매자 전용 — 백엔드 MANAGE_ANSWER 로 강제)
+  createAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'POST', { content }),
+  updateAnswer: (questionId: string | number, content: string) =>
+    mutate<QnaAnswerResponse>(`/api/qna/questions/${questionId}/answers`, 'PUT', { content }),
+  deleteAnswer: (questionId: string | number) =>
+    mutate<void>(`/api/qna/questions/${questionId}/answers`, 'DELETE'),
 
   // Reflections
   getReflection: (lectureId: string | number) => request<any>(`/api/lectures/${lectureId}/reflections`, null),
@@ -1154,6 +1226,10 @@ export const api = {
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/toss/confirm`, 'POST', request),
+  confirmProviderPayment: (orderId: number, providerType: string, request: ConfirmTossPaymentRequest) =>
+    mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/providers/${providerType}/confirm`, 'POST', request),
+  prepareNicepayPayment: (orderId: number, request: NicepayPreparePaymentRequest) =>
+    mutate<NicepayPreparePaymentResponse>(`/api/payments/${orderId}/nicepay/prepare`, 'POST', request),
   refundPayment: (orderId: number | string) =>
     mutate<PaymentResponse>(`/api/payments/${orderId}/refund`, 'POST'),
   confirmPayment: (
@@ -1199,6 +1275,12 @@ export const api = {
     request<PageResponse<StudyActivityResponse>>(
       `/api/studies/${studyId}/activities?page=${page}&size=${size}`,
       { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true }
+    ),
+
+  getMyStudyActivities: (page = 0, size = 10) =>
+    request<PageResponse<StudyActivityResponse>>(
+      `/api/study-activities/me?page=${page}&size=${size}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
     ),
 
   getStudyFeed: (studyId: string | number, cursor?: FeedCursor | null, size = 10) => {
@@ -1357,7 +1439,39 @@ export const api = {
   terminateAdminCoupon: (couponId: number) =>
     mutate<void>(`/api/admin/coupons/${couponId}/terminate`, 'PATCH'),
   deleteAdminCoupon: (couponId: number) =>
-    mutate<void>(`/api/admin/coupons/${couponId}`, 'DELETE'),
+    mutate(`/api/admin/coupons/${couponId}`, 'DELETE'),
+
+  issueCouponToUsers: async (policyId: number, userIds: number[], requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/users`,
+      'POST',
+      { userIds, requestKey }
+    )
+  },
+
+  issueCouponToAll: async (policyId: number, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/all`,
+      'POST',
+      { requestKey }
+    )
+  },
+
+  issueCouponToInactiveUsers: async (policyId: number, inactiveDays: number, maxInactiveDays: number | undefined, requestKey: string) => {
+    return await mutate<CouponIssueRequestResponse>(
+      `/api/admin/coupons/${policyId}/issue/inactive`,
+      'POST',
+      { inactiveDays, maxInactiveDays, requestKey }
+    )
+  },
+
+  getCouponIssueRequests: async (page = 0, size = 20) => {
+    const result = await request<PageResponse<CouponIssueRequestResponse> | null>(
+      `/api/admin/coupons/issue-requests?page=${page}&size=${size}`,
+      null
+    )
+    return result
+  },
 
   // User Profile
   getProfile: async (): Promise<UserProfile | null> => {
@@ -1379,39 +1493,11 @@ export const api = {
     }
   },
   getPurchasedCourses: async (): Promise<EnrolledCourse[]> => {
-    try {
-      const res = await request<any>('/api/orders', { content: [] })
-      const orders = Array.isArray(res) ? res : (res?.content || [])
-      const enrolled: EnrolledCourse[] = []
-      for (const ord of orders) {
-        if (ord.status === 'PAID') {
-          for (const item of ord.items ?? []) {
-            const courseId = item.courseId.toString()
-            if (!enrolled.some(e => (e.courseId ?? e.id) === courseId)) {
-              const studyId = await api.getStudyIdByCourseId(courseId)
-              if (!studyId) continue
-              enrolled.push({
-                id: studyId,
-                courseId,
-                title: item.courseTitle || '',
-                instructor: '강사',
-                thumbnailUrl: '/placeholder.svg',
-                progress: 0,
-                totalLectures: 0,
-                completedLectures: 0,
-                status: '진행 중'
-              })
-            }
-          }
-        }
-      }
-      return enrolled
-    } catch (e) {
-      console.error('Failed to get purchased courses from orders:', e)
-      return []
-    }
+    const courses = await request<EnrolledCourseResponse[]>('/api/enrollments/me/courses', [])
+    return Array.isArray(courses) ? courses.map(mapEnrolledCourseResponseToCourse) : []
   },
   getMyComments: () => request<MyComment[]>('/api/me/comments', []),
+  getMyAnswers: () => request<MyAnswer[]>('/api/me/answers', []),
 
   // Orders
   getOrders: async () => {
@@ -1549,11 +1635,11 @@ export const api = {
     const aggregate: MyStudyReport | null =
       raws.length > 1
         ? {
-            studyId: 'all',
-            studyName: `전체 ${reports.length}개 스터디`,
-            userName,
-            ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
-          }
+          studyId: 'all',
+          studyName: `전체 ${reports.length}개 스터디`,
+          userName,
+          ...mapStudyReportToDisplay(buildAggregateReportRaw(raws)),
+        }
         : null
 
     return { reports, aggregate }

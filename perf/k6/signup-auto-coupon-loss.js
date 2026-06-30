@@ -97,7 +97,6 @@ export function signup(data) {
         password: PASSWORD,
         nickname: `k6-auto-${data.runId}-${seq}`,
         profileImage: null,
-        userRole: 'USER',
     };
 
     signupAttemptCount.add(1);

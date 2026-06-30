@@ -10,18 +10,15 @@ import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
 import com.team08.backend.domain.issuedcoupon.exception.CouponNotFoundException;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
+import com.team08.backend.domain.issuedcoupon.strategy.CouponIssueResult;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
-import com.team08.backend.domain.issuedcoupon.entity.IssuedCouponJob;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobStreamPublisher;
-import com.team08.backend.domain.issuedcoupon.service.IssuedCouponJobWriter;
 import com.team08.backend.domain.user.repository.UserRepository;
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -40,9 +37,6 @@ public class IssuedCouponService {
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
     private final IssuedCouponWriter issuedCouponWriter;
-    private final IssuedCouponJobWriter issuedCouponJobWriter;
-    private final IssuedCouponJobStreamPublisher issuedCouponJobStreamPublisher;
-    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     // TODO 나중에 회원가입에 추가
@@ -91,28 +85,13 @@ public class IssuedCouponService {
         CouponType couponType = couponPolicyRepository.findCouponTypeById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        if (couponType == CouponType.FCFS) {
-            // 타입에 맞는 전략 선택
-            IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
+        IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
+        CouponIssueResult result = strategy.issue(userId, policyId);
 
-            // 쿠폰 발급 로직 실행
-            strategy.issue(userId, policyId);
-
-            IssuedCouponJob issuedCouponJob = issuedCouponJobWriter.createRequested(
-                    userId,
-                    policyId,
-                    LocalDateTime.now(clock)
-            );
-            issuedCouponJobStreamPublisher.publish(issuedCouponJob.getId(), userId, policyId);
-            return CouponDownloadResponse.requested(userId, policyId, issuedCouponJob);
+        if (result.status() == CouponIssueResult.Status.REQUESTED) {
+            return CouponDownloadResponse.requested(result.userId(), result.policyId());
         }
-
-        return transactionTemplate.execute(status -> {
-            IssuedCouponStrategy strategy = strategyFactory.getStrategy(couponType);
-            IssuedCoupon newCoupon = strategy.issue(userId, policyId);
-            IssuedCoupon savedCoupon = issuedCouponWriter.saveWithConcurrencyProtection(newCoupon);
-            return CouponDownloadResponse.issued(savedCoupon);
-        });
+        return CouponDownloadResponse.issued(result.issuedCoupon());
     }
 
     // [사용자] 내 쿠폰 목록 조회

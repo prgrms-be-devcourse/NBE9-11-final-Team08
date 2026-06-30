@@ -26,6 +26,7 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
+        default_batch_fetch_size: 100
         jdbc:
           batch_size: 50
         order_updates: true
@@ -109,8 +110,8 @@ app:
       read-timeout: ${TOSS_PAYMENTS_READ_TIMEOUT:5s}
     nicepay:
       base-url: ${NICEPAY_PAYMENTS_BASE_URL:https://api.nicepay.co.kr}
-      client-key: ${NICEPAY_PAYMENTS_CLIENT_KEY:}
-      secret-key: ${NICEPAY_PAYMENTS_SECRET_KEY:}
+      mid: ${NICEPAY_MID:}
+      merchant-key: ${NICEPAY_MERCHANT_KEY:}
       connect-timeout: ${NICEPAY_PAYMENTS_CONNECT_TIMEOUT:3s}
       read-timeout: ${NICEPAY_PAYMENTS_READ_TIMEOUT:5s}
 

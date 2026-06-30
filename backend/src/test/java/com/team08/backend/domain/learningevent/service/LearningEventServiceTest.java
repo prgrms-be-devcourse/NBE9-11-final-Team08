@@ -116,6 +116,52 @@ class LearningEventServiceTest {
         verify(learningEventRepository, never()).save(any());
     }
 
+    // ──── 완료 이벤트: 서버 전용(클라이언트 거부 + 멱등 적재) ───────────────────────
+
+    @Test
+    @DisplayName("클라이언트가 LECTURE_COMPLETE 를 직접 보내면 거부, 적재하지 않음")
+    void recordEvent_clientComplete_rejected() {
+        Long userId = 1L;
+        RecordLearningEventRequest request = lectureCompleteRequest(10L, "complete-key");
+
+        assertThatThrownBy(() -> learningEventService.recordEvent(userId, request))
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CLIENT_COMPLETE_EVENT_NOT_ALLOWED);
+
+        verify(learningEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("서버 완료 적재: 신규면 LECTURE_COMPLETE 저장 + 도메인 이벤트 발행")
+    void recordLectureCompletion_new_persistsAndPublishes() {
+        Long userId = 1L;
+        String key = "LECTURE_COMPLETE:1:10";
+
+        given(learningEventRepository.existsByUniqueEventKey(key)).willReturn(false);
+        given(learningEventRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        learningEventService.recordLectureCompletion(userId, 2L, 3L, 10L, LocalDateTime.now());
+
+        ArgumentCaptor<LearningEvent> captor = ArgumentCaptor.forClass(LearningEvent.class);
+        verify(learningEventRepository).save(captor.capture());
+        assertThat(captor.getValue().getEventType()).isEqualTo(LearningEventType.LECTURE_COMPLETE);
+        assertThat(captor.getValue().getUniqueEventKey()).isEqualTo(key);
+        verify(eventPublisher).publishEvent(any(LearningEventRecorded.class));
+    }
+
+    @Test
+    @DisplayName("서버 완료 적재: 이미 기록됐으면 멱등(저장·발행 없음)")
+    void recordLectureCompletion_duplicate_idempotent() {
+        given(learningEventRepository.existsByUniqueEventKey("LECTURE_COMPLETE:1:10")).willReturn(true);
+
+        learningEventService.recordLectureCompletion(1L, 2L, 3L, 10L, LocalDateTime.now());
+
+        verify(learningEventRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
     // ──── 사용자별 활동 조회 ───────────────────────────────────────────────────────
 
     @Test
@@ -357,6 +403,15 @@ class LearningEventServiceTest {
         return new RecordLearningEventRequest(
                 1L, 2L, lectureId,
                 LearningEventType.LECTURE_ENTER,
+                null,
+                eventKey
+        );
+    }
+
+    private RecordLearningEventRequest lectureCompleteRequest(Long lectureId, String eventKey) {
+        return new RecordLearningEventRequest(
+                1L, 2L, lectureId,
+                LearningEventType.LECTURE_COMPLETE,
                 null,
                 eventKey
         );

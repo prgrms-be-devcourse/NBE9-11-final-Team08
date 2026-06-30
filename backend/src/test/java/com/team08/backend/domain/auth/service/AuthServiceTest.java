@@ -1,7 +1,6 @@
 package com.team08.backend.domain.auth.service;
 
 import com.team08.backend.domain.auth.dto.request.SignupRequest;
-import com.team08.backend.domain.auth.dto.request.SignupRole;
 import com.team08.backend.domain.auth.entity.RefreshToken;
 import com.team08.backend.domain.auth.exception.LoginFailedException;
 import com.team08.backend.domain.auth.exception.InvalidRefreshTokenException;
@@ -12,6 +11,8 @@ import com.team08.backend.domain.auth.token.TokenHasher;
 import com.team08.backend.domain.auth.token.TokenProperties;
 import com.team08.backend.domain.couponreward.outbox.service.CouponRewardOutboxService;
 import com.team08.backend.domain.fixture.UserFixture;
+import com.team08.backend.domain.seller.entity.Seller;
+import com.team08.backend.domain.seller.repository.SellerRepository;
 import com.team08.backend.domain.user.dto.LoginUserDto;
 import com.team08.backend.domain.user.entity.User;
 import com.team08.backend.domain.user.entity.UserRole;
@@ -59,6 +60,9 @@ public class AuthServiceTest {
     @Mock
     private CouponRewardOutboxService couponRewardOutboxService;
 
+    @Mock
+    private SellerRepository sellerRepository;
+
     private AuthService authService;
 
     private final Clock fixedClock = Clock.fixed(
@@ -81,7 +85,8 @@ public class AuthServiceTest {
                 refreshTokenRepository,
                 tokenProperties,
                 fixedClock,
-                couponRewardOutboxService
+                couponRewardOutboxService,
+                sellerRepository
         );
     }
 
@@ -174,8 +179,7 @@ public class AuthServiceTest {
                 "test@email.com",
                 "password",
                 "nickname",
-                null,
-                SignupRole.USER
+                null
         );
 
         given(userRepository.existsByEmail(request.email()))
@@ -205,14 +209,13 @@ public class AuthServiceTest {
     }
 
     @Test
-    void SELLER로_회원가입하면_SELLER로_저장된다() {
+    void 판매자_회원가입하면_SELLER로_저장하고_seller_정보를_생성한다() {
         // given
         SignupRequest request = new SignupRequest(
                 "test@email.com",
                 "password",
                 "nickname",
-                null,
-                SignupRole.SELLER
+                null
         );
 
         given(userRepository.existsByEmail(request.email()))
@@ -224,10 +227,10 @@ public class AuthServiceTest {
                     User user = invocation.getArgument(0);
                     ReflectionTestUtils.setField(user, "id", 1L);
                     return user;
-                });
+        });
 
         // when
-        authService.signup(request);
+        authService.signupSeller(request);
 
         // then
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -238,6 +241,11 @@ public class AuthServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@email.com");
         assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
         assertThat(savedUser.getRole()).isEqualTo(UserRole.ROLE_SELLER);
+
+        ArgumentCaptor<Seller> sellerCaptor = ArgumentCaptor.forClass(Seller.class);
+        then(sellerRepository).should().save(sellerCaptor.capture());
+        assertThat(sellerCaptor.getValue().getUserId()).isEqualTo(1L);
+        then(couponRewardOutboxService).shouldHaveNoInteractions();
     }
 
     @Test
@@ -247,8 +255,7 @@ public class AuthServiceTest {
                 "test@email.com",
                 "password",
                 "nickname",
-                null,
-                SignupRole.USER
+                null
         );
 
         given(userRepository.existsByEmail(request.email()))
