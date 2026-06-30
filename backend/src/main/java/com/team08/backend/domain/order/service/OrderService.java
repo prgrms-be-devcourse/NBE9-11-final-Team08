@@ -8,6 +8,7 @@ import com.team08.backend.domain.course.entity.CourseStatus;
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.enrollment.repository.EnrollmentRepository;
 import com.team08.backend.domain.order.dto.OrderDetailResponse;
+import com.team08.backend.domain.order.dto.OrderPaymentResponse;
 import com.team08.backend.domain.order.dto.OrderSummaryResponse;
 import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.repository.OrderRepository;
@@ -88,8 +89,11 @@ public class OrderService {
     public OrderDetailResponse getMyOrder(Long userId, Long orderId) {
         Order order = findMyOrder(userId, orderId);
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
+        OrderPaymentResponse payment = paymentRepository.findByOrder_Id(order.getId())
+                .map(OrderPaymentResponse::from)
+                .orElse(null);
 
-        return OrderDetailResponse.from(order, orderItems);
+        return OrderDetailResponse.from(order, orderItems, payment);
     }
 
     @Transactional
@@ -103,7 +107,8 @@ public class OrderService {
         payment.ifPresent(cancelablePayment -> cancelablePayment.cancel(canceledAt));
 
         List<OrderItem> orderItems = orderItemRepository.findAllByOrderId(order.getId());
-        return OrderDetailResponse.from(order, orderItems);
+        OrderPaymentResponse orderPayment = payment.map(OrderPaymentResponse::from).orElse(null);
+        return OrderDetailResponse.from(order, orderItems, orderPayment);
     }
 
     private OrderDetailResponse createPendingPaymentOrder(Long userId, List<Course> courses) {

@@ -34,7 +34,7 @@ public class TossPaymentProvider implements PaymentProvider {
                     response.paymentKey(),
                     response.orderId(),
                     response.status(),
-                    response.method(),
+                    response.resolvedMethod(),
                     response.totalAmount(),
                     response.approvedAt()
             );
@@ -68,7 +68,7 @@ public class TossPaymentProvider implements PaymentProvider {
                 response.paymentKey(),
                 response.orderId(),
                 response.status(),
-                response.method(),
+                response.resolvedMethod(),
                 response.totalAmount(),
                 response.approvedAt()
         );
