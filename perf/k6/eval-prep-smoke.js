@@ -102,13 +102,15 @@ export default function () {
     for (let i = 1; i <= USER_COUNT; i++) {
       const email = `${EMAIL_PREFIX}-${i}@test.local`;
       const nickname = `${EMAIL_PREFIX}-${i}`;
+      let csrf = null;
 
       if (PREP_SIGNUP) {
-        signup(BASE_URL, email, PASSWORD, nickname);
+        const signupResult = signup(BASE_URL, email, PASSWORD, nickname);
+        csrf = signupResult.csrf;
         think(THINK_MIN, THINK_MAX);
       }
 
-      const auth = login(BASE_URL, email, PASSWORD);
+      const auth = login(BASE_URL, email, PASSWORD, csrf);
       users.push({ email, auth });
 
       const meRes = authedGet(BASE_URL, auth, '/api/auth/me', { api: 'auth.me' });
@@ -129,15 +131,22 @@ export default function () {
           { api: 'orders.direct' },
         );
 
-        const order = parseJson(orderRes, {});
-        const finalPrice = Number(order.finalPrice || order.totalPrice || 0);
-        const orderId = Number(order.orderId);
-
         const orderOk = check(orderRes, {
           'direct order is created or already blocked as expected': (r) => r.status === 200 || r.status === 201 || r.status === 409 || r.status === 400,
         });
 
-        if (orderOk && orderId) {
+        if (orderRes.status >= 200 && orderRes.status < 300) {
+          const order = parseJson(orderRes, {});
+          const finalPrice = Number(order.finalPrice || order.totalPrice || 0);
+          const orderId = Number(order.orderId);
+
+          if (!orderId) {
+            check(orderRes, {
+              'direct order has orderId': () => false,
+            });
+            continue;
+          }
+
           const confirmRes = authedPost(
             BASE_URL,
             user.auth,

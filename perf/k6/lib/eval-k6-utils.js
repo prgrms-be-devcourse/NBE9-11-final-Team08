@@ -99,6 +99,20 @@ export function getCsrf(baseUrl) {
   };
 }
 
+export function getCurrentCsrf(baseUrl) {
+  const cookies = cookiesForUrl(baseUrl);
+  const token = decodeCookieValue(cookies['XSRF-TOKEN'] || '');
+  if (!token) {
+    return getCsrf(baseUrl);
+  }
+  return {
+    ok: true,
+    token,
+    cookies,
+    res: null,
+  };
+}
+
 export function cookiesForUrl(baseUrl) {
   const jarCookies = http.cookieJar().cookiesForURL(baseUrl);
   const cookies = {};
@@ -128,13 +142,19 @@ export function signup(baseUrl, email, password, nickname) {
     console.log(`[signup 403] email=${email}, csrfTokenPresent=${csrf.token !== ''}, body=${res.body}`);
   }
 
-  return check(res, {
+  const ok = check(res, {
     'signup created or already exists': (r) => r.status === 201 || r.status === 409 || r.status === 400,
   });
+
+  return {
+    ok,
+    csrf: getCurrentCsrf(baseUrl),
+    res,
+  };
 }
 
-export function login(baseUrl, email, password) {
-  const csrf = getCsrf(baseUrl);
+export function login(baseUrl, email, password, existingCsrf = null) {
+  const csrf = existingCsrf && existingCsrf.token ? existingCsrf : getCurrentCsrf(baseUrl);
   const res = http.post(
     `${baseUrl}/api/auth/login`,
     JSON.stringify({ email, password }),

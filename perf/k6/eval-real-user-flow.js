@@ -244,6 +244,10 @@ function purchaseFlow(auth, ids) {
       'direct order 2xx or already purchased': (r) => (r.status >= 200 && r.status < 300) || r.status === 400 || r.status === 409,
     }) && ok;
 
+    if (orderRes.status < 200 || orderRes.status >= 300) {
+      return;
+    }
+
     const order = parseJson(orderRes, {});
     if (order && order.orderId) {
       const confirmRes = authedPost(BASE_URL, auth, `/api/payments/${order.orderId}/confirm`, {
