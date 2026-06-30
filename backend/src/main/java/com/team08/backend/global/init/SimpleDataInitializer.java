@@ -33,11 +33,52 @@ public class SimpleDataInitializer {
         // 이미 데이터가 있으면 seed() 가 건너뛰고 false 를 반환한다.
         // 그 경우 비멱등인 시나리오 보강도 함께 건너뛴다.
         if (!dataSeeder.seed(CONFIG)) {
+            if (repairPartiallySeededSimpleData()) {
+                return;
+            }
             log.info("[DataInit] 이미 데이터가 존재해 시나리오 보강을 건너뜀");
             return;
         }
         dataSeeder.seedDemoScenarios();
         linkLearnersAsStudyMembers();
+    }
+
+    private boolean repairPartiallySeededSimpleData() {
+        Long seededCourseCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM (SELECT id FROM courses ORDER BY id LIMIT ?) seeded
+                """, Long.class, CONFIG.courseCount());
+        Long seededDraftCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM (SELECT status FROM courses ORDER BY id LIMIT ?) seeded
+                WHERE seeded.status = 'DRAFT'
+                """, Long.class, CONFIG.courseCount());
+        Long studyCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM studies", Long.class);
+        Long seededHistoryCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM course_status_histories h
+                WHERE h.course_id IN (
+                    SELECT seeded.id
+                    FROM (SELECT id FROM courses ORDER BY id LIMIT ?) seeded
+                )
+                """, Long.class, CONFIG.courseCount());
+
+        if (seededCourseCount == null || seededDraftCount == null || studyCount == null || seededHistoryCount == null) {
+            return false;
+        }
+
+        boolean partiallySeeded = seededCourseCount == CONFIG.courseCount()
+                && seededDraftCount == CONFIG.courseCount()
+                && studyCount >= CONFIG.sellerCount()
+                && seededHistoryCount == 0;
+        if (!partiallySeeded) {
+            return false;
+        }
+
+        log.warn("[DataInit] simple seed partial state detected. Replaying demo scenarios.");
+        dataSeeder.seedDemoScenarios();
+        linkLearnersAsStudyMembers();
+        return true;
     }
 
     /**
