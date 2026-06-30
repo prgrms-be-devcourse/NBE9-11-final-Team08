@@ -121,16 +121,27 @@ public class LectureProgressService {
                 .orElse(null);
 
         // 이전 비트 시각(클램프 기준)·완료 여부는 가산 전에 스냅샷한다.
-        LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
-        boolean wasCompleted = progress != null && Boolean.TRUE.equals(progress.getCompleted());
-
-        if (progress == null) {
+        LocalDateTime previousBeatAt;
+        boolean wasCompleted;
+        if (progress != null) {
+            previousBeatAt = progress.getUpdatedAt();
+            wasCompleted = Boolean.TRUE.equals(progress.getCompleted());
+        } else {
             if (!canStartProgress(userId, lecture)) {
                 throw new CustomException(ErrorCode.VIDEO_ACCESS_DENIED);
             }
-            // 동시 생성(입장과 하트비트가 겹치는 경우 등)에 대비해 멱등으로 행을 확보한다.
-            // previousBeatAt 은 null 로 유지해 최초 비트의 delta 산정 동작을 보존한다.
-            progress = getOrCreateStarted(userId, lectureId, positionSeconds, eventTime);
+            // 행이 없으면 멱등 생성. 단, 같은 강의의 동시 첫 비트가 먼저 행을 만들었을 수 있으므로
+            // "이번 호출이 실제로 행을 만들었는지"로 클램프 기준을 정한다.
+            //  - 내가 만든 진짜 첫 비트 → previousBeatAt=null (클램프 면제, 기존 동작)
+            //  - 남이 먼저 만든 경우    → 그 행의 시각으로 클램프 → 동시 첫 비트가 둘 다 면제받아
+            //                            watchedSeconds 를 벽시계 제한 없이 과다 계상하는 것을 막는다.
+            boolean createdByMe =
+                    lectureProgressRepository.insertIfAbsent(userId, lectureId, positionSeconds, eventTime) > 0;
+            progress = lectureProgressRepository
+                    .findByUserIdAndLectureId(userId, lectureId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
+            previousBeatAt = createdByMe ? null : progress.getUpdatedAt();
+            wasCompleted = Boolean.TRUE.equals(progress.getCompleted());
         }
 
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);

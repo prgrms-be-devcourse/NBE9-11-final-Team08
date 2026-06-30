@@ -20,6 +20,10 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
      * 예외 없이 무시한다(현재 트랜잭션을 rollback-only 로 만들지 않음).
      * 삽입 후에는 findByUserIdAndLectureId 로 재조회해 managed 엔티티를 얻는다.
      * version 은 낙관적 락 초기값 0 으로 명시 삽입한다(NOT NULL).
+     * <p>
+     * 반환값 = 영향받은 행 수. 신규 삽입이면 1, 이미 존재해 no-op 이면 0 이다(update 가 user_id=user_id
+     * 무변경이라 2 가 나오지 않는다). 호출부는 이 값으로 "이번 호출이 행을 실제로 만들었는지"를 판별해
+     * 동시 첫 비트의 클램프 기준을 정한다.
      */
     @Modifying
     @Query(value = """
@@ -29,10 +33,10 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
             VALUES (:userId, :lectureId, :positionSeconds, 0, 0, false, 0, :now, :now)
             ON DUPLICATE KEY UPDATE user_id = user_id
             """, nativeQuery = true)
-    void insertIfAbsent(@Param("userId") Long userId,
-                        @Param("lectureId") Long lectureId,
-                        @Param("positionSeconds") int positionSeconds,
-                        @Param("now") LocalDateTime now);
+    int insertIfAbsent(@Param("userId") Long userId,
+                       @Param("lectureId") Long lectureId,
+                       @Param("positionSeconds") int positionSeconds,
+                       @Param("now") LocalDateTime now);
 
     // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 모든 강의 진행 정보(있는 것만)
     List<LectureProgress> findByUserIdAndLectureIdIn(Long userId, List<Long> lectureIds);
