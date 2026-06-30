@@ -109,7 +109,7 @@ class CourseControllerTest {
                 "images/thumb.jpg", 30000, CourseStatus.ON_SALE, null, 0, List.of(chapterResponse)
         );
 
-        given(courseService.getCourseDetail(courseId)).willReturn(response);
+        given(courseService.getCourseDetail(eq(courseId), any(String.class))).willReturn(response);
 
         mockMvc.perform(get("/api/courses/{courseId}", courseId)
                         .contentType(MediaType.APPLICATION_JSON))

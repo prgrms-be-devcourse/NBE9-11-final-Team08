@@ -17,22 +17,32 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class CourseViewCountRedisManager {
  
-    private static final String KEY_PREFIX = "course:viewcount:delta:";
-    private static final String KEY_SET_PREFIX = "course:viewcount:active_ids";
+    private static final String KEY_PREFIX = "{course:viewcount}:delta:";
+    private static final String KEY_SET_PREFIX = "{course:viewcount}:active_ids";
+    private static final String LOCK_KEY_PREFIX = "{course:viewcount}:lock:";
+    private static final long LOCK_TTL_MINUTES = 5;
  
     private final StringRedisTemplate redisTemplate;
     private final CourseRepository courseRepository;
     private final CourseDetailCacheManager courseDetailCacheManager;
     private final MeterRegistry meterRegistry;
  
-
-    public void increaseViewCount(Long courseId) {
+ 
+    public void increaseViewCount(Long courseId, String userIdentifier) {
         try {
-            String key = KEY_PREFIX + courseId;
-            redisTemplate.opsForValue().increment(key);
-            redisTemplate.expire(key, 1, TimeUnit.HOURS);
-            redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            String lockKey = LOCK_KEY_PREFIX + courseId + ":" + userIdentifier;
+            Boolean isFirstView = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL_MINUTES, TimeUnit.MINUTES);
+            
+            if (isFirstView != null && isFirstView) {
+                String key = KEY_PREFIX + courseId;
+                redisTemplate.opsForValue().increment(key);
+                redisTemplate.expire(key, 1, TimeUnit.HOURS);
+                redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            } else {
+                log.debug("[조회수 중복 증가 차단] courseId={}, user={}", courseId, userIdentifier);
+            }
         } catch (Exception e) {
+            log.warn("[Redis 조회수 가산 실패] RDB Fallback으로 우회합니다. courseId={}, user={}", courseId, userIdentifier, e);
             meterRegistry.counter("redis.viewcount.errors", "operation", "increase").increment();
             throw e;
         }
@@ -87,10 +97,11 @@ public class CourseViewCountRedisManager {
  
         for (String idStr : activeIds) {
             String key = KEY_PREFIX + idStr;
+            int delta = 0;
             try {
                 String deltaStr = redisTemplate.opsForValue().getAndSet(key, "0");
                 if (deltaStr != null) {
-                    int delta = Integer.parseInt(deltaStr);
+                    delta = Integer.parseInt(deltaStr);
                     if (delta > 0) {
                         Long courseId = Long.parseLong(idStr);
                         courseRepository.increaseViewCountByDelta(courseId, delta);
@@ -99,7 +110,8 @@ public class CourseViewCountRedisManager {
                     }
                 }
             } catch (Exception e) {
-                log.error("[조회수 동기화 실패] CourseId: {}", idStr, e);
+                // TODO: Consider DLQ storage if view count strictness increases in the future
+                log.error("[조회수 동기화 최종 실패] RDB 반영 중 예외가 발생하여 조회수 델타가 유실되었습니다. CourseId: {}, Lost Delta: {}", idStr, delta, e);
                 meterRegistry.counter("redis.viewcount.errors", "operation", "sync_write_db").increment();
             }
         }
