@@ -10,6 +10,8 @@ public record OrderItemResponse(
         Long courseId,
         @Schema(description = "주문 시점 강의 제목", example = "Spring Boot 입문")
         String courseTitle,
+        @Schema(description = "주문 시점 강의 썸네일 URL")
+        String thumbnailUrl,
         @Schema(description = "정가", example = "30000")
         int price,
         @Schema(description = "할인 금액", example = "0")
@@ -22,6 +24,7 @@ public record OrderItemResponse(
                 orderItem.getId(),
                 orderItem.getCourseId(),
                 orderItem.getCourseTitle(),
+                orderItem.getCourseThumbnail(),
                 orderItem.getPrice(),
                 orderItem.getDiscountPrice(),
                 orderItem.getFinalPrice()

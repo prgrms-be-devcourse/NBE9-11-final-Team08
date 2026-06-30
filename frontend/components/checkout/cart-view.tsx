@@ -60,7 +60,7 @@ export function CartView() {
             <li key={item.cartItemId} className="flex items-center gap-3 rounded-xl border bg-card p-3">
               <div className="relative h-16 w-28 shrink-0 overflow-hidden rounded-md bg-muted">
                 <Image
-                  src={'/placeholder.svg'}
+                  src={item.thumbnailUrl || '/placeholder.svg'}
                   alt={item.title}
                   fill
                   sizes="112px"

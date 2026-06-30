@@ -140,6 +140,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
         key: `order-${item.orderItemId}`,
         courseId: item.courseId,
         title: item.courseTitle,
+        thumbnailUrl: item.thumbnailUrl,
         price: item.finalPrice,
       }))
     }
@@ -148,6 +149,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       key: `cart-${item.cartItemId}`,
       courseId: item.courseId,
       title: item.title,
+      thumbnailUrl: item.thumbnailUrl,
       price: item.price,
     }))
   }, [directOrder, items])
@@ -458,7 +460,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
               {checkoutItems.map((item) => (
                 <div key={item.key} className="flex gap-4">
                   <Image
-                    src="/placeholder.svg"
+                    src={item.thumbnailUrl || '/placeholder.svg'}
                     alt={item.title}
                     width={96}
                     height={56}

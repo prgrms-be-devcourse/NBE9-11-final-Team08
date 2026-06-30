@@ -23,6 +23,7 @@ public class OrderItem {
     private Long courseId;
     @Column(nullable = false)
     private String courseTitle;
+    private String courseThumbnail;
     @Column(nullable = false)
     private Integer price;
     @Column(nullable = false)
@@ -33,17 +34,36 @@ public class OrderItem {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    private OrderItem(Order order, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
+    private OrderItem(
+            Order order,
+            Long courseId,
+            String courseTitle,
+            String courseThumbnail,
+            int price,
+            int discountPrice,
+            int finalPrice,
+            LocalDateTime createdAt
+    ) {
         this.order = order;
         this.courseId = courseId;
         this.courseTitle = courseTitle;
+        this.courseThumbnail = courseThumbnail;
         this.price = price;
         this.discountPrice = discountPrice;
         this.finalPrice = finalPrice;
         this.createdAt = createdAt;
     }
 
-    public static OrderItem createSnapshot(Order order, Long courseId, String courseTitle, int price, int discountPrice, int finalPrice, LocalDateTime createdAt) {
-        return new OrderItem(order, courseId, courseTitle, price, discountPrice, finalPrice, createdAt);
+    public static OrderItem createSnapshot(
+            Order order,
+            Long courseId,
+            String courseTitle,
+            String courseThumbnail,
+            int price,
+            int discountPrice,
+            int finalPrice,
+            LocalDateTime createdAt
+    ) {
+        return new OrderItem(order, courseId, courseTitle, courseThumbnail, price, discountPrice, finalPrice, createdAt);
     }
 }
