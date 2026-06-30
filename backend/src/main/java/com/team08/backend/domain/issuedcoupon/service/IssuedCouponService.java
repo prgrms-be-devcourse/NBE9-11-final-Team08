@@ -38,7 +38,6 @@ public class IssuedCouponService {
     private final CouponPolicyRepository couponPolicyRepository;
     private final UserRepository userRepository;
     private final IssuedCouponStrategyFactory strategyFactory;
-    private final IssuedCouponWriter issuedCouponWriter;
     private final Clock clock;
 
     public CouponDownloadResponse downloadCoupon(Long userId, Long policyId) {
