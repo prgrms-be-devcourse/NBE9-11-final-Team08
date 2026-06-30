@@ -110,16 +110,9 @@ public class CourseViewCountRedisManager {
                     }
                 }
             } catch (Exception e) {
-                log.error("[조회수 동기화 실패] RDB 반영 중 오류 발생. 복구 연산을 시도합니다. CourseId: {}, Delta: {}", idStr, delta, e);
+                // TODO: Consider DLQ storage if view count strictness increases in the future
+                log.error("[조회수 동기화 최종 실패] RDB 반영 중 예외가 발생하여 조회수 델타가 유실되었습니다. CourseId: {}, Lost Delta: {}", idStr, delta, e);
                 meterRegistry.counter("redis.viewcount.errors", "operation", "sync_write_db").increment();
-                if (delta > 0) {
-                    try {
-                        redisTemplate.opsForValue().increment(key, delta);
-                        redisTemplate.opsForSet().add(KEY_SET_PREFIX, idStr);
-                    } catch (Exception restoreEx) {
-                        log.error("[조회수 복구 실패] Redis 데이터 원복에 실패했습니다. CourseId: {}, Delta: {}", idStr, delta, restoreEx);
-                    }
-                }
             }
         }
 
