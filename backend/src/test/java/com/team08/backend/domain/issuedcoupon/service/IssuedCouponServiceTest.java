@@ -8,11 +8,11 @@ import com.team08.backend.domain.issuedcoupon.dto.CouponDownloadResponse;
 import com.team08.backend.domain.issuedcoupon.dto.CouponListResponse;
 import com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse;
 import com.team08.backend.domain.issuedcoupon.entity.IssuedCoupon;
-import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.issuedcoupon.repository.IssuedCouponRepository;
 import com.team08.backend.domain.issuedcoupon.strategy.CouponIssueResult;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
+import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,10 +50,6 @@ class IssuedCouponServiceTest {
     @Mock
     private IssuedCouponStrategyFactory strategyFactory;
 
-    @Mock
-    private IssuedCouponWriter issuedCouponWriter;
-
-
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
 
     private IssuedCouponService issuedCouponService;
@@ -65,7 +61,6 @@ class IssuedCouponServiceTest {
                 couponPolicyRepository,
                 userRepository,
                 strategyFactory,
-                issuedCouponWriter,
                 clock
         );
     }
@@ -82,7 +77,7 @@ class IssuedCouponServiceTest {
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.NORMAL));
         when(strategyFactory.getStrategy(CouponType.NORMAL)).thenReturn(strategy);
-        
+
         CouponIssueResult issueResult = CouponIssueResult.issued(issuedCoupon);
         when(strategy.issue(userId, policyId)).thenReturn(issueResult);
 
@@ -106,7 +101,7 @@ class IssuedCouponServiceTest {
         when(userRepository.existsById(userId)).thenReturn(true);
         when(couponPolicyRepository.findCouponTypeById(policyId)).thenReturn(Optional.of(CouponType.FCFS));
         when(strategyFactory.getStrategy(CouponType.FCFS)).thenReturn(strategy);
-        
+
         CouponIssueResult issueResult = CouponIssueResult.requested(userId, policyId);
         when(strategy.issue(userId, policyId)).thenReturn(issueResult);
 
@@ -213,13 +208,15 @@ class IssuedCouponServiceTest {
 
         CouponPolicy policy = mock(CouponPolicy.class);
         when(policy.getUsageType()).thenReturn(CouponUsageType.SINGLE_USE);
+        when(policy.getIsStackable()).thenReturn(true);
         when(policy.calculateDiscountAmount(originalPrice)).thenReturn(1000);
 
         when(issuedCouponRepository.findByIdWithLock(issuedCouponId)).thenReturn(Optional.of(issuedCoupon));
         when(couponPolicyRepository.findById(1L)).thenReturn(Optional.of(policy));
 
         // when
-        int discountAmount = issuedCouponService.useCouponForOrder(userId, issuedCouponId, originalPrice);
+        com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult result = issuedCouponService.useCouponsForOrder(userId, null, issuedCouponId, List.of(), originalPrice, 1L);
+        int discountAmount = result.totalDiscount();
 
         // then
         assertThat(discountAmount).isEqualTo(1000);

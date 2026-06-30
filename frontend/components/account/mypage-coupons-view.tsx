@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { Ticket, Info } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { Coupon, Course } from '@/lib/types'
 
 interface MyPageCouponsViewProps {
@@ -22,8 +24,21 @@ const CATEGORY_NAMES: Record<string, string> = {
 }
 
 export function MyPageCouponsView({ coupons, courses = [] }: MyPageCouponsViewProps) {
+  const [tab, setTab] = useState('active')
+  const [page, setPage] = useState(1)
+  const pageSize = 8
+
   const activeCoupons = coupons.filter((c) => c.status === 'ACTIVE')
   const inactiveCoupons = coupons.filter((c) => c.status !== 'ACTIVE')
+
+  const currentCoupons = tab === 'active' ? activeCoupons : inactiveCoupons
+  const totalPages = Math.max(1, Math.ceil(currentCoupons.length / pageSize))
+  const paginated = currentCoupons.slice((page - 1) * pageSize, page * pageSize)
+
+  const handleTabChange = (value: string) => {
+    setTab(value)
+    setPage(1)
+  }
 
   return (
     <div className="space-y-6">
@@ -41,7 +56,7 @@ export function MyPageCouponsView({ coupons, courses = [] }: MyPageCouponsViewPr
         </div>
       </div>
 
-      <Tabs defaultValue="active" className="w-full">
+      <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full max-w-[400px] grid-cols-2">
           <TabsTrigger value="active">
             사용 가능 ({activeCoupons.length})
@@ -54,7 +69,7 @@ export function MyPageCouponsView({ coupons, courses = [] }: MyPageCouponsViewPr
         <TabsContent value="active" className="mt-6">
           {activeCoupons.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {activeCoupons.map((coupon) => (
+              {paginated.map((coupon) => (
                 <CouponCard key={coupon.id} coupon={coupon} isActive={true} courses={courses} />
               ))}
             </div>
@@ -66,7 +81,7 @@ export function MyPageCouponsView({ coupons, courses = [] }: MyPageCouponsViewPr
         <TabsContent value="inactive" className="mt-6">
           {inactiveCoupons.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              {inactiveCoupons.map((coupon) => (
+              {paginated.map((coupon) => (
                 <CouponCard key={coupon.id} coupon={coupon} isActive={false} courses={courses} />
               ))}
             </div>
@@ -74,6 +89,30 @@ export function MyPageCouponsView({ coupons, courses = [] }: MyPageCouponsViewPr
             <EmptyState message="사용 완료 또는 만료된 쿠폰이 없습니다." />
           )}
         </TabsContent>
+
+        {totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              이전
+            </Button>
+            <span className="text-sm font-medium">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              다음
+            </Button>
+          </div>
+        )}
       </Tabs>
     </div>
   )
@@ -128,7 +167,17 @@ function CouponCard({
               <Ticket className="h-4 w-4" />
             </span>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap justify-end gap-1.5">
+            {!isActive && coupon.originalStatus === 'USED' && (
+              <Badge className="bg-slate-500 hover:bg-slate-500 text-white text-[10px] border-transparent">
+                사용 완료
+              </Badge>
+            )}
+            {!isActive && coupon.originalStatus === 'EXPIRED' && (
+              <Badge variant="destructive" className="text-[10px]">
+                기간 만료
+              </Badge>
+            )}
             {coupon.isStackable && (
               <Badge variant="outline" className={isActive ? 'border-primary/30 bg-primary/5 text-primary text-[10px]' : 'text-[10px]'}>
                 중복 가능

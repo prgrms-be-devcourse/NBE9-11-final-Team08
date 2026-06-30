@@ -183,7 +183,8 @@ export interface ConfirmTossPaymentRequest {
   paymentKey: string
   method: string
   amount: number
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
   idempotencyKey?: string | null
   authResultCode?: string | null
   authResultMsg?: string | null
@@ -199,7 +200,8 @@ export interface ConfirmTossPaymentRequest {
 
 export interface NicepayPreparePaymentRequest {
   payMethod: 'CARD'
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
 }
 
 export interface NicepayPreparePaymentResponse {
@@ -231,12 +233,14 @@ export interface PaymentResponse {
 
 export interface Coupon {
   id: string
+  policyId?: string
   name: string
   amount: string
   condition: string
   category: '진행 중인 이벤트' | '종료된 이벤트'
   type: 'discount' | 'attendance' | 'firstcome'
   status?: 'SCHEDULED' | 'ACTIVE' | 'ENDED'
+  originalStatus?: string
   startDate?: string | null
   endDate?: string | null
   validDays?: number | null
@@ -320,6 +324,7 @@ export interface AdminCouponPolicyRequest {
 
 export interface CouponListResponse {
   issuedCouponId: number
+  policyId: number
   couponName: string
   discountType: string
   discountValue: number

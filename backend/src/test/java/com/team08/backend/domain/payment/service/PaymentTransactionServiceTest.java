@@ -720,11 +720,11 @@ class PaymentTransactionServiceTest {
     }
 
     private ConfirmPaymentRequest confirmRequest() {
-        return new ConfirmPaymentRequest("payment-key", "CARD", 30_000, null);
+        return new ConfirmPaymentRequest("payment-key", "CARD", 30_000, null, null);
     }
 
     private ConfirmPaymentRequest confirmRequest(String idempotencyKey) {
-        return new ConfirmPaymentRequest("payment-key", "CARD", 30_000, null, idempotencyKey);
+        return new ConfirmPaymentRequest("payment-key", "CARD", 30_000, null, null, idempotencyKey);
     }
 
     private TossPaymentResponse tossResponse(String orderNumber, String status, int amount) {
