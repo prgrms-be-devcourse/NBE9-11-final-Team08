@@ -1,7 +1,5 @@
 package com.team08.backend.domain.learningevent.controller;
 
-import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
-import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
 import com.team08.backend.domain.learningevent.service.LearningEventService;
@@ -17,7 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "학습 이벤트", description = "학습 활동 기록 및 통계 API")
+// 서비스 트래픽의 핫 경로(이벤트 적재 + 본인 활동 조회)만 담당한다.
+// 어드민/판매자용 대용량 조회·통계는 LearningEventAnalyticsController 로 분리되어 있다.
+@Tag(name = "학습 이벤트", description = "학습 활동 기록 및 본인 활동 조회 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/learning-events")
@@ -50,56 +50,6 @@ public class LearningEventController {
     ) {
         return learningEventService.getUserActivities(
                 principal.user().id(), userId, principal.user().role(), pageable
-        );
-    }
-
-    // ── 강의별 학습 통계 조회 ────────────────────────────────────────────────────────
-    @Operation(summary = "강의별 학습 통계",
-               description = "강좌 단위의 입장 수, 시청 시간, 수강 완료 수 등을 조회합니다. 관리자 또는 강좌 소유 판매자만 접근 가능합니다.")
-    @GetMapping("/courses/{courseId}/stats")
-    public CourseStatsResponse getCourseStats(
-            @PathVariable Long courseId,
-            @AuthenticationPrincipal LoginUserPrincipal principal
-    ) {
-        return learningEventService.getCourseStats(
-                principal.user().id(), courseId, principal.user().role()
-        );
-    }
-
-    // ── 챕터별 학습 통계 조회 ───────────────────────────────────────────────────────
-    @Operation(summary = "챕터별 학습 통계",
-               description = "챕터 단위의 입장 수, 완료 수, 평균 시청 시간을 조회합니다. 관리자 또는 판매자만 접근 가능합니다.")
-    @GetMapping("/chapters/{chapterId}/stats")
-    public ChapterStatsResponse getChapterStats(
-            @PathVariable Long chapterId,
-            @AuthenticationPrincipal LoginUserPrincipal principal
-    ) {
-        return learningEventService.getChapterStats(
-                principal.user().id(), chapterId, principal.user().role()
-        );
-    }
-
-    // ── 관리자 전체 조회 ──────────────────────────────────────────────────
-    @Operation(summary = "[관리자] 전체 학습 이벤트 조회",
-               description = "모든 강좌의 학습 이벤트를 페이지네이션으로 조회합니다. 관리자 전용입니다.")
-    @GetMapping("/admin")
-    public Page<LearningEventResponse> getAllEvents(
-            @PageableDefault(size = 50) Pageable pageable,
-            @AuthenticationPrincipal LoginUserPrincipal principal
-    ) {
-        return learningEventService.getAllEvents(principal.user().role(), pageable);
-    }
-
-    // ── 판매자 강좌 필터링 조회 ────────────────────────────────────────────────
-    @Operation(summary = "[판매자] 내 강좌 학습 이벤트 조회",
-               description = "판매자 본인이 개설한 강좌의 학습 이벤트만 조회합니다.")
-    @GetMapping("/seller")
-    public Page<LearningEventResponse> getSellerEvents(
-            @PageableDefault(size = 50) Pageable pageable,
-            @AuthenticationPrincipal LoginUserPrincipal principal
-    ) {
-        return learningEventService.getSellerEvents(
-                principal.user().id(), principal.user().role(), pageable
         );
     }
 }

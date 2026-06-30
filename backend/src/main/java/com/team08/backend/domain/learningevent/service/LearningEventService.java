@@ -1,11 +1,7 @@
 package com.team08.backend.domain.learningevent.service;
 
-import com.team08.backend.domain.course.repository.CourseRepository;
-import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
-import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.dto.RecordLearningEventRequest;
-import com.team08.backend.domain.learningevent.dto.CourseStatsProjection;
 import com.team08.backend.domain.learningevent.entity.LearningEvent;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
 import com.team08.backend.domain.learningevent.event.LearningEventRecorded;
@@ -20,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -28,7 +23,6 @@ import java.util.UUID;
 public class LearningEventService {
 
     private final LearningEventRepository learningEventRepository;
-    private final CourseRepository courseRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     // ── 클라이언트 이벤트 기록 (입장/멈춤/퇴장) ───────────────────────────────
@@ -101,62 +95,6 @@ public class LearningEventService {
                 .map(LearningEventResponse::from);
     }
 
-    // ── 강의별 통계 집계 ──────────────────────────────────────────────────
-    @Transactional(readOnly = true)
-    public CourseStatsResponse getCourseStats(Long requesterId, Long courseId, String requesterRole) {
-        validateAdminOrCourseOwner(requesterId, courseId, requesterRole);
-
-        CourseStatsProjection projection = learningEventRepository.getStatsByCourseId(courseId);
-        return new CourseStatsResponse(
-                courseId,
-                projection.enterCount(),
-                projection.watchTimeSeconds(),
-                projection.completionCount()
-        );
-    }
-
-    // ── 챕터별 통계 집계 ─────────────────────────────────────────────────
-    @Transactional(readOnly = true)
-    public ChapterStatsResponse getChapterStats(Long requesterId, Long chapterId, String requesterRole) {
-        if (!isAdmin(requesterRole) && !isSeller(requesterRole)) {
-            throw new CustomException(ErrorCode.LEARNING_EVENT_ACCESS_DENIED);
-        }
-
-        return new ChapterStatsResponse(
-                chapterId,
-                learningEventRepository.countByChapterIdAndEventType(chapterId, LearningEventType.LECTURE_ENTER),
-                learningEventRepository.countByChapterIdAndEventType(chapterId, LearningEventType.LECTURE_COMPLETE),
-                (long) learningEventRepository.avgWatchTimeSecondsByChapterId(chapterId)
-        );
-    }
-
-    // ── 관리자 전체 조회 ─────────────────────────────────────────────────
-    @Transactional(readOnly = true)
-    public Page<LearningEventResponse> getAllEvents(String requesterRole, Pageable pageable) {
-        if (!isAdmin(requesterRole)) {
-            throw new CustomException(ErrorCode.LEARNING_EVENT_ACCESS_DENIED);
-        }
-        return learningEventRepository.findAll(pageable)
-                .map(LearningEventResponse::from);
-    }
-
-    // ── 판매자 강좌 필터링 ───────────────────────────────────────────────
-    @Transactional(readOnly = true)
-    public Page<LearningEventResponse> getSellerEvents(Long sellerId, String requesterRole, Pageable pageable) {
-        if (!isSeller(requesterRole) && !isAdmin(requesterRole)) {
-            throw new CustomException(ErrorCode.LEARNING_EVENT_ACCESS_DENIED);
-        }
-
-        List<Long> courseIds = courseRepository.findIdsByInstructorId(sellerId);
-
-        if (courseIds.isEmpty()) {
-            return Page.empty(pageable);
-        }
-
-        return learningEventRepository.findByCourseIdIn(courseIds, pageable)
-                .map(LearningEventResponse::from);
-    }
-
     // ── helpers ──────────────────────────────────────────────────────────────
     private String resolveEventKey(RecordLearningEventRequest request) {
         if (request.eventKey() != null && !request.eventKey().isBlank()) {
@@ -173,21 +111,5 @@ public class LearningEventService {
 
     private boolean isAdmin(String role) {
         return "ROLE_ADMIN".equals(role);
-    }
-
-    private boolean isSeller(String role) {
-        return "ROLE_SELLER".equals(role);
-    }
-
-    private void validateAdminOrCourseOwner(Long requesterId, Long courseId, String requesterRole) {
-        if (isAdmin(requesterRole)) return;
-
-        boolean isCourseOwner = courseRepository.findById(courseId)
-                .map(course -> course.getInstructorId().equals(requesterId))
-                .orElse(false);
-
-        if (!isCourseOwner) {
-            throw new CustomException(ErrorCode.LEARNING_EVENT_ACCESS_DENIED);
-        }
     }
 }
