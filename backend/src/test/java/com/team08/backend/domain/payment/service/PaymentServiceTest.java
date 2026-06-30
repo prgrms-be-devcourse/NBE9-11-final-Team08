@@ -8,9 +8,9 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
-import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
@@ -19,7 +19,6 @@ import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentReques
 import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
-import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
@@ -772,10 +771,11 @@ class PaymentServiceTest {
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(List.of());
+//        given(orderCouponUsageRepository.findByOrderId(ORDER_ID)).willReturn(Optional.empty());
 
         paymentService.refundPayment(USER_ID, ORDER_ID);
 
-        verifyNoInteractions(issuedCouponService, orderCouponUsageRepository);
+        verifyNoInteractions(issuedCouponService);
     }
 
     @Test

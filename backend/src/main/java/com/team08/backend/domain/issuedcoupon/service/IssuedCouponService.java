@@ -186,4 +186,12 @@ public class IssuedCouponService {
             CouponPolicy couponPolicy
     ) {
     }
+
+    @Transactional
+    public void refundCoupon(Long issuedCouponId) {
+        IssuedCoupon issuedCoupon = issuedCouponRepository.findByIdWithLock(issuedCouponId)
+                .orElseThrow(CouponNotFoundException::new);
+
+        issuedCoupon.refund(LocalDateTime.now(clock));
+    }
 }

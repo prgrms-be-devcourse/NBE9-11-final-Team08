@@ -209,6 +209,9 @@ public class PaymentService {
         refundOrder(order, refundedAt);
         cancelActiveEnrollmentsForRefund(order, refundedAt);
 
+        orderCouponUsageRepository.findByOrderId(orderId)
+                .ifPresent(usage -> issuedCouponService.refundCoupon(usage.getIssuedCouponId()));
+
         return PaymentResponse.from(payment, order);
     }
 
