@@ -56,6 +56,5 @@ public record CourseUpdateRequest(
             int orderNo,
 
             boolean isFreePreview
-            // 영상 파일 경로(m3u8Path)는 심사 대상이므로 일반 수정에서 제외
     ) {}
 }
