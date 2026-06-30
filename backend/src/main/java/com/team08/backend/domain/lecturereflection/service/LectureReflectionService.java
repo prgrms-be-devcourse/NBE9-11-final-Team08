@@ -22,7 +22,6 @@ public class LectureReflectionService {
 
     @Transactional
     public LectureReflectionResponse createReflection(Long userId, Long lectureId, String content) {
-        // TODO: 권한 추가. 은혜님 확인 필요
         courseAccessAuthorizer.authorizeByLectureId(lectureId, userId, CourseAction.WRITE_CONTENT);
 
         lectureRepository.findById(lectureId)

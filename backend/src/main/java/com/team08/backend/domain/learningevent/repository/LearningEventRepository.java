@@ -15,8 +15,6 @@ public interface LearningEventRepository extends JpaRepository<LearningEvent, Lo
     // ── 중복 이벤트 방지 ──────────────────────────────────────────────
     boolean existsByUniqueEventKey(String uniqueEventKey);
 
-    //TODO: FQCN QueryDSL로 변환하기
-    // ── 강의별 통계 단일 쿼리 ─────────────────────────────────────────
     @Query("SELECT new com.team08.backend.domain.learningevent.dto.CourseStatsProjection(" +
            "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.LECTURE_ENTER THEN 1 ELSE 0 END), " +
            "SUM(CASE WHEN e.eventType = com.team08.backend.domain.learningevent.entity.LearningEventType.VIDEO_PAUSE THEN e.positionSeconds ELSE 0 END), " +

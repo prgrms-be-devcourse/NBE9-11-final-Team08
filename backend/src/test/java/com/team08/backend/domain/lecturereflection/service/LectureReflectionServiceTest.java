@@ -177,7 +177,7 @@ class LectureReflectionServiceTest {
         assertThat(response.lectureId()).isEqualTo(lectureId);
     }
 
-    // TODO:여기 프론트연동하다 에러발견
+    // TODO:여기 프론트연동하다 에러발견 
 //    @Test
 //    @DisplayName("회고 조회 실패 - 회고 없음")
 //    void getReflection_notFound() {
