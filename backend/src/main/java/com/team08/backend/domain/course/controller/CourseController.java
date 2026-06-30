@@ -20,6 +20,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import jakarta.servlet.http.HttpServletRequest;
+import com.team08.backend.global.util.ClientIpExtractor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -52,7 +53,7 @@ public class CourseController {
             HttpServletRequest request) {
         String userIdentifier = (loginUserPrincipal != null)
                 ? "MEMBER:" + loginUserPrincipal.user().id()
-                : "GUEST:" + getClientIp(request);
+                : "GUEST:" + ClientIpExtractor.getClientIp(request);
         return courseService.getCourseDetail(courseId, userIdentifier);
     }
 
@@ -142,28 +143,5 @@ public class CourseController {
             @Parameter(description = "강의 ID", example = "1") @PathVariable("lectureId") Long lectureId,
             @RequestPart("file") MultipartFile file) {
         courseService.uploadAndEncodeLectureVideo(loginUserPrincipal.user().id(), lectureId, file);
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 }
