@@ -99,7 +99,7 @@ export function AnomalyPanel() {
               <TableRow>
                 <TableHead>강좌</TableHead>
                 <TableHead className="text-right">수강자</TableHead>
-                <TableHead className="text-right">완강</TableHead>
+                <TableHead className="text-right">완강자</TableHead>
                 <TableHead className="text-right">미완강률</TableHead>
               </TableRow>
             </TableHeader>
@@ -110,7 +110,7 @@ export function AnomalyPanel() {
                     <span className="text-muted-foreground">#{c.courseId}</span> {c.title}
                   </TableCell>
                   <TableCell className="text-right">{c.enrollees.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">{c.completionCount.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{c.fullyCompleted.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     <Badge variant="destructive">{c.incompletionRate.toFixed(1)}%</Badge>
                   </TableCell>

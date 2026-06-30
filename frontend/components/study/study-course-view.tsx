@@ -39,12 +39,21 @@ export function StudyCourseView({
             {course.title}
           </p>
         </div>
-        {study.myRole === 'owner' && (
-          <Button variant="outline" size="sm">
-            <Plus className="mr-1 h-4 w-4" />
-            챕터 생성하기
+        <div className="flex items-center gap-2">
+          <Button asChild size="sm">
+            {/* lecture 파라미터 없이 진입 → StudyView 가 마지막 시청 강의(이어보기)로 이동 */}
+            <Link href={`${base}/learn`}>
+              <PlayCircle className="mr-1 h-4 w-4" />
+              이어서 학습하기
+            </Link>
           </Button>
-        )}
+          {study.myRole === 'owner' && (
+            <Button variant="outline" size="sm">
+              <Plus className="mr-1 h-4 w-4" />
+              챕터 생성하기
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -87,7 +96,7 @@ export function StudyCourseView({
                   {ch.lectures.map((lec) => (
                     <li key={lec.id}>
                       <Link
-                        href={`${base}/learn`}
+                        href={`${base}/learn?chapter=${ch.id}&lecture=${lec.id}`}
                         className="flex items-center gap-3 px-5 py-3 pl-12 text-sm hover:bg-secondary"
                       >
                         {lec.completed ? (
