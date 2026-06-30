@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { FileVideo, GripVertical, ImageUp, Plus, Trash2, Save, Loader2, AlertTriangle } from 'lucide-react'
+import { FileVideo, GripVertical, ImageUp, Plus, Trash2, Save, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,6 +49,15 @@ export function CurriculumBuilder({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
+
+  // Accordion Expand State for Lectures
+  const [expandedLectureIds, setExpandedLectureIds] = useState<Record<string, boolean>>({})
+
+  // Drag and Drop State
+  const [draggedChapterIndex, setDraggedChapterIndex] = useState<number | null>(null)
+  const [draggedLectureIndex, setDraggedLectureIndex] = useState<number | null>(null)
+  const [dragOverChapterIndex, setDragOverChapterIndex] = useState<number | null>(null)
+  const [dragOverLectureIndex, setDragOverLectureIndex] = useState<number | null>(null)
 
   const isReadOnly = useMemo(() => {
     return course?.status === 'ON_SALE' || course?.status === 'SUSPENDED'
@@ -148,6 +157,7 @@ export function CurriculumBuilder({
 
   const addLecture = (cid: string) => {
     if (isReadOnly) return
+    const id = nextId()
     setChapters((prev) =>
       prev.map((c) =>
         c.id === cid
@@ -155,12 +165,13 @@ export function CurriculumBuilder({
               ...c,
               lectures: [
                 ...c.lectures,
-                { id: nextId(), title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
+                { id, title: '새 강의', description: '', durationSeconds: 0, videoFile: null, hasVideo: false, isFreePreview: false },
               ],
             }
           : c,
       ),
     )
+    setExpandedLectureIds((prev) => ({ ...prev, [id]: true }))
   }
 
   const removeLecture = (cid: string, lid: string) => {
@@ -354,19 +365,77 @@ export function CurriculumBuilder({
           </div>
 
           <ul className="space-y-2">
-            {chapters.map((c) => {
+            {chapters.map((c, index) => {
               const isActive = c.id === active?.id
+              const isDragging = index === draggedChapterIndex
+              const isDragOver = index === dragOverChapterIndex
               return (
-                <li key={c.id}>
+                <li
+                  key={c.id}
+                  draggable={!isReadOnly}
+                  onDragStart={(e) => {
+                    if (isReadOnly) return
+                    setDraggedChapterIndex(index)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragOver={(e) => {
+                    if (isReadOnly) return
+                    e.preventDefault()
+                    if (draggedChapterIndex === index) return
+                    setDragOverChapterIndex(index)
+                  }}
+                  onDragEnd={() => {
+                    setDraggedChapterIndex(null)
+                    setDragOverChapterIndex(null)
+                  }}
+                  onDrop={async (e) => {
+                    if (isReadOnly) return
+                    e.preventDefault()
+                    if (draggedChapterIndex === null || draggedChapterIndex === index) return
+
+                    const nextChapters = [...chapters]
+                    const [draggedItem] = nextChapters.splice(draggedChapterIndex, 1)
+                    nextChapters.splice(index, 0, draggedItem)
+
+                    const originalChapters = [...chapters]
+                    setChapters(nextChapters)
+
+                    const hasTempChapter = nextChapters.some((ch) => ch.id.startsWith('tmp_'))
+                    if (!hasTempChapter && courseId) {
+                      try {
+                        const reorders = nextChapters.map((ch, idx) => ({
+                          chapterId: Number(ch.id),
+                          orderNo: idx + 1,
+                        }))
+                        await api.reorderChapters(courseId, reorders)
+                        toast.success('챕터 순서가 변경되었습니다.')
+                      } catch (err: unknown) {
+                        setChapters(originalChapters)
+                        const msg = err instanceof Error ? err.message : String(err)
+                        toast.error(`순서 저장에 실패했습니다: ${msg}`)
+                      }
+                    } else if (hasTempChapter) {
+                      toast.info('저장되지 않은 챕터가 있습니다. 우측 하단의 [커리큘럼 저장] 버튼을 누르면 순서가 최종 저장됩니다.')
+                    }
+
+                    setDraggedChapterIndex(null)
+                    setDragOverChapterIndex(null)
+                  }}
+                  className={cn(
+                    'transition-all duration-200 rounded-lg',
+                    isDragging && 'opacity-40 border-dashed border-2 border-primary',
+                    isDragOver && 'border-t-2 border-primary pt-1',
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => setActiveId(c.id)}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-secondary',
+                      'flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-secondary cursor-grab active:cursor-grabbing',
                       isActive && 'border-primary bg-secondary font-medium',
                     )}
                   >
-                    <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <GripVertical className="size-4 shrink-0 text-muted-foreground cursor-grab" aria-hidden />
                     <span className="line-clamp-1 flex-1">{c.title}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {c.lectures.length}
@@ -430,26 +499,121 @@ export function CurriculumBuilder({
               </p>
 
               <div className="space-y-4">
-                {active.lectures.map((lecture, index) => (
-                  <article key={lecture.id} className="rounded-xl border bg-card p-4">
-                    <div className="flex items-center gap-2">
-                      <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <span className="text-sm font-semibold">강의 {index + 1}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="ml-auto size-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeLecture(active.id, lecture.id)}
-                        disabled={isReadOnly}
-                        aria-label="강의 삭제"
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
+                {active.lectures.map((lecture, index) => {
+                  const isDragging = index === draggedLectureIndex
+                  const isDragOver = index === dragOverLectureIndex
+                  return (
+                    <article
+                      key={lecture.id}
+                      draggable={!isReadOnly}
+                      onDragStart={(e) => {
+                        if (isReadOnly) return
+                        setDraggedLectureIndex(index)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      onDragOver={(e) => {
+                        if (isReadOnly) return
+                        e.preventDefault()
+                        if (draggedLectureIndex === index) return
+                        setDragOverLectureIndex(index)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedLectureIndex(null)
+                        setDragOverLectureIndex(null)
+                      }}
+                      onDrop={async (e) => {
+                        if (isReadOnly) return
+                        e.preventDefault()
+                        if (draggedLectureIndex === null || draggedLectureIndex === index) return
 
-                    <div className="mt-3 grid gap-4">
-                      <div className="grid gap-1.5">
+                        const nextLectures = [...active.lectures]
+                        const [draggedItem] = nextLectures.splice(draggedLectureIndex, 1)
+                        nextLectures.splice(index, 0, draggedItem)
+
+                        const originalChapters = [...chapters]
+                        const nextChapters = chapters.map((c) =>
+                          c.id === active.id ? { ...c, lectures: nextLectures } : c
+                        )
+                        setChapters(nextChapters)
+
+                        const hasTempLecture = nextLectures.some((lec) => lec.id.startsWith('tmp_'))
+                        const isTempChapter = active.id.startsWith('tmp_')
+
+                        if (!hasTempLecture && !isTempChapter) {
+                          try {
+                            const reorders = nextLectures.map((lec, idx) => ({
+                              lectureId: Number(lec.id),
+                              orderNo: idx + 1,
+                            }))
+                            await api.reorderLectures(active.id, reorders)
+                            toast.success('강의 순서가 변경되었습니다.')
+                          } catch (err: unknown) {
+                            setChapters(originalChapters)
+                            const msg = err instanceof Error ? err.message : String(err)
+                            toast.error(`순서 저장에 실패했습니다: ${msg}`)
+                          }
+                        } else {
+                          toast.info('저장되지 않은 강의/챕터가 있습니다. 우측 하단의 [커리큘럼 저장] 버튼을 누르면 순서가 최종 저장됩니다.')
+                        }
+
+                        setDraggedLectureIndex(null)
+                        setDragOverLectureIndex(null)
+                      }}
+                      className={cn(
+                        'rounded-xl border bg-card p-3 transition-all duration-200 shadow-sm hover:shadow',
+                        isDragging && 'opacity-40 border-dashed border-2 border-primary',
+                        isDragOver && 'border-t-2 border-primary pt-1',
+                      )}
+                    >
+                      {/* 카드 헤더 (토글 영역) */}
+                      <div 
+                        className="flex items-center gap-2 cursor-pointer select-none py-1"
+                        onClick={() => setExpandedLectureIds(prev => ({ ...prev, [lecture.id]: !prev[lecture.id] }))}
+                      >
+                        <GripVertical 
+                          className="size-4 shrink-0 text-muted-foreground cursor-grab active:cursor-grabbing hover:text-foreground" 
+                          onClick={(e) => e.stopPropagation()} 
+                          aria-hidden 
+                        />
+                        <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          강의 {index + 1}
+                        </span>
+                        <span className="text-sm font-medium line-clamp-1 flex-1 pl-1 text-foreground">
+                          {lecture.title || '제목 없는 강의'}
+                        </span>
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeLecture(active.id, lecture.id)}
+                            disabled={isReadOnly}
+                            aria-label="강의 삭제"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="size-8 text-muted-foreground hover:bg-secondary"
+                            onClick={() => setExpandedLectureIds(prev => ({ ...prev, [lecture.id]: !prev[lecture.id] }))}
+                            aria-label="상세 토글"
+                          >
+                            {expandedLectureIds[lecture.id] ? (
+                              <ChevronUp className="size-4" />
+                            ) : (
+                              <ChevronDown className="size-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 카드 내용 (확장 시 노출) */}
+                      {expandedLectureIds[lecture.id] && (
+                        <div className="mt-4 pt-3 border-t grid gap-4 transition-all duration-200 animate-in fade-in-50 slide-in-from-top-1">
+                          <div className="grid gap-1.5">
                         <Label htmlFor={`title-${lecture.id}`}>강의 제목</Label>
                         <Input
                           id={`title-${lecture.id}`}
@@ -547,8 +711,10 @@ export function CurriculumBuilder({
                         </button>
                       </div>
                     </div>
-                  </article>
-                ))}
+                  )}
+                </article>
+                )
+              })}
 
                 {active.lectures.length === 0 ? (
                   <div className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">

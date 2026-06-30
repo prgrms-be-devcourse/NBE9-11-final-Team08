@@ -1005,6 +1005,14 @@ export const api = {
     return mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
   },
 
+  reorderChapters: async (courseId: string | number, reorders: { chapterId: number; orderNo: number }[]) => {
+    return mutate<void>(`/api/curriculums/courses/${courseId}/chapters/reorder`, 'PUT', { reorders }, false, true)
+  },
+
+  reorderLectures: async (chapterId: string | number, reorders: { lectureId: number; orderNo: number }[]) => {
+    return mutate<void>(`/api/curriculums/chapters/${chapterId}/lectures/reorder`, 'PUT', { reorders }, false, true)
+  },
+
   requestCourseReview: async (courseId: string | number) => {
     const res = await mutate<void>(`/api/courses/${courseId}/reviews`, 'POST')
     const draft = await getCourseDraftFromCookies(courseId)
