@@ -10,7 +10,7 @@ export default async function EventsPage() {
     api.getCourses(0, 100).catch(() => ({ content: [] })),
   ])
 
-  const ownedPolicyNames = myCoupons.map((c) => c.name)
+  const ownedPolicyIds = myCoupons.map((c) => c.policyId?.toString())
   const courses = coursesRes?.content || []
 
   return (
@@ -19,7 +19,7 @@ export default async function EventsPage() {
       <p className="mt-1 text-sm text-muted-foreground">
         진행 중인 이벤트에 참여하고 다양한 혜택을 받아보세요.
       </p>
-      <EventsView coupons={coupons} ownedPolicyNames={ownedPolicyNames} courses={courses} />
+      <EventsView coupons={coupons} ownedPolicyIds={ownedPolicyIds} courses={courses} />
     </div>
   )
 }

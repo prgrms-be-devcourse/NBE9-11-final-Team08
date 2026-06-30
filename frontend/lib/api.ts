@@ -540,6 +540,7 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
 
   return {
     id: coupon.issuedCouponId.toString(),
+    policyId: coupon.policyId?.toString(),
     name: coupon.couponName,
     amount: isRate
       ? `${coupon.discountValue}% 할인`
@@ -607,6 +608,7 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
 
   return {
     id: policy.id.toString(),
+    policyId: policy.id.toString(),
     name: policy.name,
     amount: isRate
       ? `${policy.discountValue}% 할인`
@@ -1377,14 +1379,14 @@ export const api = {
   // Coupons & Admin
   getCoupons: async () => {
     const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
-      '/api/coupons',
+      '/api/coupons?size=1000',
       null,
       false,
       false,
     )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content
-      .filter((policy) => policy.couponType !== 'AUTO')
+      .filter((policy) => policy.couponType === 'NORMAL' || policy.couponType === 'FCFS')
       .map(mapAdminCouponPolicyToUserCoupon)
   },
   getMyCoupons: async () => {
@@ -1394,7 +1396,7 @@ export const api = {
   downloadCoupon: (policyId: number) =>
     mutate<any>(`/api/coupons/${policyId}/download`, 'POST'),
   getAdminCoupons: async (): Promise<AdminCoupon[]> => {
-    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>('/api/admin/coupons', null)
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>('/api/admin/coupons?size=1000', null)
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToCoupon)
   },

@@ -233,6 +233,7 @@ export interface PaymentResponse {
 
 export interface Coupon {
   id: string
+  policyId?: string
   name: string
   amount: string
   condition: string
@@ -322,6 +323,7 @@ export interface AdminCouponPolicyRequest {
 
 export interface CouponListResponse {
   issuedCouponId: number
+  policyId: number
   couponName: string
   discountType: string
   discountValue: number

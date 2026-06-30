@@ -285,7 +285,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
       const pendingPayment = buildPendingPayment(order, 'mock')
 
       setStep('mock-confirming')
-      const response = await api.confirmMockPayment(
+      const paymentResponse = await api.confirmMockPayment(
         order.orderId,
         `mock-payment-key-${Date.now()}`,
         'CARD',
