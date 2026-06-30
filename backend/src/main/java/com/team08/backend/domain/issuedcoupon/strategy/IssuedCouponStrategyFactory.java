@@ -19,7 +19,6 @@ public class IssuedCouponStrategyFactory {
                 .collect(Collectors.toMap(IssuedCouponStrategy::getSupportedType, Function.identity()));
     }
 
-    // 타입에 맞는 발급 전략 반환
     public IssuedCouponStrategy getStrategy(CouponType type) {
         IssuedCouponStrategy strategy = strategyMap.get(type);
         if (strategy == null) {

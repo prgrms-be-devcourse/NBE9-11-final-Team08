@@ -19,7 +19,6 @@ public record StructuredDlqMessage(
         try {
             return objectMapper.writeValueAsString(this);
         } catch (JsonProcessingException e) {
-            // fallback if serialization fails
             return String.format("{\"streamKey\":\"%s\",\"recordId\":\"%s\",\"error\":\"Serialization Failed\"}", streamKey, recordId);
         }
     }

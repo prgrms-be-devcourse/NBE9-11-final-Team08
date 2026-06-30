@@ -40,7 +40,7 @@ public abstract class AbstractStreamListenerWorker implements StreamListener<Str
         }
     }
 
-    protected abstract void processRecord(MapRecord<String, String, String> record) throws Exception;
+    protected abstract void processRecord(MapRecord<String, String, String> record);
 
     protected void ack(MapRecord<String, String, String> record) {
         redisTemplate.opsForStream().acknowledge(getStreamKey(), getGroupName(), record.getId());

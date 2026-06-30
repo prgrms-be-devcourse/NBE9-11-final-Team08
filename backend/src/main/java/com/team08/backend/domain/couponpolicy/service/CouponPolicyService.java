@@ -35,7 +35,6 @@ public class CouponPolicyService {
     private final CouponPolicyUpdater couponPolicyUpdater;
     private final Clock clock;
 
-    // 쿠폰 정책 생성
     @Transactional
     public CouponPolicyResponse createCouponPolicy(CouponPolicyCreateRequest request) {
         LocalDateTime now = LocalDateTime.now(clock);
@@ -50,14 +49,12 @@ public class CouponPolicyService {
         return CouponPolicyResponse.from(savedPolicy);
     }
 
-    // 쿠폰 정책 목록 조회
     @Transactional(readOnly = true)
     public Page<CouponPolicySummaryResponse> getCouponPolicies(CouponPolicySearchRequest condition, Pageable pageable) {
         return couponPolicyRepository.findAllByCondition(condition, LocalDateTime.now(clock), pageable)
                 .map(CouponPolicySummaryResponse::from);
     }
 
-    // 쿠폰 정책 상세 조회
     @Transactional(readOnly = true)
     public CouponPolicyDetailResponse getCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findByIdWithDetails(id)
@@ -65,13 +62,11 @@ public class CouponPolicyService {
         return CouponPolicyDetailResponse.from(policy);
     }
 
-    // 쿠폰 정책 수정
     @Transactional
     public CouponPolicyResponse updateCouponPolicy(Long id, CouponPolicyUpdateRequest request) {
         CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        // 발급 이력 확인
         long issuedCount = issuedCouponRepository.countByPolicyId(id);
         if (issuedCount > 0) {
             throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED);
@@ -107,7 +102,6 @@ public class CouponPolicyService {
         return CouponPolicyResponse.from(policy);
     }
 
-    // 쿠폰 정책 조기 종료
     @Transactional
     public void terminateCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
@@ -116,13 +110,11 @@ public class CouponPolicyService {
         policy.terminate(LocalDateTime.now(clock));
     }
 
-    // 쿠폰 정책 삭제
     @Transactional
     public void deleteCouponPolicy(Long id) {
         CouponPolicy policy = couponPolicyRepository.findByIdWithLock(id)
                 .orElseThrow(CouponPolicyNotFoundException::new);
 
-        // 발급 이력 확인
         long issuedCount = issuedCouponRepository.countByPolicyId(id);
         if (issuedCount > 0) {
             throw new CustomException(ErrorCode.COUPON_POLICY_ALREADY_ISSUED_CANNOT_DELETE);

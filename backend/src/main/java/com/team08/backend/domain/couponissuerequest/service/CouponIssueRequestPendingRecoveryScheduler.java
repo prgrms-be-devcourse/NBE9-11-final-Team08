@@ -41,13 +41,12 @@ public class CouponIssueRequestPendingRecoveryScheduler extends AbstractPendingR
     }
 
     @Override
-    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) throws Exception {
+    protected void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) {
         List<CouponIssueRequestProcessor.SelectedUserIssueCommand> commands = records.stream()
                 .map(this::toCommand)
                 .filter(java.util.Objects::nonNull)
                 .toList();
 
-        // 일괄 처리 성공 시 전체 ACK
         couponIssueRequestProcessor.processSelectedUsers(commands);
         records.forEach(record -> ackCallback.accept(record.recordId()));
     }

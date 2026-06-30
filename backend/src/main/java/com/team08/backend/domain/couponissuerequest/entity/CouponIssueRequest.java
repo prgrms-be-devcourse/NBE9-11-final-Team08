@@ -144,15 +144,4 @@ public class CouponIssueRequest extends BaseTimeEntity {
         this.completedAt = completedAt;
     }
 
-    public boolean isFinished() {
-        return this.status == CouponIssueRequestStatus.COMPLETED
-                || this.status == CouponIssueRequestStatus.FAILED
-                || this.status == CouponIssueRequestStatus.CANCELED;
-    }
-
-    public void completeIfProcessed(LocalDateTime completedAt) {
-        if (this.successCount + this.failedCount + this.skippedCount >= this.requestedCount) {
-            markCompleted(completedAt);
-        }
-    }
 }

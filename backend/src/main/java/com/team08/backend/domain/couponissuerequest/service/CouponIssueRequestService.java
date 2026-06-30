@@ -170,7 +170,6 @@ public class CouponIssueRequestService {
         CouponIssueRequest savedRequest = saveRequest(request);
         String issueKey = SELECTED_USERS_ISSUE_KEY_PREFIX + normalizedRequestKey;
         
-        // Chunking the stream publishing to prevent Redis Pipeline memory spikes
         int chunkSize = 1000;
         for (int i = 0; i < finalTargetUserIds.size(); i += chunkSize) {
             int end = Math.min(finalTargetUserIds.size(), i + chunkSize);

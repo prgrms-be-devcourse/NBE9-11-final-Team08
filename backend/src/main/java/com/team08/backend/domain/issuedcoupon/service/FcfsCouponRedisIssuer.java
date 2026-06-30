@@ -41,7 +41,6 @@ public class FcfsCouponRedisIssuer {
         return script;
     }
 
-    // 선착순 쿠폰 발급 확정
     public void issue(Long userId, CouponPolicy policy) {
         Long policyId = policy.getId();
         String totalQuantity = policy.getTotalQuantity() == null ? "" : String.valueOf(policy.getTotalQuantity());
