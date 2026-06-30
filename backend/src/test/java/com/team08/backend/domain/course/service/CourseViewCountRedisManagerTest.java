@@ -55,8 +55,8 @@ class CourseViewCountRedisManagerTest {
         // given
         Long courseId = 1L;
         String userIdentifier = "GUEST:127.0.0.1";
-        String lockKey = "course:view:lock:1:GUEST:127.0.0.1";
-        String deltaKey = "course:viewcount:delta:1";
+        String lockKey = "{course:viewcount}:lock:1:GUEST:127.0.0.1";
+        String deltaKey = "{course:viewcount}:delta:1";
 
         given(valueOperations.setIfAbsent(eq(lockKey), eq("1"), eq(5L), eq(TimeUnit.MINUTES)))
                 .willReturn(true);
@@ -68,7 +68,7 @@ class CourseViewCountRedisManagerTest {
         verify(valueOperations).setIfAbsent(eq(lockKey), eq("1"), eq(5L), eq(TimeUnit.MINUTES));
         verify(valueOperations).increment(eq(deltaKey));
         verify(redisTemplate).expire(eq(deltaKey), eq(1L), eq(TimeUnit.HOURS));
-        verify(setOperations).add(eq("course:viewcount:active_ids"), eq("1"));
+        verify(setOperations).add(eq("{course:viewcount}:active_ids"), eq("1"));
     }
 
     @Test
@@ -76,7 +76,7 @@ class CourseViewCountRedisManagerTest {
         // given
         Long courseId = 1L;
         String userIdentifier = "GUEST:127.0.0.1";
-        String lockKey = "course:view:lock:1:GUEST:127.0.0.1";
+        String lockKey = "{course:viewcount}:lock:1:GUEST:127.0.0.1";
 
         given(valueOperations.setIfAbsent(eq(lockKey), eq("1"), eq(5L), eq(TimeUnit.MINUTES)))
                 .willReturn(false);

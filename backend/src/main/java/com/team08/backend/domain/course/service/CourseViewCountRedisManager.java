@@ -17,9 +17,9 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class CourseViewCountRedisManager {
  
-    private static final String KEY_PREFIX = "course:viewcount:delta:";
-    private static final String KEY_SET_PREFIX = "course:viewcount:active_ids";
-    private static final String LOCK_KEY_PREFIX = "course:view:lock:";
+    private static final String KEY_PREFIX = "{course:viewcount}:delta:";
+    private static final String KEY_SET_PREFIX = "{course:viewcount}:active_ids";
+    private static final String LOCK_KEY_PREFIX = "{course:viewcount}:lock:";
     private static final long LOCK_TTL_MINUTES = 5;
  
     private final StringRedisTemplate redisTemplate;
@@ -42,6 +42,7 @@ public class CourseViewCountRedisManager {
                 log.debug("[조회수 중복 증가 차단] courseId={}, user={}", courseId, userIdentifier);
             }
         } catch (Exception e) {
+            log.warn("[Redis 조회수 가산 실패] RDB Fallback으로 우회합니다. courseId={}, user={}", courseId, userIdentifier, e);
             meterRegistry.counter("redis.viewcount.errors", "operation", "increase").increment();
             throw e;
         }
@@ -96,10 +97,11 @@ public class CourseViewCountRedisManager {
  
         for (String idStr : activeIds) {
             String key = KEY_PREFIX + idStr;
+            int delta = 0;
             try {
                 String deltaStr = redisTemplate.opsForValue().getAndSet(key, "0");
                 if (deltaStr != null) {
-                    int delta = Integer.parseInt(deltaStr);
+                    delta = Integer.parseInt(deltaStr);
                     if (delta > 0) {
                         Long courseId = Long.parseLong(idStr);
                         courseRepository.increaseViewCountByDelta(courseId, delta);
@@ -108,8 +110,16 @@ public class CourseViewCountRedisManager {
                     }
                 }
             } catch (Exception e) {
-                log.error("[조회수 동기화 실패] CourseId: {}", idStr, e);
+                log.error("[조회수 동기화 실패] RDB 반영 중 오류 발생. 복구 연산을 시도합니다. CourseId: {}, Delta: {}", idStr, delta, e);
                 meterRegistry.counter("redis.viewcount.errors", "operation", "sync_write_db").increment();
+                if (delta > 0) {
+                    try {
+                        redisTemplate.opsForValue().increment(key, delta);
+                        redisTemplate.opsForSet().add(KEY_SET_PREFIX, idStr);
+                    } catch (Exception restoreEx) {
+                        log.error("[조회수 복구 실패] Redis 데이터 원복에 실패했습니다. CourseId: {}, Delta: {}", idStr, delta, restoreEx);
+                    }
+                }
             }
         }
 
