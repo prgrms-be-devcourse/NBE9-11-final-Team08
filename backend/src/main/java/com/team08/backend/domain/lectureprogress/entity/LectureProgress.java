@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "lecture_progresses", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "lecture_id"}))
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LectureProgress {
 
@@ -33,6 +32,31 @@ public class LectureProgress {
     private LocalDateTime createdAt;
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    // 하트비트 누적(watchedSeconds += delta)의 lost update 방어용 낙관적 락 버전.
+    // 동시 하트비트가 같은 행을 read-modify-write 하면 UPDATE 의 version 검증에서 한쪽이 실패하고,
+    // 서비스가 재조회→재가산으로 재시도한다. 신규 엔티티는 null→영속 시 0 으로 채워지고,
+    // 네이티브 insertIfAbsent 로 만든 행은 version = 0 을 명시 삽입한다.
+    @Version
+    private Long version;
+
+    // 생성자는 기존 10개 인자 시그니처를 그대로 유지한다(version 은 영속 계층이 관리하므로 제외).
+    // start() 팩토리·DataSeeder·테스트가 이 시그니처로 행을 만든다.
+    public LectureProgress(Long id, Long lectureId, Long userId,
+                           Integer lastPositionSeconds, Integer watchedSeconds, Integer progressRate,
+                           Boolean completed, LocalDateTime completedAt,
+                           LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
+        this.lectureId = lectureId;
+        this.userId = userId;
+        this.lastPositionSeconds = lastPositionSeconds;
+        this.watchedSeconds = watchedSeconds;
+        this.progressRate = progressRate;
+        this.completed = completed;
+        this.completedAt = completedAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
 
     // 해당 강의의 첫 진행 정보 기록
     // watchedSeconds/progressRate 등 누적 지표는 아직 0 으로 두고, 마지막 위치만 기록한다.

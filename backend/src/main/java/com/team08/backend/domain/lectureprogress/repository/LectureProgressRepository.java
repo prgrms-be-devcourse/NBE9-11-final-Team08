@@ -1,9 +1,7 @@
 package com.team08.backend.domain.lectureprogress.repository;
 
 import com.team08.backend.domain.lectureprogress.entity.LectureProgress;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,28 +15,18 @@ public interface LectureProgressRepository extends JpaRepository<LectureProgress
     Optional<LectureProgress> findByUserIdAndLectureId(Long userId, Long lectureId);
 
     /**
-     * 하트비트 누적(watchedSeconds += delta)용 쓰기 락 조회.
-     * 같은 (user, lecture) 행에 대한 동시 하트비트가 각자 읽고 더한 뒤 저장하면 한쪽 delta 가
-     * 사라지는 lost update 가 발생한다. SELECT ... FOR UPDATE 로 행을 잠가
-     * read-modify-write 를 행 단위로 직렬화한다(서로 다른 행은 경합하지 않음).
-     */
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM LectureProgress p WHERE p.userId = :userId AND p.lectureId = :lectureId")
-    Optional<LectureProgress> findByUserIdAndLectureIdForUpdate(@Param("userId") Long userId,
-                                                               @Param("lectureId") Long lectureId);
-
-    /**
      * 진행 행을 race-safe 하게 생성한다. (user_id, lecture_id) 유니크 제약 위에서
      * ON DUPLICATE KEY UPDATE 를 no-op 으로 두어, 동시 입장으로 행이 이미 있어도
      * 예외 없이 무시한다(현재 트랜잭션을 rollback-only 로 만들지 않음).
      * 삽입 후에는 findByUserIdAndLectureId 로 재조회해 managed 엔티티를 얻는다.
+     * version 은 낙관적 락 초기값 0 으로 명시 삽입한다(NOT NULL).
      */
     @Modifying
     @Query(value = """
             INSERT INTO lecture_progresses
                 (user_id, lecture_id, last_position_seconds, watched_seconds,
-                 progress_rate, completed, created_at, updated_at)
-            VALUES (:userId, :lectureId, :positionSeconds, 0, 0, false, :now, :now)
+                 progress_rate, completed, version, created_at, updated_at)
+            VALUES (:userId, :lectureId, :positionSeconds, 0, 0, false, 0, :now, :now)
             ON DUPLICATE KEY UPDATE user_id = user_id
             """, nativeQuery = true)
     void insertIfAbsent(@Param("userId") Long userId,

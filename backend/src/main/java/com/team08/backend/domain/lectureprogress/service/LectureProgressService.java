@@ -10,7 +10,10 @@ import com.team08.backend.domain.lectureprogress.repository.LectureProgressRepos
 import com.team08.backend.global.exception.CustomException;
 import com.team08.backend.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +29,26 @@ public class LectureProgressService {
 
     private static final int PLAYBACK_SPEED_TOLERANCE = 2;
 
+    // 동시 하트비트로 인한 낙관적 락 충돌 시 재조회→재가산 재시도 횟수(총 시도 횟수).
+    // 충돌은 같은 (user, lecture) 행에 대한 동시 비트일 때만 발생하는 드문 사건이라 소수면 충분하다.
+    private static final int MAX_WRITE_ATTEMPTS = 3;
+
     private final LectureProgressRepository lectureProgressRepository;
     private final LectureRepository lectureRepository;
     private final EnrollmentQueryService enrollmentQueryService;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Transactional
+    // 자기 자신의 프록시. 재시도 루프(비트랜잭션)에서 매 시도마다 트랜잭션 경계를 새로 열기 위해
+    // self.applyProgress(...) 로 호출한다. this 직접 호출은 프록시를 우회해 @Transactional 이 무시된다.
+    @Autowired
+    @Lazy
+    private LectureProgressService self;
+
+    // 하트비트 진입점 — 트랜잭션을 직접 열지 않고, 트랜잭션 단위(applyProgress)를 재시도로 감싼다.
     public LectureProgress applyHeartbeat(Long userId, Long lectureId, int positionSeconds,
                                           int watchedDeltaSeconds, LocalDateTime eventTime) {
         // 실제 누적량은 applyProgress 에서 절대 상한 + 벽시계 경과 경계로 보정한다.
-        return applyProgress(userId, lectureId, positionSeconds, watchedDeltaSeconds, eventTime);
+        return applyProgressWithRetry(userId, lectureId, positionSeconds, watchedDeltaSeconds, eventTime);
     }
 
     // 강좌 커리큘럼 화면용 — 사용자의 강좌 내 강의별 진행도 목록(진행 이력이 있는 강의만 포함)
@@ -69,21 +82,45 @@ public class LectureProgressService {
         return getOrCreateStarted(userId, lecture.getId(), 0, now);
     }
 
-    @Transactional
     public void upsertLastPosition(Long userId, Long lectureId, int positionSeconds, LocalDateTime eventTime) {
-        applyProgress(userId, lectureId, positionSeconds, 0, eventTime);
+        applyProgressWithRetry(userId, lectureId, positionSeconds, 0, eventTime);
     }
 
-    private LectureProgress applyProgress(Long userId, Long lectureId, int positionSeconds,
-                                          int watchedDeltaSeconds, LocalDateTime eventTime) {
+    /**
+     * read-modify-write 를 낙관적 락 충돌 시 재시도로 감싼다. 비트랜잭션 메서드라서 매 시도가
+     * self 프록시를 통해 새 트랜잭션으로 실행된다(이전 시도의 트랜잭션은 롤백 후 종료된 상태).
+     * 같은 (user, lecture) 행에 동시 하트비트가 겹쳐 한쪽 UPDATE 가 version 검증에 실패하면,
+     * 갱신된 행을 다시 읽어 delta 를 재가산함으로써 lost update 없이 양쪽 시청시간을 모두 반영한다.
+     */
+    private LectureProgress applyProgressWithRetry(Long userId, Long lectureId, int positionSeconds,
+                                                   int watchedDeltaSeconds, LocalDateTime eventTime) {
+        int attempt = 0;
+        while (true) {
+            try {
+                return self.applyProgress(userId, lectureId, positionSeconds, watchedDeltaSeconds, eventTime);
+            } catch (OptimisticLockingFailureException e) {
+                if (++attempt >= MAX_WRITE_ATTEMPTS) {
+                    throw e;
+                }
+                // 충돌 — 다음 시도는 새 트랜잭션에서 최신 행을 다시 읽어 재가산한다.
+            }
+        }
+    }
+
+    @Transactional
+    public LectureProgress applyProgress(Long userId, Long lectureId, int positionSeconds,
+                                         int watchedDeltaSeconds, LocalDateTime eventTime) {
         Lecture lecture = lectureRepository.findByIdWithChapterAndCourse(lectureId)
                 .orElseThrow(() -> new CustomException(ErrorCode.LECTURE_NOT_FOUND));
 
+        // 낙관적 락(@Version) — 잠그지 않고 평범히 조회한 뒤, save 시점에 version 을 함께 검증/증가시킨다.
+        // 같은 (user, lecture) 행에 동시 하트비트가 겹쳐 한쪽 UPDATE 가 version 검증에 실패하면,
+        // applyProgressWithRetry 가 최신 행을 재조회→재가산해 lost update 없이 모두 반영한다.
         LectureProgress progress = lectureProgressRepository
                 .findByUserIdAndLectureId(userId, lectureId)
                 .orElse(null);
 
-        //이전 업데이트 시간과 이벤트 시간 대조 & 완료여부 검사
+        // 이전 비트 시각(클램프 기준)·완료 여부는 가산 전에 스냅샷한다.
         LocalDateTime previousBeatAt = progress != null ? progress.getUpdatedAt() : null;
         boolean wasCompleted = progress != null && Boolean.TRUE.equals(progress.getCompleted());
 
@@ -96,7 +133,6 @@ public class LectureProgressService {
             progress = getOrCreateStarted(userId, lectureId, positionSeconds, eventTime);
         }
 
-        // 클램프적용
         int effectiveDelta = boundWatchedDelta(watchedDeltaSeconds, previousBeatAt, eventTime);
         progress.applyProgress(positionSeconds, effectiveDelta, lecture.getDurationSeconds(), eventTime);
         LectureProgress saved = lectureProgressRepository.save(progress);
@@ -137,6 +173,7 @@ public class LectureProgressService {
         return enrollmentQueryService.hasActiveEnrollment(userId, courseId);
     }
 
+    //델타시간 검사
     private int boundWatchedDelta(int rawDelta, LocalDateTime previousBeatAt, LocalDateTime now) {
         int delta = Math.min(Math.max(rawDelta, 0), MAX_WATCHED_DELTA_SECONDS);
         if (previousBeatAt == null) {
