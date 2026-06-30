@@ -850,7 +850,7 @@ class PaymentServiceTest {
     private OrderItem orderItem(Long orderItemId, Long courseId, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", price, 0, price, now);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", "thumbnail.jpg", price, 0, price, now);
         ReflectionTestUtils.setField(orderItem, "id", orderItemId);
         return orderItem;
     }

@@ -112,6 +112,7 @@ export interface CartItemResponse {
   cartItemId: number
   courseId: number
   title: string
+  thumbnailUrl?: string | null
   price: number
 }
 
@@ -140,6 +141,7 @@ export interface OrderItemResponse {
   orderItemId: number
   courseId: number
   courseTitle: string
+  thumbnailUrl?: string | null
   price: number
   discountPrice: number
   finalPrice: number

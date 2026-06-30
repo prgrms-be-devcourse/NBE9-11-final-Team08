@@ -185,6 +185,7 @@ class OrderServiceTest {
                 .satisfies(item -> {
                     assertThat(item.courseId()).isEqualTo(COURSE_ID);
                     assertThat(item.courseTitle()).isEqualTo("Spring");
+                    assertThat(item.thumbnailUrl()).isEqualTo("Spring.png");
                     assertThat(item.price()).isEqualTo(30_000);
                 });
     }
@@ -227,7 +228,10 @@ class OrderServiceTest {
 
         assertThat(response.orderId()).isEqualTo(ORDER_ID);
         assertThat(response.items()).singleElement()
-                .satisfies(item -> assertThat(item.courseTitle()).isEqualTo("Spring"));
+                .satisfies(item -> {
+                    assertThat(item.courseTitle()).isEqualTo("Spring");
+                    assertThat(item.thumbnailUrl()).isEqualTo("thumbnail.jpg");
+                });
     }
 
     @Test
@@ -362,7 +366,7 @@ class OrderServiceTest {
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
         Order order = order(orderId, USER_ID, OrderStatus.PENDING_PAYMENT);
-        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, price, 0, price, now);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, "thumbnail.jpg", price, 0, price, now);
         ReflectionTestUtils.setField(orderItem, "id", orderItemId);
         return orderItem;
     }
