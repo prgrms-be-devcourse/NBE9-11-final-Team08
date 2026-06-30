@@ -7,7 +7,7 @@ import { ChevronLeft, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
 import { formatOrderStatus, formatPaymentStatus, getOrderStatusVariant } from '@/lib/order-payment-labels'
-import { formatDateTime, formatKRW, toDateValue } from '@/lib/utils'
+import { formatDateTime, formatKRW } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +32,8 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null)
 
   const displayStatus = formatOrderStatus(order.status)
+  const payment = order.payment
+  const effectivePaymentStatus = paymentStatus ?? payment?.status ?? null
   const canCancel = order.status === 'PENDING_PAYMENT'
   const canRefund = order.status === 'PAID'
 
@@ -128,10 +130,18 @@ export function OrderDetailView({ order: initial }: { order: OrderDetailResponse
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <Row label="주문 상태" value={displayStatus} />
-          {paymentStatus ? (
-            <Row label="결제 상태" value={formatPaymentStatus(paymentStatus)} />
+          {effectivePaymentStatus ? (
+            <Row label="결제 상태" value={formatPaymentStatus(effectivePaymentStatus)} />
           ) : null}
-          <Row label="결제 수단" value="신용카드 (기본)" />
+          {payment ? (
+            <>
+              <Row label="PG사" value={formatPaymentProvider(payment.provider)} />
+              <Row label="결제 수단" value={formatPaymentMethod(payment.method)} />
+              <Row label="결제 일시" value={payment.paidAt ? formatDateTime(payment.paidAt) : '-'} />
+            </>
+          ) : (
+            <Row label="결제 정보" value="없음" />
+          )}
           <Separator />
           <Row label="상품 금액" value={formatKRW(order.totalPrice)} />
           <Row label="할인 금액" value={`- ${formatKRW(order.discountPrice)}`} />
@@ -181,4 +191,28 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-right">{value}</span>
     </div>
   )
+}
+
+function formatPaymentProvider(provider?: string | null) {
+  if (!provider) return '-'
+
+  const labels: Record<string, string> = {
+    MOCK: 'Mock',
+    TOSS: 'Toss',
+    NICEPAY: 'NICEPAY',
+    KCP: 'KCP',
+  }
+
+  return labels[provider] ?? provider
+}
+
+function formatPaymentMethod(method?: string | null) {
+  if (!method) return '-'
+
+  const labels: Record<string, string> = {
+    CARD: '신용카드',
+    KAKAOPAY: '카카오페이',
+  }
+
+  return labels[method] ?? method
 }

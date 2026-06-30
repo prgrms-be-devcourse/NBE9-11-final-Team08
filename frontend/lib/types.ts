@@ -147,6 +147,14 @@ export interface OrderItemResponse {
   finalPrice: number
 }
 
+export interface OrderPaymentResponse {
+  paymentId: number
+  provider: 'MOCK' | 'TOSS' | 'NICEPAY' | 'KCP' | string
+  method?: string | null
+  status: PaymentStatus
+  paidAt?: string | null
+}
+
 export interface OrderDetailResponse {
   orderId: number
   orderNumber: string
@@ -156,6 +164,7 @@ export interface OrderDetailResponse {
   status: OrderStatus
   orderedAt: string
   canceledAt?: string
+  payment?: OrderPaymentResponse | null
   items: OrderItemResponse[]
 }
 
