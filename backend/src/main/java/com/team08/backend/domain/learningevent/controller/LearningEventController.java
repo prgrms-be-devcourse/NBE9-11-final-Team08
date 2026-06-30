@@ -16,7 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 // 서비스 트래픽의 핫 경로(이벤트 적재 + 본인 활동 조회)만 담당한다.
-// 어드민/판매자용 대용량 조회·통계는 LearningEventAnalyticsController 로 분리되어 있다.
+// 어드민/판매자용 대용량 조회·통계는 learningevent.analytics 패키지로 분리되어 있다.
 @Tag(name = "학습 이벤트", description = "학습 활동 기록 및 본인 활동 조회 API")
 @RestController
 @RequiredArgsConstructor

@@ -1,4 +1,4 @@
-package com.team08.backend.domain.learningevent.service;
+package com.team08.backend.domain.learningevent.analytics.service;
 
 import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
@@ -20,10 +20,10 @@ import java.util.List;
 /**
  * 어드민/판매자용 대용량 조회·집계 전용 서비스.
  * <p>
- * 서비스 트래픽의 핫 경로(이벤트 적재 = {@link LearningEventService#recordEvent})와
- * 클래스 단위로 분리해, 무거운 운영 조회가 적재 경로와 같은 트랜잭션·컴포넌트 경계를
- * 공유하지 않게 한다. 이렇게 갈라 두면 이후 물리 분리(별도 인스턴스/읽기 전용 복제본·
- * 별도 커넥션 풀로의 분리)는 리팩터링이 아니라 배포·설정 변경만으로 끝난다.
+ * 서비스 트래픽의 핫 경로(이벤트 적재 = LearningEventService#recordEvent)와 패키지 단위로
+ * 분리해, 무거운 운영 조회가 적재 경로와 같은 트랜잭션·컴포넌트 경계를 공유하지 않게 한다.
+ * analytics 패키지로 갈라 두면 이후 물리 분리(별도 인스턴스/읽기 전용 복제본·별도 커넥션
+ * 풀로의 분리)는 패키지 단위 component-scan 슬라이스 또는 모듈 추출만으로 끝난다.
  * <p>
  * 모든 메서드는 읽기 전용이며 적재 경로와 도메인 이벤트를 발행하지 않는다.
  */

@@ -1,9 +1,9 @@
-package com.team08.backend.domain.learningevent.controller;
+package com.team08.backend.domain.learningevent.analytics.controller;
 
+import com.team08.backend.domain.learningevent.analytics.service.LearningEventAnalyticsService;
 import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
 import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
-import com.team08.backend.domain.learningevent.service.LearningEventAnalyticsService;
 import com.team08.backend.global.auth.principal.LoginUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,10 +17,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * 어드민/판매자용 대용량 조회·집계 엔드포인트.
  * <p>
- * 서비스 트래픽의 핫 경로(이벤트 적재)인 {@link LearningEventController} 와 클래스 단위로 분리한다.
- * 무거운 운영 조회를 적재 컨트롤러·서비스와 갈라 두면, 이후 별도 인스턴스/커넥션 풀로의
- * 물리 분리가 리팩터링이 아니라 라우팅·배포 변경으로 끝난다. URL 경로는 분리 전과 동일하게
- * 유지해 클라이언트·보안 설정에는 영향이 없다.
+ * 서비스 트래픽의 핫 경로(이벤트 적재)인 learningevent.controller.LearningEventController 와
+ * 별도 패키지(learningevent.analytics)로 분리한다. 무거운 운영 조회를 적재 컨트롤러·서비스와
+ * 갈라 두면, 이후 별도 인스턴스/커넥션 풀로의 물리 분리가 리팩터링이 아니라 패키지 단위
+ * 슬라이스·라우팅·배포 변경으로 끝난다. URL 경로는 분리 전과 동일하게 유지해 클라이언트·보안
+ * 설정에는 영향이 없다.
  */
 @Tag(name = "학습 이벤트 - 운영 조회", description = "관리자/판매자용 학습 이벤트 대용량 조회·통계 API")
 @RestController

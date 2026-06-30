@@ -1,10 +1,10 @@
-package com.team08.backend.domain.learningevent.controller;
+package com.team08.backend.domain.learningevent.analytics.controller;
 
+import com.team08.backend.domain.learningevent.analytics.service.LearningEventAnalyticsService;
 import com.team08.backend.domain.learningevent.dto.ChapterStatsResponse;
 import com.team08.backend.domain.learningevent.dto.CourseStatsResponse;
 import com.team08.backend.domain.learningevent.dto.LearningEventResponse;
 import com.team08.backend.domain.learningevent.entity.LearningEventType;
-import com.team08.backend.domain.learningevent.service.LearningEventAnalyticsService;
 import com.team08.backend.support.security.WithMockLoginUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.team08.backend.domain.learningevent.service;
+package com.team08.backend.domain.learningevent.analytics.service;
 
 import com.team08.backend.domain.course.entity.Course;
 import com.team08.backend.domain.course.entity.CourseStatus;
