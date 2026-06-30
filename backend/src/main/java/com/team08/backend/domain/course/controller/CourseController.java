@@ -19,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,8 +47,13 @@ public class CourseController {
     @SecurityRequirements
     @Operation(summary = "공개 강좌 상세 조회", description = "판매 중(ON_SALE) 상태인 강좌의 상세 정보와 커리큘럼을 조회합니다. 조회수는 Redis에 누적 후 주기적으로 DB에 반영됩니다.")
     public CourseDetailResponse getCourseDetail(
-            @Parameter(description = "강좌 ID", example = "1") @PathVariable("courseId") Long courseId) {
-        return courseService.getCourseDetail(courseId);
+            @Parameter(description = "강좌 ID", example = "1") @PathVariable("courseId") Long courseId,
+            @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal,
+            HttpServletRequest request) {
+        String userIdentifier = (loginUserPrincipal != null)
+                ? "MEMBER:" + loginUserPrincipal.user().id()
+                : "GUEST:" + getClientIp(request);
+        return courseService.getCourseDetail(courseId, userIdentifier);
     }
 
     @GetMapping
@@ -136,5 +142,28 @@ public class CourseController {
             @Parameter(description = "강의 ID", example = "1") @PathVariable("lectureId") Long lectureId,
             @RequestPart("file") MultipartFile file) {
         courseService.uploadAndEncodeLectureVideo(loginUserPrincipal.user().id(), lectureId, file);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

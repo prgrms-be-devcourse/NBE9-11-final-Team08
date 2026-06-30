@@ -76,12 +76,12 @@ public class CourseService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public CourseDetailResponse getCourseDetail(Long courseId) {
+    public CourseDetailResponse getCourseDetail(Long courseId, String userIdentifier) {
         CourseDetailResponse response = getCourseDetailInternal(courseId);
         if (response.status() != CourseStatus.ON_SALE) {
             throw new CustomException(ErrorCode.COURSE_NOT_FOUND);
         }
-        int delta = incrementViewCount(courseId);
+        int delta = incrementViewCount(courseId, userIdentifier);
         return response.withViewCount(response.viewCount() + delta);
     }
 
@@ -100,12 +100,12 @@ public class CourseService {
         return response.withStatusReason(getLatestStatusReason(courseId, response.status()));
     }
 
-    private int incrementViewCount(Long courseId) {
+    private int incrementViewCount(Long courseId, String userIdentifier) {
         try {
-            courseViewCountRedisManager.increaseViewCount(courseId);
+            courseViewCountRedisManager.increaseViewCount(courseId, userIdentifier);
             return courseViewCountRedisManager.getViewCountDelta(courseId);
         } catch (Exception e) {
-            log.error("Failed to process Redis view count caching for courseId: {}", courseId, e);
+            log.error("Failed to process Redis view count caching for courseId: {}, user: {}", courseId, userIdentifier, e);
             courseViewCountManager.increaseViewCountRequiresNew(courseId);
             return 1;
         }

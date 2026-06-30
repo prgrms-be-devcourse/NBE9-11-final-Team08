@@ -19,19 +19,28 @@ public class CourseViewCountRedisManager {
  
     private static final String KEY_PREFIX = "course:viewcount:delta:";
     private static final String KEY_SET_PREFIX = "course:viewcount:active_ids";
+    private static final String LOCK_KEY_PREFIX = "course:view:lock:";
+    private static final long LOCK_TTL_MINUTES = 5;
  
     private final StringRedisTemplate redisTemplate;
     private final CourseRepository courseRepository;
     private final CourseDetailCacheManager courseDetailCacheManager;
     private final MeterRegistry meterRegistry;
  
-
-    public void increaseViewCount(Long courseId) {
+ 
+    public void increaseViewCount(Long courseId, String userIdentifier) {
         try {
-            String key = KEY_PREFIX + courseId;
-            redisTemplate.opsForValue().increment(key);
-            redisTemplate.expire(key, 1, TimeUnit.HOURS);
-            redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            String lockKey = LOCK_KEY_PREFIX + courseId + ":" + userIdentifier;
+            Boolean isFirstView = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL_MINUTES, TimeUnit.MINUTES);
+            
+            if (isFirstView != null && isFirstView) {
+                String key = KEY_PREFIX + courseId;
+                redisTemplate.opsForValue().increment(key);
+                redisTemplate.expire(key, 1, TimeUnit.HOURS);
+                redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            } else {
+                log.debug("[조회수 중복 증가 차단] courseId={}, user={}", courseId, userIdentifier);
+            }
         } catch (Exception e) {
             meterRegistry.counter("redis.viewcount.errors", "operation", "increase").increment();
             throw e;
