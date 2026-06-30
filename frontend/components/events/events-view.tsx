@@ -261,27 +261,29 @@ export function EventsView({
         </div>
       </TabsContent>
 
-      <div className="mt-8 flex items-center justify-center gap-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          이전
-        </Button>
-        <span className="text-sm font-medium">
-          {page} / {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-        >
-          다음
-        </Button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            이전
+          </Button>
+          <span className="text-sm font-medium">
+            {page} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            다음
+          </Button>
+        </div>
+      )}
     </Tabs>
   )
 }
