@@ -91,7 +91,7 @@ public class DashboardQueryRepository {
         }
         inner.append(" ORDER BY enrollees DESC, c.id DESC LIMIT :limit OFFSET :offset ");
 
-        String sql = "SELECT id, title, instructorId, status, enrollees, enterCount, completionCount, "
+        String sql = "SELECT id, title, instructorId, status, enrollees, enterCount, completionCount, fullyCompleted, "
                 + " CASE WHEN enrollees = 0 THEN 0 "
                 + "      ELSE ROUND((enrollees - fullyCompleted) * 100.0 / enrollees, 1) END AS incompletionRate "
                 + " FROM ( " + inner + " ) sub ORDER BY enrollees DESC, id DESC";
@@ -109,7 +109,7 @@ public class DashboardQueryRepository {
         for (Object[] r : rows) {
             result.add(new CourseStatRow(
                     toLong(r[0]), String.valueOf(r[1]), toLong(r[2]), String.valueOf(r[3]),
-                    toLong(r[4]), toLong(r[5]), toLong(r[6]), ((Number) r[7]).doubleValue()));
+                    toLong(r[4]), toLong(r[5]), toLong(r[6]), toLong(r[7]), ((Number) r[8]).doubleValue()));
         }
         return result;
     }

@@ -106,7 +106,7 @@ class CourseControllerTest {
         );
         CourseDetailResponse response = new CourseDetailResponse(
                 courseId, 1L, 5L, "스프링 부트 완벽 가이드", "백엔드 강의",
-                "images/thumb.jpg", 30000, CourseStatus.ON_SALE, 0, List.of(chapterResponse)
+                "images/thumb.jpg", 30000, CourseStatus.ON_SALE, null, 0, List.of(chapterResponse)
         );
 
         given(courseService.getCourseDetail(courseId)).willReturn(response);

@@ -2,9 +2,9 @@ import Link from 'next/link'
 import { MessageSquare, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { MyAnswerItem } from '@/components/account/my-answer-item'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/utils'
-import type { MyAnswer } from '@/lib/types'
 
 export const metadata = {
   title: 'QnA — PlayLearn',
@@ -23,7 +23,7 @@ export default async function CommentsPage() {
         {answers.length > 0 ? (
           <ul className="space-y-3">
             {answers.map((a) => (
-              <AnswerItem key={a.answerId} answer={a} />
+              <MyAnswerItem key={a.answerId} answer={a} />
             ))}
           </ul>
         ) : (
@@ -94,38 +94,6 @@ function Header({ noun, count }: { noun: string; count: number }) {
         강의에서 작성한 {noun} {count}개
       </p>
     </div>
-  )
-}
-
-function AnswerItem({ answer }: { answer: MyAnswer }) {
-  return (
-    <li className="rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{answer.courseTitle}</span>
-        <span>·</span>
-        <span>{answer.lectureTitle}</span>
-      </div>
-
-      {answer.questionTitle && (
-        <p className="mt-2 flex items-start gap-2 text-sm font-semibold leading-relaxed">
-          <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-          {answer.questionTitle}
-        </p>
-      )}
-      <p className="mt-1 whitespace-pre-wrap pl-6 text-sm leading-relaxed text-muted-foreground">
-        {answer.questionContent}
-      </p>
-
-      <div className="mt-3 ml-6 rounded-md bg-secondary/60 p-3">
-        <p className="text-xs font-semibold text-primary">내 답변</p>
-        <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
-          {answer.answerContent}
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {formatDateTime(answer.createdAt)}
-        </p>
-      </div>
-    </li>
   )
 }
 

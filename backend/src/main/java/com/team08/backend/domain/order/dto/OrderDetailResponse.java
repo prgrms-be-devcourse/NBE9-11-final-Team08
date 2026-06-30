@@ -25,10 +25,16 @@ public record OrderDetailResponse(
         LocalDateTime orderedAt,
         @Schema(description = "주문 취소 일시")
         LocalDateTime canceledAt,
+        @Schema(description = "결제 요약 정보")
+        OrderPaymentResponse payment,
         @Schema(description = "주문 항목 목록")
         List<OrderItemResponse> items
 ) {
     public static OrderDetailResponse from(Order order, List<OrderItem> orderItems) {
+        return from(order, orderItems, null);
+    }
+
+    public static OrderDetailResponse from(Order order, List<OrderItem> orderItems, OrderPaymentResponse payment) {
         return new OrderDetailResponse(
                 order.getId(),
                 order.getOrderNumber(),
@@ -38,6 +44,7 @@ public record OrderDetailResponse(
                 order.getStatus(),
                 order.getOrderedAt(),
                 order.getCanceledAt(),
+                payment,
                 orderItems.stream()
                         .map(OrderItemResponse::from)
                         .toList()

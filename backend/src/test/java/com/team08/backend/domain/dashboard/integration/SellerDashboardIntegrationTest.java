@@ -129,7 +129,7 @@ class SellerDashboardIntegrationTest {
 
     private void paidEnroll(Long userId, Long courseId, String title, int price) {
         Order order = Order.createPendingPayment(userId, "ORD-" + userId + "-" + courseId, NOW);
-        order.addItem(courseId, title, price, NOW);
+        order.addItem(courseId, title, "thumbnail.jpg", price, NOW);
         order.markPaid(NOW);
         orderRepository.save(order);
         enrollmentRepository.save(Enrollment.createActive(userId, courseId, order, NOW));

@@ -185,6 +185,7 @@ class OrderServiceTest {
                 .satisfies(item -> {
                     assertThat(item.courseId()).isEqualTo(COURSE_ID);
                     assertThat(item.courseTitle()).isEqualTo("Spring");
+                    assertThat(item.thumbnailUrl()).isEqualTo("Spring.png");
                     assertThat(item.price()).isEqualTo(30_000);
                 });
     }
@@ -219,15 +220,23 @@ class OrderServiceTest {
     void myOrderDetailCanBeFound() {
         Order order = order(ORDER_ID, USER_ID, OrderStatus.PENDING_PAYMENT);
         OrderItem orderItem = orderItem(1L, ORDER_ID, COURSE_ID, "Spring", 30_000);
+        Payment payment = payment(order, PaymentStatus.SUCCESS);
 
         given(orderRepository.findByIdAndUserId(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of(orderItem));
+        given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
 
         OrderDetailResponse response = orderService.getMyOrder(USER_ID, ORDER_ID);
 
         assertThat(response.orderId()).isEqualTo(ORDER_ID);
+        assertThat(response.payment()).isNotNull();
+        assertThat(response.payment().status()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(response.payment().method()).isEqualTo("CARD");
         assertThat(response.items()).singleElement()
-                .satisfies(item -> assertThat(item.courseTitle()).isEqualTo("Spring"));
+                .satisfies(item -> {
+                    assertThat(item.courseTitle()).isEqualTo("Spring");
+                    assertThat(item.thumbnailUrl()).isEqualTo("thumbnail.jpg");
+                });
     }
 
     @Test
@@ -362,7 +371,7 @@ class OrderServiceTest {
     private OrderItem orderItem(Long orderItemId, Long orderId, Long courseId, String courseTitle, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
         Order order = order(orderId, USER_ID, OrderStatus.PENDING_PAYMENT);
-        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, price, 0, price, now);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, courseTitle, "thumbnail.jpg", price, 0, price, now);
         ReflectionTestUtils.setField(orderItem, "id", orderItemId);
         return orderItem;
     }

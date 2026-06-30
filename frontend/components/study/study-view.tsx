@@ -44,17 +44,6 @@ interface StudyViewProps {
   qna?: any[]
 }
 
-const LESSON_NOTE = `영속성(Persistence)이란 프로그램이 종료되거나 시스템이 재시작되더라도 데이터가 사라지지 않고 저장되는 특성을 의미한다.
-
-예를 들어,
-· 변수에 저장된 데이터 — 프로그램 종료 시 사라짐
-· 데이터베이스에 저장된 데이터 — 프로그램 종료 후에도 유지됨
-
-따라서 영속성은 데이터를 장기적으로 보관하기 위한 개념이다.
-
-2. 영속성의 필요성
-만약 모든 데이터를 메모리에만 저장한다면 다음과 같은 문제가 발생한다.
-예시: 쇼핑몰 회원 정보가 서버 재시작 시 모두 사라진다면 서비스를 운영할 수 없다.`
 
 // 하트비트 주기(초). 이 간격마다 진행 시간을 누적해 서버에 보고한다.
 // NEXT_PUBLIC_HEARTBEAT_INTERVAL_SECONDS 로 환경별 조절(미설정/비정상 값이면 5초).
@@ -180,7 +169,7 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
           if (lectures.some((l) => l.id === id)) setActiveId(id)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
     // 최초 1회만 이어보기 위치를 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -392,7 +381,7 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
       if (durationSeconds && video.currentTime >= durationSeconds) {
         video.currentTime = 0
       }
-      video.play().catch(() => {})
+      video.play().catch(() => { })
     } else {
       video.pause()
     }
@@ -625,13 +614,19 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
 
             <Separator className="my-5" />
 
-            <article className="space-y-4 text-sm leading-relaxed text-foreground/90">
-              {LESSON_NOTE.split('\n\n').map((para, i) => (
-                <p key={i} className="whitespace-pre-line">
-                  {para}
-                </p>
-              ))}
-            </article>
+            {active?.summary?.trim() ? (
+              <article className="space-y-4 text-sm leading-relaxed text-foreground/90">
+                {active.summary.split('\n\n').map((para, i) => (
+                  <p key={i} className="whitespace-pre-line">
+                    {para}
+                  </p>
+                ))}
+              </article>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                이 강의에는 등록된 강의 노트가 없어요.
+              </p>
+            )}
 
             <ReflectionSection
               lectureId={active?.id}
@@ -906,11 +901,7 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
         setReflectionId(res.id)
         setEditing(false)
         setDraft('')
-        toast.success(
-          requestAi
-            ? '회고가 저장되었습니다. AI 피드백을 요청했어요.'
-            : '회고가 저장되었습니다.',
-        )
+        toast.success('회고가 저장되었습니다.')
       } else {
         throw new Error('Failed to save reflection')
       }
@@ -952,15 +943,6 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
               onChange={setDraft}
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={requestAi}
-              onChange={(e) => setRequestAi(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-            />
-            AI 피드백 요청하기
-          </label>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={cancelEdit}>
               취소
@@ -976,7 +958,7 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
             <p className="text-sm text-muted-foreground">
               {disabled
                 ? '입장 권한이 없어 회고를 작성할 수 없어요.'
-                : '아직 작성한 회고가 없어요. 학습한 내용을 정리하고 AI 피드백을 받아보세요.'}
+                : '아직 작성한 회고가 없어요.'}
             </p>
           )}
         </div>

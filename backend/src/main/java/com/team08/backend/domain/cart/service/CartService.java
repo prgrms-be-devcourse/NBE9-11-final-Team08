@@ -160,6 +160,7 @@ public class CartService {
                 cartItem.getId(),
                 course.getId(),
                 course.getTitle(),
+                course.getThumbnail(),
                 course.getPrice()
         );
     }

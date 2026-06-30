@@ -63,6 +63,8 @@ export function CouponManager({
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<'ALL' | CouponPolicyType>('ALL')
   const [statusFilter, setStatusFilter] = useState<'ALL' | CouponStatus>('ALL')
+  const [page, setPage] = useState(1)
+  const pageSize = 20
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<AdminCoupon | null>(null)
@@ -83,6 +85,17 @@ export function CouponManager({
       }),
     [coupons, query, typeFilter, statusFilter],
   )
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page]
+  )
+
+  // 필터가 바뀌면 1페이지로 리셋
+  useMemo(() => {
+    setPage(1)
+  }, [query, typeFilter, statusFilter])
 
   const openCreate = () => {
     setEditing(null)
@@ -231,7 +244,7 @@ export function CouponManager({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((c) => {
+            {paginated.map((c) => {
               const status = couponStatusMeta[c.status] || couponStatusMeta['ACTIVE']
               return (
                 <TableRow key={c.id}>
@@ -289,7 +302,7 @@ export function CouponManager({
                 </TableRow>
               )
             })}
-            {filtered.length === 0 && (
+            {paginated.length === 0 && (
               <TableRow>
                 <TableCell
                   colSpan={7}
@@ -302,6 +315,30 @@ export function CouponManager({
           </TableBody>
         </Table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            이전
+          </Button>
+          <span className="text-sm font-medium">
+            {page} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            다음
+          </Button>
+        </div>
+      )}
 
       <CouponFormSheet
         open={formOpen}

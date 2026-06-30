@@ -22,6 +22,7 @@ public class CourseViewCountRedisManager {
  
     private final StringRedisTemplate redisTemplate;
     private final CourseRepository courseRepository;
+    private final CourseDetailCacheManager courseDetailCacheManager;
     private final MeterRegistry meterRegistry;
  
     /**
@@ -105,6 +106,7 @@ public class CourseViewCountRedisManager {
                     if (delta > 0) {
                         Long courseId = Long.parseLong(idStr);
                         courseRepository.increaseViewCountByDelta(courseId, delta);
+                        courseDetailCacheManager.evictCache(courseId);
                         log.debug("[조회수 동기화 완료] Course: {}, Delta: {}", courseId, delta);
                     }
                 }

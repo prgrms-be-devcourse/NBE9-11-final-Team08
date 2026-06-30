@@ -41,7 +41,9 @@ export interface Course {
   instructor: Instructor
   chapters: Chapter[]
   badges?: string[]
+  tags?: string[]
   status?: 'PUBLISHED' | 'DRAFT' | 'REVIEW' | 'ON_SALE' | 'IN_REVIEW' | 'CLOSED' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
 }
 
 export interface CourseCardResponse {
@@ -52,6 +54,8 @@ export interface CourseCardResponse {
   thumbnail: string
   price: number
   viewCount: number
+  status?: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'IN_REVIEW' | 'ON_SALE' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
 }
 
 export interface CategoryResponse {
@@ -88,6 +92,7 @@ export interface CourseDetailResponse {
   thumbnail: string
   price: number
   status: 'DRAFT' | 'PUBLISHED' | 'CLOSED' | 'IN_REVIEW' | 'ON_SALE' | 'SUSPENDED' | 'DELETED'
+  statusReason?: string | null
   viewCount: number
   chapters: ChapterInfoResponse[]
 }
@@ -107,6 +112,7 @@ export interface CartItemResponse {
   cartItemId: number
   courseId: number
   title: string
+  thumbnailUrl?: string | null
   price: number
 }
 
@@ -135,9 +141,18 @@ export interface OrderItemResponse {
   orderItemId: number
   courseId: number
   courseTitle: string
+  thumbnailUrl?: string | null
   price: number
   discountPrice: number
   finalPrice: number
+}
+
+export interface OrderPaymentResponse {
+  paymentId: number
+  provider: 'MOCK' | 'TOSS' | 'NICEPAY' | 'KCP' | string
+  method?: string | null
+  status: PaymentStatus
+  paidAt?: string | null
 }
 
 export interface OrderDetailResponse {
@@ -149,6 +164,7 @@ export interface OrderDetailResponse {
   status: OrderStatus
   orderedAt: string
   canceledAt?: string
+  payment?: OrderPaymentResponse | null
   items: OrderItemResponse[]
 }
 
@@ -176,7 +192,8 @@ export interface ConfirmTossPaymentRequest {
   paymentKey: string
   method: string
   amount: number
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
   idempotencyKey?: string | null
   authResultCode?: string | null
   authResultMsg?: string | null
@@ -192,7 +209,8 @@ export interface ConfirmTossPaymentRequest {
 
 export interface NicepayPreparePaymentRequest {
   payMethod: 'CARD'
-  issuedCouponId?: number | null
+  itemCouponIds?: Record<number, number> | null
+  stackableCouponId?: number | null
 }
 
 export interface NicepayPreparePaymentResponse {
@@ -224,12 +242,14 @@ export interface PaymentResponse {
 
 export interface Coupon {
   id: string
+  policyId?: string
   name: string
   amount: string
   condition: string
   category: '진행 중인 이벤트' | '종료된 이벤트'
   type: 'discount' | 'attendance' | 'firstcome'
   status?: 'SCHEDULED' | 'ACTIVE' | 'ENDED'
+  originalStatus?: string
   startDate?: string | null
   endDate?: string | null
   validDays?: number | null
@@ -313,6 +333,7 @@ export interface AdminCouponPolicyRequest {
 
 export interface CouponListResponse {
   issuedCouponId: number
+  policyId: number
   couponName: string
   discountType: string
   discountValue: number
@@ -718,6 +739,10 @@ export interface StudyReport {
   progressData: { day: string; progress: number; minutes: number }[]
   calendar: { date: string; active: boolean; level?: number }[]
   topLectures: string[]
+  // 리포트가 마지막으로 집계된 시각(백엔드 updatedAt). 갱신 버튼 안내용.
+  updatedAt?: string
+  // 쿨다운으로 다음 갱신이 가능한 시각. null 이면 즉시 갱신 가능.
+  nextRegenerableAt?: string | null
 }
 
 // 마이페이지 리포트 화면용: 화면 리포트 + 스터디 식별자(개별 갱신/구분용)
@@ -837,6 +862,7 @@ export interface CourseStatRow {
   enrollees: number
   enterCount: number
   completionCount: number
+  fullyCompleted: number
   incompletionRate: number
 }
 

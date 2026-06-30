@@ -78,6 +78,7 @@ class CartServiceTest {
         assertThat(response.items()).hasSize(1);
         assertThat(response.items().get(0).courseId()).isEqualTo(COURSE_ID);
         assertThat(response.items().get(0).title()).isEqualTo("Spring");
+        assertThat(response.items().get(0).thumbnailUrl()).isEqualTo("Spring.png");
         assertThat(response.items().get(0).price()).isEqualTo(30_000);
         assertThat(response.totalPrice()).isEqualTo(30_000);
         verify(cartCreationService).create(USER_ID);

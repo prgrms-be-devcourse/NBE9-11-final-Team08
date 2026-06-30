@@ -94,13 +94,6 @@ export function LoginForm() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Checkbox id="remember" />
-          <Label htmlFor="remember" className="text-sm font-normal text-muted-foreground">
-            로그인 상태 유지
-          </Label>
-        </div>
-
         <Button type="submit" size="lg" disabled={submitting}>
           {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           {submitting ? '로그인 중...' : '로그인'}

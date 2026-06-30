@@ -1,5 +1,7 @@
 package com.team08.backend.domain.chapter.service;
 
+import com.team08.backend.domain.course.entity.CourseStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.team08.backend.domain.chapter.dto.ChapterCreateRequest;
 import com.team08.backend.domain.chapter.dto.ChapterWithLecturesResponse;
 import com.team08.backend.domain.course.access.CourseAccessAuthorizer;
@@ -100,6 +102,36 @@ class ChapterServiceTest {
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 
         verify(courseRepository).findById(invalidCourseId);
+    }
+
+    @Test
+    @DisplayName("챕터 생성 실패 - 이미 ON_SALE 상태인 강좌에 챕터 생성 시")
+    void createChapter_alreadyOnSale() {
+        Long courseId = 1L;
+        ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
+        Course course = TestEntityFactory.course(courseId);
+        ReflectionTestUtils.setField(course, "status", CourseStatus.ON_SALE);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> chapterService.createChapter(courseId, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_ALREADY_ON_SALE.getMessage());
+    }
+
+    @Test
+    @DisplayName("챕터 생성 실패 - 이미 SUSPENDED 상태인 강좌에 챕터 생성 시")
+    void createChapter_suspended() {
+        Long courseId = 1L;
+        ChapterCreateRequest request = new ChapterCreateRequest("오리엔테이션", 1);
+        Course course = TestEntityFactory.course(courseId);
+        ReflectionTestUtils.setField(course, "status", CourseStatus.SUSPENDED);
+
+        given(courseRepository.findById(courseId)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> chapterService.createChapter(courseId, 1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasMessageContaining(ErrorCode.COURSE_ALREADY_ON_SALE.getMessage());
     }
 
     // ── 챕터 리스트 조회 ──────────────────────────────────────────────────

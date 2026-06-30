@@ -113,4 +113,15 @@ public class IssuedCoupon {
             throw new CouponAlreadyUsedOrExpiredException();
         }
     }
+
+    public void refund(LocalDateTime now) {
+        if (this.status == CouponStatus.USED) {
+            if (this.expiredAt.isBefore(now)) {
+                this.status = CouponStatus.EXPIRED;
+            } else {
+                this.status = CouponStatus.ISSUED;
+            }
+            this.usedAt = null;
+        }
+    }
 }

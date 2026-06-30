@@ -53,4 +53,48 @@ class IssuedCouponTest {
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.COUPON_NOT_OWNED);
     }
+
+    @Test
+    @DisplayName("성공: 쿠폰 환불 시 만료일이 지나지 않았다면 상태가 ISSUED로 변경된다")
+    void refund_success_toIssued() {
+        // given
+        Long userId = 1L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiredAt = now.plusDays(30);
+
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(expiredAt);
+
+        IssuedCoupon coupon = IssuedCoupon.create(policy, userId, now);
+        coupon.use(now);
+
+        // when
+        coupon.refund(now);
+
+        // then
+        assertThat(coupon.getStatus()).isEqualTo(CouponStatus.ISSUED);
+        assertThat(coupon.getUsedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("성공: 쿠폰 환불 시 만료일이 지났다면 상태가 EXPIRED로 변경된다")
+    void refund_success_toExpired() {
+        // given
+        Long userId = 1L;
+        CouponPolicy policy = mock(CouponPolicy.class);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiredAt = now.minusDays(1); // Already expired
+
+        when(policy.calculateExpirationDate(any(LocalDateTime.class))).thenReturn(expiredAt);
+
+        IssuedCoupon coupon = IssuedCoupon.create(policy, userId, now);
+        coupon.use(now);
+
+        // when
+        coupon.refund(now);
+
+        // then
+        assertThat(coupon.getStatus()).isEqualTo(CouponStatus.EXPIRED);
+        assertThat(coupon.getUsedAt()).isNull();
+    }
 }

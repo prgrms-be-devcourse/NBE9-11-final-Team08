@@ -14,6 +14,7 @@ import java.util.List;
 
 public record CouponListResponse(
         Long issuedCouponId,
+        Long policyId,
         String couponName,
         Integer discountValue,
         DiscountType discountType,
@@ -36,6 +37,7 @@ public record CouponListResponse(
 
         return new CouponListResponse(
                 coupon.getId(),
+                policy.getId(),
                 policy.getName(),
                 policy.getDiscountValue(),
                 policy.getDiscountType(),

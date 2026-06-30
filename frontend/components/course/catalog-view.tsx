@@ -12,10 +12,10 @@ import type { Course } from '@/lib/types'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-const sorts = ['VIEW_DESC', 'LATEST', 'PRICE_ASC'] as const
+const sorts = ['VIEW_DESC', 'CREATED_DESC', 'PRICE_ASC'] as const
 const sortLabels: Record<string, string> = {
   VIEW_DESC: '인기순',
-  LATEST: '최신순',
+  CREATED_DESC: '최신순',
   PRICE_ASC: '낮은가격순',
 }
 
@@ -111,7 +111,7 @@ export function CatalogView() {
             개발부터 AI까지, 실무로 통하는 강좌 모음전
           </h1>
           <p className="mt-2 max-w-lg text-sm leading-relaxed opacity-90">
-            PlayLearn에서 강의를 듣고 스터디에 참여하며 회고와 AI 피드백으로 성장하세요.
+            PlayLearn에서 강의를 듣고 스터디에 참여하여 성장하세요.
           </p>
         </div>
 

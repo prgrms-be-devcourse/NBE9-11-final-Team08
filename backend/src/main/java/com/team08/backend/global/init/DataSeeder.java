@@ -345,7 +345,7 @@ public class DataSeeder {
         for (int i = 0; i < count; i++) {
             Course course = courses.get(i);
             Order order = Order.createPendingPayment(users.get(i).getId(), "ORD-SEED-" + (i + 1), now);
-            order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
+            order.addItem(course.getId(), course.getTitle(), course.getThumbnail(), course.getPrice(), now);
             order.markPaid(now);
             orders.add(order);
         }
@@ -630,7 +630,7 @@ public class DataSeeder {
 
                 Order order = Order.createPendingPayment(
                         learner.getId(), "ORD-DEMO-MEM-" + courseId + "-" + learner.getId(), now);
-                order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
+            order.addItem(course.getId(), course.getTitle(), course.getThumbnail(), course.getPrice(), now);
                 order.markPaid(now);
                 orders.add(order);
 
@@ -889,7 +889,7 @@ public class DataSeeder {
     private Enrollment enroll(User learner, Course course, LocalDateTime now, String tag) {
         Order order = Order.createPendingPayment(
                 learner.getId(), "ORD-DEMO-" + tag + "-" + learner.getId(), now);
-        order.addItem(course.getId(), course.getTitle(), course.getPrice(), now);
+            order.addItem(course.getId(), course.getTitle(), course.getThumbnail(), course.getPrice(), now);
         order.markPaid(now);
         orderRepository.save(order);
 
@@ -1187,6 +1187,7 @@ public class DataSeeder {
         Set<Long> studyCourseIds = studies.stream()
                 .map(study -> study.getCourse().getId())
                 .collect(java.util.stream.Collectors.toSet());
+        studyCourseIds.add(rejected.getId());
 
         // 신규: DRAFT 강좌 → DRAFT 스터디 (생성자/관리자만 조회 가능)
         Course draftCourse = courses.stream()

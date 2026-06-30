@@ -391,6 +391,8 @@ const mapCourseCardToCourse = (card: CourseCardResponse): Course => ({
   viewCount: card.viewCount || 0,
   instructor: { id: card.instructorId?.toString() || '0', name: `강사 ${card.instructorId || ''}`, title: '' },
   chapters: [],
+  status: card.status,
+  statusReason: card.statusReason ?? null,
 })
 
 const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
@@ -422,6 +424,7 @@ const mapCourseDetailToCourse = (detail: CourseDetailResponse): Course => ({
     })) || [],
   })) || [],
   status: detail.status,
+  statusReason: detail.statusReason ?? null,
 })
 
 const mapStudyDetailToStudy = (
@@ -537,6 +540,7 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
 
   return {
     id: coupon.issuedCouponId.toString(),
+    policyId: coupon.policyId?.toString(),
     name: coupon.couponName,
     amount: isRate
       ? `${coupon.discountValue}% 할인`
@@ -545,13 +549,15 @@ const mapCouponListToCoupon = (coupon: CouponListResponse): Coupon => {
     category: category,
     type: isRate ? 'discount' : 'firstcome',
     status: isAvailable ? 'ACTIVE' : 'ENDED',
+    originalStatus: coupon.status,
     usageType: usageTypeStr,
-    isStackable: coupon.isStackable,
+    isStackable: coupon.isStackable ?? (coupon as any).stackable ?? false,
     maxDiscountAmount: coupon.maxDiscountAmount,
     minOrderAmount: coupon.minOrderAmount,
     couponTarget: couponTargetStr,
     categoryIds: coupon.categoryIds || [],
     courseIds: coupon.courseIds || [],
+    endDate: expiredAtStr,
   }
 }
 
@@ -603,6 +609,7 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
 
   return {
     id: policy.id.toString(),
+    policyId: policy.id.toString(),
     name: policy.name,
     amount: isRate
       ? `${policy.discountValue}% 할인`
@@ -616,7 +623,7 @@ const mapAdminCouponPolicyToUserCoupon = (policy: AdminCouponPolicyResponse): Co
     validDays: policy.validDays,
     couponTarget: couponTargetStr,
     usageType: usageTypeStr,
-    isStackable: policy.isStackable,
+    isStackable: policy.isStackable ?? (policy as any).stackable ?? false,
     maxDiscountAmount: policy.maxDiscountAmount,
     minOrderAmount: policy.minOrderAmount,
     categoryIds: policy.categoryIds || [],
@@ -639,7 +646,7 @@ const mapAdminCouponPolicyToCoupon = (policy: AdminCouponPolicyResponse): AdminC
     autoIssueType: policy.autoIssueType ?? null,
     target: policy.couponTarget,
     useType: mapUseTypeToFrontend(policy.usageType),
-    stackable: policy.isStackable,
+    stackable: policy.isStackable ?? (policy as any).stackable ?? false,
     discountType: mapDiscountTypeToFrontend(policy.discountType),
     discountValue: policy.discountValue,
     maxDiscount: policy.maxDiscountAmount ?? null,
@@ -840,6 +847,8 @@ const mapStudyReportToDisplay = (
     progressData,
     calendar,
     topLectures: (raw.topLectures ?? []).map((l) => l.title),
+    updatedAt: raw.updatedAt,
+    nextRegenerableAt: raw.nextRegenerableAt,
   }
 }
 
@@ -928,6 +937,20 @@ export const api = {
     }
   },
 
+  getAdminCourses: async (status?: string, page = 0, size = 20): Promise<PageResponse<Course>> => {
+    const statusQuery = status && status !== 'ALL' ? `&status=${status}` : ''
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/admin/courses?page=${page}&size=${size}${statusQuery}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
+      true,
+      true,
+    )
+    return {
+      ...res,
+      content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
+    }
+  },
+
   // Categories
   getCategories: () => request<CategoryResponse[]>('/api/categories', [], false, false),
 
@@ -935,109 +958,63 @@ export const api = {
     const detail = await request<CourseDetailResponse | undefined>(
       `/api/courses/${id}`,
       undefined,
-      true,
+      false,
       false,
     )
     if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
+  },
 
-    const chapters = await request<ChapterInfoResponse[]>(
-      `/api/courses/${id}/chapters`,
-      [],
+  getInstructorCourses: async (status?: string, page = 0, size = 100): Promise<PageResponse<Course>> => {
+    const statusQuery = status && status !== 'ALL' ? `&status=${status}` : ''
+    const res = await request<PageResponse<CourseCardResponse>>(
+      `/api/courses/instructor?page=${page}&size=${size}${statusQuery}`,
+      { content: [], pageable: { pageNumber: page, pageSize: size }, totalElements: 0, totalPages: 0, last: true },
       true,
-      false,
+      true,
     )
-
-    let generalInfo = SEEDED_COURSES[Number(id)]
-    if (!generalInfo) {
-      generalInfo = await getCourseDraftFromCookies(id)
+    return {
+      ...res,
+      content: res.content ? res.content.map(c => mapCourseCardToCourse(c)) : []
     }
+  },
 
-    if (!generalInfo) {
-      try {
-        const coursesPage = await api.getCourses(0, 100)
-        const found = coursesPage.content.find(c => c.id.toString() === id.toString())
-        if (found) {
-          generalInfo = {
-            title: found.title,
-            description: found.description || `${found.title}에 대한 설명입니다.`,
-            price: found.price,
-            categoryId: Number(found.category),
-            instructorId: Number(found.instructor.id),
-            thumbnail: found.thumbnailUrl,
-            status: 'PUBLISHED'
-          }
-        }
-      } catch (e) {
-        console.error('Failed to find course in public list:', e)
-      }
-    }
+  getAdminCourse: async (id: string | number): Promise<Course | undefined> => {
+    const detail = await request<CourseDetailResponse | undefined>(
+      `/api/admin/courses/${id}`,
+      undefined,
+      true,
+      true,
+    )
+    if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
+  },
 
-    if (!generalInfo) {
-      generalInfo = {
-        title: `강좌 ${id}`,
-        description: `강좌 ${id}에 대한 설명입니다.`,
-        price: 0,
-        categoryId: 1,
-        instructorId: 1,
-        thumbnail: 'https://via.placeholder.com/800x450',
-        status: 'PUBLISHED'
-      }
-    }
-
-    const detailResponse: CourseDetailResponse = {
-      id: Number(id),
-      instructorId: generalInfo.instructorId || 1,
-      categoryId: generalInfo.categoryId || 1,
-      title: generalInfo.title || '',
-      description: generalInfo.description || '',
-      thumbnail: generalInfo.thumbnail || '',
-      price: generalInfo.price || 0,
-      status: generalInfo.status || 'PUBLISHED',
-      viewCount: 0,
-      chapters: chapters
-    }
-
-    return mapCourseDetailToCourse(detailResponse)
+  getInstructorCourse: async (id: string | number): Promise<Course | undefined> => {
+    const detail = await request<CourseDetailResponse | undefined>(
+      `/api/courses/instructor/${id}`,
+      undefined,
+      true,
+      true,
+    )
+    if (detail && detail.id) return mapCourseDetailToCourse(detail)
+    return undefined
   },
 
   createCourse: async (formData: FormData) => {
-    const courseId = await mutate<number>('/api/courses', 'POST', formData, true)
-    if (courseId) {
-      const instructorId = await getCurrentUserId()
-
-      const requestBlob = formData.get('request') as Blob
-      const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
-
-      saveCourseDraft(courseId, {
-        instructorId,
-        categoryId: Number(requestData.categoryId),
-        title: requestData.title || '',
-        description: requestData.description || '',
-        thumbnail: requestData.thumbnail || '',
-        price: Number(requestData.price),
-        status: 'DRAFT'
-      })
-    }
-    return courseId
+    return mutate<number>('/api/courses', 'POST', formData, true)
   },
 
   updateCourse: async (courseId: string | number, formData: FormData) => {
-    const res = await mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
-    const instructorId = await getCurrentUserId()
+    return mutate<void>(`/api/courses/${courseId}`, 'PUT', formData, true)
+  },
 
-    const requestBlob = formData.get('request') as Blob
-    const requestData = requestBlob ? JSON.parse(await requestBlob.text()) : {}
+  reorderChapters: async (courseId: string | number, reorders: { chapterId: number; orderNo: number }[]) => {
+    return mutate<void>(`/api/curriculums/courses/${courseId}/chapters/reorder`, 'PUT', { reorders }, false, true)
+  },
 
-    saveCourseDraft(courseId, {
-      instructorId,
-      categoryId: Number(requestData.categoryId),
-      title: requestData.title || '',
-      description: requestData.description || '',
-      thumbnail: requestData.thumbnail || '',
-      price: Number(requestData.price),
-      status: 'DRAFT'
-    })
-    return res
+  reorderLectures: async (chapterId: string | number, reorders: { lectureId: number; orderNo: number }[]) => {
+    return mutate<void>(`/api/curriculums/chapters/${chapterId}/lectures/reorder`, 'PUT', { reorders }, false, true)
   },
 
   requestCourseReview: async (courseId: string | number) => {
@@ -1061,8 +1038,11 @@ export const api = {
   closeCourse: (courseId: string | number) =>
     mutate<void>(`/api/courses/${courseId}/closing`, 'POST'),
 
-  deleteCourse: (courseId: string | number) =>
-    mutate<void>(`/api/courses/${courseId}`, 'DELETE'),
+  deleteCourse: async (courseId: string | number) => {
+    const res = await mutate<void>(`/api/courses/${courseId}`, 'DELETE')
+    removeCourseDraft(courseId)
+    return res
+  },
 
   uploadLectureVideo: (lectureId: string | number, file: File) => {
     const formData = new FormData()
@@ -1214,14 +1194,16 @@ export const api = {
     paymentKey: string,
     method: string,
     amount: number,
-    issuedCouponId?: number | null,
+    itemCouponIds?: Record<number, number> | null,
+    stackableCouponId?: number | null,
     idempotencyKey?: string | null,
   ) =>
     mutate<ConfirmPaymentResponse>(`/api/payments/${orderId}/confirm`, 'POST', {
       paymentKey,
       method,
       amount,
-      issuedCouponId,
+      itemCouponIds,
+      stackableCouponId,
       idempotencyKey,
     }),
   confirmTossPayment: (orderId: number, request: ConfirmTossPaymentRequest) =>
@@ -1398,14 +1380,14 @@ export const api = {
   // Coupons & Admin
   getCoupons: async () => {
     const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>(
-      '/api/coupons',
+      '/api/coupons?size=1000',
       null,
       false,
       false,
     )
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content
-      .filter((policy) => policy.couponType !== 'AUTO')
+      .filter((policy) => policy.couponType === 'NORMAL' || policy.couponType === 'FCFS')
       .map(mapAdminCouponPolicyToUserCoupon)
   },
   getMyCoupons: async () => {
@@ -1415,7 +1397,7 @@ export const api = {
   downloadCoupon: (policyId: number) =>
     mutate<any>(`/api/coupons/${policyId}/download`, 'POST'),
   getAdminCoupons: async (): Promise<AdminCoupon[]> => {
-    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>('/api/admin/coupons', null)
+    const result = await request<PageResponse<AdminCouponPolicyResponse> | AdminCouponPolicyResponse[] | null>('/api/admin/coupons?size=1000', null)
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToCoupon)
   },

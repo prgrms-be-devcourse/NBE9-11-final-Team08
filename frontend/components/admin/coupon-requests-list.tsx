@@ -157,26 +157,26 @@ export function CouponRequestsList({
         </Table>
       </div>
 
-      {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+      {data && Math.max(1, data.totalPages) > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-4">
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={() => fetchPage(page - 1)}
             disabled={page === 0 || loading}
           >
-            <ChevronLeft className="h-4 w-4" />
+            이전
           </Button>
-          <span className="text-sm">
-            {page + 1} / {data.totalPages}
+          <span className="text-sm font-medium">
+            {page + 1} / {Math.max(1, data.totalPages)}
           </span>
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={() => fetchPage(page + 1)}
-            disabled={page >= data.totalPages - 1 || loading}
+            disabled={page >= Math.max(0, data.totalPages - 1) || loading}
           >
-            <ChevronRight className="h-4 w-4" />
+            다음
           </Button>
         </div>
       )}

@@ -162,12 +162,17 @@ export function SiteHeader() {
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel>{userName || '회원님'}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/mypage">마이페이지</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/mypage/report">내 스터디 리포트</Link>
-                </DropdownMenuItem>
+                {/* 판매자는 판매자 센터만 노출한다(마이페이지·스터디 리포트는 일반 사용자용). */}
+                {!isSeller && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/mypage">마이페이지</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/mypage/report">내 스터디 리포트</Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {isSeller && (
                   <DropdownMenuItem asChild>
                     <Link href="/instructor">판매자 센터</Link>

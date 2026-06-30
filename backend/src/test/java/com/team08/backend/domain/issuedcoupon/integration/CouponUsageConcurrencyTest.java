@@ -62,7 +62,7 @@ class CouponUsageConcurrencyTest {
             executorService.submit(() -> {
                 try {
                     // 동일한 사용자가 동일한 쿠폰을 결제에 사용 시도
-                    issuedCouponService.useCouponForOrder(user.getId(), issuedCoupon.getId(), 10000);
+                    issuedCouponService.useCouponsForOrder(user.getId(), null, issuedCoupon.getId(), java.util.List.of(), 10000, 1L);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failCount.incrementAndGet();
@@ -98,7 +98,7 @@ class CouponUsageConcurrencyTest {
     private CouponPolicy savePolicy(String name, CouponType type) {
         return couponPolicyRepository.save(CouponPolicy.createPolicy(
                 name, CouponTarget.ALL, type, null,
-                CouponUsageType.SINGLE_USE, false, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, null
+                CouponUsageType.SINGLE_USE, true, DiscountType.AMOUNT, 1000, null, null, 7, null, null, null, null
         ));
     }
 

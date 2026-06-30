@@ -8,9 +8,9 @@ import com.team08.backend.domain.order.entity.Order;
 import com.team08.backend.domain.order.entity.OrderStatus;
 import com.team08.backend.domain.order.repository.OrderRepository;
 import com.team08.backend.domain.ordercouponusage.repository.OrderCouponUsageRepository;
-import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.orderitem.entity.OrderItem;
 import com.team08.backend.domain.orderitem.repository.OrderItemRepository;
+import com.team08.backend.domain.payment.config.NicepayPaymentProperties;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentRequest;
 import com.team08.backend.domain.payment.dto.ConfirmPaymentResponse;
 import com.team08.backend.domain.payment.dto.FailPaymentRequest;
@@ -19,7 +19,6 @@ import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentReques
 import com.team08.backend.domain.payment.dto.nicepay.NicepayPreparePaymentResponse;
 import com.team08.backend.domain.payment.entity.Payment;
 import com.team08.backend.domain.payment.entity.PaymentAttempt;
-import com.team08.backend.domain.payment.entity.PaymentAttemptStatus;
 import com.team08.backend.domain.payment.entity.PaymentProviderType;
 import com.team08.backend.domain.payment.entity.PaymentStatus;
 import com.team08.backend.domain.payment.outbox.PaymentSuccessOutboxService;
@@ -59,6 +58,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.anyList;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
@@ -193,15 +194,16 @@ class PaymentServiceTest {
                 List.of(COURSE_ID)
         )).willReturn(List.of());
 
-        given(issuedCouponService.calculateExpectedDiscount(USER_ID, issuedCouponId, 30_000))
-                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse("Coupon", 30_000, 5000, 25_000));
-        given(issuedCouponService.useCouponForOrder(USER_ID, issuedCouponId, 30_000)).willReturn(5000);
+        given(issuedCouponService.calculateExpectedDiscounts(eq(USER_ID), isNull(), eq(issuedCouponId), anyList(), eq(30_000)))
+                .willReturn(5000);
+        given(issuedCouponService.useCouponsForOrder(eq(USER_ID), isNull(), eq(issuedCouponId), anyList(), eq(30_000), eq(ORDER_ID)))
+                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult(5000, List.of(new com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage(ORDER_ID, issuedCouponId, 5000))));
 
         stubPaymentSave();
 
-        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, new ConfirmPaymentRequest("payment-key", "CARD", 25_000, issuedCouponId));
+        ConfirmPaymentResponse response = paymentService.confirmPayment(USER_ID, ORDER_ID, new ConfirmPaymentRequest("payment-key", "CARD", 25_000, null, issuedCouponId));
 
-        verify(orderCouponUsageRepository).save(any());
+        verify(orderCouponUsageRepository).saveAll(any());
         assertThat(order.getDiscountPrice()).isEqualTo(5000);
         assertThat(order.getFinalPrice()).isEqualTo(25_000);
         assertThat(response.amount()).isEqualTo(25_000);
@@ -222,28 +224,23 @@ class PaymentServiceTest {
                 USER_ID,
                 List.of(COURSE_ID)
         )).willReturn(List.of());
-        given(issuedCouponService.calculateExpectedDiscount(USER_ID, materializedAllUsersCouponId, 30_000))
-                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.ExpectedDiscountResponse(
-                        "전체 회원 쿠폰",
-                        30_000,
-                        5_000,
-                        25_000
-                ));
-        given(issuedCouponService.useCouponForOrder(USER_ID, materializedAllUsersCouponId, 30_000))
+        given(issuedCouponService.calculateExpectedDiscounts(eq(USER_ID), isNull(), eq(materializedAllUsersCouponId), anyList(), eq(30_000)))
                 .willReturn(5_000);
+        given(issuedCouponService.useCouponsForOrder(eq(USER_ID), isNull(), eq(materializedAllUsersCouponId), anyList(), eq(30_000), eq(ORDER_ID)))
+                .willReturn(new com.team08.backend.domain.issuedcoupon.dto.CouponUsageResult(5_000, List.of(new com.team08.backend.domain.ordercouponusage.entity.OrderCouponUsage(ORDER_ID, materializedAllUsersCouponId, 5_000))));
         stubPaymentSave();
 
         // when
         ConfirmPaymentResponse response = paymentService.confirmPayment(
                 USER_ID,
                 ORDER_ID,
-                new ConfirmPaymentRequest("payment-key", "CARD", 25_000, materializedAllUsersCouponId)
+                new ConfirmPaymentRequest("payment-key", "CARD", 25_000, null, materializedAllUsersCouponId)
         );
 
         // then
-        verify(issuedCouponService).calculateExpectedDiscount(USER_ID, materializedAllUsersCouponId, 30_000);
-        verify(issuedCouponService).useCouponForOrder(USER_ID, materializedAllUsersCouponId, 30_000);
-        verify(orderCouponUsageRepository).save(any());
+        verify(issuedCouponService).calculateExpectedDiscounts(eq(USER_ID), isNull(), eq(materializedAllUsersCouponId), anyList(), eq(30_000));
+        verify(issuedCouponService).useCouponsForOrder(eq(USER_ID), isNull(), eq(materializedAllUsersCouponId), anyList(), eq(30_000), eq(ORDER_ID));
+        verify(orderCouponUsageRepository).saveAll(any());
         assertThat(order.getDiscountPrice()).isEqualTo(5_000);
         assertThat(order.getFinalPrice()).isEqualTo(25_000);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PAID);
@@ -264,7 +261,7 @@ class PaymentServiceTest {
         NicepayPreparePaymentResponse response = paymentService.prepareNicepayPayment(
                 user,
                 ORDER_ID,
-                new NicepayPreparePaymentRequest("CARD", null)
+                new NicepayPreparePaymentRequest("CARD", null, null)
         );
 
         assertThat(response.goodsName()).isEqualTo("Spring");
@@ -287,7 +284,7 @@ class PaymentServiceTest {
         assertThatThrownBy(() -> paymentService.prepareNicepayPayment(
                 user,
                 ORDER_ID,
-                new NicepayPreparePaymentRequest("BANK", null)
+                new NicepayPreparePaymentRequest("BANK", null, null)
         ))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE));
@@ -474,6 +471,7 @@ class PaymentServiceTest {
                 PAYMENT_ID,
                 200L,
                 null,
+                null,
                 0
         );
         PaymentProviderConfirmResponse providerResponse = providerResponse(context.orderNumber(), "DONE", 30_000);
@@ -505,6 +503,7 @@ class PaymentServiceTest {
                 PAYMENT_ID,
                 200L,
                 null,
+                null,
                 0
         );
         PaymentProviderException exception = PaymentProviderException.timeout("TOSS_TIMEOUT", "Toss timeout");
@@ -533,6 +532,7 @@ class PaymentServiceTest {
                 30_000,
                 PAYMENT_ID,
                 200L,
+                null,
                 null,
                 0
         );
@@ -563,6 +563,7 @@ class PaymentServiceTest {
                 30_000,
                 PAYMENT_ID,
                 200L,
+                null,
                 null,
                 0
         );
@@ -730,13 +731,14 @@ class PaymentServiceTest {
 
         given(orderRepository.findByIdAndUserIdForUpdate(ORDER_ID, USER_ID)).willReturn(Optional.of(order));
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.empty());
+        given(orderItemRepository.findAllByOrderId(ORDER_ID)).willReturn(List.of());
 
         assertThatThrownBy(() -> paymentService.confirmPayment(USER_ID, ORDER_ID, confirmRequest(29_000)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.PAYMENT_AMOUNT_MISMATCH));
 
         verify(paymentRepository, never()).save(any(Payment.class));
-        verifyNoInteractions(orderItemRepository, enrollmentRepository);
+        verifyNoInteractions(enrollmentRepository);
     }
 
     @Test
@@ -772,10 +774,11 @@ class PaymentServiceTest {
         given(paymentRepository.findByOrder_Id(ORDER_ID)).willReturn(Optional.of(payment));
         given(enrollmentRepository.findAllByOrder_IdAndStatus(ORDER_ID, EnrollmentStatus.ACTIVE))
                 .willReturn(List.of());
+//        given(orderCouponUsageRepository.findByOrderId(ORDER_ID)).willReturn(Optional.empty());
 
         paymentService.refundPayment(USER_ID, ORDER_ID);
 
-        verifyNoInteractions(issuedCouponService, orderCouponUsageRepository);
+        verifyNoInteractions(issuedCouponService);
     }
 
     @Test
@@ -850,7 +853,7 @@ class PaymentServiceTest {
     private OrderItem orderItem(Long orderItemId, Long courseId, int price) {
         LocalDateTime now = LocalDateTime.parse("2026-06-12T10:00:00");
         Order order = order(OrderStatus.PENDING_PAYMENT);
-        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", price, 0, price, now);
+        OrderItem orderItem = OrderItem.createSnapshot(order, courseId, "Spring", "thumbnail.jpg", price, 0, price, now);
         ReflectionTestUtils.setField(orderItem, "id", orderItemId);
         return orderItem;
     }
@@ -882,11 +885,11 @@ class PaymentServiceTest {
     }
 
     private ConfirmPaymentRequest confirmRequest(int amount) {
-        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null);
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null, null);
     }
 
     private ConfirmPaymentRequest confirmRequest(int amount, String idempotencyKey) {
-        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null, idempotencyKey);
+        return new ConfirmPaymentRequest("payment-key", "CARD", amount, null, null, idempotencyKey);
     }
 
     private PaymentAttempt paymentAttempt(Payment payment, String idempotencyKey) {
@@ -927,7 +930,7 @@ class PaymentServiceTest {
     }
 
     private FailPaymentRequest failRequest(int amount) {
-        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패", null);
+        return new FailPaymentRequest("payment-key", "CARD", amount, "승인 실패", null, null);
     }
 
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CalendarCheck, Gift, Ticket, Timer } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -199,40 +199,91 @@ function CouponCard({
 
 export function EventsView({
   coupons,
-  ownedPolicyNames = [],
+  ownedPolicyIds = [],
   courses = [],
 }: {
   coupons: Coupon[]
-  ownedPolicyNames?: string[]
+  ownedPolicyIds?: (string | undefined)[]
   courses?: Course[]
 }) {
+  const [tab, setTab] = useState('ongoing')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(9)
+
+  useEffect(() => {
+    const handleResize = () => {
+      // lg 뷰포트(1024px) 이상이면 3칸이므로 9개, 그 미만(1칸 또는 2칸)이면 8개
+      if (window.innerWidth >= 1024) {
+        setPageSize(9)
+      } else {
+        setPageSize(8)
+      }
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const ongoing = coupons.filter((c) => c.category === '진행 중인 이벤트')
   const ended = coupons.filter((c) => c.category === '종료된 이벤트')
 
+  const currentCoupons = tab === 'ongoing' ? ongoing : ended
+  const totalPages = Math.max(1, Math.ceil(currentCoupons.length / pageSize))
+  const paginated = currentCoupons.slice((page - 1) * pageSize, page * pageSize)
+
+  const handleTabChange = (value: string) => {
+    setTab(value)
+    setPage(1)
+  }
+
   const isCouponOwned = (coupon: Coupon) => {
-    return ownedPolicyNames.includes(coupon.name)
+    return ownedPolicyIds.includes(coupon.policyId?.toString())
   }
 
   return (
-    <Tabs defaultValue="ongoing" className="mt-6">
+    <Tabs value={tab} onValueChange={handleTabChange} className="mt-6">
       <TabsList>
         <TabsTrigger value="ongoing">진행 중인 이벤트</TabsTrigger>
         <TabsTrigger value="ended">종료된 이벤트</TabsTrigger>
       </TabsList>
       <TabsContent value="ongoing" className="mt-6">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {ongoing.map((c) => (
+          {paginated.map((c) => (
             <CouponCard key={c.id} coupon={c} isOwned={isCouponOwned(c)} courses={courses} />
           ))}
         </div>
       </TabsContent>
       <TabsContent value="ended" className="mt-6">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {ended.map((c) => (
+          {paginated.map((c) => (
             <CouponCard key={c.id} coupon={c} isOwned={isCouponOwned(c)} courses={courses} />
           ))}
         </div>
       </TabsContent>
+
+      {totalPages > 1 && (
+        <div className="mt-8 flex items-center justify-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            이전
+          </Button>
+          <span className="text-sm font-medium">
+            {page} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            다음
+          </Button>
+        </div>
+      )}
     </Tabs>
   )
 }
