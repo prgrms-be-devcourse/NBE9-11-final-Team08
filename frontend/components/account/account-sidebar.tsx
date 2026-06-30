@@ -16,7 +16,6 @@ export function AccountSidebar({ profile }: { profile: UserProfile | null }) {
     { label: '주문 내역', href: '/orders' },
     { label: '내 쿠폰', href: '/mypage/coupons' },
     { label: `내 ${profile?.isSeller ? '답변' : '질문'}`, href: '/mypage/comments' },
-    { label: '설정', href: '/mypage/settings' },
   ]
 
   return (

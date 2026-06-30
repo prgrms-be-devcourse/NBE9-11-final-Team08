@@ -37,7 +37,6 @@ const NAV: NavItem[] = [
   { segment: 'course', label: '강좌', icon: BookOpen },
   { segment: 'board', label: '학습 활동', icon: MessageSquare, memberOnly: true },
   { segment: 'report', label: '리포트', icon: BarChart3 },
-  { segment: 'settings', label: '설정', icon: Settings, ownerOnly: true },
 ]
 
 export function StudyShell({

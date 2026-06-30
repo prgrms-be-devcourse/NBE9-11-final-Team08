@@ -43,7 +43,7 @@ const buildChapterUpdatePayload = (chapters: Chapter[]) =>
 export function CourseForm({ course }: { course?: Course }) {
   const router = useRouter()
   const editing = Boolean(course)
-  
+
   const [title, setTitle] = useState(course?.title ?? '')
   const [mainCat, setMainCat] = useState(course?.category ?? '')
   const [price, setPrice] = useState(course ? String(course.price) : '')
@@ -192,10 +192,10 @@ export function CourseForm({ course }: { course?: Course }) {
         }
 
         const requestBlob = new Blob(
-          [JSON.stringify(requestData)], 
+          [JSON.stringify(requestData)],
           { type: 'application/json' }
         )
-        
+
         formData.append('request', requestBlob)
 
         if (thumbnailFile) {
@@ -225,10 +225,10 @@ export function CourseForm({ course }: { course?: Course }) {
         }
 
         const requestBlob = new Blob(
-          [JSON.stringify(requestData)], 
+          [JSON.stringify(requestData)],
           { type: 'application/json' }
         )
-        
+
         formData.append('request', requestBlob)
 
         if (thumbnailFile) {
@@ -288,10 +288,10 @@ export function CourseForm({ course }: { course?: Course }) {
                   </SelectTrigger>
                   <SelectContent>
                     {mainCategories.map((c) => (
-                        <SelectItem key={c.id} value={categoryId(c)}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem key={c.id} value={categoryId(c)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -308,58 +308,11 @@ export function CourseForm({ course }: { course?: Course }) {
                 disabled={isReadOnly || loading}
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="tags">태그 / 키워드</Label>
-              <div className="flex flex-wrap gap-2">
-                {tags.map((t) => (
-                  <Badge key={t} variant="secondary" className="gap-1">
-                    {t}
-                    <button
-                      type="button"
-                      onClick={() => setTags((p) => p.filter((x) => x !== t))}
-                      aria-label={`${t} 삭제`}
-                      disabled={isReadOnly || loading}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  id="tags"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      addTag()
-                    }
-                  }}
-                  placeholder="태그 입력 후 Enter"
-                  disabled={isReadOnly || loading}
-                />
-                <Button type="button" variant="outline" onClick={addTag} disabled={isReadOnly || loading}>
-                  추가
-                </Button>
-              </div>
-            </div>
           </section>
 
           <section className="space-y-3 rounded-xl border bg-card p-5">
             <div className="flex items-center justify-between">
               <Label htmlFor="desc">상세 설명</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground"
-                onClick={() => toast.info('AI 설명 생성 기능은 곧 제공될 예정입니다.')}
-                disabled={isReadOnly || loading}
-              >
-                <Sparkles className="mr-1 h-3.5 w-3.5" /> AI로 생성
-              </Button>
             </div>
             <Textarea
               id="desc"
@@ -394,11 +347,11 @@ export function CourseForm({ course }: { course?: Course }) {
         <div className="space-y-6">
           <section className="rounded-xl border bg-card p-5">
             <Label>커버 이미지</Label>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/jpeg, image/png" 
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept="image/jpeg, image/png"
               onChange={handleFileChange}
               disabled={isReadOnly || loading}
             />
@@ -462,7 +415,7 @@ export function CourseForm({ course }: { course?: Course }) {
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {editing ? '수정 완료' : '임시저장'}
                 </Button>
-                
+
                 {isOnSale && (
                   <Button
                     type="button"
@@ -475,7 +428,7 @@ export function CourseForm({ course }: { course?: Course }) {
                     판매 종료
                   </Button>
                 )}
-                
+
                 {isDraft && editing && (
                   <Button
                     type="button"
