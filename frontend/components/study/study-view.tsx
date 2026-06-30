@@ -180,7 +180,7 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
           if (lectures.some((l) => l.id === id)) setActiveId(id)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
     // 최초 1회만 이어보기 위치를 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -392,7 +392,7 @@ export function StudyView({ course, studyId, readOnly = false, viewerId }: Study
       if (durationSeconds && video.currentTime >= durationSeconds) {
         video.currentTime = 0
       }
-      video.play().catch(() => {})
+      video.play().catch(() => { })
     } else {
       video.pause()
     }
@@ -906,11 +906,7 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
         setReflectionId(res.id)
         setEditing(false)
         setDraft('')
-        toast.success(
-          requestAi
-            ? '회고가 저장되었습니다. AI 피드백을 요청했어요.'
-            : '회고가 저장되었습니다.',
-        )
+        toast.success('회고가 저장되었습니다.')
       } else {
         throw new Error('Failed to save reflection')
       }
@@ -952,15 +948,6 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
               onChange={setDraft}
             />
           </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={requestAi}
-              onChange={(e) => setRequestAi(e.target.checked)}
-              className="h-4 w-4 rounded border-input accent-primary"
-            />
-            AI 피드백 요청하기
-          </label>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={cancelEdit}>
               취소
@@ -976,7 +963,7 @@ function ReflectionSection({ lectureId, lectureTitle, disabled = false }: { lect
             <p className="text-sm text-muted-foreground">
               {disabled
                 ? '입장 권한이 없어 회고를 작성할 수 없어요.'
-                : '아직 작성한 회고가 없어요. 학습한 내용을 정리하고 AI 피드백을 받아보세요.'}
+                : '아직 작성한 회고가 없어요.'}
             </p>
           )}
         </div>
