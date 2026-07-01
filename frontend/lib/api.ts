@@ -1401,6 +1401,10 @@ export const api = {
     const content = Array.isArray(result) ? result : (result?.content ?? [])
     return content.map(mapAdminCouponPolicyToCoupon)
   },
+  getAdminCoupon: async (couponId: number): Promise<AdminCoupon | undefined> => {
+    const result = await request<AdminCouponPolicyResponse | undefined>(`/api/admin/coupons/${couponId}`, undefined)
+    return result ? mapAdminCouponPolicyToCoupon(result) : undefined
+  },
   createAdminCoupon: async (coupon: AdminCoupon) => {
     const result = await mutate<AdminCouponPolicyResponse>(
       '/api/admin/coupons',

@@ -16,9 +16,7 @@ public abstract class AbstractCouponPolicyCreator implements CouponPolicyCreator
         return createEntity(request);
     }
 
-    // 타입별 특화 검증
     protected abstract void validateSpecific(CouponPolicyCreateRequest request);
 
-    // 엔티티 생성 위임
     protected abstract CouponPolicy createEntity(CouponPolicyCreateRequest request);
 }

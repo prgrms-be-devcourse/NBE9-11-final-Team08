@@ -22,12 +22,7 @@ public class CourseDetailCacheManager {
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
- 
-    /**
-     * Redis 캐시에서 강좌 상세 정보를 조회합니다.
-     * 장애 감내(Graceful Degradation)를 위해 모든 예외를 안전하게 catch하고 null을 반환합니다.
-     * 예외 수치는 모니터링을 위해 Micrometer 메트릭 카운터에 기록합니다.
-     */
+
     public CourseDetailResponse getCache(Long courseId) {
         String key = CACHE_KEY_PREFIX + courseId;
         try {
@@ -38,19 +33,16 @@ public class CourseDetailCacheManager {
             return objectMapper.readValue(json, CourseDetailResponse.class);
         } catch (JsonProcessingException e) {
             log.error("[Redis Deserialization Error] Data corruption for courseId: {}", courseId, e);
-            evictCache(courseId); // 손상된 캐시 즉시 제거
+            evictCache(courseId);
             meterRegistry.counter("redis.cache.errors", "operation", "deserialize", "courseId", String.valueOf(courseId)).increment();
             return null;
         } catch (Exception e) {
             log.error("[Redis Read Error] Failed to read course detail cache for courseId: {}", courseId, e);
             meterRegistry.counter("redis.cache.errors", "operation", "read", "courseId", String.valueOf(courseId)).increment();
-            return null; // Redis 다운 시 RDB로 자연스럽게 복구되도록 null 반환
+            return null;
         }
     }
- 
-    /**
-     * 강좌 상세 정보를 Redis 캐시에 기록합니다. (30분 TTL)
-     */
+
     public void setCache(Long courseId, CourseDetailResponse response) {
         String key = CACHE_KEY_PREFIX + courseId;
         try {
@@ -62,10 +54,7 @@ public class CourseDetailCacheManager {
             meterRegistry.counter("redis.cache.errors", "operation", "write", "courseId", String.valueOf(courseId)).increment();
         }
     }
- 
-    /**
-     * 강좌 상세 캐시를 즉각 무효화(삭제)합니다. (Write 발생 시 호출)
-     */
+
     public void evictCache(Long courseId) {
         String key = CACHE_KEY_PREFIX + courseId;
         try {

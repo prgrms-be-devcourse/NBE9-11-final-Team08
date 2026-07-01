@@ -68,7 +68,6 @@ public class CouponPolicyValidator {
             AutoIssueType autoIssueType
     ) {
 
-        // 숫자 범위 검증
         if (totalQuantity != null && totalQuantity < 1) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
@@ -85,7 +84,6 @@ public class CouponPolicyValidator {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        // 쿠폰 타입별 검증
         if (type == CouponType.FCFS) {
             if (totalQuantity == null || totalQuantity < 1) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
@@ -106,7 +104,6 @@ public class CouponPolicyValidator {
             }
         }
 
-        // 할인 타입별 검증
         if (discountType == DiscountType.AMOUNT) {
             if (maxDiscountAmount != null) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
@@ -117,7 +114,6 @@ public class CouponPolicyValidator {
             }
         }
 
-        // 적용 대상별 검증
         if (target == CouponTarget.ALL) {
             if ((categoryIds != null && !categoryIds.isEmpty()) || (courseIds != null && !courseIds.isEmpty())) {
                 throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
@@ -132,7 +128,6 @@ public class CouponPolicyValidator {
             }
         }
 
-        // 기간 검증
         if (issueStartDate != null && issueEndDate != null && issueStartDate.isAfter(issueEndDate)) {
             throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
         }

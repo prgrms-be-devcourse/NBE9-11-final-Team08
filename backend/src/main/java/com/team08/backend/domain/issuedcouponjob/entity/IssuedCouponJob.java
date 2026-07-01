@@ -52,12 +52,10 @@ public class IssuedCouponJob {
         this.requestedAt = requestedAt;
     }
 
-    // 쿠폰 발급 작업 생성
     public static IssuedCouponJob request(String requestId, Long userId, Long policyId, LocalDateTime requestedAt) {
         return new IssuedCouponJob(requestId, userId, policyId, requestedAt);
     }
 
-    // 쿠폰 발급 성공 처리
     public void markIssued(LocalDateTime completedAt) {
         this.status = IssuedCouponJobStatus.ISSUED;
         this.lastTriedAt = completedAt;

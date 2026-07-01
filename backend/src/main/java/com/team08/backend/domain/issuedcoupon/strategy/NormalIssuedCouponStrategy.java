@@ -41,14 +41,12 @@ public class NormalIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
         return CouponType.NORMAL;
     }
 
-    // 일반 쿠폰 정책 조회
     @Override
     protected CouponPolicy findPolicy(Long policyId) {
         return couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
     }
 
-    // 일반 쿠폰 중복 발급 체크
     @Override
     protected void validateDuplicateIssue(Long userId, Long policyId) {
         if (issuedCouponRepository.existsByUserIdAndPolicyId(userId, policyId)) {
@@ -56,7 +54,6 @@ public class NormalIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
         }
     }
 
-    // 타입별 핵심 발급 처리
     @Override
     protected CouponIssueResult processIssue(Long userId, CouponPolicy policy, LocalDateTime now) {
         return transactionTemplate.execute(status -> {

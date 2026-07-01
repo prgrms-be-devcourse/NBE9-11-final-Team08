@@ -64,7 +64,7 @@ public abstract class AbstractScheduledBatchStreamWorker {
     protected abstract void processBatch(
             List<MapRecord<String, Object, Object>> records,
             java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback
-    ) throws Exception;
+    );
 
     protected void ack(MapRecord<String, Object, Object> record) {
         redisTemplate.opsForStream().acknowledge(
@@ -75,7 +75,6 @@ public abstract class AbstractScheduledBatchStreamWorker {
     }
 
     protected void handleBatchError(List<MapRecord<String, Object, Object>> records, Exception e) {
-        // 인프라 레벨의 전체 배치 실패 시 ACK하지 않고 PEL에 남겨둡니다.
         org.slf4j.LoggerFactory.getLogger(getClass()).warn("Redis Stream Scheduled Batch 처리 중 예외 발생. (PEL 대기) stream={}, group={}, batchSize={}",
                 getStreamKey(), getGroupName(), records.size(), e);
     }

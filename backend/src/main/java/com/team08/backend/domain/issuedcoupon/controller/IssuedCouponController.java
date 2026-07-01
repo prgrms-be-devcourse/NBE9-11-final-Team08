@@ -38,7 +38,6 @@ public class IssuedCouponController {
     private final IssuedCouponQueryFacade issuedCouponQueryFacade;
     private final CouponPolicyService couponPolicyService;
 
-    // [사용자] 쿠폰 정책 목록 조회 /api/coupons
     @GetMapping
     @Operation(summary = "발급 가능한 쿠폰 정책 목록 조회", description = "모든 사용자가 발급 가능한 쿠폰 정책 목록을 조회합니다.")
     public Page<CouponPolicySummaryResponse> getCoupons(
@@ -48,7 +47,6 @@ public class IssuedCouponController {
         return couponPolicyService.getCouponPolicies(condition, pageable);
     }
 
-    // [사용자] 쿠폰 다운로드 /api/coupons/{policyId}/download
     @PostMapping("/{policyId}/download")
     @Operation(summary = "쿠폰 다운로드", description = "지정한 쿠폰 정책 ID로 쿠폰을 다운로드합니다. (일반/선착순 등 타입에 따라 자동 처리)")
     public CouponDownloadResponse downloadCoupon(
@@ -58,7 +56,6 @@ public class IssuedCouponController {
         return issuedCouponService.downloadCoupon(loginUserPrincipal.user().id(), policyId);
     }
 
-    // [사용자] 내 쿠폰 목록 조회 /api/coupons/me
     @GetMapping("/me")
     @Operation(summary = "내 쿠폰 목록 조회", description = "현재 로그인한 사용자가 보유한 모든 쿠폰 목록을 조회합니다.")
     public List<CouponListResponse> getMyCoupons(
@@ -66,7 +63,6 @@ public class IssuedCouponController {
         return issuedCouponQueryFacade.getMyCoupons(loginUserPrincipal.user().id());
     }
 
-    // [사용자] 쿠폰 적용 시 예상 할인 금액 조회 /api/coupons/{issuedCouponId}/discount
     @GetMapping("/{issuedCouponId}/discount")
     @Operation(summary = "예상 할인 금액 조회", description = "결제 전 특정 쿠폰을 적용했을 때의 예상 할인 금액과 최종 가격을 조회합니다.")
     public ExpectedDiscountResponse calculateExpectedDiscount(

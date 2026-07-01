@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -48,7 +47,6 @@ public class Attendance {
         this.createdAt = createdAt;
     }
 
-    // 오늘 자 출석 기록 생성
     public static Attendance record(Long userId, LocalDate today, Optional<Attendance> yesterdayAttendance, int monthCountBeforeToday, LocalDateTime now) {
         int consecutive = yesterdayAttendance
                 .map(Attendance::getConsecutiveDays)

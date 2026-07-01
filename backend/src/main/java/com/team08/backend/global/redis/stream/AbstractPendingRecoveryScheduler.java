@@ -1,7 +1,6 @@
 package com.team08.backend.global.redis.stream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.stream.RecordId;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,10 +15,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-/**
- * Redis Stream의 PEL(Pending Entries List)을 스캔하여 재처리하거나 DLQ로 격리하는 공통 스케줄러.
- * @Scheduled 어노테이션이 붙은 하위 클래스의 메서드에서 주기적으로 호출합니다.
- */
 public abstract class AbstractPendingRecoveryScheduler {
 
     protected final StringRedisTemplate redisTemplate;
@@ -33,18 +28,13 @@ public abstract class AbstractPendingRecoveryScheduler {
     }
 
     protected abstract String getStreamKey();
+
     protected abstract String getGroupName();
-    
-    /**
-     * Pending 상태로 얼마나 머물러야 복구 대상으로 간주할지 설정합니다.
-     */
+
     protected Duration getMinIdleTime() {
         return Duration.ofMinutes(5);
     }
 
-    /**
-     * 최대 몇 번 재시도 후 DLQ로 보낼지 설정합니다. (기본 3회)
-     */
     protected int getMaxRetries() {
         return 3;
     }
@@ -53,9 +43,6 @@ public abstract class AbstractPendingRecoveryScheduler {
         return 500;
     }
 
-    /**
-     * @Scheduled 어노테이션이 붙은 하위 클래스의 메서드에서 이 메서드를 주기적으로 호출합니다.
-     */
     protected void recoverPendingRecords() {
         Map<String, Long> pendingRecordDeliveryCounts = findPendingRecordDeliveryCounts();
         if (pendingRecordDeliveryCounts.isEmpty()) {
@@ -88,11 +75,7 @@ public abstract class AbstractPendingRecoveryScheduler {
         }
     }
 
-    /**
-     * 재시도 가능한 레코드들을 비즈니스 로직에 넘깁니다.
-     * 성공적으로 처리된 레코드에 대해서만 ackCallback.accept(recordId)를 호출해야 합니다.
-     */
-    protected abstract void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback) throws Exception;
+    protected abstract void processRetryRecords(List<ClaimedRecord> records, Consumer<String> ackCallback);
 
     protected void ack(String recordId) {
         redisTemplate.opsForStream().acknowledge(
@@ -120,8 +103,7 @@ public abstract class AbstractPendingRecoveryScheduler {
 
             String dlqKey = getStreamKey() + ":dlq";
             redisTemplate.opsForList().rightPush(dlqKey, dlqMessage.toJson(objectMapper));
-            
-            // DLQ 저장 성공 시 원본 Stream에서는 ACK 처리하여 제거
+
             ack(record.recordId());
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(getClass()).error(

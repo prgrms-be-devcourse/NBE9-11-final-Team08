@@ -30,26 +30,21 @@ public class AttendanceService {
     private final CouponRewardOutboxService couponRewardOutboxService;
     private final Clock clock;
 
-    // 출석체크
     @Transactional
     public AttendanceResponse checkIn(Long userId) {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDate today = now.toLocalDate();
         LocalDate yesterday = today.minusDays(1);
 
-        // 사용자 검증
         if (!userRepository.existsById(userId)) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND); // USER_001
+            throw new CustomException(ErrorCode.USER_NOT_FOUND); 
         }
 
-        // 어제 출석 기록 조회
         Optional<Attendance> yesterdayAttendance = attendanceRepository.findByUserIdAndAttendanceDate(userId, yesterday);
 
-        // 이번 달 누적 출석일 조회 (오늘 기록 제외)
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
         long monthCountBeforeToday = attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startOfMonth, yesterday);
 
-        // 오늘 자 출석 기록 생성
         Attendance todayLog = Attendance.record(
                 userId,
                 today,
@@ -57,7 +52,6 @@ public class AttendanceService {
                 (int) monthCountBeforeToday,
                 now);
 
-        // 출석 기록 저장 (동시성 중복 저장 방어)
         try {
             Attendance savedLog = attendanceRepository.saveAndFlush(todayLog);
             couponRewardOutboxService.createAttendanceCheckedEvent(
@@ -73,19 +67,16 @@ public class AttendanceService {
         }
     }
 
-    // 출석 기록 조회
     @Transactional(readOnly = true)
     public AttendanceStatusResponse getMyAttendance(Long userId) {
         LocalDate today = LocalDate.now(clock);
         LocalDate startOfMonth = YearMonth.from(today).atDay(1);
         LocalDate endOfMonth = YearMonth.from(today).atEndOfMonth();
 
-        // 사용자 검증
         if (!userRepository.existsById(userId)) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND); // USER_001
+            throw new CustomException(ErrorCode.USER_NOT_FOUND); 
         }
 
-        // 이번 달 출석 기록 조회
         List<Attendance> monthlyAttendances =
                 attendanceRepository.findAllByUserIdAndAttendanceDateBetweenOrderByAttendanceDateAsc(
                         userId,

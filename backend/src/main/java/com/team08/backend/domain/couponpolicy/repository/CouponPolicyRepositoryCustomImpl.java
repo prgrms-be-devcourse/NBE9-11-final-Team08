@@ -30,7 +30,6 @@ public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryC
         this.queryFactory = new JPAQueryFactory(em);
     }
 
-    // 관리자 쿠폰 정책 목록 조회 (필터링 및 페이징)
     @Override
     public Page<CouponPolicy> findAllByCondition(CouponPolicySearchRequest condition, LocalDateTime now, Pageable pageable) {
         List<CouponPolicy> content = queryFactory
@@ -57,7 +56,6 @@ public class CouponPolicyRepositoryCustomImpl implements CouponPolicyRepositoryC
         return PageableExecutionUtils.getPage(content, pageable, countQuery::fetchOne);
     }
 
-    // 쿠폰 정책 상세 조회
     @Override
     public Optional<CouponPolicy> findByIdWithDetails(Long id) {
         return Optional.ofNullable(queryFactory

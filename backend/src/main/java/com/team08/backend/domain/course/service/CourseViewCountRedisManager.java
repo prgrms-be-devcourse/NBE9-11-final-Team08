@@ -17,34 +17,38 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class CourseViewCountRedisManager {
  
-    private static final String KEY_PREFIX = "course:viewcount:delta:";
-    private static final String KEY_SET_PREFIX = "course:viewcount:active_ids";
+    private static final String KEY_PREFIX = "{course:viewcount}:delta:";
+    private static final String KEY_SET_PREFIX = "{course:viewcount}:active_ids";
+    private static final String LOCK_KEY_PREFIX = "{course:viewcount}:lock:";
+    private static final long LOCK_TTL_MINUTES = 5;
  
     private final StringRedisTemplate redisTemplate;
     private final CourseRepository courseRepository;
     private final CourseDetailCacheManager courseDetailCacheManager;
     private final MeterRegistry meterRegistry;
  
-    /**
-     * 상세 조회 시 RDB Write를 생략하고 Redis Delta 값을 1 증가시킵니다.
-     * 메모리 유실 방지를 위해 1시간의 TTL을 적용합니다.
-     * 활성 ID Set에 강좌 ID를 적재하여 KEYS 명령어 없이 대상 스캔이 가능하게 차단합니다.
-     */
-    public void increaseViewCount(Long courseId) {
+ 
+    public void increaseViewCount(Long courseId, String userIdentifier) {
         try {
-            String key = KEY_PREFIX + courseId;
-            redisTemplate.opsForValue().increment(key);
-            redisTemplate.expire(key, 1, TimeUnit.HOURS);
-            redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            String lockKey = LOCK_KEY_PREFIX + courseId + ":" + userIdentifier;
+            Boolean isFirstView = redisTemplate.opsForValue().setIfAbsent(lockKey, "1", LOCK_TTL_MINUTES, TimeUnit.MINUTES);
+            
+            if (isFirstView != null && isFirstView) {
+                String key = KEY_PREFIX + courseId;
+                redisTemplate.opsForValue().increment(key);
+                redisTemplate.expire(key, 1, TimeUnit.HOURS);
+                redisTemplate.opsForSet().add(KEY_SET_PREFIX, String.valueOf(courseId));
+            } else {
+                log.debug("[조회수 중복 증가 차단] courseId={}, user={}", courseId, userIdentifier);
+            }
         } catch (Exception e) {
+            log.warn("[Redis 조회수 가산 실패] RDB Fallback으로 우회합니다. courseId={}, user={}", courseId, userIdentifier, e);
             meterRegistry.counter("redis.viewcount.errors", "operation", "increase").increment();
             throw e;
         }
     }
  
-    /**
-     * 현재 캐싱된 Redis Delta 값을 가져옵니다. (실시간 조회 응답 조립용)
-     */
+
     public int getViewCountDelta(Long courseId) {
         try {
             String key = KEY_PREFIX + courseId;
@@ -58,11 +62,7 @@ public class CourseViewCountRedisManager {
         }
     }
  
-    /**
-     * 10초 주기로 Redis에 쌓인 델타값을 RDB에 반영(Write-Behind)합니다.
-     * 원자적인 getAndSet 연산을 활용하여 동기화 도중 인크리먼트되는 조회수의 유실을 100% 예방합니다.
-     * Redis KEYS 명령어 전체 스캔을 제거하고 active_ids Set 구조만 O(M)으로 훑어 메인 스레드 멈춤 현상을 완전히 방지합니다.
-     */
+
     @Transactional
     @Scheduled(fixedDelay = 10000)
     public void syncViewCountsToDb() {
@@ -82,7 +82,6 @@ public class CourseViewCountRedisManager {
         String tempKey = KEY_SET_PREFIX + ":temp:" + System.currentTimeMillis();
         Set<String> activeIds = null;
         try {
-            // 원자적으로 키 이름을 변경하여 동기화 대상 격리 (Atomic Swap)
             redisTemplate.rename(KEY_SET_PREFIX, tempKey);
             activeIds = redisTemplate.opsForSet().members(tempKey);
         } catch (Exception e) {
@@ -98,11 +97,11 @@ public class CourseViewCountRedisManager {
  
         for (String idStr : activeIds) {
             String key = KEY_PREFIX + idStr;
+            int delta = 0;
             try {
-                // 원자적으로 현재 값을 가져오고 0으로 리셋하여 유실 0% 달성
                 String deltaStr = redisTemplate.opsForValue().getAndSet(key, "0");
                 if (deltaStr != null) {
-                    int delta = Integer.parseInt(deltaStr);
+                    delta = Integer.parseInt(deltaStr);
                     if (delta > 0) {
                         Long courseId = Long.parseLong(idStr);
                         courseRepository.increaseViewCountByDelta(courseId, delta);
@@ -111,12 +110,12 @@ public class CourseViewCountRedisManager {
                     }
                 }
             } catch (Exception e) {
-                log.error("[조회수 동기화 실패] CourseId: {}", idStr, e);
+                // TODO: Consider DLQ storage if view count strictness increases in the future
+                log.error("[조회수 동기화 최종 실패] RDB 반영 중 예외가 발생하여 조회수 델타가 유실되었습니다. CourseId: {}, Lost Delta: {}", idStr, delta, e);
                 meterRegistry.counter("redis.viewcount.errors", "operation", "sync_write_db").increment();
             }
         }
 
-        // 임시 격리 키 전체 데이터 일괄 영구 삭제 (N번의 remove 쿼리를 1번의 delete로 단축)
         try {
             redisTemplate.delete(tempKey);
         } catch (Exception e) {

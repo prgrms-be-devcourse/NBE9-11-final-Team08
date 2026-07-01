@@ -110,8 +110,7 @@ public class CouponPolicy extends BaseTimeEntity {
             }
         }
     }
-    
-    // 쿠폰 정책 생성
+
     public static CouponPolicy createPolicy(
             String name, CouponTarget couponTarget, CouponType couponType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate, List<Long> categoryIds, List<Long> courseIds
     ) {
@@ -128,7 +127,6 @@ public class CouponPolicy extends BaseTimeEntity {
         );
     }
 
-    // 연관관계 편의 메서드
     public void addTargetCourse(Long courseId) {
         if (this.targetCourses.stream().noneMatch(tc -> tc.getCourseId().equals(courseId))) {
             this.targetCourses.add(new CouponPolicyCourse(this, courseId));
@@ -149,7 +147,6 @@ public class CouponPolicy extends BaseTimeEntity {
         this.targetCategories.removeIf(tc -> tc.getCategoryId().equals(categoryId));
     }
 
-    // 쿠폰 발급 후 사용기간 
     public LocalDateTime calculateExpirationDate(LocalDateTime now) {
         if (this.validDays == null) {
             return LocalDateTime.of(2099, 1, 1, 23, 59);
@@ -159,7 +156,6 @@ public class CouponPolicy extends BaseTimeEntity {
                 .atTime(java.time.LocalTime.MAX);
     }
 
-    // 쿠폰 발급 기간 검증
     public void validateIssuePeriod(LocalDateTime now) {
         if (issueStartDate != null && now.isBefore(issueStartDate)) {
             throw new CouponIssuePeriodNotStartedException();
@@ -169,7 +165,6 @@ public class CouponPolicy extends BaseTimeEntity {
         }
     }
 
-    // 선착순 쿠폰 수량 차감
     public void decreaseQuantity() {
         if (this.totalQuantity == null) {
             return;
@@ -180,16 +175,12 @@ public class CouponPolicy extends BaseTimeEntity {
         this.totalQuantity--;
     }
 
-    // 할인 금액 계산
     public int calculateDiscountAmount(int originalPrice) {
         if (this.discountType == DiscountType.AMOUNT) {
-            // 정액 할인: (할인 금액과 원래 가격 중 작은 값 반환 - 상품가보다 더 할인되는 것 방지)
             return Math.min(this.discountValue, originalPrice);
         } else {
-            // 정률 할인 (원 단위 내림): (원래 가격 * 할인율) / 100
             int discount = (int) ((long) originalPrice * this.discountValue / 100);
 
-            // 최대 할인 금액 제한이 있는 경우
             if (this.maxDiscountAmount != null && discount > this.maxDiscountAmount) {
                 return this.maxDiscountAmount;
             }
@@ -197,18 +188,16 @@ public class CouponPolicy extends BaseTimeEntity {
         }
     }
 
-    // 할인 적용 가능 여부 확인
-    public boolean isApplicableTo(Long targetCourseId, Long targetCategoryId) {
+    public boolean isApplicableTo(Long targetCourseId, List<Long> targetCategoryIds) {
         return switch (this.couponTarget) {
             case ALL -> true;
-            case CATEGORY -> targetCategoryId != null && this.targetCategories.stream()
-                    .anyMatch(tc -> tc.getCategoryId().equals(targetCategoryId));
+            case CATEGORY -> targetCategoryIds != null && !targetCategoryIds.isEmpty() && this.targetCategories.stream()
+                    .anyMatch(tc -> targetCategoryIds.contains(tc.getCategoryId()));
             case COURSE -> targetCourseId != null && this.targetCourses.stream()
                     .anyMatch(tc -> tc.getCourseId().equals(targetCourseId));
         };
     }
 
-    // 정책 핵심 정보 수정
     public void update(String name, AutoIssueType autoIssueType, Integer totalQuantity, CouponUsageType usageType, Boolean isStackable, DiscountType discountType, Integer discountValue, Integer maxDiscountAmount, Integer minOrderAmount, Integer validDays, LocalDateTime issueStartDate, LocalDateTime issueEndDate) {
         this.name = name;
         this.autoIssueType = autoIssueType;
@@ -224,12 +213,10 @@ public class CouponPolicy extends BaseTimeEntity {
         this.issueEndDate = issueEndDate;
     }
 
-    // 쿠폰 정책 조기 종료
     public void terminate(LocalDateTime now) {
         this.issueEndDate = now;
     }
 
-    // 쿠폰 정책 삭제
     public void delete(LocalDateTime now) {
         this.deletedAt = now;
     }

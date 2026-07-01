@@ -154,13 +154,13 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
-        CourseDetailResponse response = courseService.getCourseDetail(courseId);
+        CourseDetailResponse response = courseService.getCourseDetail(courseId, "GUEST:127.0.0.1");
 
         assertThat(response.id()).isEqualTo(courseId);
         assertThat(response.chapters()).hasSize(1);
         assertThat(response.chapters().get(0).lectures()).hasSize(1);
         verify(courseRepository).findWithChaptersAsc(courseId);
-        verify(courseViewCountRedisManager).increaseViewCount(courseId);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId, "GUEST:127.0.0.1");
     }
 
     @Test
@@ -170,12 +170,12 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
         willThrow(new RuntimeException("redis down"))
-                .given(courseViewCountRedisManager).increaseViewCount(courseId);
+                .given(courseViewCountRedisManager).increaseViewCount(courseId, "GUEST:127.0.0.1");
 
-        CourseDetailResponse response = courseService.getCourseDetail(courseId);
+        CourseDetailResponse response = courseService.getCourseDetail(courseId, "GUEST:127.0.0.1");
 
         assertThat(response.viewCount()).isEqualTo(course.getViewCount() + 1);
-        verify(courseViewCountRedisManager).increaseViewCount(courseId);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId, "GUEST:127.0.0.1");
         verify(courseViewCountManager).increaseViewCountRequiresNew(courseId);
     }
 
@@ -205,11 +205,11 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAsc(courseId)).willReturn(Optional.of(course));
 
-        CourseDetailResponse response = courseService.getCourseDetail(courseId);
+        CourseDetailResponse response = courseService.getCourseDetail(courseId, "GUEST:127.0.0.1");
 
         assertThat(response.chapters().get(0).lectures().get(0).m3u8Path()).isNull();
         verify(courseRepository).findWithChaptersAsc(courseId);
-        verify(courseViewCountRedisManager).increaseViewCount(courseId);
+        verify(courseViewCountRedisManager).increaseViewCount(courseId, "GUEST:127.0.0.1");
     }
 
     @Test
@@ -218,7 +218,7 @@ class CourseServiceTest {
 
         given(courseRepository.findWithChaptersAsc(invalidCourseId)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> courseService.getCourseDetail(invalidCourseId))
+        assertThatThrownBy(() -> courseService.getCourseDetail(invalidCourseId, "GUEST:127.0.0.1"))
                 .isInstanceOf(CustomException.class)
                 .hasMessageContaining(ErrorCode.COURSE_NOT_FOUND.getMessage());
 

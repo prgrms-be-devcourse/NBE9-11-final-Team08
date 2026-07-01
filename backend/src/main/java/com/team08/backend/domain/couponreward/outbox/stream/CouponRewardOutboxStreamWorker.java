@@ -37,7 +37,7 @@ public class CouponRewardOutboxStreamWorker extends AbstractStreamListenerWorker
     }
 
     @Override
-    protected void processRecord(MapRecord<String, String, String> record) throws Exception {
+    protected void processRecord(MapRecord<String, String, String> record) {
         Map<String, String> value = record.getValue();
         Long outboxEventId = Long.valueOf(value.get("outboxEventId"));
         couponRewardOutboxWorker.processOne(outboxEventId);

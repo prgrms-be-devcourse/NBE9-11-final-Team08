@@ -37,21 +37,18 @@ public class FcfsIssuedCouponStrategy extends AbstractIssuedCouponStrategy {
         return CouponType.FCFS;
     }
 
-    // 선착순 쿠폰 정책 조회
     @Override
     protected CouponPolicy findPolicy(Long policyId) {
         return couponPolicyRepository.findById(policyId)
                 .orElseThrow(CouponPolicyNotFoundException::new);
     }
 
-    // 선착순 쿠폰 중복 발급 체크
     @Override
     protected void validateDuplicateIssue(Long userId, Long policyId) {
     }
 
     @Override
     protected CouponIssueResult processIssue(Long userId, CouponPolicy policy, LocalDateTime now) {
-        // Redis 선착순 발급 확정
         fcfsCouponRedisIssuer.issue(userId, policy);
 
         String requestId = UUID.randomUUID().toString();

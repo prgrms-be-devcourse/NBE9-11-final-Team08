@@ -45,12 +45,11 @@ public class CouponIssueRequestStreamWorker extends AbstractScheduledBatchStream
     }
 
     @Override
-    protected void processBatch(List<MapRecord<String, Object, Object>> records, java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback) throws Exception {
+    protected void processBatch(List<MapRecord<String, Object, Object>> records, java.util.function.Consumer<MapRecord<String, Object, Object>> ackCallback) {
         List<CouponIssueRequestProcessor.SelectedUserIssueCommand> commands = records.stream()
                 .map(this::toCommand)
                 .toList();
         
-        // 이 Bulk Insert가 예외 없이 정상 종료되면 비즈니스 처리가 완료된 것이므로 전체 ACK
         couponIssueRequestProcessor.processSelectedUsers(commands);
         records.forEach(ackCallback);
     }

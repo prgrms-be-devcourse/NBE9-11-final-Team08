@@ -15,7 +15,6 @@ public class IssuedCouponWriter {
 
     private final IssuedCouponRepository issuedCouponRepository;
 
-    // 중복 발급 에러가 부모 트랜잭션을 롤백시키지 않도록 독립 트랜잭션으로 분리
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IssuedCoupon saveWithConcurrencyProtection(IssuedCoupon coupon) {
         try {

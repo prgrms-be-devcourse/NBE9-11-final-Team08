@@ -12,10 +12,8 @@ import java.util.Collection;
 import java.util.Optional;
 
 public interface IssuedCouponJobRepository extends JpaRepository<IssuedCouponJob, Long> {
+    
     Optional<IssuedCouponJob> findByRequestId(String requestId);
-
-    // 특정 사용자의 쿠폰 발급 작업 조회
-    Optional<IssuedCouponJob> findByIdAndUserId(Long id, Long userId);
 
     @Modifying(clearAutomatically = true)
     @Query("""

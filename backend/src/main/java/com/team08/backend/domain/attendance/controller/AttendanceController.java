@@ -24,22 +24,18 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
 
 
-    // 출석 체크 /api/attendance
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "출석 체크", description = "당일 출석을 수행하고 연속/누적 출석일수를 반환합니다.")
     public AttendanceResponse checkIn(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        // [사용자] 출석체크
         return attendanceService.checkIn(loginUserPrincipal.user().id());
     }
 
-    // 출석 기록 조회 /api/attendance/me
     @GetMapping("/me")
     @Operation(summary = "내 출석 현황 조회", description = "이번 달 출석 현황과 오늘 출석 여부를 조회합니다.")
     public AttendanceStatusResponse getMyAttendance(
             @AuthenticationPrincipal LoginUserPrincipal loginUserPrincipal) {
-        // 출석 기록 조회
         return attendanceService.getMyAttendance(loginUserPrincipal.user().id());
     }
 }
