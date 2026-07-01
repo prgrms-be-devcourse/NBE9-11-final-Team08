@@ -173,7 +173,8 @@ export function PaymentResultView({ params }: { params: PaymentResultParams }) {
           paymentKey,
           method: 'CARD',
           amount,
-          issuedCouponId: pendingPayment.issuedCouponId,
+          itemCouponIds: pendingPayment.itemCouponIds,
+          stackableCouponId: pendingPayment.stackableCouponId,
           idempotencyKey,
         })
         setConfirmedPayment(response)
