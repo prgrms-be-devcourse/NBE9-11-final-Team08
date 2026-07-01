@@ -13,6 +13,8 @@ import com.team08.backend.domain.issuedcoupon.strategy.CouponIssueResult;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategy;
 import com.team08.backend.domain.issuedcoupon.strategy.IssuedCouponStrategyFactory;
 import com.team08.backend.domain.issuedcouponjob.entity.IssuedCouponJobStatus;
+import com.team08.backend.domain.category.repository.CategoryRepository;
+import com.team08.backend.domain.course.repository.CourseRepository;
 import com.team08.backend.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,6 +50,12 @@ class IssuedCouponServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private CourseRepository courseRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
     private IssuedCouponStrategyFactory strategyFactory;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-06-14T10:00:00Z"), ZoneId.systemDefault());
@@ -59,6 +67,8 @@ class IssuedCouponServiceTest {
         issuedCouponService = new IssuedCouponService(
                 issuedCouponRepository,
                 couponPolicyRepository,
+                courseRepository,
+                categoryRepository,
                 userRepository,
                 strategyFactory,
                 clock
