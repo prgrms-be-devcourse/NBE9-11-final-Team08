@@ -70,10 +70,13 @@ export function CouponRequestsList({
 
   const getIssueTypeLabel = (type: string) => {
     switch (type) {
+      case 'SELECTED_USERS':
       case 'TARGETED':
         return '특정 회원'
       case 'ALL_USERS':
         return '전체 회원'
+      case 'INACTIVE_USERS':
+        return '장기 미접속 회원'
       default:
         return type
     }
