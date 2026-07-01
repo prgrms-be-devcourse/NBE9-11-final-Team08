@@ -274,7 +274,7 @@ export function CheckoutView({ initialOrderId }: { initialOrderId?: string }) {
 
   const buildPendingPayment = (order: OrderDetailResponse, paymentProvider: PaymentProvider): PendingPayment => {
     const pendingPayment: PendingPayment = {
-      orderId: order.orderId,
+      serviceOrderId: order.orderId,
       orderNumber: order.orderNumber,
       amount: Math.max(0, order.finalPrice - couponDiscount),
       orderName: getOrderName(order),
