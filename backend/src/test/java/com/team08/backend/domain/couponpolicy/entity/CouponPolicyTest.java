@@ -25,9 +25,9 @@ class CouponPolicyTest {
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(100L, 1L)).isTrue();  // 코스 100 포함됨
-        assertThat(policy.isApplicableTo(200L, 1L)).isTrue();  // 코스 200 포함됨
-        assertThat(policy.isApplicableTo(300L, 1L)).isFalse(); // 코스 300 미포함 (적용 불가)
+        assertThat(policy.isApplicableTo(100L, List.of(1L))).isTrue();  // 코스 100 포함됨
+        assertThat(policy.isApplicableTo(200L, List.of(1L))).isTrue();  // 코스 200 포함됨
+        assertThat(policy.isApplicableTo(300L, List.of(1L))).isFalse(); // 코스 300 미포함 (적용 불가)
     }
 
     @Test
@@ -40,9 +40,9 @@ class CouponPolicyTest {
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(1L, 50L)).isTrue();  // 카테고리 50 포함됨
-        assertThat(policy.isApplicableTo(1L, 51L)).isTrue();  // 카테고리 51 포함됨
-        assertThat(policy.isApplicableTo(1L, 60L)).isFalse(); // 카테고리 60 미포함
+        assertThat(policy.isApplicableTo(1L, List.of(50L))).isTrue();  // 카테고리 50 포함됨
+        assertThat(policy.isApplicableTo(1L, List.of(51L))).isTrue();  // 카테고리 51 포함됨
+        assertThat(policy.isApplicableTo(1L, List.of(60L))).isFalse(); // 카테고리 60 미포함
     }
 
     @Test
@@ -55,8 +55,8 @@ class CouponPolicyTest {
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(999L, 999L)).isTrue();
-        assertThat(policy.isApplicableTo(1L, 1L)).isTrue();
+        assertThat(policy.isApplicableTo(999L, List.of(999L))).isTrue();
+        assertThat(policy.isApplicableTo(1L, List.of(1L))).isTrue();
     }
 
     @Test
@@ -179,7 +179,7 @@ class CouponPolicyTest {
         );
 
         // when & then
-        assertThat(policy.isApplicableTo(null, 1L)).isFalse();
+        assertThat(policy.isApplicableTo(null, List.of(1L))).isFalse();
     }
 
     @Test
