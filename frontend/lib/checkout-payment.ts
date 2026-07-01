@@ -22,6 +22,10 @@ const isBrowser = () => typeof window !== 'undefined'
 const byIdKey = (serviceOrderId: number | string) => `${STORAGE_PREFIX}:id:${serviceOrderId}`
 const byOrderNumberKey = (orderNumber: string) => `${STORAGE_PREFIX}:orderNumber:${orderNumber}`
 
+type StoredPendingPayment = PendingPayment & {
+  orderId?: number | string
+}
+
 export function getOrderName(order: OrderDetailResponse) {
   const items = order.items ?? []
   const firstTitle = items[0]?.courseTitle || '강의'
@@ -39,30 +43,72 @@ export function createPaymentIdempotencyKey(serviceOrderId: number | string, pro
 export function savePendingPayment(payment: PendingPayment) {
   if (!isBrowser()) return
 
-  const serialized = JSON.stringify(payment)
-  window.localStorage.setItem(byIdKey(payment.serviceOrderId), serialized)
-  window.localStorage.setItem(byOrderNumberKey(payment.orderNumber), String(payment.serviceOrderId))
+  const normalized = normalizePendingPayment(payment)
+  if (!normalized) return
+
+  const serialized = JSON.stringify(normalized)
+  window.localStorage.setItem(byIdKey(normalized.serviceOrderId), serialized)
+  window.localStorage.setItem(byOrderNumberKey(normalized.orderNumber), String(normalized.serviceOrderId))
 }
 
 export function getPendingPayment(serviceOrderId?: string | null, orderNumber?: string | null) {
   if (!isBrowser()) return null
 
   const id = serviceOrderId || (orderNumber ? window.localStorage.getItem(byOrderNumberKey(orderNumber)) : null)
-  if (!id) return null
-
-  const raw = window.localStorage.getItem(byIdKey(id))
-  if (!raw) return null
-
-  try {
-    return JSON.parse(raw) as PendingPayment
-  } catch {
-    return null
+  if (id) {
+    const pendingPayment = readPendingPayment(byIdKey(id))
+    if (pendingPayment) return pendingPayment
   }
+
+  if (!orderNumber) return null
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.startsWith(`${STORAGE_PREFIX}:id:`)) continue
+
+    const pendingPayment = readPendingPayment(key)
+    if (pendingPayment?.orderNumber === orderNumber) {
+      return pendingPayment
+    }
+  }
+
+  return null
 }
 
 export function removePendingPayment(payment: PendingPayment) {
   if (!isBrowser()) return
 
-  window.localStorage.removeItem(byIdKey(payment.serviceOrderId))
-  window.localStorage.removeItem(byOrderNumberKey(payment.orderNumber))
+  const normalized = normalizePendingPayment(payment)
+  if (!normalized) return
+
+  window.localStorage.removeItem(byIdKey(normalized.serviceOrderId))
+  window.localStorage.removeItem(byOrderNumberKey(normalized.orderNumber))
+}
+
+function readPendingPayment(key: string) {
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return null
+
+  try {
+    return normalizePendingPayment(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+function normalizePendingPayment(value: unknown): PendingPayment | null {
+  if (!value || typeof value !== 'object') return null
+
+  const stored = value as StoredPendingPayment
+  const serviceOrderId = stored.serviceOrderId ?? stored.orderId
+  const normalizedServiceOrderId = Number(serviceOrderId)
+
+  if (!Number.isFinite(normalizedServiceOrderId) || !stored.orderNumber) {
+    return null
+  }
+
+  return {
+    ...stored,
+    serviceOrderId: normalizedServiceOrderId,
+  }
 }
